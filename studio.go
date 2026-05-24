@@ -911,6 +911,63 @@ func DefaultRuntimeContracts() []RuntimeContract {
 			},
 		},
 		{
+			Key:     "style-runtime",
+			Label:   "Style runtime",
+			Global:  "GoSXStudioStyleRuntime",
+			Surface: SurfaceInspector,
+			Engine:  EngineCanvas,
+			Methods: []RuntimeMethod{
+				{
+					Name:    "bindWorkbench",
+					Label:   "Bind style workbench",
+					Summary: "Bind Look inspector style recipes, reset controls, hover previews, and impact readouts.",
+					Payload: []RuntimePayloadField{
+						{Name: "root", Label: "Root element", Kind: ControlSource, Summary: "Document or element that contains the Look style workbench."},
+					},
+				},
+				{
+					Name:    "syncControlButtons",
+					Label:   "Sync style controls",
+					Summary: "Refresh selected recipe states, inherited readouts, and reset affordances from current theme values.",
+					Payload: []RuntimePayloadField{
+						{Name: "root", Label: "Root element", Kind: ControlSource, Summary: "Document or element that contains style controls."},
+					},
+				},
+				{
+					Name:    "showImpact",
+					Label:   "Show style impact",
+					Summary: "Preview or commit the affected site areas for a style control value.",
+					Payload: []RuntimePayloadField{
+						{Name: "name", Label: "Control name", Kind: ControlText, Required: true},
+						{Name: "value", Label: "Control value", Kind: ControlChoice},
+						{Name: "committed", Label: "Committed", Kind: ControlToggle},
+					},
+				},
+				{
+					Name:    "restoreImpact",
+					Label:   "Restore style impact",
+					Summary: "Restore the last committed style impact readout or clear transient hover previews.",
+				},
+				{
+					Name:    "setControlValue",
+					Label:   "Set style value",
+					Summary: "Apply a Look inspector style control value and dispatch the underlying theme field changes.",
+					Payload: []RuntimePayloadField{
+						{Name: "name", Label: "Control name", Kind: ControlText, Required: true},
+						{Name: "value", Label: "Control value", Kind: ControlChoice, Required: true},
+					},
+				},
+				{
+					Name:    "resetControlValue",
+					Label:   "Reset style value",
+					Summary: "Reset a Look inspector style control to the active starter kit value.",
+					Payload: []RuntimePayloadField{
+						{Name: "name", Label: "Control name", Kind: ControlText, Required: true},
+					},
+				},
+			},
+		},
+		{
 			Key:     "block-layout-runtime",
 			Label:   "Block layout runtime",
 			Global:  "GoSXStudioBlockLayoutRuntime",

@@ -72,7 +72,7 @@ func TestDefaultEnginesCoverHeavyStudioInteractions(t *testing.T) {
 
 func TestDefaultRuntimeContractsExposeEngineAPIs(t *testing.T) {
 	contracts := DefaultRuntimeContracts()
-	if len(contracts) < 4 {
+	if len(contracts) < 5 {
 		t.Fatalf("expected default runtime contracts, got %#v", contracts)
 	}
 
@@ -160,6 +160,27 @@ func TestDefaultRuntimeContractsExposeEngineAPIs(t *testing.T) {
 	brandLogo, ok := brand.Method("updateHeaderLogo")
 	if !ok || len(brandLogo.Payload) != 5 {
 		t.Fatalf("brand logo payload = %#v, ok=%v", brandLogo, ok)
+	}
+
+	style, ok := RuntimeContractByGlobal(contracts, "GoSXStudioStyleRuntime")
+	if !ok {
+		t.Fatalf("missing style runtime contract in %#v", contracts)
+	}
+	if style.Surface != SurfaceInspector || style.Engine != EngineCanvas {
+		t.Fatalf("style runtime should belong to the inspector surface and canvas engine: %#v", style)
+	}
+	for _, method := range []string{"bindWorkbench", "syncControlButtons", "showImpact", "restoreImpact", "setControlValue", "resetControlValue"} {
+		if !runtimeHasMethod(style, method) {
+			t.Fatalf("style runtime missing method %q: %#v", method, style)
+		}
+	}
+	showImpact, ok := style.Method("showImpact")
+	if !ok || len(showImpact.Payload) != 3 {
+		t.Fatalf("show impact payload = %#v, ok=%v", showImpact, ok)
+	}
+	setStyle, ok := style.Method("setControlValue")
+	if !ok || len(setStyle.Payload) != 2 {
+		t.Fatalf("set style payload = %#v, ok=%v", setStyle, ok)
 	}
 
 	blockLayout, ok := RuntimeContractByGlobal(contracts, "GoSXStudioBlockLayoutRuntime")
