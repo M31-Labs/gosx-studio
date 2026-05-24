@@ -751,6 +751,9 @@ func TestSiteMapNormalizesPageComposition(t *testing.T) {
 	if siteMap.Pages[0].Components[0].Controls[1].Kind != ControlText || siteMap.Pages[0].Components[0].Controls[1].Options[0].Value != "split" {
 		t.Fatalf("nested controls were not normalized: %#v", siteMap.Pages[0].Components[0].Controls)
 	}
+	if siteMap.Pages[0].Components[0].Controls[1].KindLabel() != "Text" {
+		t.Fatalf("control label = %q", siteMap.Pages[0].Components[0].Controls[1].KindLabel())
+	}
 	selected, ok := siteMap.SelectedPage()
 	if !ok || selected.Key != "showcase" {
 		t.Fatalf("selected page = %#v, ok=%v", selected, ok)

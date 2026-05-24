@@ -2160,6 +2160,10 @@ func (control Control) NormalizedKind() ControlKind {
 	return normalizeControlKind(control.Kind)
 }
 
+func (control Control) KindLabel() string {
+	return ControlKindLabel(control.Kind)
+}
+
 func PageGroupLabel(group PageGroup) string {
 	switch normalizePageGroup(group) {
 	case PageGroupCommerce:
