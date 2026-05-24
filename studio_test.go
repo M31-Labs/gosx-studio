@@ -57,13 +57,16 @@ func TestDefaultEnginesCoverHeavyStudioInteractions(t *testing.T) {
 		byKind[engine.Kind] = engine
 	}
 
-	for _, kind := range []EngineKind{EngineCanvas, EngineSiteMap, EngineBlockLayout} {
+	for _, kind := range []EngineKind{EngineCanvas, EngineSiteMap, EngineBlockLayout, EngineScene3D} {
 		if _, ok := byKind[kind]; !ok {
 			t.Fatalf("missing default engine kind %q", kind)
 		}
 	}
 	if !engineHasCapability(byKind[EngineCanvas], CapabilityPanZoom) || !engineHasCapability(byKind[EngineCanvas], CapabilityDragDrop) {
 		t.Fatalf("canvas engine should cover pan/zoom and drag/drop: %#v", byKind[EngineCanvas])
+	}
+	if byKind[EngineScene3D].Surface != SurfaceShowcase3D || !engineHasCapability(byKind[EngineScene3D], CapabilityPopout) {
+		t.Fatalf("Scene3D engine should cover showcase pop-out viewing: %#v", byKind[EngineScene3D])
 	}
 }
 

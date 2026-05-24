@@ -693,6 +693,17 @@ func DefaultEngines() []Engine {
 				CapabilityPersistence,
 			},
 		},
+		{
+			Key:     "showcase-3d",
+			Label:   "Showcase 3D",
+			Kind:    EngineScene3D,
+			MountID: "gosx-studio-showcase-3d-engine",
+			Surface: SurfaceShowcase3D,
+			Capabilities: []EngineCapability{
+				CapabilityPreview,
+				CapabilityPopout,
+			},
+		},
 	}
 }
 
