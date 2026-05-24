@@ -176,6 +176,7 @@ func TestNoCodeControlsExposeEditorFacingBindings(t *testing.T) {
 	component := Component{
 		Key:           "contact-form",
 		Label:         "Contact form",
+		Summary:       "Collects customer questions.",
 		GoSXComponent: "ContactFormFlow",
 		Source:        ComponentSource(" cms "),
 		Binding:       "flow.contact",
@@ -204,5 +205,62 @@ func TestNoCodeControlsExposeEditorFacingBindings(t *testing.T) {
 	}
 	if component.Controls[2].NormalizedKind() != ControlText {
 		t.Fatalf("unknown control kinds should be editor text by default: %#v", component.Controls[2])
+	}
+}
+
+func TestCompositionLibraryDefinesPageBlueprintsAndPalette(t *testing.T) {
+	library := CompositionLibrary{
+		PageBlueprints: []PageBlueprint{
+			{
+				Key:           "landing",
+				Label:         "Landing page",
+				Summary:       "A focused page with a hero, proof, and a call to action.",
+				RoutePattern:  "/new-page",
+				Group:         PageGroupContent,
+				GoSXComponent: "LandingPage",
+				Status:        "Ready",
+				Components: []ComponentTemplate{
+					{Key: "hero", Label: "Hero", GoSXComponent: "HeroSection", Source: ComponentSourceHost},
+					{Key: "cta", Label: "Call to action", GoSXComponent: "CallToAction", Source: ComponentSourceStudio},
+				},
+			},
+		},
+		ComponentTemplates: []ComponentTemplate{
+			{
+				Key:            "showcase-3d",
+				Label:          "3D showcase",
+				Summary:        "Places an approved generated model on a page.",
+				Category:       "Media",
+				GoSXComponent:  "Showcase3DViewer",
+				Source:         ComponentSourcePlugin,
+				DefaultBinding: "showcase3d.model",
+				Status:         "Plugin",
+				AddLabel:       "Add viewer",
+				Controls: []Control{
+					{Key: "model", Label: "Model", Kind: ControlScene3D, Binding: "showcase3d.model"},
+					{Key: "placement", Label: "Placement", Kind: ControlChoice, Binding: "showcase3d.placement"},
+				},
+			},
+		},
+	}
+	siteMap := SiteMap{Library: library}
+
+	if library.BlueprintCount() != 1 || library.TemplateCount() != 1 {
+		t.Fatalf("library counts = %d blueprints, %d templates", library.BlueprintCount(), library.TemplateCount())
+	}
+	if siteMap.BlueprintCount() != 1 || siteMap.TemplateCount() != 1 {
+		t.Fatalf("site map library counts = %d blueprints, %d templates", siteMap.BlueprintCount(), siteMap.TemplateCount())
+	}
+	if library.PageBlueprints[0].ComponentCount() != 2 {
+		t.Fatalf("blueprint component count = %d", library.PageBlueprints[0].ComponentCount())
+	}
+	if library.PageBlueprints[0].NormalizedGroup() != PageGroupContent {
+		t.Fatalf("blueprint group = %q", library.PageBlueprints[0].NormalizedGroup())
+	}
+	if library.ComponentTemplates[0].ControlCount() != 2 {
+		t.Fatalf("template control count = %d", library.ComponentTemplates[0].ControlCount())
+	}
+	if library.ComponentTemplates[0].NormalizedSource() != ComponentSourcePlugin {
+		t.Fatalf("template source = %q", library.ComponentTemplates[0].NormalizedSource())
 	}
 }

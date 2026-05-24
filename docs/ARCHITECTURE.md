@@ -64,6 +64,8 @@ Each `Page` maps a route to a top-level GoSX page component. Pages can declare a
 
 The site map is intentionally not a generic JSON page builder. It is a compact visual graph over typed GoSX components. Editors manipulate pages, sections, and component settings; host apps decide how those changes persist.
 
+`CompositionLibrary` describes what editors can add without seeing Go or handler details. `PageBlueprint` entries are page starters such as a landing page, collection page, content page, or flow page. `ComponentTemplate` entries are palette cards such as hero, product grid, gallery, contact flow, or showcase viewer. The site-map engine can render those as a compact authoring tray while retaining GoSX component names and opaque bindings for the host adapter.
+
 ## Engine Contract
 
 Heavy interactions belong behind `Engine` declarations:

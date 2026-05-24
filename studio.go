@@ -77,7 +77,8 @@ const (
 )
 
 type SiteMap struct {
-	Pages []Page
+	Pages   []Page
+	Library CompositionLibrary
 }
 
 type Page struct {
@@ -93,6 +94,7 @@ type Page struct {
 type Component struct {
 	Key           string
 	Label         string
+	Summary       string
 	GoSXComponent string
 	Source        ComponentSource
 	Binding       string
@@ -116,6 +118,35 @@ type Control struct {
 type ControlOption struct {
 	Value string
 	Label string
+}
+
+type CompositionLibrary struct {
+	PageBlueprints     []PageBlueprint
+	ComponentTemplates []ComponentTemplate
+}
+
+type PageBlueprint struct {
+	Key           string
+	Label         string
+	Summary       string
+	RoutePattern  string
+	Group         PageGroup
+	GoSXComponent string
+	Status        string
+	Components    []ComponentTemplate
+}
+
+type ComponentTemplate struct {
+	Key            string
+	Label          string
+	Summary        string
+	Category       string
+	GoSXComponent  string
+	Source         ComponentSource
+	DefaultBinding string
+	Status         string
+	AddLabel       string
+	Controls       []Control
 }
 
 type PageGroupCount struct {
@@ -284,6 +315,14 @@ func (siteMap SiteMap) PageGroupCounts() []PageGroupCount {
 	return out
 }
 
+func (siteMap SiteMap) BlueprintCount() int {
+	return len(siteMap.Library.PageBlueprints)
+}
+
+func (siteMap SiteMap) TemplateCount() int {
+	return len(siteMap.Library.ComponentTemplates)
+}
+
 func (page Page) ComponentCount() int {
 	return len(page.Components)
 }
@@ -318,6 +357,30 @@ func (component Component) SelectionKey(pageKey string) string {
 
 func (component Component) NormalizedSource() ComponentSource {
 	return normalizeComponentSource(component.Source)
+}
+
+func (library CompositionLibrary) BlueprintCount() int {
+	return len(library.PageBlueprints)
+}
+
+func (library CompositionLibrary) TemplateCount() int {
+	return len(library.ComponentTemplates)
+}
+
+func (blueprint PageBlueprint) ComponentCount() int {
+	return len(blueprint.Components)
+}
+
+func (blueprint PageBlueprint) NormalizedGroup() PageGroup {
+	return normalizePageGroup(blueprint.Group)
+}
+
+func (template ComponentTemplate) ControlCount() int {
+	return len(template.Controls)
+}
+
+func (template ComponentTemplate) NormalizedSource() ComponentSource {
+	return normalizeComponentSource(template.Source)
 }
 
 func (control Control) NormalizedKind() ControlKind {
