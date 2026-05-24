@@ -66,6 +66,8 @@ type Component struct {
 	Label         string
 	GoSXComponent string
 	Source        ComponentSource
+	Binding       string
+	Status        string
 	Editable      bool
 }
 

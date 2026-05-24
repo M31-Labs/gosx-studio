@@ -72,8 +72,8 @@ func TestSiteMapCountsComposedGoSXComponents(t *testing.T) {
 			Route:         "/",
 			GoSXComponent: "HomePage",
 			Components: []Component{
-				{Key: "hero", Label: "Hero", GoSXComponent: "HomeHero", Source: ComponentSourceHost, Editable: true},
-				{Key: "products", Label: "Products", GoSXComponent: "FeaturedProducts", Source: ComponentSourceCMS, Editable: true},
+				{Key: "hero", Label: "Hero", GoSXComponent: "HomeHero", Source: ComponentSourceHost, Binding: "home.section.hero", Status: "Editable", Editable: true},
+				{Key: "products", Label: "Products", GoSXComponent: "FeaturedProducts", Source: ComponentSourceCMS, Binding: "products.collection", Status: "Synced", Editable: true},
 			},
 		},
 		{
@@ -82,7 +82,7 @@ func TestSiteMapCountsComposedGoSXComponents(t *testing.T) {
 			Route:         "/shop/{slug}",
 			GoSXComponent: "ProductPage",
 			Components: []Component{
-				{Key: "viewer", Label: "3D viewer", GoSXComponent: "Showcase3DViewer", Source: ComponentSourcePlugin, Editable: true},
+				{Key: "viewer", Label: "3D viewer", GoSXComponent: "Showcase3DViewer", Source: ComponentSourcePlugin, Binding: "showcase3d.model", Status: "Ready", Editable: true},
 			},
 		},
 	}}
@@ -92,5 +92,8 @@ func TestSiteMapCountsComposedGoSXComponents(t *testing.T) {
 	}
 	if siteMap.Pages[0].ComponentCount() != 2 {
 		t.Fatalf("home component count = %d, want 2", siteMap.Pages[0].ComponentCount())
+	}
+	if siteMap.Pages[1].Components[0].Binding != "showcase3d.model" {
+		t.Fatalf("plugin binding = %q", siteMap.Pages[1].Components[0].Binding)
 	}
 }

@@ -58,6 +58,8 @@ Studio's core authoring model is a no-code site map.
 
 Each `Page` maps a route to a top-level GoSX page component. Each page owns ordered `Component` entries that point at concrete GoSX components supplied by the host app, CMS catalogs, Studio, or plugins.
 
+`Component.Source` names the broad owner of a component, while `Component.Binding` is an opaque adapter key such as a CMS collection, flow, section, or plugin artifact. Studio can show friendly labels and readiness status without exposing handler refs, schemas, or Go DSL details to editors.
+
 The site map is intentionally not a generic JSON page builder. It is a compact visual graph over typed GoSX components. Editors manipulate pages, sections, and component settings; host apps decide how those changes persist.
 
 ## Engine Contract
