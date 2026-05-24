@@ -28,6 +28,7 @@ The first public contracts are intentionally small:
 - `SiteMap`, `Page`, and `Component` describe no-code page composition in terms of GoSX components, editor-facing page groups, broad source kinds, opaque host/CMS bindings, and readiness status.
 - `Control` and `ControlOption` describe the editor-facing fields each component exposes: text, media, choices, links, color, source bindings, flows, and Scene3D/model controls.
 - `CompositionLibrary`, `PageBlueprint`, and `ComponentTemplate` describe the editor-facing building blocks that a site-map engine can expose as page starters and a component palette.
+- `CompositionIntent` and `CompositionStep` describe draft no-code operations such as creating a page from a blueprint or adding a component template to the selected route.
 - `ResourceAdapter` and `ResourceBinding` describe host-owned media, pages, products, orders, contacts, settings, revisions, lifecycle, and flow resources without importing host internals.
 - `Engine` declares heavy interaction surfaces and the capabilities a host app can mount.
 - `HostConfig` ties product labels, features, engines, and the editable site map together.

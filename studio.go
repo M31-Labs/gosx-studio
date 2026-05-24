@@ -103,6 +103,13 @@ const (
 	ControlScene3D  ControlKind = "scene-3d"
 )
 
+type CompositionIntentKind string
+
+const (
+	CompositionIntentCreatePage   CompositionIntentKind = "create-page"
+	CompositionIntentAddComponent CompositionIntentKind = "add-component"
+)
+
 type SiteMap struct {
 	Pages   []Page
 	Library CompositionLibrary
@@ -174,6 +181,33 @@ type ComponentTemplate struct {
 	Status         string
 	AddLabel       string
 	Controls       []Control
+}
+
+type CompositionIntent struct {
+	Key                  string
+	Label                string
+	Summary              string
+	Kind                 CompositionIntentKind
+	TargetPageKey        string
+	TargetPageLabel      string
+	TargetRoute          string
+	TargetRegion         string
+	PageBlueprintKey     string
+	PageBlueprintLabel   string
+	ComponentTemplateKey string
+	ComponentLabel       string
+	GoSXComponent        string
+	Binding              string
+	Status               string
+	Steps                []CompositionStep
+}
+
+type CompositionStep struct {
+	Key           string
+	Label         string
+	Summary       string
+	GoSXComponent string
+	Binding       string
 }
 
 type PageGroupCount struct {
@@ -597,6 +631,14 @@ func (template ComponentTemplate) NormalizedSource() ComponentSource {
 	return normalizeComponentSource(template.Source)
 }
 
+func (intent CompositionIntent) StepCount() int {
+	return len(intent.Steps)
+}
+
+func (intent CompositionIntent) NormalizedKind() CompositionIntentKind {
+	return normalizeCompositionIntentKind(intent.Kind)
+}
+
 func (control Control) NormalizedKind() ControlKind {
 	return normalizeControlKind(control.Kind)
 }
@@ -726,5 +768,14 @@ func normalizeControlKind(kind ControlKind) ControlKind {
 		return ControlScene3D
 	default:
 		return ControlText
+	}
+}
+
+func normalizeCompositionIntentKind(kind CompositionIntentKind) CompositionIntentKind {
+	switch CompositionIntentKind(strings.TrimSpace(string(kind))) {
+	case CompositionIntentCreatePage:
+		return CompositionIntentCreatePage
+	default:
+		return CompositionIntentAddComponent
 	}
 }

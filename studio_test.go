@@ -312,3 +312,46 @@ func TestCompositionLibraryDefinesPageBlueprintsAndPalette(t *testing.T) {
 		t.Fatalf("template source = %q", library.ComponentTemplates[0].NormalizedSource())
 	}
 }
+
+func TestCompositionIntentDescribesNoCodeDraftOperations(t *testing.T) {
+	intent := CompositionIntent{
+		Key:                  "add-hero-home",
+		Label:                "Add hero to Home",
+		Summary:              "Adds a page section to the selected route.",
+		Kind:                 CompositionIntentKind(" add-component "),
+		TargetPageKey:        "home",
+		TargetPageLabel:      "Home",
+		TargetRoute:          "/",
+		TargetRegion:         "main",
+		PageBlueprintKey:     "landing",
+		PageBlueprintLabel:   "Landing page",
+		ComponentTemplateKey: "hero",
+		ComponentLabel:       "Hero",
+		GoSXComponent:        "HomeHero",
+		Binding:              "home.section.hero",
+		Status:               "Draft",
+		Steps: []CompositionStep{
+			{Key: "target", Label: "Home", Summary: "Selected route", GoSXComponent: "HomePage"},
+			{Key: "block", Label: "Hero", Summary: "Reusable page section", GoSXComponent: "HomeHero", Binding: "home.section.hero"},
+		},
+	}
+
+	if intent.NormalizedKind() != CompositionIntentAddComponent {
+		t.Fatalf("intent kind = %q", intent.NormalizedKind())
+	}
+	if intent.StepCount() != 2 {
+		t.Fatalf("step count = %d", intent.StepCount())
+	}
+	if intent.Steps[1].GoSXComponent != "HomeHero" || intent.Steps[1].Binding != "home.section.hero" {
+		t.Fatalf("intent step should expose GoSX component and binding: %#v", intent.Steps[1])
+	}
+
+	createPage := CompositionIntent{Kind: CompositionIntentCreatePage}
+	if createPage.NormalizedKind() != CompositionIntentCreatePage {
+		t.Fatalf("create page kind = %q", createPage.NormalizedKind())
+	}
+	unknown := CompositionIntent{Kind: CompositionIntentKind("custom")}
+	if unknown.NormalizedKind() != CompositionIntentAddComponent {
+		t.Fatalf("unknown intent kind should default to add-component, got %q", unknown.NormalizedKind())
+	}
+}

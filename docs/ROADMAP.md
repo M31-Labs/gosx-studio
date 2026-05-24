@@ -6,6 +6,7 @@
 - Stabilize the site map contract for pages composed from GoSX components, source ownership, opaque adapter bindings, and publish-readiness status.
 - Stabilize component control contracts so editors can change GoSX elements through no-code fields instead of touching Go or handler identifiers.
 - Stabilize page blueprints and component templates so site-map engines can expose a no-code authoring palette.
+- Stabilize composition intents so a visual site-map engine can preview and apply page/component edits through host actions.
 - Stabilize the engine declaration contract for canvas, site map, block layout, flow, and Scene3D surfaces.
 - Define content, media, page, section, theme, publish, revision, lifecycle, and flow adapter interfaces.
 - Move reusable editor contracts out of `muddy-noni-commerce`.
