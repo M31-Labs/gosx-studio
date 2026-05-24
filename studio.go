@@ -767,6 +767,20 @@ func DefaultRuntimeContracts() []RuntimeContract {
 					},
 				},
 				{
+					Name:    "applyTextUpdate",
+					Label:   "Apply text update",
+					Summary: "Mirror editor text and attribute edits into the Studio shell and preview frames.",
+					Payload: []RuntimePayloadField{
+						{Name: "sourceKey", Label: "Source key", Kind: ControlText},
+						{Name: "frameTarget", Label: "Frame target", Kind: ControlText},
+						{Name: "attrTarget", Label: "Attribute target", Kind: ControlText},
+						{Name: "attrName", Label: "Attribute name", Kind: ControlText},
+						{Name: "attrPrefix", Label: "Attribute prefix", Kind: ControlText},
+						{Name: "attrSuffix", Label: "Attribute suffix", Kind: ControlText},
+						{Name: "value", Label: "Value", Kind: ControlRichText},
+					},
+				},
+				{
 					Name:    "applyFonts",
 					Label:   "Apply font CSS",
 					Summary: "Apply generated font-face and font-token CSS to the Studio shell and preview frames.",
