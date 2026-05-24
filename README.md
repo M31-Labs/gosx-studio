@@ -33,6 +33,7 @@ The first public contracts are intentionally small:
 - `ResourceAdapter` and `ResourceBinding` describe host-owned media, pages, products, orders, contacts, settings, revisions, lifecycle, and flow resources without importing host internals.
 - `Engine` declares heavy interaction surfaces and the capabilities a host app can mount.
 - `HostConfig` ties product labels, features, engines, and the editable site map together.
+- `plugins/showcase3d` defines the CMS/Studio contract for source photos, generated model artifacts, provenance, moderation, lifecycle readiness, no-code placement controls, and Scene3D viewer descriptors.
 
 The eventual combined product should consume:
 

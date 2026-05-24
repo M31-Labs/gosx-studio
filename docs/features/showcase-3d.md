@@ -13,6 +13,7 @@ CMS owns:
 - generated model metadata
 - provenance and moderation state
 - lifecycle fields for review, approval, and replacement
+- the persisted `ShowcaseAsset` data described by the `plugins/showcase3d` contract
 
 Studio owns:
 
@@ -21,6 +22,7 @@ Studio owns:
 - preview state
 - validation before publish
 - plain-language controls for non-technical editors
+- `ComponentTemplate`, `AuthoringControls`, readiness checks, and `ViewerSurface` descriptors from `plugins/showcase3d`
 
 GoSX Scene3D or a Studio engine owns:
 
@@ -51,3 +53,4 @@ The host app owns:
 - Define the generation provider as an adapter interface.
 - Store provenance and moderation metadata before publishing generated models.
 - Provide a poster image and lazy-loading fallback for slow devices.
+- Keep provider credentials and product/page placement rules in the host app; Studio stores only adapter and policy refs.
