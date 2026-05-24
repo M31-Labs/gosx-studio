@@ -37,6 +37,7 @@ Host applications configure Studio. Editors use Studio.
 The host application supplies:
 
 - content adapters
+- shell labels, modes, panels, and resource links
 - permission adapters
 - server actions
 - route bindings
@@ -79,6 +80,8 @@ The site map is intentionally not a generic JSON page builder. It is a compact v
 Studio consumes host resources through `ResourceAdapter` declarations instead of importing host packages. The default adapter set covers media, pages, products, orders, contacts, settings, revisions, lifecycle, and flows. Each adapter declares an editor-facing label, the Studio surface that should use it, resource capabilities, and opaque `ResourceBinding` keys such as `media.assets`, `pages.routes`, `products.collection`, or `lifecycle.schedule`.
 
 Adapters describe what Studio can ask for; host applications decide how those requests load, validate, mutate, preview, publish, restore, or execute. This keeps `gosx-cms`, `gosx-admin`, and app-specific repositories behind a configuration boundary.
+
+`ShellConfig` is the reusable chrome contract for host-mounted Studio surfaces. It normalizes editor-safe labels, modes, panels, host resource links, action targets, permission flags, engine globals, feature flags, and the canvas preview shell. Host apps can override this surface without owning platform UI or shipping ad hoc browser scripts.
 
 ## Engine Contract
 

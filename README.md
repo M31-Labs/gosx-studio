@@ -34,6 +34,7 @@ The first public contracts are intentionally small:
 - `Engine` declares heavy interaction surfaces and the capabilities a host app can mount.
 - `RuntimeContract`, `RuntimeMethod`, and `RuntimePayloadField` declare the browser runtime APIs that engines expose, including the preview, workbench, brand, style, and block-layout globals used by canvas editing.
 - `HostConfig` ties product labels, features, engines, and the editable site map together.
+- `ShellConfig` describes the reusable Studio chrome a host app configures: operator labels, modes, panels, resource links, engine globals, server actions, permissions, feature flags, and canvas preview shell.
 - `plugins/showcase3d` defines the CMS/Studio contract for source photos, generated model artifacts, provenance, moderation, lifecycle readiness, no-code placement controls, and Scene3D viewer descriptors.
 
 The eventual combined product should consume:
