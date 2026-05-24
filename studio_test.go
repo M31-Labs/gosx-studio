@@ -781,6 +781,10 @@ func TestCompositionWorkspaceBuildsEditableGraphFromSiteMap(t *testing.T) {
 	if workspace.LinkCount() != 6 {
 		t.Fatalf("link count = %d, want contains and binding links", workspace.LinkCount())
 	}
+	canvas := workspace.CanvasLayout()
+	if canvas.ViewBox != "0 0 100 100" || len(canvas.Nodes) != workspace.NodeCount() || len(canvas.Links) != workspace.LinkCount() {
+		t.Fatalf("canvas layout = %#v", canvas)
+	}
 
 	byKey := map[string]WorkspaceNode{}
 	for _, node := range workspace.Nodes {
@@ -817,6 +821,28 @@ func TestCompositionWorkspaceBuildsEditableGraphFromSiteMap(t *testing.T) {
 	}
 	if linkKinds[WorkspaceLinkContains] != 3 || linkKinds[WorkspaceLinkBinds] != 3 {
 		t.Fatalf("link kinds = %#v", linkKinds)
+	}
+	points := map[string]WorkspaceNodePoint{}
+	for _, point := range canvas.Nodes {
+		points[point.NodeKey] = point
+	}
+	if points["page:home"].X != 8 || points["page:home"].Y != 12 {
+		t.Fatalf("home point = %#v", points["page:home"])
+	}
+	if points["component:home:hero"].X != 8 || points["component:home:hero"].Y != 50 {
+		t.Fatalf("hero point = %#v", points["component:home:hero"])
+	}
+	paths := map[string]WorkspaceLinkPath{}
+	for _, path := range canvas.Links {
+		paths[path.Key] = path
+	}
+	containsHero := paths["contains:home:hero"]
+	if containsHero.Path != "M 8 12 C 16 12, 16 50, 8 50" || containsHero.Kind != WorkspaceLinkContains {
+		t.Fatalf("contains path = %#v", containsHero)
+	}
+	bindsContact := paths["binds:home:contact:flow-contact"]
+	if bindsContact.Path == "" || bindsContact.FromNodeKey != "component:home:contact" || bindsContact.ToNodeKey != "resource:flow-contact" {
+		t.Fatalf("binding path = %#v", bindsContact)
 	}
 	if WorkspaceNodeKindLabel(WorkspaceNodeResource) != "Resource" {
 		t.Fatalf("resource node label mismatch")

@@ -4,6 +4,7 @@
 
 - Define the Studio host configuration API.
 - Stabilize the site map contract for pages composed from GoSX components, source ownership, opaque adapter bindings, and publish-readiness status.
+- Stabilize composition-canvas coordinates and link paths so site-map engines can render editable graph boards from shared data.
 - Stabilize component control contracts so editors can change GoSX elements through no-code fields instead of touching Go or handler identifiers.
 - Stabilize page blueprints and component templates so site-map engines can expose a no-code authoring palette.
 - Stabilize composition intents so a visual site-map engine can preview and apply page/component edits through host actions.

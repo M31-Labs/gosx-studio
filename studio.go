@@ -377,6 +377,12 @@ type CompositionWorkspace struct {
 	Links  []WorkspaceLink
 }
 
+type WorkspaceCanvas struct {
+	ViewBox string
+	Nodes   []WorkspaceNodePoint
+	Links   []WorkspaceLinkPath
+}
+
 type WorkspaceLayer struct {
 	Key      string
 	Label    string
@@ -407,6 +413,25 @@ type WorkspaceLink struct {
 	Kind        WorkspaceLinkKind
 	FromNodeKey string
 	ToNodeKey   string
+}
+
+type WorkspaceNodePoint struct {
+	NodeKey  string
+	LayerKey string
+	X        float64
+	Y        float64
+}
+
+type WorkspaceLinkPath struct {
+	Key         string
+	Kind        WorkspaceLinkKind
+	FromNodeKey string
+	ToNodeKey   string
+	Path        string
+	FromX       float64
+	FromY       float64
+	ToX         float64
+	ToY         float64
 }
 
 type PageGroupCount struct {
@@ -1634,6 +1659,64 @@ func (workspace CompositionWorkspace) LayerCount() int {
 	return len(workspace.Layers)
 }
 
+func (workspace CompositionWorkspace) CanvasLayout() WorkspaceCanvas {
+	workspace = workspace.Normalize()
+	canvas := WorkspaceCanvas{ViewBox: "0 0 100 100"}
+	nodesByKey := map[string]WorkspaceNode{}
+	for _, node := range workspace.Nodes {
+		nodesByKey[node.Key] = node
+	}
+
+	layerCount := len(workspace.Layers)
+	pointsByKey := map[string]WorkspaceNodePoint{}
+	for layerIndex, layer := range workspace.Layers {
+		nodeKeys := make([]string, 0, len(layer.NodeKeys))
+		for _, nodeKey := range layer.NodeKeys {
+			if _, ok := nodesByKey[nodeKey]; ok {
+				nodeKeys = append(nodeKeys, nodeKey)
+			}
+		}
+		nodeCount := len(nodeKeys)
+		if nodeCount == 0 {
+			continue
+		}
+		for nodeIndex, nodeKey := range nodeKeys {
+			point := WorkspaceNodePoint{
+				NodeKey:  nodeKey,
+				LayerKey: layer.Key,
+				X:        workspaceLayerX(layerIndex, layerCount),
+				Y:        workspaceNodeY(nodeIndex, nodeCount),
+			}
+			canvas.Nodes = append(canvas.Nodes, point)
+			pointsByKey[nodeKey] = point
+		}
+	}
+
+	for _, link := range workspace.Links {
+		from, ok := pointsByKey[link.FromNodeKey]
+		if !ok {
+			continue
+		}
+		to, ok := pointsByKey[link.ToNodeKey]
+		if !ok {
+			continue
+		}
+		canvas.Links = append(canvas.Links, WorkspaceLinkPath{
+			Key:         link.Key,
+			Kind:        link.NormalizedKind(),
+			FromNodeKey: link.FromNodeKey,
+			ToNodeKey:   link.ToNodeKey,
+			Path:        workspaceLinkPath(from, to),
+			FromX:       from.X,
+			FromY:       from.Y,
+			ToX:         to.X,
+			ToY:         to.Y,
+		})
+	}
+
+	return canvas
+}
+
 func (page Page) ComponentCount() int {
 	return len(page.Components)
 }
@@ -1714,6 +1797,43 @@ func (link WorkspaceLink) Normalize() WorkspaceLink {
 
 func (link WorkspaceLink) NormalizedKind() WorkspaceLinkKind {
 	return normalizeWorkspaceLinkKind(link.Kind)
+}
+
+func workspaceLayerX(index int, count int) float64 {
+	if count <= 1 {
+		return 50
+	}
+	return 8 + (float64(index) * 84 / float64(count-1))
+}
+
+func workspaceNodeY(index int, count int) float64 {
+	if count <= 1 {
+		return 50
+	}
+	return 12 + (float64(index) * 76 / float64(count-1))
+}
+
+func workspaceLinkPath(from WorkspaceNodePoint, to WorkspaceNodePoint) string {
+	delta := to.X - from.X
+	if delta < 0 {
+		delta = -delta
+	}
+	curve := delta * 0.5
+	if curve < 8 {
+		curve = 8
+	}
+	controlFromX := from.X + curve
+	controlToX := to.X - curve
+	if to.X == from.X {
+		controlToX = to.X + curve
+	} else if to.X < from.X {
+		controlFromX = from.X - curve
+		controlToX = to.X + curve
+	}
+	return "M " + workspaceCoord(from.X) + " " + workspaceCoord(from.Y) +
+		" C " + workspaceCoord(controlFromX) + " " + workspaceCoord(from.Y) +
+		", " + workspaceCoord(controlToX) + " " + workspaceCoord(to.Y) +
+		", " + workspaceCoord(to.X) + " " + workspaceCoord(to.Y)
 }
 
 func (library CompositionLibrary) BlueprintCount() int {
@@ -2431,6 +2551,16 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func workspaceCoord(value float64) string {
+	text := strconv.FormatFloat(value, 'f', 2, 64)
+	text = strings.TrimRight(text, "0")
+	text = strings.TrimRight(text, ".")
+	if text == "" || text == "-0" {
+		return "0"
+	}
+	return text
 }
 
 func workspaceToken(value string) string {

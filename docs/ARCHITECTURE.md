@@ -92,6 +92,10 @@ Heavy interactions belong behind `Engine` declarations:
 
 The engine declaration names the mount id, surface, kind, and capabilities. Host apps configure and mount engines; Studio owns the authoring controls and interaction affordances.
 
+## Site Map Canvas Contract
+
+`SiteMap.CompositionWorkspace()` turns pages, components, and resources into a graph. `CompositionWorkspace.CanvasLayout()` adds deterministic node points and SVG path data for visual site-map engines, so host apps can render Miro/Figma-like composition boards without inventing layout contracts or exposing Go/handler details to editors.
+
 ## Runtime API Contract
 
 `RuntimeContract` describes the browser APIs an engine exposes after it is mounted. These contracts make the interactive surface explicit: host apps can configure Studio and call named runtime methods, while editors keep using `.gsx` components, islands, and engines instead of authored JavaScript or Go DSL internals.
