@@ -430,7 +430,7 @@
   function activateWorkbenchZoom(form, zoom) {
     if (!form) return;
     zoom = zoom || "fit";
-    var button = form.querySelector('[data-studio-zoom="' + attrValue(zoom) + '"]');
+    var button = form.querySelector('button[data-studio-zoom="' + attrValue(zoom) + '"], [role="button"][data-studio-zoom="' + attrValue(zoom) + '"]');
     if (button && button.click) {
       button.click();
       return;
@@ -530,7 +530,7 @@
         syncWorkbenchViewport(form, viewport.getAttribute("data-studio-viewport"));
         return;
       }
-      var zoom = event.target.closest("[data-studio-zoom]");
+      var zoom = event.target.closest("button[data-studio-zoom], [role='button'][data-studio-zoom]");
       if (zoom && form.contains(zoom)) {
         event.preventDefault();
         syncWorkbenchZoom(form, zoom.getAttribute("data-studio-zoom"));

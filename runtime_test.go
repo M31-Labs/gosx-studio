@@ -21,6 +21,7 @@ func TestEngineRuntimeOwnsStudioEngineFactories(t *testing.T) {
 		"bindWorkbenchRailResizers",
 		"bindWorkbenchChrome",
 		"gosxStudioWorkbenchChromeBound",
+		"button[data-studio-zoom]",
 		"emitWorkbenchChange(\"mode-change\"",
 		"emitWorkbenchChange(\"viewport-change\"",
 		"emitWorkbenchChange(\"style-state-change\"",
