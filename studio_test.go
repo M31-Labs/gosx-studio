@@ -676,6 +676,93 @@ func TestCompositionLibraryDefinesPageBlueprintsAndPalette(t *testing.T) {
 	}
 }
 
+func TestSiteMapNormalizesPageComposition(t *testing.T) {
+	siteMap := SiteMap{Pages: []Page{
+		{
+			Key:           " home ",
+			Label:         " Home ",
+			Route:         " / ",
+			Group:         PageGroup(" commerce "),
+			GoSXComponent: " HomePage ",
+			Components: []Component{
+				{
+					Key:           " hero ",
+					Label:         " Hero ",
+					Summary:       " Hero copy and image ",
+					GoSXComponent: " HomeHero ",
+					Source:        ComponentSourceHost,
+					Binding:       " home.section.hero ",
+					Status:        " Editable ",
+					Editable:      true,
+					Controls: []Control{
+						{Key: " headline ", Label: " Headline ", Kind: ControlText, Binding: " home.hero.headline "},
+						{Key: " layout ", Label: " Layout ", Kind: ControlKind(" custom "), Binding: " home.hero.layout ", Options: []ControlOption{{Value: " split ", Label: " Split "}}},
+					},
+				},
+				{Key: "products", Label: "Products", GoSXComponent: "ProductGrid", Source: ComponentSourceCMS, Binding: "products.collection", Status: "Synced", Editable: true},
+			},
+		},
+		{
+			Key:           "showcase",
+			Label:         "Showcase",
+			Route:         "/showcase",
+			GoSXComponent: "ShowcasePage",
+			Selected:      true,
+			Components: []Component{
+				{Key: "viewer", Label: "3D viewer", GoSXComponent: "Showcase3DViewer", Source: ComponentSourcePlugin, Binding: "showcase3d.model", Status: "Ready", Editable: true},
+			},
+		},
+	}, Library: CompositionLibrary{
+		PageBlueprints: []PageBlueprint{{
+			Key:           " landing ",
+			Label:         " Landing ",
+			Summary:       " Hero and call to action ",
+			RoutePattern:  " /new-page ",
+			Group:         PageGroup(" content "),
+			GoSXComponent: " LandingPage ",
+			Components: []ComponentTemplate{{
+				Key:           " hero ",
+				Label:         " Hero ",
+				GoSXComponent: " HomeHero ",
+				Source:        ComponentSourceHost,
+			}},
+		}},
+		ComponentTemplates: []ComponentTemplate{{
+			Key:            " showcase-3d ",
+			Label:          " 3D showcase ",
+			Summary:        " Pop-out model viewer ",
+			Category:       " Media ",
+			GoSXComponent:  " Showcase3DViewer ",
+			Source:         ComponentSource(" plugin "),
+			DefaultBinding: " showcase3d.model ",
+			AddLabel:       " Add viewer ",
+			Controls: []Control{
+				{Key: " model ", Label: " Model ", Kind: ControlScene3D, Binding: " showcase3d.model "},
+			},
+		}},
+	}}.Normalize()
+
+	if siteMap.ComponentCount() != 3 || siteMap.ControlCount() != 2 || siteMap.BlueprintCount() != 1 || siteMap.TemplateCount() != 1 {
+		t.Fatalf("site map counts = components %d controls %d blueprints %d templates %d", siteMap.ComponentCount(), siteMap.ControlCount(), siteMap.BlueprintCount(), siteMap.TemplateCount())
+	}
+	if siteMap.Pages[0].Key != "home" || siteMap.Pages[0].Route != "/" || siteMap.Pages[0].GroupLabel() != "Store" {
+		t.Fatalf("home page was not normalized: %#v", siteMap.Pages[0])
+	}
+	if siteMap.Pages[0].Components[0].Controls[1].Kind != ControlText || siteMap.Pages[0].Components[0].Controls[1].Options[0].Value != "split" {
+		t.Fatalf("nested controls were not normalized: %#v", siteMap.Pages[0].Components[0].Controls)
+	}
+	selected, ok := siteMap.SelectedPage()
+	if !ok || selected.Key != "showcase" {
+		t.Fatalf("selected page = %#v, ok=%v", selected, ok)
+	}
+	if siteMap.Library.PageBlueprints[0].RoutePattern != "/new-page" || siteMap.Library.PageBlueprints[0].GroupLabel() != "Content" {
+		t.Fatalf("blueprint was not normalized: %#v", siteMap.Library.PageBlueprints[0])
+	}
+	if siteMap.Library.ComponentTemplates[0].SourceLabel() != "Plugin" {
+		t.Fatalf("template source = %q", siteMap.Library.ComponentTemplates[0].SourceLabel())
+	}
+}
+
 func TestCompositionIntentDescribesNoCodeDraftOperations(t *testing.T) {
 	intent := CompositionIntent{
 		Key:                  "add-hero-home",
@@ -707,6 +794,22 @@ func TestCompositionIntentDescribesNoCodeDraftOperations(t *testing.T) {
 	}
 	if intent.Steps[1].GoSXComponent != "HomeHero" || intent.Steps[1].Binding != "home.section.hero" {
 		t.Fatalf("intent step should expose GoSX component and binding: %#v", intent.Steps[1])
+	}
+	normalized := CompositionIntent{
+		Key:           " add-hero ",
+		Label:         " Add hero ",
+		Kind:          CompositionIntentKind(" add-component "),
+		TargetRoute:   " / ",
+		GoSXComponent: " HomeHero ",
+		Binding:       " home.section.hero ",
+		Steps: []CompositionStep{
+			{Key: " target ", Label: " Home ", Summary: " Selected route ", GoSXComponent: " HomePage "},
+			{Key: " block ", Label: " Hero ", Summary: " Section ", GoSXComponent: " HomeHero ", Binding: " home.section.hero "},
+			{Key: "", Label: "Skipped"},
+		},
+	}.Normalize()
+	if normalized.Key != "add-hero" || normalized.TargetRoute != "/" || normalized.Binding != "home.section.hero" || normalized.StepCount() != 2 {
+		t.Fatalf("normalized intent = %#v", normalized)
 	}
 
 	createPage := CompositionIntent{Kind: CompositionIntentCreatePage}

@@ -1366,9 +1366,35 @@ func (siteMap SiteMap) ControlCount() int {
 	return count
 }
 
+func (siteMap SiteMap) Normalize() SiteMap {
+	out := SiteMap{
+		Pages:   make([]Page, 0, len(siteMap.Pages)),
+		Library: siteMap.Library.Normalize(),
+	}
+	hasSelected := false
+	for _, page := range siteMap.Pages {
+		page = page.Normalize()
+		if page.Key == "" || page.Label == "" || page.Route == "" || page.GoSXComponent == "" {
+			continue
+		}
+		if page.Selected {
+			if hasSelected {
+				page.Selected = false
+			} else {
+				hasSelected = true
+			}
+		}
+		out.Pages = append(out.Pages, page)
+	}
+	if !hasSelected && len(out.Pages) > 0 {
+		out.Pages[0].Selected = true
+	}
+	return out
+}
+
 func (siteMap SiteMap) PageGroupCounts() []PageGroupCount {
 	counts := map[PageGroup]int{}
-	for _, page := range siteMap.Pages {
+	for _, page := range siteMap.Normalize().Pages {
 		counts[page.NormalizedGroup()]++
 	}
 
@@ -1412,6 +1438,19 @@ func (siteMap SiteMap) BlueprintCount() int {
 
 func (siteMap SiteMap) TemplateCount() int {
 	return len(siteMap.Library.ComponentTemplates)
+}
+
+func (siteMap SiteMap) SelectedPage() (Page, bool) {
+	siteMap = siteMap.Normalize()
+	for _, page := range siteMap.Pages {
+		if page.Selected {
+			return page, true
+		}
+	}
+	if len(siteMap.Pages) > 0 {
+		return siteMap.Pages[0], true
+	}
+	return Page{}, false
 }
 
 func (canvas CanvasWorkspace) Normalize() CanvasWorkspace {
@@ -1506,6 +1545,7 @@ func (canvas CanvasWorkspace) SelectedBlock() (CanvasBlock, bool) {
 }
 
 func (siteMap SiteMap) CompositionWorkspace() CompositionWorkspace {
+	siteMap = siteMap.Normalize()
 	workspace := CompositionWorkspace{}
 	resourceNodeKeys := map[string]string{}
 
@@ -1721,6 +1761,17 @@ func (page Page) ComponentCount() int {
 	return len(page.Components)
 }
 
+func (page Page) Normalize() Page {
+	page.Key = strings.TrimSpace(page.Key)
+	page.Label = strings.TrimSpace(page.Label)
+	page.Route = strings.TrimSpace(page.Route)
+	page.Group = normalizePageGroup(page.Group)
+	page.GoSXComponent = strings.TrimSpace(page.GoSXComponent)
+	page.Status = strings.TrimSpace(page.Status)
+	page.Components = normalizeComponents(page.Components)
+	return page
+}
+
 func (page Page) ControlCount() int {
 	count := 0
 	for _, component := range page.Components {
@@ -1729,12 +1780,28 @@ func (page Page) ControlCount() int {
 	return count
 }
 
+func (page Page) GroupLabel() string {
+	return PageGroupLabel(page.Group)
+}
+
 func (page Page) NormalizedGroup() PageGroup {
 	return normalizePageGroup(page.Group)
 }
 
 func (component Component) ControlCount() int {
 	return len(component.Controls)
+}
+
+func (component Component) Normalize() Component {
+	component.Key = strings.TrimSpace(component.Key)
+	component.Label = strings.TrimSpace(component.Label)
+	component.Summary = strings.TrimSpace(component.Summary)
+	component.GoSXComponent = strings.TrimSpace(component.GoSXComponent)
+	component.Source = normalizeComponentSource(component.Source)
+	component.Binding = strings.TrimSpace(component.Binding)
+	component.Status = strings.TrimSpace(component.Status)
+	component.Controls = normalizeControls(component.Controls)
+	return component
 }
 
 func (component Component) SelectionKey(pageKey string) string {
@@ -1755,6 +1822,18 @@ func (component Component) NormalizedSource() ComponentSource {
 
 func (block CanvasBlock) ControlCount() int {
 	return len(block.Controls)
+}
+
+func (block CanvasBlock) Normalize() CanvasBlock {
+	block.Key = strings.TrimSpace(block.Key)
+	block.Label = strings.TrimSpace(block.Label)
+	block.Summary = strings.TrimSpace(block.Summary)
+	block.GoSXComponent = strings.TrimSpace(block.GoSXComponent)
+	block.Source = normalizeComponentSource(block.Source)
+	block.Binding = strings.TrimSpace(block.Binding)
+	block.Status = strings.TrimSpace(block.Status)
+	block.Controls = normalizeControls(block.Controls)
+	return block
 }
 
 func (block CanvasBlock) NormalizedSource() ComponentSource {
@@ -1840,12 +1919,50 @@ func (library CompositionLibrary) BlueprintCount() int {
 	return len(library.PageBlueprints)
 }
 
+func (library CompositionLibrary) Normalize() CompositionLibrary {
+	out := CompositionLibrary{
+		PageBlueprints:     make([]PageBlueprint, 0, len(library.PageBlueprints)),
+		ComponentTemplates: make([]ComponentTemplate, 0, len(library.ComponentTemplates)),
+	}
+	for _, blueprint := range library.PageBlueprints {
+		blueprint = blueprint.Normalize()
+		if blueprint.Key == "" || blueprint.Label == "" || blueprint.GoSXComponent == "" {
+			continue
+		}
+		out.PageBlueprints = append(out.PageBlueprints, blueprint)
+	}
+	for _, template := range library.ComponentTemplates {
+		template = template.Normalize()
+		if template.Key == "" || template.Label == "" || template.GoSXComponent == "" {
+			continue
+		}
+		out.ComponentTemplates = append(out.ComponentTemplates, template)
+	}
+	return out
+}
+
 func (library CompositionLibrary) TemplateCount() int {
 	return len(library.ComponentTemplates)
 }
 
 func (blueprint PageBlueprint) ComponentCount() int {
 	return len(blueprint.Components)
+}
+
+func (blueprint PageBlueprint) Normalize() PageBlueprint {
+	blueprint.Key = strings.TrimSpace(blueprint.Key)
+	blueprint.Label = strings.TrimSpace(blueprint.Label)
+	blueprint.Summary = strings.TrimSpace(blueprint.Summary)
+	blueprint.RoutePattern = strings.TrimSpace(blueprint.RoutePattern)
+	blueprint.Group = normalizePageGroup(blueprint.Group)
+	blueprint.GoSXComponent = strings.TrimSpace(blueprint.GoSXComponent)
+	blueprint.Status = strings.TrimSpace(blueprint.Status)
+	blueprint.Components = normalizeComponentTemplates(blueprint.Components)
+	return blueprint
+}
+
+func (blueprint PageBlueprint) GroupLabel() string {
+	return PageGroupLabel(blueprint.Group)
 }
 
 func (blueprint PageBlueprint) NormalizedGroup() PageGroup {
@@ -1856,8 +1973,46 @@ func (template ComponentTemplate) ControlCount() int {
 	return len(template.Controls)
 }
 
+func (template ComponentTemplate) Normalize() ComponentTemplate {
+	template.Key = strings.TrimSpace(template.Key)
+	template.Label = strings.TrimSpace(template.Label)
+	template.Summary = strings.TrimSpace(template.Summary)
+	template.Category = strings.TrimSpace(template.Category)
+	template.GoSXComponent = strings.TrimSpace(template.GoSXComponent)
+	template.Source = normalizeComponentSource(template.Source)
+	template.DefaultBinding = strings.TrimSpace(template.DefaultBinding)
+	template.Status = strings.TrimSpace(template.Status)
+	template.AddLabel = strings.TrimSpace(template.AddLabel)
+	template.Controls = normalizeControls(template.Controls)
+	return template
+}
+
+func (template ComponentTemplate) SourceLabel() string {
+	return ComponentSourceLabel(template.Source)
+}
+
 func (template ComponentTemplate) NormalizedSource() ComponentSource {
 	return normalizeComponentSource(template.Source)
+}
+
+func (intent CompositionIntent) Normalize() CompositionIntent {
+	intent.Key = strings.TrimSpace(intent.Key)
+	intent.Label = strings.TrimSpace(intent.Label)
+	intent.Summary = strings.TrimSpace(intent.Summary)
+	intent.Kind = normalizeCompositionIntentKind(intent.Kind)
+	intent.TargetPageKey = strings.TrimSpace(intent.TargetPageKey)
+	intent.TargetPageLabel = strings.TrimSpace(intent.TargetPageLabel)
+	intent.TargetRoute = strings.TrimSpace(intent.TargetRoute)
+	intent.TargetRegion = strings.TrimSpace(intent.TargetRegion)
+	intent.PageBlueprintKey = strings.TrimSpace(intent.PageBlueprintKey)
+	intent.PageBlueprintLabel = strings.TrimSpace(intent.PageBlueprintLabel)
+	intent.ComponentTemplateKey = strings.TrimSpace(intent.ComponentTemplateKey)
+	intent.ComponentLabel = strings.TrimSpace(intent.ComponentLabel)
+	intent.GoSXComponent = strings.TrimSpace(intent.GoSXComponent)
+	intent.Binding = strings.TrimSpace(intent.Binding)
+	intent.Status = strings.TrimSpace(intent.Status)
+	intent.Steps = normalizeCompositionSteps(intent.Steps)
+	return intent
 }
 
 func (intent CompositionIntent) StepCount() int {
@@ -2283,14 +2438,7 @@ func normalizeCanvasZoomLevels(values []CanvasZoomLevel) []CanvasZoomLevel {
 func normalizeCanvasBlocks(values []CanvasBlock) []CanvasBlock {
 	out := make([]CanvasBlock, 0, len(values))
 	for _, value := range values {
-		value.Key = strings.TrimSpace(value.Key)
-		value.Label = strings.TrimSpace(value.Label)
-		value.Summary = strings.TrimSpace(value.Summary)
-		value.GoSXComponent = strings.TrimSpace(value.GoSXComponent)
-		value.Source = normalizeComponentSource(value.Source)
-		value.Binding = strings.TrimSpace(value.Binding)
-		value.Status = strings.TrimSpace(value.Status)
-		value.Controls = normalizeControls(value.Controls)
+		value = value.Normalize()
 		if value.Key == "" || value.Label == "" {
 			continue
 		}
@@ -2333,6 +2481,46 @@ func normalizeControls(values []Control) []Control {
 		value.Value = strings.TrimSpace(value.Value)
 		value.Help = strings.TrimSpace(value.Help)
 		value.Options = normalizeControlOptions(value.Options)
+		if value.Key == "" || value.Label == "" {
+			continue
+		}
+		out = append(out, value)
+	}
+	return out
+}
+
+func normalizeComponents(values []Component) []Component {
+	out := make([]Component, 0, len(values))
+	for _, value := range values {
+		value = value.Normalize()
+		if value.Key == "" || value.Label == "" || value.GoSXComponent == "" {
+			continue
+		}
+		out = append(out, value)
+	}
+	return out
+}
+
+func normalizeComponentTemplates(values []ComponentTemplate) []ComponentTemplate {
+	out := make([]ComponentTemplate, 0, len(values))
+	for _, value := range values {
+		value = value.Normalize()
+		if value.Key == "" || value.Label == "" || value.GoSXComponent == "" {
+			continue
+		}
+		out = append(out, value)
+	}
+	return out
+}
+
+func normalizeCompositionSteps(values []CompositionStep) []CompositionStep {
+	out := make([]CompositionStep, 0, len(values))
+	for _, value := range values {
+		value.Key = strings.TrimSpace(value.Key)
+		value.Label = strings.TrimSpace(value.Label)
+		value.Summary = strings.TrimSpace(value.Summary)
+		value.GoSXComponent = strings.TrimSpace(value.GoSXComponent)
+		value.Binding = strings.TrimSpace(value.Binding)
 		if value.Key == "" || value.Label == "" {
 			continue
 		}
