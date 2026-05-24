@@ -7,7 +7,7 @@
 - Stabilize component control contracts so editors can change GoSX elements through no-code fields instead of touching Go or handler identifiers.
 - Stabilize page blueprints and component templates so site-map engines can expose a no-code authoring palette.
 - Stabilize the engine declaration contract for canvas, site map, block layout, flow, and Scene3D surfaces.
-- Define content, media, page, section, theme, and publish adapter interfaces.
+- Define content, media, page, section, theme, publish, revision, lifecycle, and flow adapter interfaces.
 - Move reusable editor contracts out of `muddy-noni-commerce`.
 - Keep Noni-specific copy, resource names, and routes in the Noni app.
 

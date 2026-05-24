@@ -64,6 +64,54 @@ func TestDefaultEnginesCoverHeavyStudioInteractions(t *testing.T) {
 	}
 }
 
+func TestDefaultResourceAdaptersCoverHostBoundResources(t *testing.T) {
+	adapters := DefaultResourceAdapters()
+	if len(adapters) < 9 {
+		t.Fatalf("expected default resource adapters, got %#v", adapters)
+	}
+
+	byKind := map[ResourceKind]ResourceAdapter{}
+	for _, adapter := range adapters {
+		if adapter.Kind == "" || adapter.Label == "" || adapter.Summary == "" || adapter.Surface == "" {
+			t.Fatalf("adapter should include kind, label, summary, and surface: %#v", adapter)
+		}
+		if adapter.CapabilityCount() == 0 {
+			t.Fatalf("adapter should declare capabilities: %#v", adapter)
+		}
+		if adapter.BindingCount() == 0 {
+			t.Fatalf("adapter should expose at least one binding: %#v", adapter)
+		}
+		byKind[adapter.NormalizedKind()] = adapter
+	}
+
+	for _, kind := range []ResourceKind{
+		ResourceMedia,
+		ResourcePages,
+		ResourceProducts,
+		ResourceOrders,
+		ResourceContacts,
+		ResourceSettings,
+		ResourceRevisions,
+		ResourceLifecycle,
+		ResourceFlows,
+	} {
+		if _, ok := byKind[kind]; !ok {
+			t.Fatalf("missing default resource adapter kind %q", kind)
+		}
+	}
+
+	host := HostConfig{Adapters: adapters}
+	lifecycle, ok := host.ResourceAdapter(ResourceLifecycle)
+	if !ok || lifecycle.Surface != SurfacePublish {
+		t.Fatalf("lifecycle adapter = %#v, ok=%v", lifecycle, ok)
+	}
+
+	fallback := ResourceAdapter{Kind: ResourceKind(" unknown "), Label: "Unknown", Summary: "Fallback", Surface: SurfaceInspector}
+	if fallback.NormalizedKind() != ResourceMedia {
+		t.Fatalf("unknown resource kind should normalize to media, got %q", fallback.NormalizedKind())
+	}
+}
+
 func TestSiteMapCountsComposedGoSXComponents(t *testing.T) {
 	siteMap := SiteMap{Pages: []Page{
 		{

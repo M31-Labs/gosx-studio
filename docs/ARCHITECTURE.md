@@ -66,6 +66,12 @@ The site map is intentionally not a generic JSON page builder. It is a compact v
 
 `CompositionLibrary` describes what editors can add without seeing Go or handler details. `PageBlueprint` entries are page starters such as a landing page, collection page, content page, or flow page. `ComponentTemplate` entries are palette cards such as hero, product grid, gallery, contact flow, or showcase viewer. The site-map engine can render those as a compact authoring tray while retaining GoSX component names and opaque bindings for the host adapter.
 
+## Host Adapter Contract
+
+Studio consumes host resources through `ResourceAdapter` declarations instead of importing host packages. The default adapter set covers media, pages, products, orders, contacts, settings, revisions, lifecycle, and flows. Each adapter declares an editor-facing label, the Studio surface that should use it, resource capabilities, and opaque `ResourceBinding` keys such as `media.assets`, `pages.routes`, `products.collection`, or `lifecycle.schedule`.
+
+Adapters describe what Studio can ask for; host applications decide how those requests load, validate, mutate, preview, publish, restore, or execute. This keeps `gosx-cms`, `gosx-admin`, and app-specific repositories behind a configuration boundary.
+
 ## Engine Contract
 
 Heavy interactions belong behind `Engine` declarations:

@@ -60,6 +60,33 @@ const (
 	CapabilityPersistence EngineCapability = "persistence"
 )
 
+type ResourceKind string
+
+const (
+	ResourceMedia     ResourceKind = "media"
+	ResourcePages     ResourceKind = "pages"
+	ResourceProducts  ResourceKind = "products"
+	ResourceOrders    ResourceKind = "orders"
+	ResourceContacts  ResourceKind = "contacts"
+	ResourceSettings  ResourceKind = "settings"
+	ResourceRevisions ResourceKind = "revisions"
+	ResourceLifecycle ResourceKind = "lifecycle"
+	ResourceFlows     ResourceKind = "flows"
+)
+
+type ResourceCapability string
+
+const (
+	ResourceList    ResourceCapability = "list"
+	ResourceRead    ResourceCapability = "read"
+	ResourceWrite   ResourceCapability = "write"
+	ResourceSearch  ResourceCapability = "search"
+	ResourcePreview ResourceCapability = "preview"
+	ResourcePublish ResourceCapability = "publish"
+	ResourceRestore ResourceCapability = "restore"
+	ResourceExecute ResourceCapability = "execute"
+)
+
 type ControlKind string
 
 const (
@@ -185,6 +212,7 @@ type HostConfig struct {
 	EditorLabel string
 	Features    []Feature
 	Engines     []Engine
+	Adapters    []ResourceAdapter
 	SiteMap     SiteMap
 }
 
@@ -193,6 +221,22 @@ type Feature struct {
 	Label   string
 	Surface SurfaceKind
 	Summary string
+}
+
+type ResourceAdapter struct {
+	Kind         ResourceKind
+	Label        string
+	Summary      string
+	Surface      SurfaceKind
+	Capabilities []ResourceCapability
+	Bindings     []ResourceBinding
+}
+
+type ResourceBinding struct {
+	Key     string
+	Label   string
+	Summary string
+	Binding string
 }
 
 func DefaultFeatures() []Feature {
@@ -226,6 +270,150 @@ func DefaultFeatures() []Feature {
 			Label:   "Publish",
 			Surface: SurfacePublish,
 			Summary: "Review, schedule, and publish controls for non-technical site operators.",
+		},
+	}
+}
+
+func DefaultResourceAdapters() []ResourceAdapter {
+	return []ResourceAdapter{
+		{
+			Kind:    ResourceMedia,
+			Label:   "Media",
+			Summary: "Images, video, generated assets, alt text, and focal points.",
+			Surface: SurfaceInspector,
+			Capabilities: []ResourceCapability{
+				ResourceList,
+				ResourceRead,
+				ResourceWrite,
+				ResourceSearch,
+				ResourcePreview,
+			},
+			Bindings: []ResourceBinding{
+				{Key: "assets", Label: "Assets", Binding: "media.assets"},
+				{Key: "uploads", Label: "Uploads", Binding: "media.uploads"},
+			},
+		},
+		{
+			Kind:    ResourcePages,
+			Label:   "Pages",
+			Summary: "Routes, page drafts, page templates, previews, and page publishing state.",
+			Surface: SurfaceSiteMap,
+			Capabilities: []ResourceCapability{
+				ResourceList,
+				ResourceRead,
+				ResourceWrite,
+				ResourcePreview,
+				ResourcePublish,
+			},
+			Bindings: []ResourceBinding{
+				{Key: "routes", Label: "Routes", Binding: "pages.routes"},
+				{Key: "drafts", Label: "Drafts", Binding: "pages.drafts"},
+			},
+		},
+		{
+			Kind:    ResourceProducts,
+			Label:   "Products",
+			Summary: "Product collections, categories, availability, and storefront placement.",
+			Surface: SurfaceSiteMap,
+			Capabilities: []ResourceCapability{
+				ResourceList,
+				ResourceRead,
+				ResourceSearch,
+				ResourcePreview,
+			},
+			Bindings: []ResourceBinding{
+				{Key: "collection", Label: "Collection", Binding: "products.collection"},
+				{Key: "categories", Label: "Categories", Binding: "products.categories"},
+			},
+		},
+		{
+			Kind:    ResourceOrders,
+			Label:   "Orders",
+			Summary: "Store activity that can inform storefront messaging without making Studio the order desk.",
+			Surface: SurfacePublish,
+			Capabilities: []ResourceCapability{
+				ResourceList,
+				ResourceRead,
+			},
+			Bindings: []ResourceBinding{
+				{Key: "activity", Label: "Activity", Binding: "orders.activity"},
+			},
+		},
+		{
+			Kind:    ResourceContacts,
+			Label:   "Contacts",
+			Summary: "Contact destinations, customer messages, and form routing context.",
+			Surface: SurfaceFlow,
+			Capabilities: []ResourceCapability{
+				ResourceList,
+				ResourceRead,
+				ResourceWrite,
+			},
+			Bindings: []ResourceBinding{
+				{Key: "messages", Label: "Messages", Binding: "contacts.messages"},
+				{Key: "destinations", Label: "Destinations", Binding: "contacts.destinations"},
+			},
+		},
+		{
+			Kind:    ResourceSettings,
+			Label:   "Settings",
+			Summary: "Site identity, theme, navigation, checkout, and operational settings.",
+			Surface: SurfaceInspector,
+			Capabilities: []ResourceCapability{
+				ResourceRead,
+				ResourceWrite,
+				ResourcePreview,
+			},
+			Bindings: []ResourceBinding{
+				{Key: "site", Label: "Site", Binding: "settings.site"},
+				{Key: "theme", Label: "Theme", Binding: "settings.theme"},
+			},
+		},
+		{
+			Kind:    ResourceRevisions,
+			Label:   "Revisions",
+			Summary: "Saved versions, compare points, and restore actions.",
+			Surface: SurfacePublish,
+			Capabilities: []ResourceCapability{
+				ResourceList,
+				ResourceRead,
+				ResourceRestore,
+			},
+			Bindings: []ResourceBinding{
+				{Key: "history", Label: "History", Binding: "revisions.history"},
+			},
+		},
+		{
+			Kind:    ResourceLifecycle,
+			Label:   "Lifecycle",
+			Summary: "Readiness, scheduling, approvals, preview links, and publish decisions.",
+			Surface: SurfacePublish,
+			Capabilities: []ResourceCapability{
+				ResourceRead,
+				ResourceWrite,
+				ResourcePreview,
+				ResourcePublish,
+			},
+			Bindings: []ResourceBinding{
+				{Key: "readiness", Label: "Readiness", Binding: "lifecycle.readiness"},
+				{Key: "schedule", Label: "Schedule", Binding: "lifecycle.schedule"},
+			},
+		},
+		{
+			Kind:    ResourceFlows,
+			Label:   "Flows",
+			Summary: "Visual automations, form handlers, lifecycle actions, and publishable flow drafts.",
+			Surface: SurfaceFlow,
+			Capabilities: []ResourceCapability{
+				ResourceList,
+				ResourceRead,
+				ResourceWrite,
+				ResourceExecute,
+			},
+			Bindings: []ResourceBinding{
+				{Key: "library", Label: "Library", Binding: "flows.library"},
+				{Key: "drafts", Label: "Drafts", Binding: "flows.drafts"},
+			},
 		},
 	}
 }
@@ -271,6 +459,20 @@ func DefaultEngines() []Engine {
 	}
 }
 
+func (config HostConfig) ResourceAdapter(kind ResourceKind) (ResourceAdapter, bool) {
+	return ResourceAdapterByKind(config.Adapters, kind)
+}
+
+func ResourceAdapterByKind(adapters []ResourceAdapter, kind ResourceKind) (ResourceAdapter, bool) {
+	normalized := normalizeResourceKind(kind)
+	for _, adapter := range adapters {
+		if normalizeResourceKind(adapter.Kind) == normalized {
+			return adapter, true
+		}
+	}
+	return ResourceAdapter{}, false
+}
+
 func (siteMap SiteMap) ComponentCount() int {
 	count := 0
 	for _, page := range siteMap.Pages {
@@ -313,6 +515,18 @@ func (siteMap SiteMap) PageGroupCounts() []PageGroupCount {
 		})
 	}
 	return out
+}
+
+func (adapter ResourceAdapter) NormalizedKind() ResourceKind {
+	return normalizeResourceKind(adapter.Kind)
+}
+
+func (adapter ResourceAdapter) CapabilityCount() int {
+	return len(adapter.Capabilities)
+}
+
+func (adapter ResourceAdapter) BindingCount() int {
+	return len(adapter.Bindings)
 }
 
 func (siteMap SiteMap) BlueprintCount() int {
@@ -462,6 +676,29 @@ func normalizeComponentSource(source ComponentSource) ComponentSource {
 		return ComponentSourceStudio
 	default:
 		return ComponentSourceHost
+	}
+}
+
+func normalizeResourceKind(kind ResourceKind) ResourceKind {
+	switch ResourceKind(strings.TrimSpace(string(kind))) {
+	case ResourcePages:
+		return ResourcePages
+	case ResourceProducts:
+		return ResourceProducts
+	case ResourceOrders:
+		return ResourceOrders
+	case ResourceContacts:
+		return ResourceContacts
+	case ResourceSettings:
+		return ResourceSettings
+	case ResourceRevisions:
+		return ResourceRevisions
+	case ResourceLifecycle:
+		return ResourceLifecycle
+	case ResourceFlows:
+		return ResourceFlows
+	default:
+		return ResourceMedia
 	}
 }
 
