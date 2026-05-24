@@ -781,6 +781,20 @@ func DefaultRuntimeContracts() []RuntimeContract {
 					},
 				},
 				{
+					Name:    "applyTheme",
+					Label:   "Apply theme",
+					Summary: "Apply selected kit, template, palette, image ratio, style classes, and color tokens to the Studio shell and preview frames.",
+					Payload: []RuntimePayloadField{
+						{Name: "kit", Label: "Kit", Kind: ControlChoice},
+						{Name: "template", Label: "Template", Kind: ControlChoice},
+						{Name: "palette", Label: "Palette", Kind: ControlChoice},
+						{Name: "imageRatio", Label: "Image ratio", Kind: ControlChoice},
+						{Name: "customClasses", Label: "Custom classes", Kind: ControlText},
+						{Name: "styleClasses", Label: "Style classes", Kind: ControlText},
+						{Name: "colors", Label: "Color tokens", Kind: ControlColor},
+					},
+				},
+				{
 					Name:    "applyFonts",
 					Label:   "Apply font CSS",
 					Summary: "Apply generated font-face and font-token CSS to the Studio shell and preview frames.",
