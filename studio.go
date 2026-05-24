@@ -858,6 +858,110 @@ func DefaultRuntimeContracts() []RuntimeContract {
 					},
 				},
 				{
+					Name:    "bindChrome",
+					Label:   "Bind workbench chrome",
+					Summary: "Bind GoSX-authored workbench mode controls, viewport controls, zoom controls, rail toggles, activity toggles, focus state, command-palette workbench commands, and saved layout state.",
+					Payload: []RuntimePayloadField{
+						{Name: "root", Label: "Root element", Kind: ControlSource, Summary: "Document or element that contains the Studio workbench."},
+					},
+				},
+				{
+					Name:    "setMode",
+					Label:   "Set workbench mode",
+					Summary: "Switch the active Studio mode and synchronize mode panels, labels, and mode change events.",
+					Payload: []RuntimePayloadField{
+						{Name: "form", Label: "Workbench form", Kind: ControlSource, Required: true},
+						{Name: "mode", Label: "Mode", Kind: ControlChoice, Required: true},
+						{Name: "scroll", Label: "Scroll into view", Kind: ControlToggle},
+					},
+				},
+				{
+					Name:    "syncViewport",
+					Label:   "Sync viewport",
+					Summary: "Synchronize active viewport controls, preview frame sizing, and viewport readouts for the current page canvas.",
+					Payload: []RuntimePayloadField{
+						{Name: "form", Label: "Workbench form", Kind: ControlSource, Required: true},
+						{Name: "viewport", Label: "Viewport", Kind: ControlChoice, Required: true},
+					},
+				},
+				{
+					Name:    "activateViewport",
+					Label:   "Activate viewport",
+					Summary: "Apply an editor-selected viewport and emit a viewport change event for engine and inspector synchronization.",
+					Payload: []RuntimePayloadField{
+						{Name: "form", Label: "Workbench form", Kind: ControlSource, Required: true},
+						{Name: "viewport", Label: "Viewport", Kind: ControlChoice, Required: true},
+					},
+				},
+				{
+					Name:    "currentBreakpoint",
+					Label:   "Current breakpoint",
+					Summary: "Read the active canvas breakpoint so style controls can target the same viewport state as the workbench.",
+					Payload: []RuntimePayloadField{
+						{Name: "form", Label: "Workbench form", Kind: ControlSource, Required: true},
+					},
+				},
+				{
+					Name:    "setStyleState",
+					Label:   "Set style state",
+					Summary: "Switch the active style-state target for hover/focus previews and emit a style-state change event.",
+					Payload: []RuntimePayloadField{
+						{Name: "form", Label: "Workbench form", Kind: ControlSource, Required: true},
+						{Name: "state", Label: "Style state", Kind: ControlChoice, Required: true},
+					},
+				},
+				{
+					Name:    "syncZoom",
+					Label:   "Sync zoom",
+					Summary: "Synchronize active zoom controls and canvas scale without changing the underlying page model.",
+					Payload: []RuntimePayloadField{
+						{Name: "form", Label: "Workbench form", Kind: ControlSource, Required: true},
+						{Name: "zoom", Label: "Zoom", Kind: ControlChoice, Required: true},
+					},
+				},
+				{
+					Name:    "activateZoom",
+					Label:   "Activate zoom",
+					Summary: "Apply an editor-selected zoom level, persist workbench layout state, and emit a zoom change event.",
+					Payload: []RuntimePayloadField{
+						{Name: "form", Label: "Workbench form", Kind: ControlSource, Required: true},
+						{Name: "zoom", Label: "Zoom", Kind: ControlChoice, Required: true},
+					},
+				},
+				{
+					Name:    "toggleRail",
+					Label:   "Toggle rail",
+					Summary: "Open or collapse a Studio workbench rail and persist the chrome layout state.",
+					Payload: []RuntimePayloadField{
+						{Name: "form", Label: "Workbench form", Kind: ControlSource, Required: true},
+						{Name: "side", Label: "Rail side", Kind: ControlChoice, Required: true},
+					},
+				},
+				{
+					Name:    "toggleFocus",
+					Label:   "Toggle focus",
+					Summary: "Toggle canvas focus mode, synchronize rail state, and persist the workbench layout.",
+					Payload: []RuntimePayloadField{
+						{Name: "form", Label: "Workbench form", Kind: ControlSource, Required: true},
+					},
+				},
+				{
+					Name:    "toggleActivity",
+					Label:   "Toggle activity",
+					Summary: "Open or collapse the workbench activity rail and persist the chrome layout state.",
+					Payload: []RuntimePayloadField{
+						{Name: "form", Label: "Workbench form", Kind: ControlSource, Required: true},
+					},
+				},
+				{
+					Name:    "saveLayout",
+					Label:   "Save layout",
+					Summary: "Persist the current Studio workbench layout state for the active editor.",
+					Payload: []RuntimePayloadField{
+						{Name: "form", Label: "Workbench form", Kind: ControlSource, Required: true},
+					},
+				},
+				{
 					Name:    "currentRailWidth",
 					Label:   "Current rail width",
 					Summary: "Read the current width of a Studio workbench rail.",

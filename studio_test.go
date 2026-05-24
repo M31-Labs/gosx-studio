@@ -131,10 +131,54 @@ func TestDefaultRuntimeContractsExposeEngineAPIs(t *testing.T) {
 	if workbench.Surface != SurfaceCanvas || workbench.Engine != EngineCanvas {
 		t.Fatalf("workbench runtime should belong to the canvas engine: %#v", workbench)
 	}
-	for _, method := range []string{"bindRailResizers", "currentRailWidth", "setRailWidth"} {
+	for _, method := range []string{
+		"bindRailResizers",
+		"bindChrome",
+		"setMode",
+		"syncViewport",
+		"activateViewport",
+		"currentBreakpoint",
+		"setStyleState",
+		"syncZoom",
+		"activateZoom",
+		"toggleRail",
+		"toggleFocus",
+		"toggleActivity",
+		"saveLayout",
+		"currentRailWidth",
+		"setRailWidth",
+	} {
 		if !runtimeHasMethod(workbench, method) {
 			t.Fatalf("workbench runtime missing method %q: %#v", method, workbench)
 		}
+	}
+	bindChrome, ok := workbench.Method("bindChrome")
+	if !ok || len(bindChrome.Payload) != 1 {
+		t.Fatalf("bind chrome payload = %#v, ok=%v", bindChrome, ok)
+	}
+	setMode, ok := workbench.Method("setMode")
+	if !ok || len(setMode.Payload) != 3 {
+		t.Fatalf("set mode payload = %#v, ok=%v", setMode, ok)
+	}
+	activateViewport, ok := workbench.Method("activateViewport")
+	if !ok || len(activateViewport.Payload) != 2 {
+		t.Fatalf("activate viewport payload = %#v, ok=%v", activateViewport, ok)
+	}
+	currentBreakpoint, ok := workbench.Method("currentBreakpoint")
+	if !ok || len(currentBreakpoint.Payload) != 1 {
+		t.Fatalf("current breakpoint payload = %#v, ok=%v", currentBreakpoint, ok)
+	}
+	setStyleState, ok := workbench.Method("setStyleState")
+	if !ok || len(setStyleState.Payload) != 2 {
+		t.Fatalf("set style state payload = %#v, ok=%v", setStyleState, ok)
+	}
+	toggleRail, ok := workbench.Method("toggleRail")
+	if !ok || len(toggleRail.Payload) != 2 {
+		t.Fatalf("toggle rail payload = %#v, ok=%v", toggleRail, ok)
+	}
+	saveLayout, ok := workbench.Method("saveLayout")
+	if !ok || len(saveLayout.Payload) != 1 {
+		t.Fatalf("save layout payload = %#v, ok=%v", saveLayout, ok)
 	}
 	currentRailWidth, ok := workbench.Method("currentRailWidth")
 	if !ok || len(currentRailWidth.Payload) != 3 {
