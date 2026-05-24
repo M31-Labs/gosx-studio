@@ -73,7 +73,19 @@ func TestSiteMapCountsComposedGoSXComponents(t *testing.T) {
 			Group:         PageGroupSite,
 			GoSXComponent: "HomePage",
 			Components: []Component{
-				{Key: "hero", Label: "Hero", GoSXComponent: "HomeHero", Source: ComponentSourceHost, Binding: "home.section.hero", Status: "Editable", Editable: true},
+				{
+					Key:           "hero",
+					Label:         "Hero",
+					GoSXComponent: "HomeHero",
+					Source:        ComponentSourceHost,
+					Binding:       "home.section.hero",
+					Status:        "Editable",
+					Editable:      true,
+					Controls: []Control{
+						{Key: "headline", Label: "Headline", Kind: ControlText, Binding: "home.hero.headline", Value: "Fresh clay"},
+						{Key: "layout", Label: "Layout", Kind: ControlChoice, Binding: "home.hero.layout", Value: "split", Options: []ControlOption{{Value: "split", Label: "Split"}, {Value: "overlay", Label: "Overlay"}}},
+					},
+				},
 				{Key: "products", Label: "Products", GoSXComponent: "FeaturedProducts", Source: ComponentSourceCMS, Binding: "products.collection", Status: "Synced", Editable: true},
 			},
 		},
@@ -84,7 +96,18 @@ func TestSiteMapCountsComposedGoSXComponents(t *testing.T) {
 			Group:         PageGroupCommerce,
 			GoSXComponent: "ProductPage",
 			Components: []Component{
-				{Key: "viewer", Label: "3D viewer", GoSXComponent: "Showcase3DViewer", Source: ComponentSourcePlugin, Binding: "showcase3d.model", Status: "Ready", Editable: true},
+				{
+					Key:           "viewer",
+					Label:         "3D viewer",
+					GoSXComponent: "Showcase3DViewer",
+					Source:        ComponentSourcePlugin,
+					Binding:       "showcase3d.model",
+					Status:        "Ready",
+					Editable:      true,
+					Controls: []Control{
+						{Key: "model", Label: "Model", Kind: ControlScene3D, Binding: "showcase3d.model"},
+					},
+				},
 			},
 		},
 	}}
@@ -97,6 +120,15 @@ func TestSiteMapCountsComposedGoSXComponents(t *testing.T) {
 	}
 	if siteMap.Pages[1].Components[0].Binding != "showcase3d.model" {
 		t.Fatalf("plugin binding = %q", siteMap.Pages[1].Components[0].Binding)
+	}
+	if siteMap.ControlCount() != 3 {
+		t.Fatalf("control count = %d, want 3", siteMap.ControlCount())
+	}
+	if siteMap.Pages[0].ControlCount() != 2 {
+		t.Fatalf("home control count = %d, want 2", siteMap.Pages[0].ControlCount())
+	}
+	if siteMap.Pages[0].Components[0].SelectionKey("home") != "home.hero" {
+		t.Fatalf("selection key = %q", siteMap.Pages[0].Components[0].SelectionKey("home"))
 	}
 }
 
@@ -137,5 +169,40 @@ func TestSiteMapGroupsPagesForBoardFilters(t *testing.T) {
 	}
 	if siteMap.Pages[4].NormalizedGroup() != PageGroupSite {
 		t.Fatalf("unknown group should normalize to site, got %q", siteMap.Pages[4].NormalizedGroup())
+	}
+}
+
+func TestNoCodeControlsExposeEditorFacingBindings(t *testing.T) {
+	component := Component{
+		Key:           "contact-form",
+		Label:         "Contact form",
+		GoSXComponent: "ContactFormFlow",
+		Source:        ComponentSource(" cms "),
+		Binding:       "flow.contact",
+		Editable:      true,
+		Controls: []Control{
+			{Key: "title", Label: "Title", Kind: ControlRichText, Binding: "flow.contact.title"},
+			{Key: "destination", Label: "Destination", Kind: ControlFlow, Binding: "flow.contact.handler", Advanced: true},
+			{Key: "unknown", Label: "Unknown", Kind: ControlKind("custom"), Binding: "host.custom"},
+		},
+	}
+
+	if component.NormalizedSource() != ComponentSourceCMS {
+		t.Fatalf("component source = %q", component.NormalizedSource())
+	}
+	if ComponentSourceLabel(component.Source) != "CMS" {
+		t.Fatalf("component source label = %q", ComponentSourceLabel(component.Source))
+	}
+	if component.ControlCount() != 3 {
+		t.Fatalf("control count = %d", component.ControlCount())
+	}
+	if component.Controls[0].NormalizedKind() != ControlRichText || ControlKindLabel(component.Controls[0].Kind) != "Rich text" {
+		t.Fatalf("rich text control kind = %#v", component.Controls[0])
+	}
+	if component.Controls[1].NormalizedKind() != ControlFlow || ControlKindLabel(component.Controls[1].Kind) != "Flow" {
+		t.Fatalf("flow control kind = %#v", component.Controls[1])
+	}
+	if component.Controls[2].NormalizedKind() != ControlText {
+		t.Fatalf("unknown control kinds should be editor text by default: %#v", component.Controls[2])
 	}
 }

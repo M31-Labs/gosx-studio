@@ -1,5 +1,7 @@
 package studio
 
+import "strings"
+
 const (
 	PackageCMS    = "github.com/odvcencio/gosx-cms"
 	PackageAdmin  = "github.com/odvcencio/gosx-admin"
@@ -58,6 +60,22 @@ const (
 	CapabilityPersistence EngineCapability = "persistence"
 )
 
+type ControlKind string
+
+const (
+	ControlText     ControlKind = "text"
+	ControlRichText ControlKind = "rich-text"
+	ControlMedia    ControlKind = "media"
+	ControlChoice   ControlKind = "choice"
+	ControlToggle   ControlKind = "toggle"
+	ControlNumber   ControlKind = "number"
+	ControlLink     ControlKind = "link"
+	ControlColor    ControlKind = "color"
+	ControlSource   ControlKind = "source"
+	ControlFlow     ControlKind = "flow"
+	ControlScene3D  ControlKind = "scene-3d"
+)
+
 type SiteMap struct {
 	Pages []Page
 }
@@ -80,6 +98,24 @@ type Component struct {
 	Binding       string
 	Status        string
 	Editable      bool
+	Controls      []Control
+}
+
+type Control struct {
+	Key      string
+	Label    string
+	Kind     ControlKind
+	Binding  string
+	Value    string
+	Help     string
+	Required bool
+	Advanced bool
+	Options  []ControlOption
+}
+
+type ControlOption struct {
+	Value string
+	Label string
 }
 
 type PageGroupCount struct {
@@ -212,6 +248,14 @@ func (siteMap SiteMap) ComponentCount() int {
 	return count
 }
 
+func (siteMap SiteMap) ControlCount() int {
+	count := 0
+	for _, page := range siteMap.Pages {
+		count += page.ControlCount()
+	}
+	return count
+}
+
 func (siteMap SiteMap) PageGroupCounts() []PageGroupCount {
 	counts := map[PageGroup]int{}
 	for _, page := range siteMap.Pages {
@@ -244,8 +288,40 @@ func (page Page) ComponentCount() int {
 	return len(page.Components)
 }
 
+func (page Page) ControlCount() int {
+	count := 0
+	for _, component := range page.Components {
+		count += component.ControlCount()
+	}
+	return count
+}
+
 func (page Page) NormalizedGroup() PageGroup {
 	return normalizePageGroup(page.Group)
+}
+
+func (component Component) ControlCount() int {
+	return len(component.Controls)
+}
+
+func (component Component) SelectionKey(pageKey string) string {
+	pageKey = strings.TrimSpace(pageKey)
+	componentKey := strings.TrimSpace(component.Key)
+	if pageKey == "" {
+		return componentKey
+	}
+	if componentKey == "" {
+		return pageKey
+	}
+	return pageKey + "." + componentKey
+}
+
+func (component Component) NormalizedSource() ComponentSource {
+	return normalizeComponentSource(component.Source)
+}
+
+func (control Control) NormalizedKind() ControlKind {
+	return normalizeControlKind(control.Kind)
 }
 
 func PageGroupLabel(group PageGroup) string {
@@ -263,11 +339,92 @@ func PageGroupLabel(group PageGroup) string {
 	}
 }
 
+func ComponentSourceLabel(source ComponentSource) string {
+	switch normalizeComponentSource(source) {
+	case ComponentSourceCMS:
+		return "CMS"
+	case ComponentSourcePlugin:
+		return "Plugin"
+	case ComponentSourceStudio:
+		return "Studio"
+	default:
+		return "Site"
+	}
+}
+
+func ControlKindLabel(kind ControlKind) string {
+	switch normalizeControlKind(kind) {
+	case ControlRichText:
+		return "Rich text"
+	case ControlMedia:
+		return "Media"
+	case ControlChoice:
+		return "Choice"
+	case ControlToggle:
+		return "Toggle"
+	case ControlNumber:
+		return "Number"
+	case ControlLink:
+		return "Link"
+	case ControlColor:
+		return "Color"
+	case ControlSource:
+		return "Source"
+	case ControlFlow:
+		return "Flow"
+	case ControlScene3D:
+		return "Scene 3D"
+	default:
+		return "Text"
+	}
+}
+
 func normalizePageGroup(group PageGroup) PageGroup {
-	switch group {
+	normalized := PageGroup(strings.TrimSpace(string(group)))
+	switch normalized {
 	case PageGroupCommerce, PageGroupContent, PageGroupFlows, PageGroupUtility:
-		return group
+		return normalized
 	default:
 		return PageGroupSite
+	}
+}
+
+func normalizeComponentSource(source ComponentSource) ComponentSource {
+	switch ComponentSource(strings.TrimSpace(string(source))) {
+	case ComponentSourceCMS:
+		return ComponentSourceCMS
+	case ComponentSourcePlugin:
+		return ComponentSourcePlugin
+	case ComponentSourceStudio:
+		return ComponentSourceStudio
+	default:
+		return ComponentSourceHost
+	}
+}
+
+func normalizeControlKind(kind ControlKind) ControlKind {
+	switch ControlKind(strings.TrimSpace(string(kind))) {
+	case ControlRichText:
+		return ControlRichText
+	case ControlMedia:
+		return ControlMedia
+	case ControlChoice:
+		return ControlChoice
+	case ControlToggle:
+		return ControlToggle
+	case ControlNumber:
+		return ControlNumber
+	case ControlLink:
+		return ControlLink
+	case ControlColor:
+		return ControlColor
+	case ControlSource:
+		return ControlSource
+	case ControlFlow:
+		return ControlFlow
+	case ControlScene3D:
+		return ControlScene3D
+	default:
+		return ControlText
 	}
 }

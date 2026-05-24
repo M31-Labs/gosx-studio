@@ -60,6 +60,8 @@ Each `Page` maps a route to a top-level GoSX page component. Pages can declare a
 
 `Component.Source` names the broad owner of a component, while `Component.Binding` is an opaque adapter key such as a CMS collection, flow, section, or plugin artifact. Studio can show friendly labels and readiness status without exposing handler refs, schemas, or Go DSL details to editors.
 
+`Component.Controls` describes the no-code fields a component exposes. A control can be text, media, choice, toggle, number, link, color, source, flow, or Scene3D. The control binding remains opaque to Studio; the host adapter decides how each value is loaded and persisted.
+
 The site map is intentionally not a generic JSON page builder. It is a compact visual graph over typed GoSX components. Editors manipulate pages, sections, and component settings; host apps decide how those changes persist.
 
 ## Engine Contract
