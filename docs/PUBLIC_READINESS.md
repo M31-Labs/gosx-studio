@@ -1,0 +1,18 @@
+# Public Readiness
+
+`M31-Labs/gosx-studio` is intended to become the public package for the website authoring layer.
+
+## Current Gate
+
+- Keep the repository private until the owner explicitly confirms the visibility change.
+- Keep host-specific secrets, customer data, generated media, and Noni-only implementation details out of this repo.
+- Keep public package APIs focused on configuration contracts, `.gsx` surfaces, engines, islands, and plugin boundaries.
+- Keep Noni's Mud Relics as a reference implementation, not as package source.
+
+## Before Visibility Changes
+
+- Confirm license and release policy.
+- Confirm package path casing and module import path.
+- Run `go test ./...`.
+- Search for credentials, private routes, customer records, and app-specific generated assets.
+- Confirm docs explain how `gosx-cms`, `gosx-admin`, and `gosx-studio` compose without implying this repo owns CMS or admin resources.

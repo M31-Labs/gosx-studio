@@ -3,6 +3,8 @@
 ## 1. Extraction Boundary
 
 - Define the Studio host configuration API.
+- Stabilize the site map contract for pages composed from GoSX components.
+- Stabilize the engine declaration contract for canvas, site map, block layout, flow, and Scene3D surfaces.
 - Define content, media, page, section, theme, and publish adapter interfaces.
 - Move reusable editor contracts out of `muddy-noni-commerce`.
 - Keep Noni-specific copy, resource names, and routes in the Noni app.
@@ -13,6 +15,7 @@ Extract the current editor into reusable `.gsx` surfaces:
 
 - `StudioShell.gsx`
 - `SiteNavigator.gsx`
+- `SiteMapEngine.gsx`
 - `CanvasEngine.gsx`
 - `BlockLayoutEngine.gsx`
 - `InspectorIsland.gsx`

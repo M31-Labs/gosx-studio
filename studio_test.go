@@ -21,8 +21,8 @@ func TestDefaultBoundaryNamesStudioAsAuthoringLayer(t *testing.T) {
 
 func TestDefaultFeaturesCoverAuthoringSurfaces(t *testing.T) {
 	features := DefaultFeatures()
-	if len(features) < 4 {
-		t.Fatalf("expected at least 4 default features, got %d", len(features))
+	if len(features) < 5 {
+		t.Fatalf("expected at least 5 default features, got %d", len(features))
 	}
 
 	surfaces := map[SurfaceKind]bool{}
@@ -33,9 +33,64 @@ func TestDefaultFeaturesCoverAuthoringSurfaces(t *testing.T) {
 		surfaces[feature.Surface] = true
 	}
 
-	for _, surface := range []SurfaceKind{SurfaceCanvas, SurfaceInspector, SurfaceFlow, SurfacePublish} {
+	for _, surface := range []SurfaceKind{SurfaceCanvas, SurfaceSiteMap, SurfaceInspector, SurfaceFlow, SurfacePublish} {
 		if !surfaces[surface] {
 			t.Fatalf("missing default feature for surface %q", surface)
 		}
+	}
+}
+
+func TestDefaultEnginesCoverHeavyStudioInteractions(t *testing.T) {
+	engines := DefaultEngines()
+	if len(engines) < 3 {
+		t.Fatalf("expected default engines, got %#v", engines)
+	}
+
+	byKind := map[EngineKind]Engine{}
+	for _, engine := range engines {
+		if engine.Key == "" || engine.Label == "" || engine.MountID == "" {
+			t.Fatalf("engine should include key, label, and mount id: %#v", engine)
+		}
+		if len(engine.Capabilities) == 0 {
+			t.Fatalf("engine should declare capabilities: %#v", engine)
+		}
+		byKind[engine.Kind] = engine
+	}
+
+	for _, kind := range []EngineKind{EngineCanvas, EngineSiteMap, EngineBlockLayout} {
+		if _, ok := byKind[kind]; !ok {
+			t.Fatalf("missing default engine kind %q", kind)
+		}
+	}
+}
+
+func TestSiteMapCountsComposedGoSXComponents(t *testing.T) {
+	siteMap := SiteMap{Pages: []Page{
+		{
+			Key:           "home",
+			Label:         "Home",
+			Route:         "/",
+			GoSXComponent: "HomePage",
+			Components: []Component{
+				{Key: "hero", Label: "Hero", GoSXComponent: "HomeHero", Source: ComponentSourceHost, Editable: true},
+				{Key: "products", Label: "Products", GoSXComponent: "FeaturedProducts", Source: ComponentSourceCMS, Editable: true},
+			},
+		},
+		{
+			Key:           "product",
+			Label:         "Product",
+			Route:         "/shop/{slug}",
+			GoSXComponent: "ProductPage",
+			Components: []Component{
+				{Key: "viewer", Label: "3D viewer", GoSXComponent: "Showcase3DViewer", Source: ComponentSourcePlugin, Editable: true},
+			},
+		},
+	}}
+
+	if siteMap.ComponentCount() != 3 {
+		t.Fatalf("component count = %d, want 3", siteMap.ComponentCount())
+	}
+	if siteMap.Pages[0].ComponentCount() != 2 {
+		t.Fatalf("home component count = %d, want 2", siteMap.Pages[0].ComponentCount())
 	}
 }
