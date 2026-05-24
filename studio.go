@@ -759,6 +759,34 @@ func DefaultRuntimeContracts() []RuntimeContract {
 					},
 				},
 				{
+					Name:    "applyCSS",
+					Label:   "Apply custom CSS",
+					Summary: "Apply editor-provided custom CSS to the Studio shell and preview frames.",
+					Payload: []RuntimePayloadField{
+						{Name: "cssText", Label: "CSS text", Kind: ControlRichText},
+					},
+				},
+				{
+					Name:    "applyFonts",
+					Label:   "Apply font CSS",
+					Summary: "Apply generated font-face and font-token CSS to the Studio shell and preview frames.",
+					Payload: []RuntimePayloadField{
+						{Name: "cssText", Label: "CSS text", Kind: ControlRichText},
+					},
+				},
+				{
+					Name:    "updateHeaderLogo",
+					Label:   "Update header logo",
+					Summary: "Update live header logo source, alt text, size, and offsets in the Studio shell and preview frames.",
+					Payload: []RuntimePayloadField{
+						{Name: "url", Label: "Logo URL", Kind: ControlMedia},
+						{Name: "alt", Label: "Alt text", Kind: ControlText},
+						{Name: "width", Label: "Width", Kind: ControlNumber},
+						{Name: "x", Label: "X offset", Kind: ControlNumber},
+						{Name: "y", Label: "Y offset", Kind: ControlNumber},
+					},
+				},
+				{
 					Name:    "requestInlineEdit",
 					Label:   "Request inline edit",
 					Summary: "Focus a field hotspot and open the inline text editing affordance for the selected block.",

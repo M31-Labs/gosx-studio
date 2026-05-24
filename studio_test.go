@@ -98,10 +98,14 @@ func TestDefaultRuntimeContractsExposeEngineAPIs(t *testing.T) {
 	if preview.Surface != SurfaceCanvas || preview.Engine != EngineCanvas {
 		t.Fatalf("preview runtime should belong to the canvas engine: %#v", preview)
 	}
-	for _, method := range []string{"mount", "setBlockVisibility", "requestInlineEdit", "cycleField"} {
+	for _, method := range []string{"mount", "setBlockVisibility", "applyCSS", "applyFonts", "updateHeaderLogo", "requestInlineEdit", "cycleField"} {
 		if !runtimeHasMethod(preview, method) {
 			t.Fatalf("preview runtime missing method %q: %#v", method, preview)
 		}
+	}
+	headerLogo, ok := preview.Method("updateHeaderLogo")
+	if !ok || len(headerLogo.Payload) != 5 {
+		t.Fatalf("header logo payload = %#v, ok=%v", headerLogo, ok)
 	}
 	inlineEdit, ok := preview.Method("requestInlineEdit")
 	if !ok || len(inlineEdit.Payload) != 2 {
