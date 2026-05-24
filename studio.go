@@ -154,12 +154,13 @@ type SiteMap struct {
 }
 
 type CanvasWorkspace struct {
-	RouteLabel string
-	PreviewURL string
-	Viewports  []CanvasViewport
-	ZoomLevels []CanvasZoomLevel
-	Blocks     []CanvasBlock
-	Actions    []CanvasAction
+	RouteLabel   string
+	PreviewURL   string
+	PreviewShell CanvasPreviewShell
+	Viewports    []CanvasViewport
+	ZoomLevels   []CanvasZoomLevel
+	Blocks       []CanvasBlock
+	Actions      []CanvasAction
 }
 
 type CanvasViewport struct {
@@ -196,6 +197,27 @@ type CanvasAction struct {
 	Summary string
 	Kind    CanvasActionKind
 	Enabled bool
+}
+
+type CanvasPreviewShell struct {
+	OverlayAttr         string
+	DropLineAttr        string
+	DockAttr            string
+	DockTitleAttr       string
+	FieldCountAttr      string
+	ActionAttr          string
+	OutlineTemplateAttr string
+	OutlineLabelAttr    string
+	FieldTemplateAttr   string
+	FieldActionTextAttr string
+	InlineEditClass     string
+	StyleImpactNodeAttr string
+	FrameAttr           string
+	FrameURLAttr        string
+	ViewportAttr        string
+	ViewportCurrentAttr string
+	ViewportWidthAttr   string
+	SelectionLabelAttr  string
 }
 
 type Page struct {
@@ -686,6 +708,29 @@ func DefaultCanvasActions() []CanvasAction {
 	}
 }
 
+func DefaultCanvasPreviewShell() CanvasPreviewShell {
+	return CanvasPreviewShell{
+		OverlayAttr:         "data-studio-preview-overlay",
+		DropLineAttr:        "data-studio-preview-drop-line",
+		DockAttr:            "data-studio-preview-dock",
+		DockTitleAttr:       "data-studio-preview-dock-title",
+		FieldCountAttr:      "data-studio-preview-field-count",
+		ActionAttr:          "data-studio-preview-action",
+		OutlineTemplateAttr: "data-studio-preview-outline-template",
+		OutlineLabelAttr:    "data-studio-preview-outline-label",
+		FieldTemplateAttr:   "data-studio-preview-field-template",
+		FieldActionTextAttr: "data-studio-preview-field-action-text",
+		InlineEditClass:     "is-studio-inline-editing",
+		StyleImpactNodeAttr: "data-studio-style-impact-node",
+		FrameAttr:           "data-studio-preview-frame",
+		FrameURLAttr:        "data-studio-preview-src",
+		ViewportAttr:        "data-studio-preview-viewport",
+		ViewportCurrentAttr: "data-studio-viewport-current",
+		ViewportWidthAttr:   "data-studio-viewport-width",
+		SelectionLabelAttr:  "data-studio-selection-label",
+	}
+}
+
 func (config HostConfig) ResourceAdapter(kind ResourceKind) (ResourceAdapter, bool) {
 	return ResourceAdapterByKind(config.Adapters, kind)
 }
@@ -767,11 +812,35 @@ func (siteMap SiteMap) TemplateCount() int {
 func (canvas CanvasWorkspace) Normalize() CanvasWorkspace {
 	canvas.RouteLabel = strings.TrimSpace(canvas.RouteLabel)
 	canvas.PreviewURL = strings.TrimSpace(canvas.PreviewURL)
+	canvas.PreviewShell = canvas.PreviewShell.Normalize()
 	canvas.Viewports = normalizeCanvasViewports(canvas.Viewports)
 	canvas.ZoomLevels = normalizeCanvasZoomLevels(canvas.ZoomLevels)
 	canvas.Blocks = normalizeCanvasBlocks(canvas.Blocks)
 	canvas.Actions = normalizeCanvasActions(canvas.Actions)
 	return canvas
+}
+
+func (shell CanvasPreviewShell) Normalize() CanvasPreviewShell {
+	defaults := DefaultCanvasPreviewShell()
+	shell.OverlayAttr = firstNonEmpty(strings.TrimSpace(shell.OverlayAttr), defaults.OverlayAttr)
+	shell.DropLineAttr = firstNonEmpty(strings.TrimSpace(shell.DropLineAttr), defaults.DropLineAttr)
+	shell.DockAttr = firstNonEmpty(strings.TrimSpace(shell.DockAttr), defaults.DockAttr)
+	shell.DockTitleAttr = firstNonEmpty(strings.TrimSpace(shell.DockTitleAttr), defaults.DockTitleAttr)
+	shell.FieldCountAttr = firstNonEmpty(strings.TrimSpace(shell.FieldCountAttr), defaults.FieldCountAttr)
+	shell.ActionAttr = firstNonEmpty(strings.TrimSpace(shell.ActionAttr), defaults.ActionAttr)
+	shell.OutlineTemplateAttr = firstNonEmpty(strings.TrimSpace(shell.OutlineTemplateAttr), defaults.OutlineTemplateAttr)
+	shell.OutlineLabelAttr = firstNonEmpty(strings.TrimSpace(shell.OutlineLabelAttr), defaults.OutlineLabelAttr)
+	shell.FieldTemplateAttr = firstNonEmpty(strings.TrimSpace(shell.FieldTemplateAttr), defaults.FieldTemplateAttr)
+	shell.FieldActionTextAttr = firstNonEmpty(strings.TrimSpace(shell.FieldActionTextAttr), defaults.FieldActionTextAttr)
+	shell.InlineEditClass = firstNonEmpty(strings.TrimSpace(shell.InlineEditClass), defaults.InlineEditClass)
+	shell.StyleImpactNodeAttr = firstNonEmpty(strings.TrimSpace(shell.StyleImpactNodeAttr), defaults.StyleImpactNodeAttr)
+	shell.FrameAttr = firstNonEmpty(strings.TrimSpace(shell.FrameAttr), defaults.FrameAttr)
+	shell.FrameURLAttr = firstNonEmpty(strings.TrimSpace(shell.FrameURLAttr), defaults.FrameURLAttr)
+	shell.ViewportAttr = firstNonEmpty(strings.TrimSpace(shell.ViewportAttr), defaults.ViewportAttr)
+	shell.ViewportCurrentAttr = firstNonEmpty(strings.TrimSpace(shell.ViewportCurrentAttr), defaults.ViewportCurrentAttr)
+	shell.ViewportWidthAttr = firstNonEmpty(strings.TrimSpace(shell.ViewportWidthAttr), defaults.ViewportWidthAttr)
+	shell.SelectionLabelAttr = firstNonEmpty(strings.TrimSpace(shell.SelectionLabelAttr), defaults.SelectionLabelAttr)
+	return shell
 }
 
 func (canvas CanvasWorkspace) BlockCount() int {

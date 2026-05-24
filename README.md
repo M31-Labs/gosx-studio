@@ -26,7 +26,7 @@ This module starts with contracts and plugin placement. The first extraction tar
 The first public contracts are intentionally small:
 
 - `SiteMap`, `Page`, and `Component` describe no-code page composition in terms of GoSX components, editor-facing page groups, broad source kinds, opaque host/CMS bindings, and readiness status.
-- `CanvasWorkspace`, `CanvasBlock`, `CanvasViewport`, `CanvasZoomLevel`, and `CanvasAction` describe the live page-canvas surface: preview breakpoints, zoom choices, selectable GoSX-backed blocks, no-code controls, and dock actions.
+- `CanvasWorkspace`, `CanvasBlock`, `CanvasViewport`, `CanvasZoomLevel`, `CanvasAction`, and `CanvasPreviewShell` describe the live page-canvas surface: preview breakpoints, zoom choices, selectable GoSX-backed blocks, no-code controls, dock actions, GoSX-authored overlay templates, inline editing affordances, and style-impact markers.
 - `Control` and `ControlOption` describe the editor-facing fields each component exposes: text, media, choices, links, color, source bindings, flows, and Scene3D/model controls.
 - `CompositionLibrary`, `PageBlueprint`, and `ComponentTemplate` describe the editor-facing building blocks that a site-map engine can expose as page starters and a component palette.
 - `CompositionIntent` and `CompositionStep` describe draft no-code operations such as creating a page from a blueprint or adding a component template to the selected route.

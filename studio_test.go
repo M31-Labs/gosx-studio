@@ -71,6 +71,11 @@ func TestCanvasWorkspaceNormalizesNoCodeEditingSurface(t *testing.T) {
 	canvas := CanvasWorkspace{
 		RouteLabel: " Home ",
 		PreviewURL: " / ",
+		PreviewShell: CanvasPreviewShell{
+			OverlayAttr:         " data-custom-overlay ",
+			OutlineTemplateAttr: " data-custom-outline-template ",
+			InlineEditClass:     " custom-inline ",
+		},
 		Viewports: []CanvasViewport{
 			{Key: " desktop ", Label: " Desktop ", Width: " 100% "},
 			{Key: " tablet ", Label: " Tablet ", Width: " 48rem ", Active: true},
@@ -111,6 +116,12 @@ func TestCanvasWorkspaceNormalizesNoCodeEditingSurface(t *testing.T) {
 	if canvas.RouteLabel != "Home" || canvas.PreviewURL != "/" {
 		t.Fatalf("canvas labels = %#v", canvas)
 	}
+	if canvas.PreviewShell.OverlayAttr != "data-custom-overlay" || canvas.PreviewShell.OutlineTemplateAttr != "data-custom-outline-template" || canvas.PreviewShell.InlineEditClass != "custom-inline" {
+		t.Fatalf("preview shell overrides = %#v", canvas.PreviewShell)
+	}
+	if canvas.PreviewShell.DockAttr != "data-studio-preview-dock" || canvas.PreviewShell.FieldActionTextAttr != "data-studio-preview-field-action-text" {
+		t.Fatalf("preview shell defaults = %#v", canvas.PreviewShell)
+	}
 	if canvas.BlockCount() != 2 || canvas.VisibleBlockCount() != 1 || canvas.ControlCount() != 1 {
 		t.Fatalf("canvas counts = blocks %d visible %d controls %d", canvas.BlockCount(), canvas.VisibleBlockCount(), canvas.ControlCount())
 	}
@@ -137,6 +148,9 @@ func TestCanvasWorkspaceDefaultsForStudioShell(t *testing.T) {
 	}
 	if canvas.ActiveZoom().Key != "fit" {
 		t.Fatalf("default zoom = %#v", canvas.ActiveZoom())
+	}
+	if canvas.PreviewShell.OverlayAttr != "data-studio-preview-overlay" || canvas.PreviewShell.InlineEditClass != "is-studio-inline-editing" {
+		t.Fatalf("default preview shell = %#v", canvas.PreviewShell)
 	}
 	actions := canvas.Actions
 	if len(actions) != len(DefaultCanvasActions()) {

@@ -68,6 +68,12 @@ The site map is intentionally not a generic JSON page builder. It is a compact v
 
 `CompositionIntent` describes the editor's draft operation in no-code language while keeping enough typed data for the host to apply it. Intent kinds cover creating a page from a blueprint and adding a component template to a selected page. Steps let Studio render the operation as a compact plan before persistence, with GoSX component names and opaque bindings still available to host actions and engines.
 
+## Canvas Preview Contract
+
+`CanvasWorkspace` describes the live editing surface for a selected page. Blocks point back to GoSX components and opaque host bindings; actions describe the no-code commands an editor can use on the current selection.
+
+`CanvasPreviewShell` names the `.gsx`-authored overlay affordances the canvas engine can bind to: preview overlays, drop lines, dock controls, outline templates, field hotspot templates, inline edit classes, style-impact markers, viewport controls, and selection labels. Engines should reuse this shell markup rather than constructing UI with ad hoc browser scripts.
+
 ## Host Adapter Contract
 
 Studio consumes host resources through `ResourceAdapter` declarations instead of importing host packages. The default adapter set covers media, pages, products, orders, contacts, settings, revisions, lifecycle, and flows. Each adapter declares an editor-facing label, the Studio surface that should use it, resource capabilities, and opaque `ResourceBinding` keys such as `media.assets`, `pages.routes`, `products.collection`, or `lifecycle.schedule`.
