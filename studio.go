@@ -843,6 +843,45 @@ func DefaultRuntimeContracts() []RuntimeContract {
 			},
 		},
 		{
+			Key:     "workbench-runtime",
+			Label:   "Workbench runtime",
+			Global:  "GoSXStudioWorkbenchRuntime",
+			Surface: SurfaceCanvas,
+			Engine:  EngineCanvas,
+			Methods: []RuntimeMethod{
+				{
+					Name:    "bindRailResizers",
+					Label:   "Bind rail resizers",
+					Summary: "Bind pointer and keyboard resizing for GoSX-authored workbench rail handles.",
+					Payload: []RuntimePayloadField{
+						{Name: "root", Label: "Root element", Kind: ControlSource, Summary: "Document or element that contains the Studio workbench."},
+					},
+				},
+				{
+					Name:    "currentRailWidth",
+					Label:   "Current rail width",
+					Summary: "Read the current width of a Studio workbench rail.",
+					Payload: []RuntimePayloadField{
+						{Name: "form", Label: "Workbench form", Kind: ControlSource, Required: true},
+						{Name: "side", Label: "Rail side", Kind: ControlChoice, Required: true},
+						{Name: "handle", Label: "Rail handle", Kind: ControlSource},
+					},
+				},
+				{
+					Name:    "setRailWidth",
+					Label:   "Set rail width",
+					Summary: "Apply a clamped width to a Studio workbench rail and emit live or committed resize events.",
+					Payload: []RuntimePayloadField{
+						{Name: "form", Label: "Workbench form", Kind: ControlSource, Required: true},
+						{Name: "side", Label: "Rail side", Kind: ControlChoice, Required: true},
+						{Name: "width", Label: "Rail width", Kind: ControlNumber, Required: true},
+						{Name: "handle", Label: "Rail handle", Kind: ControlSource},
+						{Name: "committed", Label: "Committed", Kind: ControlToggle},
+					},
+				},
+			},
+		},
+		{
 			Key:     "block-layout-runtime",
 			Label:   "Block layout runtime",
 			Global:  "GoSXStudioBlockLayoutRuntime",

@@ -72,7 +72,7 @@ func TestDefaultEnginesCoverHeavyStudioInteractions(t *testing.T) {
 
 func TestDefaultRuntimeContractsExposeEngineAPIs(t *testing.T) {
 	contracts := DefaultRuntimeContracts()
-	if len(contracts) < 2 {
+	if len(contracts) < 3 {
 		t.Fatalf("expected default runtime contracts, got %#v", contracts)
 	}
 
@@ -122,6 +122,27 @@ func TestDefaultRuntimeContractsExposeEngineAPIs(t *testing.T) {
 	inlineEdit, ok := preview.Method("requestInlineEdit")
 	if !ok || len(inlineEdit.Payload) != 2 {
 		t.Fatalf("inline edit payload = %#v, ok=%v", inlineEdit, ok)
+	}
+
+	workbench, ok := RuntimeContractByGlobal(contracts, "GoSXStudioWorkbenchRuntime")
+	if !ok {
+		t.Fatalf("missing workbench runtime contract in %#v", contracts)
+	}
+	if workbench.Surface != SurfaceCanvas || workbench.Engine != EngineCanvas {
+		t.Fatalf("workbench runtime should belong to the canvas engine: %#v", workbench)
+	}
+	for _, method := range []string{"bindRailResizers", "currentRailWidth", "setRailWidth"} {
+		if !runtimeHasMethod(workbench, method) {
+			t.Fatalf("workbench runtime missing method %q: %#v", method, workbench)
+		}
+	}
+	currentRailWidth, ok := workbench.Method("currentRailWidth")
+	if !ok || len(currentRailWidth.Payload) != 3 {
+		t.Fatalf("current rail width payload = %#v, ok=%v", currentRailWidth, ok)
+	}
+	setRailWidth, ok := workbench.Method("setRailWidth")
+	if !ok || len(setRailWidth.Payload) != 5 {
+		t.Fatalf("set rail width payload = %#v, ok=%v", setRailWidth, ok)
 	}
 
 	blockLayout, ok := RuntimeContractByGlobal(contracts, "GoSXStudioBlockLayoutRuntime")
