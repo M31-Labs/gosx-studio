@@ -462,3 +462,77 @@ func TestCompositionWorkspaceBuildsEditableGraphFromSiteMap(t *testing.T) {
 		t.Fatalf("binding link label mismatch")
 	}
 }
+
+func TestFlowReadinessChecksExposeOperatorFriendlyState(t *testing.T) {
+	flow := Flow{
+		Key:            "contact",
+		Label:          "Contact",
+		Route:          "/contact",
+		HasRoute:       true,
+		EmbedTarget:    "contact",
+		HasEmbedTarget: true,
+		HandlerRef:     "contact.submit",
+		CanExecute:     true,
+		Steps: []FlowStep{
+			{Key: "message", Label: "Message", BlockCount: 1, HasBlocks: true},
+		},
+		Actions: []FlowAction{
+			{
+				Key:        "submit",
+				Label:      "Submit message",
+				HandlerRef: "contact.submit",
+				CanExecute: true,
+				Fields: []FlowField{
+					{Name: "email", Label: "Email", Kind: ControlText, Required: true},
+					{Name: "message", Label: "Message", Kind: ControlRichText, Required: true},
+				},
+			},
+		},
+	}
+
+	if flow.ReadinessStatus() != ReadinessReady {
+		t.Fatalf("ready flow status = %q", flow.ReadinessStatus())
+	}
+	if flow.ReadinessLabel() != "Ready to publish" {
+		t.Fatalf("ready flow label = %q", flow.ReadinessLabel())
+	}
+	checks := flow.ReadinessChecks()
+	if len(checks) != 4 {
+		t.Fatalf("readiness checks = %#v", checks)
+	}
+	if checks[0].Status != ReadinessReady || checks[0].Summary != "contact.submit receives submissions." {
+		t.Fatalf("handler check = %#v", checks[0])
+	}
+	nodes := flow.Nodes()
+	if len(nodes) != 4 {
+		t.Fatalf("flow nodes = %#v", nodes)
+	}
+	if nodes[0].Kind != "placement" || nodes[1].Kind != "step" || nodes[2].Kind != "action" || nodes[3].Kind != "publish" {
+		t.Fatalf("flow node order = %#v", nodes)
+	}
+}
+
+func TestFlowReadinessBlocksMissingHandlerButAllowsPlacementReview(t *testing.T) {
+	flow := Flow{
+		Key:      "newsletter",
+		Label:    "Newsletter",
+		Route:    "/newsletter",
+		HasRoute: true,
+		Steps:    []FlowStep{{Key: "signup", Label: "Signup"}},
+		Actions:  []FlowAction{{Key: "submit", Label: "Subscribe"}},
+	}
+
+	if flow.ReadinessStatus() != ReadinessBlocked {
+		t.Fatalf("missing handler should block, got %q", flow.ReadinessStatus())
+	}
+	checks := flow.ReadinessChecks()
+	if checks[0].Status != ReadinessBlocked {
+		t.Fatalf("handler check = %#v", checks[0])
+	}
+	if checks[1].Status != ReadinessWatch {
+		t.Fatalf("route-only placement should need review, got %#v", checks[1])
+	}
+	if ReadinessStatusLabel(ReadinessWatch) != "Review" {
+		t.Fatalf("watch label mismatch")
+	}
+}
