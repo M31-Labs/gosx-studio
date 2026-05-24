@@ -110,6 +110,21 @@ const (
 	CompositionIntentAddComponent CompositionIntentKind = "add-component"
 )
 
+type WorkspaceNodeKind string
+
+const (
+	WorkspaceNodePage      WorkspaceNodeKind = "page"
+	WorkspaceNodeComponent WorkspaceNodeKind = "component"
+	WorkspaceNodeResource  WorkspaceNodeKind = "resource"
+)
+
+type WorkspaceLinkKind string
+
+const (
+	WorkspaceLinkContains WorkspaceLinkKind = "contains"
+	WorkspaceLinkBinds    WorkspaceLinkKind = "binds"
+)
+
 type SiteMap struct {
 	Pages   []Page
 	Library CompositionLibrary
@@ -122,6 +137,7 @@ type Page struct {
 	Group         PageGroup
 	GoSXComponent string
 	Status        string
+	Selected      bool
 	Components    []Component
 }
 
@@ -208,6 +224,44 @@ type CompositionStep struct {
 	Summary       string
 	GoSXComponent string
 	Binding       string
+}
+
+type CompositionWorkspace struct {
+	Layers []WorkspaceLayer
+	Nodes  []WorkspaceNode
+	Links  []WorkspaceLink
+}
+
+type WorkspaceLayer struct {
+	Key      string
+	Label    string
+	Summary  string
+	NodeKeys []string
+}
+
+type WorkspaceNode struct {
+	Key           string
+	Label         string
+	Summary       string
+	Kind          WorkspaceNodeKind
+	LayerKey      string
+	PageKey       string
+	Route         string
+	Group         PageGroup
+	GoSXComponent string
+	Source        ComponentSource
+	Binding       string
+	Status        string
+	Selected      bool
+}
+
+type WorkspaceLink struct {
+	Key         string
+	Label       string
+	Summary     string
+	Kind        WorkspaceLinkKind
+	FromNodeKey string
+	ToNodeKey   string
 }
 
 type PageGroupCount struct {
@@ -571,6 +625,160 @@ func (siteMap SiteMap) TemplateCount() int {
 	return len(siteMap.Library.ComponentTemplates)
 }
 
+func (siteMap SiteMap) CompositionWorkspace() CompositionWorkspace {
+	workspace := CompositionWorkspace{}
+	resourceNodeKeys := map[string]string{}
+
+	for _, page := range siteMap.Pages {
+		pageKey := strings.TrimSpace(page.Key)
+		if pageKey == "" {
+			continue
+		}
+
+		layer := WorkspaceLayer{
+			Key:     pageKey,
+			Label:   strings.TrimSpace(page.Label),
+			Summary: strings.TrimSpace(page.Route),
+		}
+		pageNodeKey := "page:" + workspaceToken(pageKey)
+		workspace.Nodes = append(workspace.Nodes, WorkspaceNode{
+			Key:           pageNodeKey,
+			Label:         strings.TrimSpace(page.Label),
+			Summary:       "Route " + strings.TrimSpace(page.Route),
+			Kind:          WorkspaceNodePage,
+			LayerKey:      pageKey,
+			PageKey:       pageKey,
+			Route:         strings.TrimSpace(page.Route),
+			Group:         page.NormalizedGroup(),
+			GoSXComponent: strings.TrimSpace(page.GoSXComponent),
+			Status:        strings.TrimSpace(page.Status),
+			Selected:      page.Selected,
+		})
+		layer.NodeKeys = append(layer.NodeKeys, pageNodeKey)
+
+		for _, component := range page.Components {
+			componentKey := strings.TrimSpace(component.Key)
+			if componentKey == "" {
+				continue
+			}
+			componentNodeKey := "component:" + workspaceToken(pageKey) + ":" + workspaceToken(componentKey)
+			workspace.Nodes = append(workspace.Nodes, WorkspaceNode{
+				Key:           componentNodeKey,
+				Label:         strings.TrimSpace(component.Label),
+				Summary:       strings.TrimSpace(component.Summary),
+				Kind:          WorkspaceNodeComponent,
+				LayerKey:      pageKey,
+				PageKey:       pageKey,
+				Route:         strings.TrimSpace(page.Route),
+				Group:         page.NormalizedGroup(),
+				GoSXComponent: strings.TrimSpace(component.GoSXComponent),
+				Source:        component.NormalizedSource(),
+				Binding:       strings.TrimSpace(component.Binding),
+				Status:        strings.TrimSpace(component.Status),
+			})
+			layer.NodeKeys = append(layer.NodeKeys, componentNodeKey)
+			workspace.Links = append(workspace.Links, WorkspaceLink{
+				Key:         "contains:" + workspaceToken(pageKey) + ":" + workspaceToken(componentKey),
+				Label:       "Contains",
+				Summary:     strings.TrimSpace(page.Label) + " contains " + strings.TrimSpace(component.Label),
+				Kind:        WorkspaceLinkContains,
+				FromNodeKey: pageNodeKey,
+				ToNodeKey:   componentNodeKey,
+			})
+
+			binding := strings.TrimSpace(component.Binding)
+			if binding == "" {
+				continue
+			}
+			resourceNodeKey, ok := resourceNodeKeys[binding]
+			if !ok {
+				resourceNodeKey = "resource:" + workspaceToken(binding)
+				resourceNodeKeys[binding] = resourceNodeKey
+				workspace.Nodes = append(workspace.Nodes, WorkspaceNode{
+					Key:     resourceNodeKey,
+					Label:   binding,
+					Summary: ComponentSourceLabel(component.Source) + " binding",
+					Kind:    WorkspaceNodeResource,
+					Source:  component.NormalizedSource(),
+					Binding: binding,
+					Status:  ComponentSourceLabel(component.Source),
+				})
+			}
+			workspace.Links = append(workspace.Links, WorkspaceLink{
+				Key:         "binds:" + workspaceToken(pageKey) + ":" + workspaceToken(componentKey) + ":" + workspaceToken(binding),
+				Label:       "Binds",
+				Summary:     strings.TrimSpace(component.Label) + " uses " + binding,
+				Kind:        WorkspaceLinkBinds,
+				FromNodeKey: componentNodeKey,
+				ToNodeKey:   resourceNodeKey,
+			})
+		}
+
+		workspace.Layers = append(workspace.Layers, layer)
+	}
+
+	if len(resourceNodeKeys) > 0 {
+		resourceLayer := WorkspaceLayer{
+			Key:     "resources",
+			Label:   "Resources",
+			Summary: "Content, flow, media, and plugin bindings used by the site.",
+		}
+		for _, node := range workspace.Nodes {
+			if node.Kind == WorkspaceNodeResource {
+				resourceLayer.NodeKeys = append(resourceLayer.NodeKeys, node.Key)
+			}
+		}
+		workspace.Layers = append(workspace.Layers, resourceLayer)
+	}
+
+	return workspace.Normalize()
+}
+
+func (workspace CompositionWorkspace) Normalize() CompositionWorkspace {
+	out := CompositionWorkspace{
+		Layers: make([]WorkspaceLayer, 0, len(workspace.Layers)),
+		Nodes:  make([]WorkspaceNode, 0, len(workspace.Nodes)),
+		Links:  make([]WorkspaceLink, 0, len(workspace.Links)),
+	}
+	for _, layer := range workspace.Layers {
+		layer.Key = strings.TrimSpace(layer.Key)
+		layer.Label = strings.TrimSpace(layer.Label)
+		layer.Summary = strings.TrimSpace(layer.Summary)
+		if layer.Key == "" || layer.Label == "" {
+			continue
+		}
+		layer.NodeKeys = normalizeWorkspaceNodeKeys(layer.NodeKeys)
+		out.Layers = append(out.Layers, layer)
+	}
+	for _, node := range workspace.Nodes {
+		node = node.Normalize()
+		if node.Key == "" || node.Label == "" {
+			continue
+		}
+		out.Nodes = append(out.Nodes, node)
+	}
+	for _, link := range workspace.Links {
+		link = link.Normalize()
+		if link.Key == "" || link.FromNodeKey == "" || link.ToNodeKey == "" {
+			continue
+		}
+		out.Links = append(out.Links, link)
+	}
+	return out
+}
+
+func (workspace CompositionWorkspace) NodeCount() int {
+	return len(workspace.Nodes)
+}
+
+func (workspace CompositionWorkspace) LinkCount() int {
+	return len(workspace.Links)
+}
+
+func (workspace CompositionWorkspace) LayerCount() int {
+	return len(workspace.Layers)
+}
+
 func (page Page) ComponentCount() int {
 	return len(page.Components)
 }
@@ -605,6 +813,40 @@ func (component Component) SelectionKey(pageKey string) string {
 
 func (component Component) NormalizedSource() ComponentSource {
 	return normalizeComponentSource(component.Source)
+}
+
+func (node WorkspaceNode) Normalize() WorkspaceNode {
+	node.Key = strings.TrimSpace(node.Key)
+	node.Label = strings.TrimSpace(node.Label)
+	node.Summary = strings.TrimSpace(node.Summary)
+	node.Kind = normalizeWorkspaceNodeKind(node.Kind)
+	node.LayerKey = strings.TrimSpace(node.LayerKey)
+	node.PageKey = strings.TrimSpace(node.PageKey)
+	node.Route = strings.TrimSpace(node.Route)
+	node.Group = normalizePageGroup(node.Group)
+	node.GoSXComponent = strings.TrimSpace(node.GoSXComponent)
+	node.Source = normalizeComponentSource(node.Source)
+	node.Binding = strings.TrimSpace(node.Binding)
+	node.Status = strings.TrimSpace(node.Status)
+	return node
+}
+
+func (node WorkspaceNode) NormalizedKind() WorkspaceNodeKind {
+	return normalizeWorkspaceNodeKind(node.Kind)
+}
+
+func (link WorkspaceLink) Normalize() WorkspaceLink {
+	link.Key = strings.TrimSpace(link.Key)
+	link.Label = strings.TrimSpace(link.Label)
+	link.Summary = strings.TrimSpace(link.Summary)
+	link.Kind = normalizeWorkspaceLinkKind(link.Kind)
+	link.FromNodeKey = strings.TrimSpace(link.FromNodeKey)
+	link.ToNodeKey = strings.TrimSpace(link.ToNodeKey)
+	return link
+}
+
+func (link WorkspaceLink) NormalizedKind() WorkspaceLinkKind {
+	return normalizeWorkspaceLinkKind(link.Kind)
 }
 
 func (library CompositionLibrary) BlueprintCount() int {
@@ -698,6 +940,26 @@ func ControlKindLabel(kind ControlKind) string {
 	}
 }
 
+func WorkspaceNodeKindLabel(kind WorkspaceNodeKind) string {
+	switch normalizeWorkspaceNodeKind(kind) {
+	case WorkspaceNodeComponent:
+		return "Component"
+	case WorkspaceNodeResource:
+		return "Resource"
+	default:
+		return "Page"
+	}
+}
+
+func WorkspaceLinkKindLabel(kind WorkspaceLinkKind) string {
+	switch normalizeWorkspaceLinkKind(kind) {
+	case WorkspaceLinkBinds:
+		return "Binding"
+	default:
+		return "Contains"
+	}
+}
+
 func normalizePageGroup(group PageGroup) PageGroup {
 	normalized := PageGroup(strings.TrimSpace(string(group)))
 	switch normalized {
@@ -706,6 +968,60 @@ func normalizePageGroup(group PageGroup) PageGroup {
 	default:
 		return PageGroupSite
 	}
+}
+
+func normalizeWorkspaceNodeKind(kind WorkspaceNodeKind) WorkspaceNodeKind {
+	switch WorkspaceNodeKind(strings.TrimSpace(string(kind))) {
+	case WorkspaceNodeComponent:
+		return WorkspaceNodeComponent
+	case WorkspaceNodeResource:
+		return WorkspaceNodeResource
+	default:
+		return WorkspaceNodePage
+	}
+}
+
+func normalizeWorkspaceLinkKind(kind WorkspaceLinkKind) WorkspaceLinkKind {
+	switch WorkspaceLinkKind(strings.TrimSpace(string(kind))) {
+	case WorkspaceLinkBinds:
+		return WorkspaceLinkBinds
+	default:
+		return WorkspaceLinkContains
+	}
+}
+
+func normalizeWorkspaceNodeKeys(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		out = append(out, value)
+	}
+	return out
+}
+
+func workspaceToken(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	var builder strings.Builder
+	lastDash := false
+	for _, char := range value {
+		if (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') {
+			builder.WriteRune(char)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			builder.WriteByte('-')
+			lastDash = true
+		}
+	}
+	token := strings.Trim(builder.String(), "-")
+	if token == "" {
+		return "node"
+	}
+	return token
 }
 
 func normalizeComponentSource(source ComponentSource) ComponentSource {

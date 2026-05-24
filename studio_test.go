@@ -355,3 +355,110 @@ func TestCompositionIntentDescribesNoCodeDraftOperations(t *testing.T) {
 		t.Fatalf("unknown intent kind should default to add-component, got %q", unknown.NormalizedKind())
 	}
 }
+
+func TestCompositionWorkspaceBuildsEditableGraphFromSiteMap(t *testing.T) {
+	siteMap := SiteMap{Pages: []Page{
+		{
+			Key:           "home",
+			Label:         "Home",
+			Route:         "/",
+			Group:         PageGroupSite,
+			GoSXComponent: "HomePage",
+			Status:        "Editable",
+			Selected:      true,
+			Components: []Component{
+				{
+					Key:           "hero",
+					Label:         "Hero",
+					Summary:       "Lead section",
+					GoSXComponent: "HomeHero",
+					Source:        ComponentSourceHost,
+					Binding:       "home.section.hero",
+					Status:        "Editable",
+				},
+				{
+					Key:           "contact",
+					Label:         "Contact form",
+					Summary:       "Collect messages",
+					GoSXComponent: "ContactFormFlow",
+					Source:        ComponentSourceCMS,
+					Binding:       "flow.contact",
+					Status:        "Connected",
+				},
+			},
+		},
+		{
+			Key:           "product",
+			Label:         "Product",
+			Route:         "/shop/{slug}",
+			Group:         PageGroupCommerce,
+			GoSXComponent: "ProductPage",
+			Status:        "Store",
+			Components: []Component{
+				{
+					Key:           "viewer",
+					Label:         "3D viewer",
+					GoSXComponent: "Showcase3DViewer",
+					Source:        ComponentSourcePlugin,
+					Binding:       "showcase3d.model",
+					Status:        "Plugin",
+				},
+			},
+		},
+	}}
+
+	workspace := siteMap.CompositionWorkspace()
+
+	if workspace.LayerCount() != 3 {
+		t.Fatalf("layer count = %d, want page layers plus resources", workspace.LayerCount())
+	}
+	if workspace.NodeCount() != 8 {
+		t.Fatalf("node count = %d, want 2 pages + 3 components + 3 resources", workspace.NodeCount())
+	}
+	if workspace.LinkCount() != 6 {
+		t.Fatalf("link count = %d, want contains and binding links", workspace.LinkCount())
+	}
+
+	byKey := map[string]WorkspaceNode{}
+	for _, node := range workspace.Nodes {
+		byKey[node.Key] = node
+	}
+	home, ok := byKey["page:home"]
+	if !ok {
+		t.Fatalf("missing home page node in %#v", workspace.Nodes)
+	}
+	if home.Kind != WorkspaceNodePage || home.GoSXComponent != "HomePage" || !home.Selected {
+		t.Fatalf("home node = %#v", home)
+	}
+	hero, ok := byKey["component:home:hero"]
+	if !ok {
+		t.Fatalf("missing hero component node in %#v", workspace.Nodes)
+	}
+	if hero.Kind != WorkspaceNodeComponent || hero.PageKey != "home" || hero.Binding != "home.section.hero" {
+		t.Fatalf("hero node = %#v", hero)
+	}
+	resource, ok := byKey["resource:flow-contact"]
+	if !ok {
+		t.Fatalf("missing flow resource node in %#v", workspace.Nodes)
+	}
+	if resource.Kind != WorkspaceNodeResource || resource.Source != ComponentSourceCMS {
+		t.Fatalf("resource node = %#v", resource)
+	}
+
+	linkKinds := map[WorkspaceLinkKind]int{}
+	for _, link := range workspace.Links {
+		linkKinds[link.Kind]++
+		if link.FromNodeKey == "" || link.ToNodeKey == "" {
+			t.Fatalf("link should connect nodes: %#v", link)
+		}
+	}
+	if linkKinds[WorkspaceLinkContains] != 3 || linkKinds[WorkspaceLinkBinds] != 3 {
+		t.Fatalf("link kinds = %#v", linkKinds)
+	}
+	if WorkspaceNodeKindLabel(WorkspaceNodeResource) != "Resource" {
+		t.Fatalf("resource node label mismatch")
+	}
+	if WorkspaceLinkKindLabel(WorkspaceLinkBinds) != "Binding" {
+		t.Fatalf("binding link label mismatch")
+	}
+}
