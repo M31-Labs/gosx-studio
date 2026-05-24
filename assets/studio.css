@@ -1,0 +1,15 @@
+body:has(.editor-page),
+.gosx-studio,
+.gosx-studio-workbench,
+.editor-workbench {
+  --size-studio-max: 1840px;
+  --size-studio-left: 18rem;
+  --size-studio-left-min: 14rem;
+  --size-studio-left-max: 24rem;
+  --size-studio-right: 23rem;
+  --size-studio-right-min: 18rem;
+  --size-studio-right-max: 30rem;
+  --size-studio-frame: 88rem;
+  --size-studio-resizer: 0.85rem;
+  --studio-stage-height: clamp(42rem, calc(100svh - 9rem), 84rem);
+}
