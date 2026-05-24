@@ -473,6 +473,28 @@ func TestDefaultResourceAdaptersCoverHostBoundResources(t *testing.T) {
 	if fallback.NormalizedKind() != ResourceMedia {
 		t.Fatalf("unknown resource kind should normalize to media, got %q", fallback.NormalizedKind())
 	}
+	normalized := ResourceAdapter{
+		Kind:    ResourceKind(" products "),
+		Summary: " Product tools ",
+		Surface: SurfaceKind(" site-map "),
+		Capabilities: []ResourceCapability{
+			ResourceCapability(" read "),
+			ResourceCapability(" "),
+		},
+		Bindings: []ResourceBinding{
+			{Key: " collection ", Label: " Collection ", Summary: " Storefront products ", Binding: " products.collection "},
+			{Key: "", Label: "Skipped", Binding: "products.skipped"},
+		},
+	}.Normalize()
+	if normalized.Kind != ResourceProducts || normalized.Label != "Products" || normalized.Surface != SurfaceSiteMap {
+		t.Fatalf("normalized adapter identity = %#v", normalized)
+	}
+	if normalized.CapabilityCount() != 1 || normalized.BindingCount() != 1 || normalized.Bindings[0].Binding != "products.collection" {
+		t.Fatalf("normalized adapter details = %#v", normalized)
+	}
+	if ResourceKindLabel(ResourceLifecycle) != "Lifecycle" || ResourceKindLabel(ResourceKind("unknown")) != "Media" {
+		t.Fatalf("resource labels did not normalize")
+	}
 }
 
 func TestSiteMapCountsComposedGoSXComponents(t *testing.T) {
