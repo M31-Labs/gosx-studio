@@ -1561,6 +1561,9 @@ func (siteMap SiteMap) CompositionWorkspace() CompositionWorkspace {
 	siteMap = siteMap.Normalize()
 	workspace := CompositionWorkspace{}
 	resourceNodeKeys := map[string]string{}
+	resourceNodeIndexes := map[string]int{}
+	resourceNodePageKeys := map[string]string{}
+	resourceNodeGroups := map[string]PageGroup{}
 
 	for _, page := range siteMap.Pages {
 		pageKey := strings.TrimSpace(page.Key)
@@ -1627,15 +1630,29 @@ func (siteMap SiteMap) CompositionWorkspace() CompositionWorkspace {
 			if !ok {
 				resourceNodeKey = "resource:" + workspaceToken(binding)
 				resourceNodeKeys[binding] = resourceNodeKey
+				resourceNodeIndexes[binding] = len(workspace.Nodes)
+				resourceNodePageKeys[binding] = pageKey
+				resourceNodeGroups[binding] = page.NormalizedGroup()
 				workspace.Nodes = append(workspace.Nodes, WorkspaceNode{
 					Key:     resourceNodeKey,
 					Label:   binding,
 					Summary: ComponentSourceLabel(component.Source) + " binding",
 					Kind:    WorkspaceNodeResource,
+					PageKey: pageKey,
+					Group:   page.NormalizedGroup(),
 					Source:  component.NormalizedSource(),
 					Binding: binding,
 					Status:  ComponentSourceLabel(component.Source),
 				})
+			} else {
+				if resourceNodePageKeys[binding] != pageKey {
+					resourceNodePageKeys[binding] = ""
+					resourceNodeGroups[binding] = PageGroupUtility
+				}
+				if index, ok := resourceNodeIndexes[binding]; ok && index >= 0 && index < len(workspace.Nodes) {
+					workspace.Nodes[index].PageKey = resourceNodePageKeys[binding]
+					workspace.Nodes[index].Group = resourceNodeGroups[binding]
+				}
 			}
 			workspace.Links = append(workspace.Links, WorkspaceLink{
 				Key:         "binds:" + workspaceToken(pageKey) + ":" + workspaceToken(componentKey) + ":" + workspaceToken(binding),

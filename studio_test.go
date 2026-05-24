@@ -942,6 +942,13 @@ func TestCompositionWorkspaceBuildsEditableGraphFromSiteMap(t *testing.T) {
 	if resource.Kind != WorkspaceNodeResource || resource.Source != ComponentSourceCMS {
 		t.Fatalf("resource node = %#v", resource)
 	}
+	if resource.PageKey != "home" || resource.Group != PageGroupSite {
+		t.Fatalf("resource node should inherit single owning page focus metadata: %#v", resource)
+	}
+	showcase := byKey["resource:showcase3d-model"]
+	if showcase.PageKey != "product" || showcase.Group != PageGroupCommerce {
+		t.Fatalf("showcase resource should inherit product page focus metadata: %#v", showcase)
+	}
 
 	linkKinds := map[WorkspaceLinkKind]int{}
 	for _, link := range workspace.Links {
