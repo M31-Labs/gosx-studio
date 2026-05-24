@@ -70,6 +70,99 @@ func TestDefaultEnginesCoverHeavyStudioInteractions(t *testing.T) {
 	}
 }
 
+func TestDefaultRuntimeContractsExposeEngineAPIs(t *testing.T) {
+	contracts := DefaultRuntimeContracts()
+	if len(contracts) < 2 {
+		t.Fatalf("expected default runtime contracts, got %#v", contracts)
+	}
+
+	for _, contract := range contracts {
+		contract = contract.Normalize()
+		if contract.Key == "" || contract.Label == "" || contract.Global == "" {
+			t.Fatalf("runtime contract should include key, label, and global: %#v", contract)
+		}
+		if contract.MethodCount() == 0 {
+			t.Fatalf("runtime contract should expose callable methods: %#v", contract)
+		}
+		for _, method := range contract.Methods {
+			if method.Name == "" || method.Label == "" || method.Summary == "" {
+				t.Fatalf("runtime method should include name, label, and summary: %#v", method)
+			}
+		}
+	}
+
+	preview, ok := RuntimeContractByGlobal(contracts, "GoSXStudioPreviewRuntime")
+	if !ok {
+		t.Fatalf("missing preview runtime contract in %#v", contracts)
+	}
+	if preview.Surface != SurfaceCanvas || preview.Engine != EngineCanvas {
+		t.Fatalf("preview runtime should belong to the canvas engine: %#v", preview)
+	}
+	for _, method := range []string{"mount", "setBlockVisibility", "requestInlineEdit", "cycleField"} {
+		if !runtimeHasMethod(preview, method) {
+			t.Fatalf("preview runtime missing method %q: %#v", method, preview)
+		}
+	}
+	inlineEdit, ok := preview.Method("requestInlineEdit")
+	if !ok || len(inlineEdit.Payload) != 2 {
+		t.Fatalf("inline edit payload = %#v, ok=%v", inlineEdit, ok)
+	}
+
+	blockLayout, ok := RuntimeContractByGlobal(contracts, "GoSXStudioBlockLayoutRuntime")
+	if !ok {
+		t.Fatalf("missing block layout runtime contract in %#v", contracts)
+	}
+	if blockLayout.Surface != SurfaceCanvas || blockLayout.Engine != EngineBlockLayout {
+		t.Fatalf("block layout runtime should belong to the block layout engine: %#v", blockLayout)
+	}
+	for _, method := range []string{"rows", "rowKey", "rowForKey", "moveRow", "renumber", "selectRow", "commitReorder", "updateBlockLibraryState"} {
+		if !runtimeHasMethod(blockLayout, method) {
+			t.Fatalf("block layout runtime missing method %q: %#v", method, blockLayout)
+		}
+	}
+	reorder, ok := blockLayout.Method("commitReorder")
+	if !ok || len(reorder.Payload) != 4 {
+		t.Fatalf("reorder payload = %#v, ok=%v", reorder, ok)
+	}
+}
+
+func TestRuntimeContractNormalizesMethodPayloads(t *testing.T) {
+	contract := RuntimeContract{
+		Key:     " preview ",
+		Label:   " Preview ",
+		Global:  " GoSXStudioPreviewRuntime ",
+		Surface: SurfaceKind(" canvas "),
+		Engine:  EngineKind(" canvas "),
+		Methods: []RuntimeMethod{
+			{
+				Name: " mount ",
+				Payload: []RuntimePayloadField{
+					{Name: " root ", Label: " Root ", Kind: ControlKind(" source "), Summary: " Mounted root "},
+					{Label: "Ignored"},
+				},
+			},
+			{Label: "Ignored"},
+		},
+	}.Normalize()
+
+	if contract.Key != "preview" || contract.Global != "GoSXStudioPreviewRuntime" {
+		t.Fatalf("contract strings = %#v", contract)
+	}
+	if contract.MethodCount() != 1 {
+		t.Fatalf("method count = %d", contract.MethodCount())
+	}
+	method, ok := contract.Method("mount")
+	if !ok {
+		t.Fatalf("missing normalized method in %#v", contract.Methods)
+	}
+	if method.Label != "mount" || len(method.Payload) != 1 {
+		t.Fatalf("normalized method = %#v", method)
+	}
+	if method.Payload[0].Name != "root" || method.Payload[0].Kind != ControlSource || method.Payload[0].Label != "Root" {
+		t.Fatalf("normalized payload = %#v", method.Payload[0])
+	}
+}
+
 func TestCanvasWorkspaceNormalizesNoCodeEditingSurface(t *testing.T) {
 	canvas := CanvasWorkspace{
 		RouteLabel: " Home ",
@@ -171,6 +264,11 @@ func engineHasCapability(engine Engine, capability EngineCapability) bool {
 		}
 	}
 	return false
+}
+
+func runtimeHasMethod(contract RuntimeContract, name string) bool {
+	_, ok := contract.Method(name)
+	return ok
 }
 
 func TestDefaultResourceAdaptersCoverHostBoundResources(t *testing.T) {

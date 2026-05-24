@@ -92,6 +92,12 @@ Heavy interactions belong behind `Engine` declarations:
 
 The engine declaration names the mount id, surface, kind, and capabilities. Host apps configure and mount engines; Studio owns the authoring controls and interaction affordances.
 
+## Runtime API Contract
+
+`RuntimeContract` describes the browser APIs an engine exposes after it is mounted. These contracts make the interactive surface explicit: host apps can configure Studio and call named runtime methods, while editors keep using `.gsx` components, islands, and engines instead of authored JavaScript or Go DSL internals.
+
+The default contracts currently include `GoSXStudioPreviewRuntime` for preview-shell mounting, block visibility, inline text requests, and field cycling, plus `GoSXStudioBlockLayoutRuntime` for row lookup, selection, movement, drag/drop commits, and component-palette state. These globals are implementation points for GoSX engines, not a separate no-code programming model for editors.
+
 ## Noni Proving Ground
 
 Noni's Mud Relics remains the reference implementation while Studio is extracted. The proving-ground app should keep using operator-facing language such as "Website editor". The reusable package can keep internal names such as GoSX Studio for package boundaries, contracts, and docs.

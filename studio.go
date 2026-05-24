@@ -424,6 +424,30 @@ type Engine struct {
 	Capabilities []EngineCapability
 }
 
+type RuntimeContract struct {
+	Key     string
+	Label   string
+	Global  string
+	Surface SurfaceKind
+	Engine  EngineKind
+	Methods []RuntimeMethod
+}
+
+type RuntimeMethod struct {
+	Name    string
+	Label   string
+	Summary string
+	Payload []RuntimePayloadField
+}
+
+type RuntimePayloadField struct {
+	Name     string
+	Label    string
+	Kind     ControlKind
+	Summary  string
+	Required bool
+}
+
 type Boundary struct {
 	CMSPackage     string
 	AdminPackage   string
@@ -445,6 +469,7 @@ type HostConfig struct {
 	EditorLabel string
 	Features    []Feature
 	Engines     []Engine
+	Runtimes    []RuntimeContract
 	Adapters    []ResourceAdapter
 	SiteMap     SiteMap
 	Canvas      CanvasWorkspace
@@ -707,6 +732,135 @@ func DefaultEngines() []Engine {
 	}
 }
 
+func DefaultRuntimeContracts() []RuntimeContract {
+	return []RuntimeContract{
+		{
+			Key:     "preview-runtime",
+			Label:   "Preview runtime",
+			Global:  "GoSXStudioPreviewRuntime",
+			Surface: SurfaceCanvas,
+			Engine:  EngineCanvas,
+			Methods: []RuntimeMethod{
+				{
+					Name:    "mount",
+					Label:   "Mount preview shell",
+					Summary: "Bind the GoSX-authored preview shell, overlays, dock controls, and inline editing affordances.",
+					Payload: []RuntimePayloadField{
+						{Name: "root", Label: "Root element", Kind: ControlSource, Summary: "Document or element that contains preview workbench markup."},
+					},
+				},
+				{
+					Name:    "setBlockVisibility",
+					Label:   "Set block visibility",
+					Summary: "Apply visible or hidden state to a GoSX-backed preview block.",
+					Payload: []RuntimePayloadField{
+						{Name: "key", Label: "Block key", Kind: ControlText, Required: true},
+						{Name: "visible", Label: "Visible", Kind: ControlToggle, Required: true},
+					},
+				},
+				{
+					Name:    "requestInlineEdit",
+					Label:   "Request inline edit",
+					Summary: "Focus a field hotspot and open the inline text editing affordance for the selected block.",
+					Payload: []RuntimePayloadField{
+						{Name: "key", Label: "Block key", Kind: ControlText, Required: true},
+						{Name: "field", Label: "Field key", Kind: ControlText},
+					},
+				},
+				{
+					Name:    "cycleField",
+					Label:   "Cycle field",
+					Summary: "Move field selection within the selected preview block.",
+					Payload: []RuntimePayloadField{
+						{Name: "key", Label: "Block key", Kind: ControlText, Required: true},
+						{Name: "direction", Label: "Direction", Kind: ControlNumber, Required: true},
+					},
+				},
+			},
+		},
+		{
+			Key:     "block-layout-runtime",
+			Label:   "Block layout runtime",
+			Global:  "GoSXStudioBlockLayoutRuntime",
+			Surface: SurfaceCanvas,
+			Engine:  EngineBlockLayout,
+			Methods: []RuntimeMethod{
+				{
+					Name:    "rows",
+					Label:   "Rows",
+					Summary: "Return the editable block rows in a page layout list.",
+					Payload: []RuntimePayloadField{
+						{Name: "list", Label: "Layout list", Kind: ControlSource, Required: true},
+					},
+				},
+				{
+					Name:    "rowKey",
+					Label:   "Row key",
+					Summary: "Read the stable GoSX block key for a layout row.",
+					Payload: []RuntimePayloadField{
+						{Name: "row", Label: "Layout row", Kind: ControlSource, Required: true},
+					},
+				},
+				{
+					Name:    "rowForKey",
+					Label:   "Row for key",
+					Summary: "Find a block layout row by stable GoSX block key.",
+					Payload: []RuntimePayloadField{
+						{Name: "list", Label: "Layout list", Kind: ControlSource, Required: true},
+						{Name: "key", Label: "Block key", Kind: ControlText, Required: true},
+					},
+				},
+				{
+					Name:    "moveRow",
+					Label:   "Move row",
+					Summary: "Move a block row within the current layout.",
+					Payload: []RuntimePayloadField{
+						{Name: "list", Label: "Layout list", Kind: ControlSource, Required: true},
+						{Name: "key", Label: "Block key", Kind: ControlText, Required: true},
+						{Name: "direction", Label: "Direction", Kind: ControlNumber, Required: true},
+					},
+				},
+				{
+					Name:    "renumber",
+					Label:   "Renumber rows",
+					Summary: "Refresh visible position labels after a block layout change.",
+					Payload: []RuntimePayloadField{
+						{Name: "list", Label: "Layout list", Kind: ControlSource, Required: true},
+					},
+				},
+				{
+					Name:    "selectRow",
+					Label:   "Select row",
+					Summary: "Select the row that represents a GoSX-backed page block.",
+					Payload: []RuntimePayloadField{
+						{Name: "list", Label: "Layout list", Kind: ControlSource, Required: true},
+						{Name: "key", Label: "Block key", Kind: ControlText, Required: true},
+					},
+				},
+				{
+					Name:    "commitReorder",
+					Label:   "Commit reorder",
+					Summary: "Commit a drag/drop reorder operation against the current block layout.",
+					Payload: []RuntimePayloadField{
+						{Name: "list", Label: "Layout list", Kind: ControlSource, Required: true},
+						{Name: "key", Label: "Block key", Kind: ControlText, Required: true},
+						{Name: "targetKey", Label: "Target block key", Kind: ControlText, Required: true},
+						{Name: "position", Label: "Position", Kind: ControlChoice, Required: true},
+					},
+				},
+				{
+					Name:    "updateBlockLibraryState",
+					Label:   "Update block library state",
+					Summary: "Refresh component-palette availability and active state from the current page layout.",
+					Payload: []RuntimePayloadField{
+						{Name: "root", Label: "Root element", Kind: ControlSource, Summary: "Document or element that contains the block library."},
+					},
+				},
+			},
+		},
+	}
+}
+
 func DefaultCanvasActions() []CanvasAction {
 	return []CanvasAction{
 		{Key: string(CanvasActionReveal), Kind: CanvasActionReveal, Label: "Reveal", Summary: "Focus the selected block in the canvas.", Enabled: true},
@@ -754,6 +908,41 @@ func ResourceAdapterByKind(adapters []ResourceAdapter, kind ResourceKind) (Resou
 		}
 	}
 	return ResourceAdapter{}, false
+}
+
+func RuntimeContractByGlobal(contracts []RuntimeContract, global string) (RuntimeContract, bool) {
+	global = strings.TrimSpace(global)
+	for _, contract := range contracts {
+		contract = contract.Normalize()
+		if contract.Global == global {
+			return contract, true
+		}
+	}
+	return RuntimeContract{}, false
+}
+
+func (contract RuntimeContract) Normalize() RuntimeContract {
+	contract.Key = strings.TrimSpace(contract.Key)
+	contract.Label = strings.TrimSpace(contract.Label)
+	contract.Global = strings.TrimSpace(contract.Global)
+	contract.Surface = normalizeSurfaceKind(contract.Surface)
+	contract.Engine = normalizeEngineKind(contract.Engine)
+	contract.Methods = normalizeRuntimeMethods(contract.Methods)
+	return contract
+}
+
+func (contract RuntimeContract) Method(name string) (RuntimeMethod, bool) {
+	name = strings.TrimSpace(name)
+	for _, method := range contract.Normalize().Methods {
+		if method.Name == name {
+			return method, true
+		}
+	}
+	return RuntimeMethod{}, false
+}
+
+func (contract RuntimeContract) MethodCount() int {
+	return len(contract.Normalize().Methods)
 }
 
 func (siteMap SiteMap) ComponentCount() int {
@@ -1423,6 +1612,38 @@ func CanvasActionKindLabel(kind CanvasActionKind) string {
 	}
 }
 
+func normalizeSurfaceKind(kind SurfaceKind) SurfaceKind {
+	switch SurfaceKind(strings.TrimSpace(string(kind))) {
+	case SurfaceSiteMap:
+		return SurfaceSiteMap
+	case SurfaceInspector:
+		return SurfaceInspector
+	case SurfaceFlow:
+		return SurfaceFlow
+	case SurfacePublish:
+		return SurfacePublish
+	case SurfaceShowcase3D:
+		return SurfaceShowcase3D
+	default:
+		return SurfaceCanvas
+	}
+}
+
+func normalizeEngineKind(kind EngineKind) EngineKind {
+	switch EngineKind(strings.TrimSpace(string(kind))) {
+	case EngineSiteMap:
+		return EngineSiteMap
+	case EngineBlockLayout:
+		return EngineBlockLayout
+	case EngineFlow:
+		return EngineFlow
+	case EngineScene3D:
+		return EngineScene3D
+	default:
+		return EngineCanvas
+	}
+}
+
 func normalizePageGroup(group PageGroup) PageGroup {
 	normalized := PageGroup(strings.TrimSpace(string(group)))
 	switch normalized {
@@ -1614,6 +1835,42 @@ func normalizeControls(values []Control) []Control {
 		value.Options = normalizeControlOptions(value.Options)
 		if value.Key == "" || value.Label == "" {
 			continue
+		}
+		out = append(out, value)
+	}
+	return out
+}
+
+func normalizeRuntimeMethods(values []RuntimeMethod) []RuntimeMethod {
+	out := make([]RuntimeMethod, 0, len(values))
+	for _, value := range values {
+		value.Name = strings.TrimSpace(value.Name)
+		value.Label = strings.TrimSpace(value.Label)
+		value.Summary = strings.TrimSpace(value.Summary)
+		value.Payload = normalizeRuntimePayloadFields(value.Payload)
+		if value.Name == "" {
+			continue
+		}
+		if value.Label == "" {
+			value.Label = value.Name
+		}
+		out = append(out, value)
+	}
+	return out
+}
+
+func normalizeRuntimePayloadFields(values []RuntimePayloadField) []RuntimePayloadField {
+	out := make([]RuntimePayloadField, 0, len(values))
+	for _, value := range values {
+		value.Name = strings.TrimSpace(value.Name)
+		value.Label = strings.TrimSpace(value.Label)
+		value.Kind = normalizeControlKind(value.Kind)
+		value.Summary = strings.TrimSpace(value.Summary)
+		if value.Name == "" {
+			continue
+		}
+		if value.Label == "" {
+			value.Label = value.Name
 		}
 		out = append(out, value)
 	}
