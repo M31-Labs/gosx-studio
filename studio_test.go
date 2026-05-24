@@ -115,7 +115,7 @@ func TestDefaultRuntimeContractsExposeEngineAPIs(t *testing.T) {
 	if blockLayout.Surface != SurfaceCanvas || blockLayout.Engine != EngineBlockLayout {
 		t.Fatalf("block layout runtime should belong to the block layout engine: %#v", blockLayout)
 	}
-	for _, method := range []string{"rows", "rowKey", "rowForKey", "moveRow", "renumber", "selectRow", "commitReorder", "updateBlockLibraryState"} {
+	for _, method := range []string{"rows", "rowKey", "rowForKey", "moveRow", "renumber", "selectRow", "commitReorder", "updateBlockLibraryState", "updateVisibilityState"} {
 		if !runtimeHasMethod(blockLayout, method) {
 			t.Fatalf("block layout runtime missing method %q: %#v", method, blockLayout)
 		}
@@ -123,6 +123,10 @@ func TestDefaultRuntimeContractsExposeEngineAPIs(t *testing.T) {
 	reorder, ok := blockLayout.Method("commitReorder")
 	if !ok || len(reorder.Payload) != 4 {
 		t.Fatalf("reorder payload = %#v, ok=%v", reorder, ok)
+	}
+	visibility, ok := blockLayout.Method("updateVisibilityState")
+	if !ok || len(visibility.Payload) != 1 || visibility.Payload[0].Kind != ControlToggle {
+		t.Fatalf("visibility payload = %#v, ok=%v", visibility, ok)
 	}
 }
 

@@ -856,6 +856,14 @@ func DefaultRuntimeContracts() []RuntimeContract {
 						{Name: "root", Label: "Root element", Kind: ControlSource, Summary: "Document or element that contains the block library."},
 					},
 				},
+				{
+					Name:    "updateVisibilityState",
+					Label:   "Update visibility state",
+					Summary: "Refresh a block row's visibility status, component-palette state, and live preview visibility.",
+					Payload: []RuntimePayloadField{
+						{Name: "check", Label: "Visibility control", Kind: ControlToggle, Required: true},
+					},
+				},
 			},
 		},
 	}
