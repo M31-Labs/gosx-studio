@@ -70,6 +70,7 @@ func TestSiteMapCountsComposedGoSXComponents(t *testing.T) {
 			Key:           "home",
 			Label:         "Home",
 			Route:         "/",
+			Group:         PageGroupSite,
 			GoSXComponent: "HomePage",
 			Components: []Component{
 				{Key: "hero", Label: "Hero", GoSXComponent: "HomeHero", Source: ComponentSourceHost, Binding: "home.section.hero", Status: "Editable", Editable: true},
@@ -80,6 +81,7 @@ func TestSiteMapCountsComposedGoSXComponents(t *testing.T) {
 			Key:           "product",
 			Label:         "Product",
 			Route:         "/shop/{slug}",
+			Group:         PageGroupCommerce,
 			GoSXComponent: "ProductPage",
 			Components: []Component{
 				{Key: "viewer", Label: "3D viewer", GoSXComponent: "Showcase3DViewer", Source: ComponentSourcePlugin, Binding: "showcase3d.model", Status: "Ready", Editable: true},
@@ -95,5 +97,45 @@ func TestSiteMapCountsComposedGoSXComponents(t *testing.T) {
 	}
 	if siteMap.Pages[1].Components[0].Binding != "showcase3d.model" {
 		t.Fatalf("plugin binding = %q", siteMap.Pages[1].Components[0].Binding)
+	}
+}
+
+func TestSiteMapGroupsPagesForBoardFilters(t *testing.T) {
+	siteMap := SiteMap{Pages: []Page{
+		{Key: "home", Label: "Home", Route: "/", Group: PageGroupSite, GoSXComponent: "HomePage"},
+		{Key: "shop", Label: "Shop", Route: "/shop", Group: PageGroupCommerce, GoSXComponent: "ShopPage"},
+		{Key: "blog", Label: "Journal", Route: "/blog", Group: PageGroupContent, GoSXComponent: "JournalPage"},
+		{Key: "contact", Label: "Contact", Route: "/contact", Group: PageGroupFlows, GoSXComponent: "ContactPage"},
+		{Key: "unknown", Label: "Unknown", Route: "/unknown", Group: PageGroup("private"), GoSXComponent: "UnknownPage"},
+	}}
+
+	counts := siteMap.PageGroupCounts()
+	if len(counts) != 4 {
+		t.Fatalf("group counts = %#v", counts)
+	}
+
+	want := map[PageGroup]int{
+		PageGroupSite:     2,
+		PageGroupCommerce: 1,
+		PageGroupContent:  1,
+		PageGroupFlows:    1,
+	}
+	for _, count := range counts {
+		if count.Label == "" {
+			t.Fatalf("group count should include an editor label: %#v", count)
+		}
+		if want[count.Group] != count.Count {
+			t.Fatalf("group %q count = %d, want %d", count.Group, count.Count, want[count.Group])
+		}
+		delete(want, count.Group)
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing group counts: %#v", want)
+	}
+	if PageGroupLabel(PageGroupCommerce) != "Store" {
+		t.Fatalf("commerce label = %q", PageGroupLabel(PageGroupCommerce))
+	}
+	if siteMap.Pages[4].NormalizedGroup() != PageGroupSite {
+		t.Fatalf("unknown group should normalize to site, got %q", siteMap.Pages[4].NormalizedGroup())
 	}
 }

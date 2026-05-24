@@ -25,7 +25,7 @@ This module starts with contracts and plugin placement. The first extraction tar
 
 The first public contracts are intentionally small:
 
-- `SiteMap`, `Page`, and `Component` describe no-code page composition in terms of GoSX components, broad source kinds, opaque host/CMS bindings, and readiness status.
+- `SiteMap`, `Page`, and `Component` describe no-code page composition in terms of GoSX components, editor-facing page groups, broad source kinds, opaque host/CMS bindings, and readiness status.
 - `Engine` declares heavy interaction surfaces and the capabilities a host app can mount.
 - `HostConfig` ties product labels, features, engines, and the editable site map together.
 

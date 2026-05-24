@@ -26,6 +26,16 @@ const (
 	ComponentSourceStudio ComponentSource = "studio"
 )
 
+type PageGroup string
+
+const (
+	PageGroupSite     PageGroup = "site"
+	PageGroupCommerce PageGroup = "commerce"
+	PageGroupContent  PageGroup = "content"
+	PageGroupFlows    PageGroup = "flows"
+	PageGroupUtility  PageGroup = "utility"
+)
+
 type EngineKind string
 
 const (
@@ -56,6 +66,7 @@ type Page struct {
 	Key           string
 	Label         string
 	Route         string
+	Group         PageGroup
 	GoSXComponent string
 	Status        string
 	Components    []Component
@@ -69,6 +80,12 @@ type Component struct {
 	Binding       string
 	Status        string
 	Editable      bool
+}
+
+type PageGroupCount struct {
+	Group PageGroup
+	Label string
+	Count int
 }
 
 type Engine struct {
@@ -195,6 +212,62 @@ func (siteMap SiteMap) ComponentCount() int {
 	return count
 }
 
+func (siteMap SiteMap) PageGroupCounts() []PageGroupCount {
+	counts := map[PageGroup]int{}
+	for _, page := range siteMap.Pages {
+		counts[page.NormalizedGroup()]++
+	}
+
+	groups := []PageGroup{
+		PageGroupSite,
+		PageGroupCommerce,
+		PageGroupContent,
+		PageGroupFlows,
+		PageGroupUtility,
+	}
+	out := make([]PageGroupCount, 0, len(groups))
+	for _, group := range groups {
+		count := counts[group]
+		if count == 0 {
+			continue
+		}
+		out = append(out, PageGroupCount{
+			Group: group,
+			Label: PageGroupLabel(group),
+			Count: count,
+		})
+	}
+	return out
+}
+
 func (page Page) ComponentCount() int {
 	return len(page.Components)
+}
+
+func (page Page) NormalizedGroup() PageGroup {
+	return normalizePageGroup(page.Group)
+}
+
+func PageGroupLabel(group PageGroup) string {
+	switch normalizePageGroup(group) {
+	case PageGroupCommerce:
+		return "Store"
+	case PageGroupContent:
+		return "Content"
+	case PageGroupFlows:
+		return "Flows"
+	case PageGroupUtility:
+		return "Utility"
+	default:
+		return "Site"
+	}
+}
+
+func normalizePageGroup(group PageGroup) PageGroup {
+	switch group {
+	case PageGroupCommerce, PageGroupContent, PageGroupFlows, PageGroupUtility:
+		return group
+	default:
+		return PageGroupSite
+	}
 }
