@@ -62,6 +62,98 @@ func TestDefaultEnginesCoverHeavyStudioInteractions(t *testing.T) {
 			t.Fatalf("missing default engine kind %q", kind)
 		}
 	}
+	if !engineHasCapability(byKind[EngineCanvas], CapabilityPanZoom) || !engineHasCapability(byKind[EngineCanvas], CapabilityDragDrop) {
+		t.Fatalf("canvas engine should cover pan/zoom and drag/drop: %#v", byKind[EngineCanvas])
+	}
+}
+
+func TestCanvasWorkspaceNormalizesNoCodeEditingSurface(t *testing.T) {
+	canvas := CanvasWorkspace{
+		RouteLabel: " Home ",
+		PreviewURL: " / ",
+		Viewports: []CanvasViewport{
+			{Key: " desktop ", Label: " Desktop ", Width: " 100% "},
+			{Key: " tablet ", Label: " Tablet ", Width: " 48rem ", Active: true},
+			{Key: " mobile ", Label: " Mobile ", Width: " 24rem ", Active: true},
+			{Label: "Ignored"},
+		},
+		ZoomLevels: []CanvasZoomLevel{
+			{Key: " fit ", Label: " Fit "},
+			{Key: " 100 ", Label: " 100% ", Scale: 1, Active: true},
+			{Key: " 125 ", Label: " 125% ", Scale: 1.25, Active: true},
+		},
+		Blocks: []CanvasBlock{
+			{
+				Key:           " hero ",
+				Label:         " Hero ",
+				Summary:       " Homepage hero ",
+				GoSXComponent: " HomeHero ",
+				Source:        ComponentSource(" cms "),
+				Binding:       " home.hero ",
+				Status:        " Editable ",
+				Visible:       true,
+				Selected:      true,
+				Editable:      true,
+				Controls: []Control{
+					{Key: " headline ", Label: " Headline ", Kind: ControlRichText, Binding: " home.hero.headline "},
+					{Key: "", Label: "Ignored"},
+				},
+			},
+			{Key: " products ", Label: " Products ", GoSXComponent: " FeaturedProducts ", Source: ComponentSourcePlugin, Binding: " products.collection "},
+			{Label: "Ignored"},
+		},
+		Actions: []CanvasAction{
+			{Kind: CanvasActionInlineText, Enabled: true},
+			{Key: "bad", Label: "Custom", Kind: CanvasActionKind("unknown")},
+		},
+	}.Normalize()
+
+	if canvas.RouteLabel != "Home" || canvas.PreviewURL != "/" {
+		t.Fatalf("canvas labels = %#v", canvas)
+	}
+	if canvas.BlockCount() != 2 || canvas.VisibleBlockCount() != 1 || canvas.ControlCount() != 1 {
+		t.Fatalf("canvas counts = blocks %d visible %d controls %d", canvas.BlockCount(), canvas.VisibleBlockCount(), canvas.ControlCount())
+	}
+	if canvas.ActiveViewport().Key != "tablet" {
+		t.Fatalf("active viewport = %#v", canvas.ActiveViewport())
+	}
+	if canvas.ActiveZoom().Key != "100" {
+		t.Fatalf("active zoom = %#v", canvas.ActiveZoom())
+	}
+	selected, ok := canvas.SelectedBlock()
+	if !ok || selected.Key != "hero" || selected.NormalizedSource() != ComponentSourceCMS {
+		t.Fatalf("selected block = %#v, ok=%v", selected, ok)
+	}
+	if len(canvas.Actions) != 2 || canvas.Actions[0].Key != string(CanvasActionInlineText) || canvas.Actions[1].NormalizedKind() != CanvasActionReveal {
+		t.Fatalf("actions = %#v", canvas.Actions)
+	}
+}
+
+func TestCanvasWorkspaceDefaultsForStudioShell(t *testing.T) {
+	canvas := CanvasWorkspace{}.Normalize()
+
+	if canvas.ActiveViewport().Key != "desktop" {
+		t.Fatalf("default viewport = %#v", canvas.ActiveViewport())
+	}
+	if canvas.ActiveZoom().Key != "fit" {
+		t.Fatalf("default zoom = %#v", canvas.ActiveZoom())
+	}
+	actions := canvas.Actions
+	if len(actions) != len(DefaultCanvasActions()) {
+		t.Fatalf("default actions = %#v", actions)
+	}
+	if CanvasActionKindLabel(CanvasActionToggleVisibility) != "Hide" {
+		t.Fatalf("toggle label = %q", CanvasActionKindLabel(CanvasActionToggleVisibility))
+	}
+}
+
+func engineHasCapability(engine Engine, capability EngineCapability) bool {
+	for _, value := range engine.Capabilities {
+		if value == capability {
+			return true
+		}
+	}
+	return false
 }
 
 func TestDefaultResourceAdaptersCoverHostBoundResources(t *testing.T) {

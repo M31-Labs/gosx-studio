@@ -136,9 +136,66 @@ const (
 	WorkspaceLinkBinds    WorkspaceLinkKind = "binds"
 )
 
+type CanvasActionKind string
+
+const (
+	CanvasActionReveal           CanvasActionKind = "reveal"
+	CanvasActionMoveUp           CanvasActionKind = "move-up"
+	CanvasActionMoveDown         CanvasActionKind = "move-down"
+	CanvasActionInlineText       CanvasActionKind = "inline-text"
+	CanvasActionContent          CanvasActionKind = "content"
+	CanvasActionStyle            CanvasActionKind = "style"
+	CanvasActionToggleVisibility CanvasActionKind = "toggle-visibility"
+)
+
 type SiteMap struct {
 	Pages   []Page
 	Library CompositionLibrary
+}
+
+type CanvasWorkspace struct {
+	RouteLabel string
+	PreviewURL string
+	Viewports  []CanvasViewport
+	ZoomLevels []CanvasZoomLevel
+	Blocks     []CanvasBlock
+	Actions    []CanvasAction
+}
+
+type CanvasViewport struct {
+	Key    string
+	Label  string
+	Width  string
+	Active bool
+}
+
+type CanvasZoomLevel struct {
+	Key    string
+	Label  string
+	Scale  float64
+	Active bool
+}
+
+type CanvasBlock struct {
+	Key           string
+	Label         string
+	Summary       string
+	GoSXComponent string
+	Source        ComponentSource
+	Binding       string
+	Status        string
+	Visible       bool
+	Selected      bool
+	Editable      bool
+	Controls      []Control
+}
+
+type CanvasAction struct {
+	Key     string
+	Label   string
+	Summary string
+	Kind    CanvasActionKind
+	Enabled bool
 }
 
 type Page struct {
@@ -368,6 +425,7 @@ type HostConfig struct {
 	Engines     []Engine
 	Adapters    []ResourceAdapter
 	SiteMap     SiteMap
+	Canvas      CanvasWorkspace
 }
 
 type Feature struct {
@@ -581,9 +639,12 @@ func DefaultEngines() []Engine {
 			MountID: "gosx-studio-canvas-engine",
 			Surface: SurfaceCanvas,
 			Capabilities: []EngineCapability{
+				CapabilityDragDrop,
+				CapabilityPanZoom,
 				CapabilitySelection,
 				CapabilityInlineEdit,
 				CapabilityPreview,
+				CapabilityPersistence,
 			},
 		},
 		{
@@ -610,6 +671,18 @@ func DefaultEngines() []Engine {
 				CapabilityPersistence,
 			},
 		},
+	}
+}
+
+func DefaultCanvasActions() []CanvasAction {
+	return []CanvasAction{
+		{Key: string(CanvasActionReveal), Kind: CanvasActionReveal, Label: "Reveal", Summary: "Focus the selected block in the canvas.", Enabled: true},
+		{Key: string(CanvasActionMoveUp), Kind: CanvasActionMoveUp, Label: "Move up", Summary: "Move the selected block earlier on the page.", Enabled: true},
+		{Key: string(CanvasActionMoveDown), Kind: CanvasActionMoveDown, Label: "Move down", Summary: "Move the selected block later on the page.", Enabled: true},
+		{Key: string(CanvasActionInlineText), Kind: CanvasActionInlineText, Label: "Edit text", Summary: "Edit the primary text field for the selection.", Enabled: true},
+		{Key: string(CanvasActionContent), Kind: CanvasActionContent, Label: "Content", Summary: "Open content controls for the selected block.", Enabled: true},
+		{Key: string(CanvasActionStyle), Kind: CanvasActionStyle, Label: "Style", Summary: "Open style controls for the selected block.", Enabled: true},
+		{Key: string(CanvasActionToggleVisibility), Kind: CanvasActionToggleVisibility, Label: "Hide", Summary: "Toggle whether the selected block is visible.", Enabled: true},
 	}
 }
 
@@ -689,6 +762,73 @@ func (siteMap SiteMap) BlueprintCount() int {
 
 func (siteMap SiteMap) TemplateCount() int {
 	return len(siteMap.Library.ComponentTemplates)
+}
+
+func (canvas CanvasWorkspace) Normalize() CanvasWorkspace {
+	canvas.RouteLabel = strings.TrimSpace(canvas.RouteLabel)
+	canvas.PreviewURL = strings.TrimSpace(canvas.PreviewURL)
+	canvas.Viewports = normalizeCanvasViewports(canvas.Viewports)
+	canvas.ZoomLevels = normalizeCanvasZoomLevels(canvas.ZoomLevels)
+	canvas.Blocks = normalizeCanvasBlocks(canvas.Blocks)
+	canvas.Actions = normalizeCanvasActions(canvas.Actions)
+	return canvas
+}
+
+func (canvas CanvasWorkspace) BlockCount() int {
+	return len(canvas.Normalize().Blocks)
+}
+
+func (canvas CanvasWorkspace) VisibleBlockCount() int {
+	count := 0
+	for _, block := range canvas.Normalize().Blocks {
+		if block.Visible {
+			count++
+		}
+	}
+	return count
+}
+
+func (canvas CanvasWorkspace) ControlCount() int {
+	count := 0
+	for _, block := range canvas.Normalize().Blocks {
+		count += block.ControlCount()
+	}
+	return count
+}
+
+func (canvas CanvasWorkspace) ActiveViewport() CanvasViewport {
+	viewports := canvas.Normalize().Viewports
+	for _, viewport := range viewports {
+		if viewport.Active {
+			return viewport
+		}
+	}
+	if len(viewports) == 0 {
+		return CanvasViewport{}
+	}
+	return viewports[0]
+}
+
+func (canvas CanvasWorkspace) ActiveZoom() CanvasZoomLevel {
+	levels := canvas.Normalize().ZoomLevels
+	for _, level := range levels {
+		if level.Active {
+			return level
+		}
+	}
+	if len(levels) == 0 {
+		return CanvasZoomLevel{}
+	}
+	return levels[0]
+}
+
+func (canvas CanvasWorkspace) SelectedBlock() (CanvasBlock, bool) {
+	for _, block := range canvas.Normalize().Blocks {
+		if block.Selected {
+			return block, true
+		}
+	}
+	return CanvasBlock{}, false
 }
 
 func (siteMap SiteMap) CompositionWorkspace() CompositionWorkspace {
@@ -879,6 +1019,18 @@ func (component Component) SelectionKey(pageKey string) string {
 
 func (component Component) NormalizedSource() ComponentSource {
 	return normalizeComponentSource(component.Source)
+}
+
+func (block CanvasBlock) ControlCount() int {
+	return len(block.Controls)
+}
+
+func (block CanvasBlock) NormalizedSource() ComponentSource {
+	return normalizeComponentSource(block.Source)
+}
+
+func (action CanvasAction) NormalizedKind() CanvasActionKind {
+	return normalizeCanvasActionKind(action.Kind)
 }
 
 func (node WorkspaceNode) Normalize() WorkspaceNode {
@@ -1170,6 +1322,27 @@ func ReadinessStatusLabel(status ReadinessStatus) string {
 	}
 }
 
+func CanvasActionKindLabel(kind CanvasActionKind) string {
+	switch normalizeCanvasActionKind(kind) {
+	case CanvasActionReveal:
+		return "Reveal"
+	case CanvasActionMoveUp:
+		return "Move up"
+	case CanvasActionMoveDown:
+		return "Move down"
+	case CanvasActionInlineText:
+		return "Edit text"
+	case CanvasActionContent:
+		return "Content"
+	case CanvasActionStyle:
+		return "Style"
+	case CanvasActionToggleVisibility:
+		return "Hide"
+	default:
+		return "Action"
+	}
+}
+
 func normalizePageGroup(group PageGroup) PageGroup {
 	normalized := PageGroup(strings.TrimSpace(string(group)))
 	switch normalized {
@@ -1177,6 +1350,25 @@ func normalizePageGroup(group PageGroup) PageGroup {
 		return normalized
 	default:
 		return PageGroupSite
+	}
+}
+
+func normalizeCanvasActionKind(kind CanvasActionKind) CanvasActionKind {
+	switch CanvasActionKind(strings.TrimSpace(string(kind))) {
+	case CanvasActionMoveUp:
+		return CanvasActionMoveUp
+	case CanvasActionMoveDown:
+		return CanvasActionMoveDown
+	case CanvasActionInlineText:
+		return CanvasActionInlineText
+	case CanvasActionContent:
+		return CanvasActionContent
+	case CanvasActionStyle:
+		return CanvasActionStyle
+	case CanvasActionToggleVisibility:
+		return CanvasActionToggleVisibility
+	default:
+		return CanvasActionReveal
 	}
 }
 
@@ -1216,6 +1408,144 @@ func normalizeWorkspaceNodeKeys(values []string) []string {
 	for _, value := range values {
 		value = strings.TrimSpace(value)
 		if value == "" {
+			continue
+		}
+		out = append(out, value)
+	}
+	return out
+}
+
+func normalizeCanvasViewports(values []CanvasViewport) []CanvasViewport {
+	if len(values) == 0 {
+		values = []CanvasViewport{
+			{Key: "desktop", Label: "Desktop", Width: "100%", Active: true},
+			{Key: "tablet", Label: "Tablet", Width: "48rem"},
+			{Key: "mobile", Label: "Mobile", Width: "24rem"},
+		}
+	}
+	out := make([]CanvasViewport, 0, len(values))
+	activeSet := false
+	for _, value := range values {
+		value.Key = strings.TrimSpace(value.Key)
+		value.Label = strings.TrimSpace(value.Label)
+		value.Width = strings.TrimSpace(value.Width)
+		if value.Key == "" || value.Label == "" {
+			continue
+		}
+		if value.Active {
+			if activeSet {
+				value.Active = false
+			} else {
+				activeSet = true
+			}
+		}
+		out = append(out, value)
+	}
+	if len(out) > 0 && !activeSet {
+		out[0].Active = true
+	}
+	return out
+}
+
+func normalizeCanvasZoomLevels(values []CanvasZoomLevel) []CanvasZoomLevel {
+	if len(values) == 0 {
+		values = []CanvasZoomLevel{
+			{Key: "fit", Label: "Fit", Active: true},
+			{Key: "75", Label: "75%", Scale: 0.75},
+			{Key: "100", Label: "100%", Scale: 1},
+			{Key: "125", Label: "125%", Scale: 1.25},
+		}
+	}
+	out := make([]CanvasZoomLevel, 0, len(values))
+	activeSet := false
+	for _, value := range values {
+		value.Key = strings.TrimSpace(value.Key)
+		value.Label = strings.TrimSpace(value.Label)
+		if value.Key == "" || value.Label == "" {
+			continue
+		}
+		if value.Active {
+			if activeSet {
+				value.Active = false
+			} else {
+				activeSet = true
+			}
+		}
+		out = append(out, value)
+	}
+	if len(out) > 0 && !activeSet {
+		out[0].Active = true
+	}
+	return out
+}
+
+func normalizeCanvasBlocks(values []CanvasBlock) []CanvasBlock {
+	out := make([]CanvasBlock, 0, len(values))
+	for _, value := range values {
+		value.Key = strings.TrimSpace(value.Key)
+		value.Label = strings.TrimSpace(value.Label)
+		value.Summary = strings.TrimSpace(value.Summary)
+		value.GoSXComponent = strings.TrimSpace(value.GoSXComponent)
+		value.Source = normalizeComponentSource(value.Source)
+		value.Binding = strings.TrimSpace(value.Binding)
+		value.Status = strings.TrimSpace(value.Status)
+		value.Controls = normalizeControls(value.Controls)
+		if value.Key == "" || value.Label == "" {
+			continue
+		}
+		out = append(out, value)
+	}
+	return out
+}
+
+func normalizeCanvasActions(values []CanvasAction) []CanvasAction {
+	if len(values) == 0 {
+		values = DefaultCanvasActions()
+	}
+	out := make([]CanvasAction, 0, len(values))
+	for _, value := range values {
+		value.Key = strings.TrimSpace(value.Key)
+		value.Label = strings.TrimSpace(value.Label)
+		value.Summary = strings.TrimSpace(value.Summary)
+		value.Kind = normalizeCanvasActionKind(value.Kind)
+		if value.Key == "" {
+			value.Key = string(value.Kind)
+		}
+		if value.Label == "" {
+			value.Label = CanvasActionKindLabel(value.Kind)
+		}
+		if value.Key == "" || value.Label == "" {
+			continue
+		}
+		out = append(out, value)
+	}
+	return out
+}
+
+func normalizeControls(values []Control) []Control {
+	out := make([]Control, 0, len(values))
+	for _, value := range values {
+		value.Key = strings.TrimSpace(value.Key)
+		value.Label = strings.TrimSpace(value.Label)
+		value.Kind = normalizeControlKind(value.Kind)
+		value.Binding = strings.TrimSpace(value.Binding)
+		value.Value = strings.TrimSpace(value.Value)
+		value.Help = strings.TrimSpace(value.Help)
+		value.Options = normalizeControlOptions(value.Options)
+		if value.Key == "" || value.Label == "" {
+			continue
+		}
+		out = append(out, value)
+	}
+	return out
+}
+
+func normalizeControlOptions(values []ControlOption) []ControlOption {
+	out := make([]ControlOption, 0, len(values))
+	for _, value := range values {
+		value.Value = strings.TrimSpace(value.Value)
+		value.Label = strings.TrimSpace(value.Label)
+		if value.Value == "" || value.Label == "" {
 			continue
 		}
 		out = append(out, value)
