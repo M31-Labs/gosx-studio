@@ -201,6 +201,23 @@ func TestDefaultRuntimeContractsExposeEngineAPIs(t *testing.T) {
 		t.Fatalf("selection bind payload = %#v, ok=%v", selectionBind, ok)
 	}
 
+	field, ok := RuntimeContractByGlobal(contracts, "GoSXStudioFieldRuntime")
+	if !ok {
+		t.Fatalf("missing field runtime contract in %#v", contracts)
+	}
+	if field.Surface != SurfaceInspector || field.Engine != EngineCanvas {
+		t.Fatalf("field runtime should belong to the inspector surface and canvas engine: %#v", field)
+	}
+	for _, method := range []string{"bind", "bindMirroring", "bindClipboard"} {
+		if !runtimeHasMethod(field, method) {
+			t.Fatalf("field runtime missing method %q: %#v", method, field)
+		}
+	}
+	fieldBind, ok := field.Method("bind")
+	if !ok || len(fieldBind.Payload) != 1 {
+		t.Fatalf("field bind payload = %#v, ok=%v", fieldBind, ok)
+	}
+
 	brand, ok := RuntimeContractByGlobal(contracts, "GoSXStudioBrandRuntime")
 	if !ok {
 		t.Fatalf("missing brand runtime contract in %#v", contracts)

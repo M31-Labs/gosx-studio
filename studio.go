@@ -1003,6 +1003,39 @@ func DefaultRuntimeContracts() []RuntimeContract {
 			},
 		},
 		{
+			Key:     "field-runtime",
+			Label:   "Field runtime",
+			Global:  "GoSXStudioFieldRuntime",
+			Surface: SurfaceInspector,
+			Engine:  EngineCanvas,
+			Methods: []RuntimeMethod{
+				{
+					Name:    "bind",
+					Label:   "Bind field utilities",
+					Summary: "Bind field-to-preview mirroring and Studio copy controls for GoSX-authored inspector fields.",
+					Payload: []RuntimePayloadField{
+						{Name: "root", Label: "Root element", Kind: ControlSource, Summary: "Document or element that contains Studio field controls."},
+					},
+				},
+				{
+					Name:    "bindMirroring",
+					Label:   "Bind field mirroring",
+					Summary: "Bind configured editor fields to preview text and attribute updates through the preview runtime.",
+					Payload: []RuntimePayloadField{
+						{Name: "root", Label: "Root element", Kind: ControlSource, Summary: "Document or element that contains mirrored field controls."},
+					},
+				},
+				{
+					Name:    "bindClipboard",
+					Label:   "Bind copy controls",
+					Summary: "Bind Studio copy buttons with native clipboard and fallback behavior.",
+					Payload: []RuntimePayloadField{
+						{Name: "root", Label: "Root element", Kind: ControlSource, Summary: "Document or element that contains copy controls."},
+					},
+				},
+			},
+		},
+		{
 			Key:     "brand-runtime",
 			Label:   "Brand runtime",
 			Global:  "GoSXStudioBrandRuntime",
