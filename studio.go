@@ -918,12 +918,41 @@ func DefaultRuntimeContracts() []RuntimeContract {
 			Engine:  EngineCanvas,
 			Methods: []RuntimeMethod{
 				{
+					Name:    "bindTheme",
+					Label:   "Bind theme controls",
+					Summary: "Bind theme kits, templates, color tokens, and image-ratio controls for live preview application.",
+					Payload: []RuntimePayloadField{
+						{Name: "root", Label: "Root element", Kind: ControlSource, Summary: "Document or element that contains Look theme controls."},
+					},
+				},
+				{
 					Name:    "bindWorkbench",
 					Label:   "Bind style workbench",
 					Summary: "Bind Look inspector style recipes, reset controls, hover previews, and impact readouts.",
 					Payload: []RuntimePayloadField{
 						{Name: "root", Label: "Root element", Kind: ControlSource, Summary: "Document or element that contains the Look style workbench."},
 					},
+				},
+				{
+					Name:    "bindCSS",
+					Label:   "Bind custom CSS",
+					Summary: "Bind custom CSS controls and mirror CSS into the Studio preview runtime.",
+					Payload: []RuntimePayloadField{
+						{Name: "root", Label: "Root element", Kind: ControlSource, Summary: "Document or element that contains custom CSS controls."},
+					},
+				},
+				{
+					Name:    "bindFonts",
+					Label:   "Bind font controls",
+					Summary: "Bind font family and URL controls and mirror generated font CSS into the Studio preview runtime.",
+					Payload: []RuntimePayloadField{
+						{Name: "root", Label: "Root element", Kind: ControlSource, Summary: "Document or element that contains font controls."},
+					},
+				},
+				{
+					Name:    "applyTheme",
+					Label:   "Apply theme",
+					Summary: "Apply the current theme kit, template, palette, style classes, and color tokens to the preview runtime.",
 				},
 				{
 					Name:    "syncControlButtons",

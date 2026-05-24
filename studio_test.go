@@ -169,10 +169,14 @@ func TestDefaultRuntimeContractsExposeEngineAPIs(t *testing.T) {
 	if style.Surface != SurfaceInspector || style.Engine != EngineCanvas {
 		t.Fatalf("style runtime should belong to the inspector surface and canvas engine: %#v", style)
 	}
-	for _, method := range []string{"bindWorkbench", "syncControlButtons", "showImpact", "restoreImpact", "setControlValue", "resetControlValue"} {
+	for _, method := range []string{"bindTheme", "bindWorkbench", "bindCSS", "bindFonts", "applyTheme", "syncControlButtons", "showImpact", "restoreImpact", "setControlValue", "resetControlValue"} {
 		if !runtimeHasMethod(style, method) {
 			t.Fatalf("style runtime missing method %q: %#v", method, style)
 		}
+	}
+	bindTheme, ok := style.Method("bindTheme")
+	if !ok || len(bindTheme.Payload) != 1 {
+		t.Fatalf("bind theme payload = %#v, ok=%v", bindTheme, ok)
 	}
 	showImpact, ok := style.Method("showImpact")
 	if !ok || len(showImpact.Payload) != 3 {
