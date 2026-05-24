@@ -406,7 +406,7 @@
     if (!form) return;
     state = normalizeWorkbenchStyleState(state || "default");
     form.setAttribute("data-studio-style-state", state);
-    Array.prototype.forEach.call(form.querySelectorAll("[data-studio-style-state]"), function (button) {
+    Array.prototype.forEach.call(form.querySelectorAll("button[data-studio-style-state], [role='button'][data-studio-style-state]"), function (button) {
       button.setAttribute("aria-pressed", button.getAttribute("data-studio-style-state") === state ? "true" : "false");
     });
     Array.prototype.forEach.call(form.querySelectorAll("[data-studio-style-scope]"), function (scope) {
@@ -536,7 +536,7 @@
         syncWorkbenchZoom(form, zoom.getAttribute("data-studio-zoom"));
         return;
       }
-      var styleState = event.target.closest("[data-studio-style-state]");
+      var styleState = event.target.closest("button[data-studio-style-state], [role='button'][data-studio-style-state]");
       if (styleState && form.contains(styleState)) {
         event.preventDefault();
         setWorkbenchStyleState(form, styleState.getAttribute("data-studio-style-state"));
@@ -808,7 +808,7 @@
       setReadout("[data-studio-style-state-label]", styleStateLabels[state]);
       setReadout("[data-studio-style-validity]", valid ? "Ready" : "Needs review");
       setReadout("[data-studio-style-system-label]", system);
-      Array.prototype.forEach.call(form.querySelectorAll("[data-studio-style-state]"), function (button) {
+      Array.prototype.forEach.call(form.querySelectorAll("button[data-studio-style-state], [role='button'][data-studio-style-state]"), function (button) {
         button.setAttribute("aria-pressed", button.getAttribute("data-studio-style-state") === state ? "true" : "false");
       });
       Array.prototype.forEach.call(form.querySelectorAll("[data-studio-style-scope]"), function (scope) {
