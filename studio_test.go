@@ -495,6 +495,9 @@ func TestDefaultResourceAdaptersCoverHostBoundResources(t *testing.T) {
 	if ResourceKindLabel(ResourceLifecycle) != "Lifecycle" || ResourceKindLabel(ResourceKind("unknown")) != "Media" {
 		t.Fatalf("resource labels did not normalize")
 	}
+	if emptySurface := (ResourceAdapter{Kind: ResourceSettings}).Normalize(); emptySurface.Surface != SurfaceInspector {
+		t.Fatalf("empty resource surface should default to inspector: %#v", emptySurface)
+	}
 }
 
 func TestSiteMapCountsComposedGoSXComponents(t *testing.T) {

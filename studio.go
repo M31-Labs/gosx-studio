@@ -1428,7 +1428,7 @@ func (adapter ResourceAdapter) Normalize() ResourceAdapter {
 	adapter.Kind = normalizeResourceKind(adapter.Kind)
 	adapter.Label = strings.TrimSpace(adapter.Label)
 	adapter.Summary = strings.TrimSpace(adapter.Summary)
-	adapter.Surface = normalizeSurfaceKind(adapter.Surface)
+	adapter.Surface = normalizeResourceSurface(adapter.Surface)
 	adapter.Capabilities = normalizeResourceCapabilities(adapter.Capabilities)
 	adapter.Bindings = normalizeResourceBindings(adapter.Bindings)
 	if adapter.Label == "" {
@@ -2322,6 +2322,14 @@ func normalizeSurfaceKind(kind SurfaceKind) SurfaceKind {
 	default:
 		return SurfaceCanvas
 	}
+}
+
+func normalizeResourceSurface(kind SurfaceKind) SurfaceKind {
+	normalized := SurfaceKind(strings.TrimSpace(string(kind)))
+	if normalized == "" {
+		return SurfaceInspector
+	}
+	return normalizeSurfaceKind(normalized)
 }
 
 func normalizeEngineKind(kind EngineKind) EngineKind {
