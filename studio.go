@@ -882,6 +882,35 @@ func DefaultRuntimeContracts() []RuntimeContract {
 			},
 		},
 		{
+			Key:     "brand-runtime",
+			Label:   "Brand runtime",
+			Global:  "GoSXStudioBrandRuntime",
+			Surface: SurfaceInspector,
+			Engine:  EngineCanvas,
+			Methods: []RuntimeMethod{
+				{
+					Name:    "bindLogo",
+					Label:   "Bind logo controls",
+					Summary: "Bind logo placement, snap, keyboard nudge, reset, and live-preview controls for the Brand inspector.",
+					Payload: []RuntimePayloadField{
+						{Name: "root", Label: "Root element", Kind: ControlSource, Summary: "Document or element that contains the Brand inspector."},
+					},
+				},
+				{
+					Name:    "updateHeaderLogo",
+					Label:   "Update header logo",
+					Summary: "Send Brand inspector logo source, alt text, size, and offsets to the preview runtime.",
+					Payload: []RuntimePayloadField{
+						{Name: "url", Label: "Logo URL", Kind: ControlMedia},
+						{Name: "alt", Label: "Alt text", Kind: ControlText},
+						{Name: "width", Label: "Width", Kind: ControlNumber},
+						{Name: "x", Label: "X offset", Kind: ControlNumber},
+						{Name: "y", Label: "Y offset", Kind: ControlNumber},
+					},
+				},
+			},
+		},
+		{
 			Key:     "block-layout-runtime",
 			Label:   "Block layout runtime",
 			Global:  "GoSXStudioBlockLayoutRuntime",

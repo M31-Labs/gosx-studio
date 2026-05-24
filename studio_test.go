@@ -72,7 +72,7 @@ func TestDefaultEnginesCoverHeavyStudioInteractions(t *testing.T) {
 
 func TestDefaultRuntimeContractsExposeEngineAPIs(t *testing.T) {
 	contracts := DefaultRuntimeContracts()
-	if len(contracts) < 3 {
+	if len(contracts) < 4 {
 		t.Fatalf("expected default runtime contracts, got %#v", contracts)
 	}
 
@@ -143,6 +143,23 @@ func TestDefaultRuntimeContractsExposeEngineAPIs(t *testing.T) {
 	setRailWidth, ok := workbench.Method("setRailWidth")
 	if !ok || len(setRailWidth.Payload) != 5 {
 		t.Fatalf("set rail width payload = %#v, ok=%v", setRailWidth, ok)
+	}
+
+	brand, ok := RuntimeContractByGlobal(contracts, "GoSXStudioBrandRuntime")
+	if !ok {
+		t.Fatalf("missing brand runtime contract in %#v", contracts)
+	}
+	if brand.Surface != SurfaceInspector || brand.Engine != EngineCanvas {
+		t.Fatalf("brand runtime should belong to the inspector surface and canvas engine: %#v", brand)
+	}
+	for _, method := range []string{"bindLogo", "updateHeaderLogo"} {
+		if !runtimeHasMethod(brand, method) {
+			t.Fatalf("brand runtime missing method %q: %#v", method, brand)
+		}
+	}
+	brandLogo, ok := brand.Method("updateHeaderLogo")
+	if !ok || len(brandLogo.Payload) != 5 {
+		t.Fatalf("brand logo payload = %#v, ok=%v", brandLogo, ok)
 	}
 
 	blockLayout, ok := RuntimeContractByGlobal(contracts, "GoSXStudioBlockLayoutRuntime")
