@@ -96,7 +96,7 @@ The engine declaration names the mount id, surface, kind, and capabilities. Host
 
 `RuntimeContract` describes the browser APIs an engine exposes after it is mounted. These contracts make the interactive surface explicit: host apps can configure Studio and call named runtime methods, while editors keep using `.gsx` components, islands, and engines instead of authored JavaScript or Go DSL internals.
 
-The default contracts currently include `GoSXStudioPreviewRuntime` for preview-shell mounting, block visibility, text and attribute mirroring, theme application, custom CSS, font CSS, header-logo preview updates, inline text requests, and field cycling, plus `GoSXStudioBlockLayoutRuntime` for row lookup, selection, movement, drag/drop commits, visibility state, and component-palette state. These globals are implementation points for GoSX engines, not a separate no-code programming model for editors.
+The default contracts currently include `GoSXStudioPreviewRuntime` for preview-shell mounting, block visibility, text and attribute mirroring, theme application, style-impact marking, custom CSS, font CSS, header-logo preview updates, inline text requests, and field cycling, plus `GoSXStudioBlockLayoutRuntime` for row lookup, selection, movement, drag/drop commits, visibility state, and component-palette state. These globals are implementation points for GoSX engines, not a separate no-code programming model for editors.
 
 ## Noni Proving Ground
 

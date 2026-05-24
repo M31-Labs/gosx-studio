@@ -795,6 +795,14 @@ func DefaultRuntimeContracts() []RuntimeContract {
 					},
 				},
 				{
+					Name:    "applyStyleImpact",
+					Label:   "Apply style impact",
+					Summary: "Clear previous style-impact markers and mark preview nodes affected by a selected style scope.",
+					Payload: []RuntimePayloadField{
+						{Name: "selector", Label: "Scope selector", Kind: ControlText},
+					},
+				},
+				{
 					Name:    "applyFonts",
 					Label:   "Apply font CSS",
 					Summary: "Apply generated font-face and font-token CSS to the Studio shell and preview frames.",
