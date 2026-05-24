@@ -189,6 +189,18 @@ func TestDefaultRuntimeContractsExposeEngineAPIs(t *testing.T) {
 		t.Fatalf("set rail width payload = %#v, ok=%v", setRailWidth, ok)
 	}
 
+	selection, ok := RuntimeContractByGlobal(contracts, "GoSXStudioSelectionRuntime")
+	if !ok {
+		t.Fatalf("missing selection runtime contract in %#v", contracts)
+	}
+	if selection.Surface != SurfaceCanvas || selection.Engine != EngineCanvas {
+		t.Fatalf("selection runtime should belong to the canvas engine: %#v", selection)
+	}
+	selectionBind, ok := selection.Method("bind")
+	if !ok || len(selectionBind.Payload) != 1 {
+		t.Fatalf("selection bind payload = %#v, ok=%v", selectionBind, ok)
+	}
+
 	brand, ok := RuntimeContractByGlobal(contracts, "GoSXStudioBrandRuntime")
 	if !ok {
 		t.Fatalf("missing brand runtime contract in %#v", contracts)

@@ -986,6 +986,23 @@ func DefaultRuntimeContracts() []RuntimeContract {
 			},
 		},
 		{
+			Key:     "selection-runtime",
+			Label:   "Selection runtime",
+			Global:  "GoSXStudioSelectionRuntime",
+			Surface: SurfaceCanvas,
+			Engine:  EngineCanvas,
+			Methods: []RuntimeMethod{
+				{
+					Name:    "bind",
+					Label:   "Bind selection surface",
+					Summary: "Bind block selection, workspace target selection, field focus, selection commandbar actions, and style-scope readouts for the Studio editor surface.",
+					Payload: []RuntimePayloadField{
+						{Name: "root", Label: "Root element", Kind: ControlSource, Summary: "Document or element that contains the Studio workbench."},
+					},
+				},
+			},
+		},
+		{
 			Key:     "brand-runtime",
 			Label:   "Brand runtime",
 			Global:  "GoSXStudioBrandRuntime",
