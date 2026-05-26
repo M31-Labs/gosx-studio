@@ -608,6 +608,21 @@
 
   window.__gosx_workbench_runtime_island_toggleRail = toggleRailIsland;
 
+  // toggleFocus(form) — mirrors toggleWorkbenchFocus at studio-engines.js:489.
+  // Flips data-studio-focus between "true" and "false", re-syncs the rail
+  // toggle aria-pressed states (the rail buttons share the focus pressed
+  // state — see syncWorkbenchRailButtons in studio-engines.js:450), emits
+  // gosxstudio:workbench-focus-change, refreshes the canvas.
+  function toggleFocusIsland(form) {
+    if (!form) return;
+    form.setAttribute("data-studio-focus", form.getAttribute("data-studio-focus") === "true" ? "false" : "true");
+    syncWorkbenchRailButtons(form);
+    emitWorkbenchChange("focus-change", form, { focus: form.getAttribute("data-studio-focus") === "true" });
+    refreshWorkbenchCanvas();
+  }
+
+  window.__gosx_workbench_runtime_island_toggleFocus = toggleFocusIsland;
+
   // bindCommandPaletteIsland — mirrors bindWorkbenchCommandPalette at
   // studio-engines.js:497. Wires the [data-studio-command-palette]
   // gosxstudio:command listener to the same fan-out (setMode /
