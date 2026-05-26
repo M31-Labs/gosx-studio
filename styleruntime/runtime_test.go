@@ -169,6 +169,46 @@ func TestIslandRuntimeJSPublishesBindCSSGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesBindFontsGlobal(t *testing.T) {
+	// Method 4/10: bindFonts(root) — legacy bindFonts at studio-engines.js:1602.
+	// For each of the three slots (display / body / mono), reads
+	// [data-editor-font-name="<slot>"] and [data-editor-font-url="<slot>"]
+	// inputs and recomputes the combined @font-face + :root font-variable
+	// CSS string. Dispatches PreviewRuntime.applyFonts(css) via
+	// frameTask. Re-binds on preview-frame load.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.BindFonts + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// DOM contracts — font-slot inputs.
+		"data-editor-font-name",
+		"data-editor-font-url",
+		// The three font slots the legacy iterates over (see line 1609).
+		`"display"`,
+		`"body"`,
+		`"mono"`,
+		// CSS family variable tokens written to :root (line 1618).
+		"--font-display",
+		"--font-body",
+		"--font-mono",
+		// Required for the @font-face rules emitted on populated slots.
+		"@font-face",
+		"font-display:swap",
+		// Per-input idempotency guard — distinct from legacy
+		// gosxStudioFontBound so both paths coexist additively.
+		"gosxStudioFontIslandBound",
+		// Cross-frame delegate the island calls into for the actual font CSS
+		// injection (slice 6 will replace with $preview.fontCSS signal).
+		"applyFonts",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() bindFonts must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
