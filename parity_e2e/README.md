@@ -38,6 +38,20 @@ Prerequisites:
 - Chromium installed via `npx playwright install chromium`
 - A running muddy-noni-commerce dev server on the URL below (or override
   via `GOSX_STUDIO_PARITY_BASE_URL`).
+- **An authenticated session for the editor route.** `/admin/editor`
+  redirects unauthenticated requests to `/login`. The parity tests require
+  the editor to be reachable. Configure
+  `ADMIN_EMAILS=<your-email>@<domain>` and sign in via Google OAuth, or
+  thread a pre-issued session cookie into the Playwright context (see
+  Playwright's `storageState`). Without auth, `bootBaseline` /
+  `bootCandidate` will fail at the canvas-attached wait.
+- **The gosx-studio module bump must include the fieldruntime island
+  bundle.** Until muddy-noni-commerce's `go.mod` pins a gosx-studio
+  version that contains `m31labs.dev/gosx-studio/fieldruntime` (or a
+  replace directive routes the import there), the candidate mode boots
+  the same legacy bundle as baseline. The `@coverage` test in
+  `fieldruntime_test.ts` detects this and marks itself skipped with a
+  descriptive reason so CI doesn't ship false-positive parity claims.
 
 ```bash
 cd ~/work/muddy-noni-commerce
