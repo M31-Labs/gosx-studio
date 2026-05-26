@@ -498,6 +498,34 @@ func TestIslandRuntimeJSPublishesToggleActivityGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesSaveLayoutGlobal(t *testing.T) {
+	// Method 13/15: saveLayout(form) — legacy saveWorkbenchLayout at
+	// studio-engines.js:294. Persistence wrapper: serializes the form's
+	// --studio-left-width / --studio-right-width custom properties and
+	// data-studio-activity-state attribute to localStorage under the
+	// gosx-studio-editor-layout key. Used as both the public island and
+	// the saveLayoutSoon (frameTask-wrapped) inside bindChrome.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.SaveLayout + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// localStorage key the legacy writes under (studio-engines.js:241).
+		`"gosx-studio-editor-layout"`,
+		// The three persisted properties (studio-engines.js:297-300).
+		"--studio-left-width",
+		"--studio-right-width",
+		"data-studio-activity-state",
+		// localStorage write API.
+		"localStorage",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() saveLayout must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
