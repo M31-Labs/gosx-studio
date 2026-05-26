@@ -321,6 +321,38 @@ func TestIslandRuntimeJSPublishesCurrentBreakpointGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesSetStyleStateGlobal(t *testing.T) {
+	// Method 7/15: setStyleState(form, state) — legacy setWorkbenchStyleState
+	// at studio-engines.js:405. Sets data-studio-style-state on the form,
+	// toggles aria-pressed on [data-studio-style-state] buttons, writes
+	// data-style-state / data-style-breakpoint / data-style-valid on
+	// [data-studio-style-scope] wrappers, emits
+	// gosxstudio:workbench-style-state-change, refreshes the canvas.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.SetStyleState + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// Form attribute setStyleState writes.
+		"data-studio-style-state",
+		// Style-scope wrapper attributes setStyleState writes.
+		"data-studio-style-scope",
+		"data-style-state",
+		"data-style-breakpoint",
+		"data-style-valid",
+		// Event name dispatched on style-state change.
+		"workbench-style-state-change",
+		// Default state when none provided (mirrors normalizer at
+		// studio-engines.js:401).
+		`"default"`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() setStyleState must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
