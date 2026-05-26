@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"m31labs.dev/gosx-studio/fieldruntime"
+	"m31labs.dev/gosx-studio/selectionruntime"
 )
 
 const (
@@ -144,7 +145,8 @@ func DefaultShellConfig() ShellConfig {
 			// once parity is proven. See
 			// ~/.hyphae/spaces/m31labs-gosx/specs/gosx-studio-runtime-parity-matrix.md
 			// for the full slice catalogue.
-			fieldruntime.FeatureFlagKey: false,
+			fieldruntime.FeatureFlagKey:     false,
+			selectionruntime.FeatureFlagKey: false,
 		},
 	}
 }
