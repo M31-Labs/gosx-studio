@@ -100,17 +100,19 @@ const bridgeShimJS = `;(function () {
   // See gosx-studio/fieldruntime/runtime.go for the contract.
   // Feature flag: ` + FeatureFlagKey + `
   if (typeof window === "undefined") return;
-  var FLAG = "` + FeatureFlagKey + `";
+  // The consumer surfaces ShellConfig.FeatureFlags via a
+  // data-gosx-studio-feature-flag-<key>="true" attribute on the document
+  // root (or any ancestor of the editor mount). This keeps the flag
+  // decision out of cookies / query params at the bundle level so SSR and
+  // CSR observations agree. The attribute name below MUST be the literal
+  // "data-gosx-studio-feature-flag-field-runtime-islands" so a grep over
+  // the bundle finds it; the test
+  // TestEngineRuntimeIncludesFieldRuntimeIslandBundle enforces this.
+  var FLAG_ATTR = "data-gosx-studio-feature-flag-field-runtime-islands";
   function flagEnabled() {
-    // The consumer surfaces ShellConfig.FeatureFlags via a
-    // data-gosx-studio-feature-flag-<key>="true" attribute on the
-    // document root (or any ancestor of the editor mount). This keeps the
-    // flag decision out of cookies / query params at the bundle level so
-    // SSR and CSR observations agree.
     try {
-      var attr = "data-gosx-studio-feature-flag-" + FLAG;
-      if (document.documentElement && document.documentElement.getAttribute(attr) === "true") return true;
-      var marked = document.querySelector("[" + attr + "='true']");
+      if (document.documentElement && document.documentElement.getAttribute(FLAG_ATTR) === "true") return true;
+      var marked = document.querySelector("[" + FLAG_ATTR + "='true']");
       return !!marked;
     } catch (e) {
       return false;
