@@ -148,6 +148,48 @@ func TestIslandRuntimeJSPublishesBindRailResizersGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesBindChromeGlobal(t *testing.T) {
+	// Method 2/15: bindChrome(root) — legacy bindWorkbenchChrome at
+	// studio-engines.js:516. Binds the workbench form's delegated click
+	// handler (fans out to setMode / syncViewport / syncZoom / setStyleState
+	// / toggleRail / toggleFocus / toggleActivity), wires saveLayoutSoon to
+	// rail-width-change/commit events, applies the persisted layout, and
+	// seeds the workbench mode / viewport / zoom on initial bind.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.BindChrome + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// Per-form idempotency guard — distinct from legacy
+		// gosxStudioWorkbenchChromeBound so both paths coexist additively.
+		"gosxStudioWorkbenchChromeIslandBound",
+		// DOM selectors the delegated click handler walks (mirrors
+		// studio-engines.js:520-561).
+		"data-studio-mode-control",
+		"data-studio-viewport",
+		"data-studio-zoom",
+		"data-studio-style-state",
+		"data-studio-rail-toggle",
+		"data-studio-focus-toggle",
+		"data-studio-activity-toggle",
+		// Custom event names the rail-width change/commit handlers
+		// listen for.
+		"gosxstudio:rail-width-change",
+		"gosxstudio:rail-width-commit",
+		// Initial seeded form attributes the bind sets when absent
+		// (mirrors studio-engines.js:577-580).
+		"data-studio-left",
+		"data-studio-right",
+		"data-studio-focus",
+		"data-studio-activity-state",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() bindChrome must preserve %q contract:\n%s", contract, body)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
