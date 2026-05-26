@@ -486,8 +486,11 @@ func TestIslandRuntimeJSPublishesToggleActivityGlobal(t *testing.T) {
 		// Activity state values toggled between.
 		`"open"`,
 		`"collapsed"`,
-		// Event name dispatched on activity change.
-		"workbench-activity-change",
+		// Event name dispatched on activity change. emitWorkbenchChange
+		// prefixes with "workbench-" so the literal in source is the
+		// suffix; the runtime CustomEvent name is
+		// "gosxstudio:workbench-activity-change".
+		`"activity-change"`,
 	} {
 		if !strings.Contains(body, contract) {
 			t.Fatalf("IslandRuntimeJS() toggleActivity must preserve %q contract", contract)
