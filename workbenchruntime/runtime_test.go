@@ -526,6 +526,38 @@ func TestIslandRuntimeJSPublishesSaveLayoutGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesCurrentRailWidthGlobal(t *testing.T) {
+	// Method 14/15: currentRailWidth(form, side, handle) — legacy
+	// currentWorkbenchRailWidth at studio-engines.js:165. Pure read:
+	// returns the form's --studio-{left,right}-width custom property as an
+	// integer (or the sidebar's bounding-rect width fallback, or the
+	// handle's bounds fallback). Per the slice plan, this method ships as
+	// a signal-derivation rather than a mutator — it reads the same DOM
+	// state setRailWidth writes (--studio-{left,right}-width CSS custom
+	// properties) and returns it unmodified. No event dispatch, no canvas
+	// refresh. The BridgeShim routes through it uniformly so future
+	// $workbench.railWidth signal consumers can substitute a signal-read
+	// for the property-read without changing the contract.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.CurrentRailWidth + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// CSS custom properties the method reads (mirrors studio-engines.js:166).
+		"--studio-left-width",
+		"--studio-right-width",
+		// Sidebar fallback selector (railSidebar helper).
+		"data-studio-sidebar",
+		// Integer parse used to normalize the CSS-prop string.
+		"parseInt",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() currentRailWidth must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
