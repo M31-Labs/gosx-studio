@@ -11,6 +11,7 @@ import (
 	"m31labs.dev/gosx-studio/blocklayoutruntime"
 	"m31labs.dev/gosx-studio/brandruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
+	"m31labs.dev/gosx-studio/previewruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
 	"m31labs.dev/gosx-studio/styleruntime"
 )
@@ -43,6 +44,7 @@ func EngineRuntimeScript() []byte {
 		brandruntime.Bundle(),
 		blocklayoutruntime.Bundle(),
 		styleruntime.Bundle(),
+		previewruntime.Bundle(),
 	}
 	totalSliceLen := 0
 	for _, slice := range slices {
@@ -85,6 +87,32 @@ func Stylesheet() []byte {
 
 func EngineRuntimeHandler() http.Handler {
 	return ScriptHandler("studio-engines.js", EngineRuntimeScript())
+}
+
+// PreviewSubscriberScript returns the JS bundle the storefront mounts
+// when loaded inside the editor preview iframe. Unlike the editor-side
+// engine bundle, this script is intended for the storefront page —
+// public storefront visitors never load it (the iframe's preview-mode
+// bootstrap per ADR 0009 is gated on ?gosx-preview=1 query param).
+//
+// The bundle wires window.__gosx_observe_shared_signal subscribers
+// against the $preview.* signal namespace; the cross-frame postMessage
+// relay (gosx/client/bridge/cross_frame.go) delivers writes from the
+// editor frame, and the subscribers apply the corresponding DOM
+// mutations locally inside the iframe.
+//
+// See ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-6-previewruntime.md
+// Section F and the package docstring at
+// gosx-studio/previewruntime/runtime.go for the contract.
+func PreviewSubscriberScript() []byte {
+	return previewruntime.PreviewSubscriberScript()
+}
+
+// PreviewSubscriberHandler serves PreviewSubscriberScript() at
+// shell.PreviewSubscriberPath. Storefront pages reference this URL in
+// a <script defer> tag emitted by the preview-mode bootstrap.
+func PreviewSubscriberHandler() http.Handler {
+	return ScriptHandler("preview-subscriber.js", PreviewSubscriberScript())
 }
 
 func StylesheetHandler() http.Handler {

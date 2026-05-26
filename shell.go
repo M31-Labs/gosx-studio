@@ -12,12 +12,13 @@ import (
 )
 
 const (
-	RuntimeRoot          = "/_gosx/studio"
-	StylesheetPath       = RuntimeRoot + "/studio.css"
-	EngineRuntimePath    = RuntimeRoot + "/studio-engines.js"
-	WorkbenchRuntimePath = RuntimeRoot + "/workbench-runtime.js"
-	CommandRuntimePath   = RuntimeRoot + "/command-palette.js"
-	StateRuntimePath     = RuntimeRoot + "/state-runtime.js"
+	RuntimeRoot             = "/_gosx/studio"
+	StylesheetPath          = RuntimeRoot + "/studio.css"
+	EngineRuntimePath       = RuntimeRoot + "/studio-engines.js"
+	WorkbenchRuntimePath    = RuntimeRoot + "/workbench-runtime.js"
+	CommandRuntimePath      = RuntimeRoot + "/command-palette.js"
+	StateRuntimePath        = RuntimeRoot + "/state-runtime.js"
+	PreviewSubscriberPath   = RuntimeRoot + "/preview-subscriber.js"
 
 	CanvasEngineName      = "GoSXStudioCanvas"
 	SiteMapEngineName     = "GoSXStudioSiteMap"
