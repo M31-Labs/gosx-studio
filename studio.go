@@ -8,7 +8,7 @@ import (
 const (
 	PackageCMS    = "github.com/odvcencio/gosx-cms"
 	PackageAdmin  = "github.com/odvcencio/gosx-admin"
-	PackageStudio = "github.com/M31-Labs/gosx-studio"
+	PackageStudio = "m31labs.dev/gosx-studio"
 )
 
 type SurfaceKind string

@@ -3,7 +3,7 @@ package showcase3d
 import (
 	"strings"
 
-	studio "github.com/M31-Labs/gosx-studio"
+	studio "m31labs.dev/gosx-studio"
 )
 
 const (

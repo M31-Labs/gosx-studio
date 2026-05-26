@@ -1,3 +1,3 @@
-module github.com/M31-Labs/gosx-studio
+module m31labs.dev/gosx-studio
 
 go 1.24

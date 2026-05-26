@@ -3,7 +3,7 @@ package showcase3d
 import (
 	"testing"
 
-	studio "github.com/M31-Labs/gosx-studio"
+	studio "m31labs.dev/gosx-studio"
 )
 
 func TestFeatureDeclaresShowcaseSurface(t *testing.T) {
