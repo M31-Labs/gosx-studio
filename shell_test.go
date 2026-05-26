@@ -6,6 +6,7 @@ import (
 	"m31labs.dev/gosx-studio/blocklayoutruntime"
 	"m31labs.dev/gosx-studio/brandruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
+	"m31labs.dev/gosx-studio/previewruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
 	"m31labs.dev/gosx-studio/styleruntime"
 )
@@ -75,6 +76,18 @@ func TestDefaultShellConfigOwnsReusableStudioChrome(t *testing.T) {
 	}
 	if config.FeatureEnabled(styleruntime.FeatureFlagKey) {
 		t.Fatalf("%q must default to false (production legacy JS path); got true", styleruntime.FeatureFlagKey)
+	}
+	// Phase 3 slice-6: the PreviewRuntime island flag must be registered
+	// with the default-off value so hosts can opt in once parity is proven.
+	// See ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-6-previewruntime.md
+	// and ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md
+	// (status-corrected by ADR 0009 — the cross-frame relay that makes
+	// this slice deliverable).
+	if _, ok := config.FeatureFlags[previewruntime.FeatureFlagKey]; !ok {
+		t.Fatalf("default shell config must register %q flag (got %#v)", previewruntime.FeatureFlagKey, config.FeatureFlags)
+	}
+	if config.FeatureEnabled(previewruntime.FeatureFlagKey) {
+		t.Fatalf("%q must default to false (production legacy JS path); got true", previewruntime.FeatureFlagKey)
 	}
 	if _, ok := config.Adapter(ResourceProducts); !ok {
 		t.Fatalf("expected product resource adapter in %#v", config.Adapters)
