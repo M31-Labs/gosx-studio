@@ -3,6 +3,7 @@ package studio
 import (
 	"strings"
 
+	"m31labs.dev/gosx-studio/brandruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
 )
@@ -147,6 +148,7 @@ func DefaultShellConfig() ShellConfig {
 			// for the full slice catalogue.
 			fieldruntime.FeatureFlagKey:     false,
 			selectionruntime.FeatureFlagKey: false,
+			brandruntime.FeatureFlagKey:     false,
 		},
 	}
 }
