@@ -137,4 +137,43 @@
   }
 
   window.__gosx_blocklayout_runtime_island_moveRow = moveRowIsland;
+
+  // updateBlockMoveButtonsIsland — internal helper mirroring
+  // updateBlockMoveButtons at studio-engines.js:2062. Walks every row and
+  // sets the row's [data-block-studio-move="up"|"down"] button.disabled
+  // based on the row's position. Used by renumberIsland; not a public
+  // method.
+  function updateBlockMoveButtonsIsland(list) {
+    var all = rowsIsland(list);
+    all.forEach(function (row, index) {
+      var up = row.querySelector('[data-block-studio-move="up"]');
+      var down = row.querySelector('[data-block-studio-move="down"]');
+      if (up) up.disabled = index === 0;
+      if (down) down.disabled = index === all.length - 1;
+    });
+  }
+
+  // renumber(list, source) — mirrors renumberBlockLayoutList at
+  // studio-engines.js:2047. Default source mirrors the legacy
+  // "block-layout-engine" string used when callers pass null/undefined.
+  // The order input takes a 1-based string; data-block-studio-index is
+  // 0-based — matching the legacy convention so the form posts the right
+  // order on submit and the engine's index queries see the right ordinal.
+  function renumberIsland(list, source) {
+    if (!list) return;
+    rowsIsland(list).forEach(function (row, index) {
+      var input = row.querySelector("[data-block-studio-order]");
+      if (input) input.value = String(index + 1);
+      row.setAttribute("data-block-studio-index", String(index));
+    });
+    updateBlockMoveButtonsIsland(list);
+    list.dispatchEvent(new CustomEvent("blockstudio:reorder", {
+      bubbles: true,
+      detail: { source: source || "block-layout-engine" }
+    }));
+    list.dispatchEvent(new Event("input", { bubbles: true }));
+    list.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  window.__gosx_blocklayout_runtime_island_renumber = renumberIsland;
 })();
