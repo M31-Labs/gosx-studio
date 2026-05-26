@@ -160,6 +160,32 @@ func TestEngineRuntimeIncludesFieldRuntimeIslandBundle(t *testing.T) {
 	}
 }
 
+func TestEngineRuntimeIncludesSelectionRuntimeIslandBundle(t *testing.T) {
+	// Phase 3 slice-2 burn-down of GoSXStudioSelectionRuntime. The engine
+	// runtime asset must include both the island-runtime JS (publishes the
+	// __gosx_selection_runtime_island_bind global) and the BridgeShim that
+	// delegates window.GoSXStudioSelectionRuntime calls when the
+	// "selection-runtime-islands" feature flag is on. See
+	// gosx-studio/selectionruntime/runtime.go.
+	engines := string(EngineRuntimeScript())
+	for _, fragment := range []string{
+		"__gosx_selection_runtime_island_bind",
+		"selection-runtime-islands",
+		// The shim's flag check must be in the bundle so the runtime is
+		// actually gated, not just loaded.
+		"data-gosx-studio-feature-flag-selection-runtime-islands",
+	} {
+		if !strings.Contains(engines, fragment) {
+			t.Fatalf("engine runtime missing selectionruntime fragment %q", fragment)
+		}
+	}
+	// The shim must override window.GoSXStudioSelectionRuntime; without
+	// that assignment the legacy method is never wrapped.
+	if !strings.Contains(engines, "window.GoSXStudioSelectionRuntime =") {
+		t.Fatalf("engine runtime missing selectionruntime shim assignment")
+	}
+}
+
 func TestEngineRuntimeHandlerServesCombinedRuntime(t *testing.T) {
 	rec := httptest.NewRecorder()
 	EngineRuntimeHandler().ServeHTTP(rec, httptest.NewRequest("GET", EngineRuntimePath, nil))
