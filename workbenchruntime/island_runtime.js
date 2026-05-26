@@ -512,6 +512,26 @@
 
   window.__gosx_workbench_runtime_island_activateViewport = activateViewportIsland;
 
+  // currentBreakpoint(form) — mirrors currentWorkbenchBreakpoint at
+  // studio-engines.js:393. Pure read: derives the form's
+  // data-studio-breakpoint attribute (or the preview-shell's
+  // data-studio-preview-viewport fallback, or "desktop"). Per the slice
+  // plan, this method ships as a signal-derivation rather than a mutator —
+  // it reads the same DOM state syncViewport writes (data-studio-breakpoint
+  // / data-studio-preview-viewport) and returns it unmodified. No event
+  // dispatch, no canvas refresh. The BridgeShim routes through it
+  // uniformly so future $workbench.viewport signal consumers can substitute
+  // a signal-read for the attribute-read without changing the contract.
+  function currentBreakpointIsland(form) {
+    if (!form) return "desktop";
+    var viewport = form.getAttribute("data-studio-breakpoint");
+    if (viewport) return viewport;
+    var shell = form.querySelector(".editor-preview-shell");
+    return shell ? shell.getAttribute("data-studio-preview-viewport") || "desktop" : "desktop";
+  }
+
+  window.__gosx_workbench_runtime_island_currentBreakpoint = currentBreakpointIsland;
+
   // bindCommandPaletteIsland — mirrors bindWorkbenchCommandPalette at
   // studio-engines.js:497. Wires the [data-studio-command-palette]
   // gosxstudio:command listener to the same fan-out (setMode /
