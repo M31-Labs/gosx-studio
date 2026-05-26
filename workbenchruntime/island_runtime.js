@@ -576,6 +576,22 @@
 
   window.__gosx_workbench_runtime_island_syncZoom = syncZoomIsland;
 
+  // activateZoom(form, zoom) — mirrors activateWorkbenchZoom at
+  // studio-engines.js:430. Clicks the matching [data-studio-zoom="<x>"]
+  // button if present; otherwise falls through to syncZoomIsland.
+  function activateZoomIsland(form, zoom) {
+    if (!form) return;
+    zoom = zoom || "fit";
+    var button = form.querySelector('button[data-studio-zoom="' + attrValue(zoom) + '"], [role="button"][data-studio-zoom="' + attrValue(zoom) + '"]');
+    if (button && button.click) {
+      button.click();
+      return;
+    }
+    syncZoomIsland(form, zoom);
+  }
+
+  window.__gosx_workbench_runtime_island_activateZoom = activateZoomIsland;
+
   // bindCommandPaletteIsland — mirrors bindWorkbenchCommandPalette at
   // studio-engines.js:497. Wires the [data-studio-command-palette]
   // gosxstudio:command listener to the same fan-out (setMode /
