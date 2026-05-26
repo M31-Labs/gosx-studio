@@ -472,6 +472,30 @@
 
   window.__gosx_workbench_runtime_island_setMode = setModeIsland;
 
+  // syncViewport(form, viewport) — mirrors syncWorkbenchViewport at
+  // studio-engines.js:369. Sets data-studio-breakpoint on the form,
+  // data-studio-preview-viewport on the .editor-preview-shell (only when
+  // the viewport island is not already managing it via
+  // data-studio-viewport-island="true"), updates
+  // [data-studio-viewport-label] readouts, emits
+  // gosxstudio:workbench-viewport-change, refreshes the canvas.
+  function syncViewportIsland(form, viewport) {
+    if (!form) return;
+    viewport = viewport || "desktop";
+    var shell = form.querySelector(".editor-preview-shell");
+    if (shell && shell.getAttribute("data-studio-viewport-island") !== "true") {
+      shell.setAttribute("data-studio-preview-viewport", viewport);
+    }
+    form.setAttribute("data-studio-breakpoint", viewport);
+    Array.prototype.forEach.call(form.querySelectorAll("[data-studio-viewport-label]"), function (node) {
+      node.textContent = workbenchViewportLabels[viewport] || viewport.charAt(0).toUpperCase() + viewport.slice(1);
+    });
+    emitWorkbenchChange("viewport-change", form, { viewport: viewport });
+    refreshWorkbenchCanvas();
+  }
+
+  window.__gosx_workbench_runtime_island_syncViewport = syncViewportIsland;
+
   // bindCommandPaletteIsland — mirrors bindWorkbenchCommandPalette at
   // studio-engines.js:497. Wires the [data-studio-command-palette]
   // gosxstudio:command listener to the same fan-out (setMode /
