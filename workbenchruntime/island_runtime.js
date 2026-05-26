@@ -532,6 +532,35 @@
 
   window.__gosx_workbench_runtime_island_currentBreakpoint = currentBreakpointIsland;
 
+  // setStyleState(form, state) — mirrors setWorkbenchStyleState at
+  // studio-engines.js:405. Sets data-studio-style-state on the form,
+  // toggles aria-pressed on [data-studio-style-state] buttons, writes
+  // data-style-state / data-style-breakpoint / data-style-valid on
+  // [data-studio-style-scope] wrappers, emits
+  // gosxstudio:workbench-style-state-change, refreshes the canvas.
+  //
+  // data-style-breakpoint is derived via currentBreakpointIsland so the
+  // attribute stays in sync with the viewport state without re-reading
+  // the raw form attribute. Per the slice plan, currentBreakpoint is a
+  // pure derivation — this method's call into it has no side effects.
+  function setStyleStateIsland(form, state) {
+    if (!form) return;
+    state = normalizeWorkbenchStyleState(state || "default");
+    form.setAttribute("data-studio-style-state", state);
+    Array.prototype.forEach.call(form.querySelectorAll("button[data-studio-style-state], [role='button'][data-studio-style-state]"), function (button) {
+      button.setAttribute("aria-pressed", button.getAttribute("data-studio-style-state") === state ? "true" : "false");
+    });
+    Array.prototype.forEach.call(form.querySelectorAll("[data-studio-style-scope]"), function (scope) {
+      scope.setAttribute("data-style-state", state);
+      scope.setAttribute("data-style-breakpoint", currentBreakpointIsland(form));
+      scope.setAttribute("data-style-valid", form.getAttribute("data-studio-style-valid") !== "false" ? "true" : "false");
+    });
+    emitWorkbenchChange("style-state-change", form, { state: state });
+    refreshWorkbenchCanvas();
+  }
+
+  window.__gosx_workbench_runtime_island_setStyleState = setStyleStateIsland;
+
   // bindCommandPaletteIsland — mirrors bindWorkbenchCommandPalette at
   // studio-engines.js:497. Wires the [data-studio-command-palette]
   // gosxstudio:command listener to the same fan-out (setMode /
