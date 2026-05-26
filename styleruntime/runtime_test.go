@@ -255,6 +255,46 @@ func TestIslandRuntimeJSPublishesApplyThemeGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesSyncControlButtonsGlobal(t *testing.T) {
+	// Method 6/10: syncControlButtons(root) — legacy syncStyleControlButtons
+	// at studio-engines.js:1848. For every [data-studio-style-control] /
+	// [data-studio-style-readout] / [data-studio-style-reset] in root:
+	//   - control button: aria-pressed + .is-selected vs live form value.
+	//   - readout: textContent (ownerLabel) + data-studio-style-inherited
+	//     against the kit default.
+	//   - reset button: disabled + textContent (Reset / Kit) + aria-label
+	//     summarising the impact metadata.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.SyncControlButtons + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// DOM contracts the helper queries / mutates.
+		"data-studio-style-control",
+		"data-studio-style-value",
+		"data-studio-style-readout",
+		"data-studio-style-reset",
+		"data-studio-style-inherited",
+		// Visual state contracts the helper toggles.
+		"aria-pressed",
+		"is-selected",
+		// Reset-button labels — the exact strings users see.
+		`"Reset"`,
+		`"Kit"`,
+		`"Inherited"`,
+		// The styleImpactFor catalog the reset button's aria-label cites
+		// for the per-control summary. studio-style-control-group is the
+		// dataset key on the surrounding wrapper that gets the inherited
+		// flag.
+		"studio-style-control-group",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() syncControlButtons must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
