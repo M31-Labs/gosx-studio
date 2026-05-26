@@ -770,4 +770,32 @@
   }
 
   window.__gosx_style_runtime_island_showImpact = showImpactIsland;
+
+  // restoreImpact() — mirrors restoreStyleImpact at studio-engines.js:1803.
+  // Replays the last committed impact when present; otherwise clears the
+  // editor-side readouts to the no-active-recipe state and removes the
+  // preview overlay markers via PreviewRuntime.applyStyleImpact("").
+  //
+  // Transitional iframe delegation per ADR 0008 — slice 6 will swap the
+  // PreviewRuntime.applyStyleImpact("") call for a $preview.style.impact
+  // .selector = "" shared-signal write subscribed by the preview document.
+  function restoreImpactIsland() {
+    if (lastStyleImpact) {
+      showImpactIsland(lastStyleImpact.name, lastStyleImpact.value, true);
+      return;
+    }
+    clearStyleImpactNodes();
+    setImpactReadout("[data-studio-style-impact-label]", "No active recipe");
+    setImpactReadout("[data-studio-style-impact-summary]", "Awaiting scoped change.");
+    setImpactReadout("[data-studio-style-impact-count]", "0 affected");
+    var form = editorWorkbench(doc);
+    setImpactReadout("[data-studio-style-impact-scope]", styleScopePath(form));
+    setImpactReadout("[data-studio-style-impact-state]", styleStatePath(form));
+    Array.prototype.forEach.call(doc.querySelectorAll("[data-studio-style-impact-panel]"), function (panel) {
+      panel.classList.remove("is-live");
+      panel.classList.remove("has-change");
+    });
+  }
+
+  window.__gosx_style_runtime_island_restoreImpact = restoreImpactIsland;
 })();
