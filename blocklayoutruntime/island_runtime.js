@@ -221,4 +221,26 @@
   }
 
   window.__gosx_blocklayout_runtime_island_commitReorder = commitReorderIsland;
+
+  // updateBlockLibraryState(root) — mirrors updateBlockLayoutLibraryState at
+  // studio-engines.js:1972. For every [data-editor-add-block] button in the
+  // supplied root (defaulting to document when root has no querySelectorAll),
+  // resolve the row in document by key, read its visibility checkbox, and
+  // update the button's className / aria-pressed / <small> label.
+  function updateBlockLibraryStateIsland(root) {
+    var scope = root && root.querySelectorAll ? root : doc;
+    Array.prototype.forEach.call(scope.querySelectorAll("[data-editor-add-block]"), function (button) {
+      var key = button.getAttribute("data-editor-add-block");
+      var row = rowForKeyIsland(doc, key);
+      var checkbox = row && row.querySelector("[data-editor-block-visible]");
+      var enabled = !!(checkbox && checkbox.checked);
+      var base = button.getAttribute("data-editor-button-base") || "button";
+      button.className = base + " " + (enabled ? "button--ghost is-active" : "button--secondary");
+      button.setAttribute("aria-pressed", enabled ? "true" : "false");
+      var label = button.querySelector("small");
+      if (label) label.textContent = enabled ? "On page" : "Add";
+    });
+  }
+
+  window.__gosx_blocklayout_runtime_island_updateBlockLibraryState = updateBlockLibraryStateIsland;
 })();
