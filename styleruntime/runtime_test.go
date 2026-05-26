@@ -142,6 +142,33 @@ func TestIslandRuntimeJSPublishesBindWorkbenchGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesBindCSSGlobal(t *testing.T) {
+	// Method 3/10: bindCSS(root) — legacy bindCSS at studio-engines.js:1570.
+	// Binds the [data-editor-css] textarea so input dispatches
+	// PreviewRuntime.applyCSS(value) via a frameTask-coalesced handler.
+	// Re-binds on preview-frame load via bindStudioFrameLoad. Calls applyCSS
+	// once on bind to seed the preview with the current value.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.BindCSS + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// DOM contract — the custom CSS textarea selector.
+		"data-editor-css",
+		// Per-textarea idempotency guard — distinct from legacy
+		// gosxStudioCSSBound so both paths coexist additively.
+		"gosxStudioCSSIslandBound",
+		// Cross-frame delegate the island calls into for the actual CSS
+		// injection (slice 6 will replace with $preview.customCSS signal).
+		"applyCSS",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() bindCSS must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
