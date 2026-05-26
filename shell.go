@@ -7,6 +7,7 @@ import (
 	"m31labs.dev/gosx-studio/brandruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
+	"m31labs.dev/gosx-studio/styleruntime"
 )
 
 const (
@@ -151,6 +152,7 @@ func DefaultShellConfig() ShellConfig {
 			selectionruntime.FeatureFlagKey:   false,
 			brandruntime.FeatureFlagKey:       false,
 			blocklayoutruntime.FeatureFlagKey: false,
+			styleruntime.FeatureFlagKey:       false,
 		},
 	}
 }
