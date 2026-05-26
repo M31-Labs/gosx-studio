@@ -351,4 +351,115 @@
     if (node) return Math.round(node.getBoundingClientRect().width);
     return railBounds(handle, side).fallback;
   }
+
+  // bindChrome(root) — mirrors bindWorkbenchChrome at studio-engines.js:516.
+  // Binds the workbench form's delegated click handler (fans out to
+  // setMode / syncViewport / syncZoom / setStyleState / toggleRail /
+  // toggleFocus / toggleActivity), wires saveLayoutSoon to
+  // rail-width-change/commit events, applies the persisted layout, and
+  // seeds the workbench mode / viewport / zoom on initial bind.
+  //
+  // Idempotency: per-form [data-gosx-studio-workbench-chrome-island-bound]
+  // distinct from the legacy [data-gosx-studio-workbench-chrome-bound] so
+  // both paths can coexist during the additive shipping window.
+  function bindChromeIsland(root) {
+    var form = editorWorkbench(root);
+    if (!form || form.dataset.gosxStudioWorkbenchChromeIslandBound === "true") return;
+    form.dataset.gosxStudioWorkbenchChromeIslandBound = "true";
+    var saveLayoutSoon = frameTask(saveLayoutIsland);
+    form.addEventListener("click", function (event) {
+      var mode = event.target.closest("[data-studio-mode-control]");
+      if (mode && form.contains(mode)) {
+        event.preventDefault();
+        setModeIsland(form, mode.getAttribute("data-studio-mode-control"), true);
+        return;
+      }
+      var viewport = event.target.closest("[data-studio-viewport]");
+      if (viewport && form.contains(viewport)) {
+        event.preventDefault();
+        syncViewportIsland(form, viewport.getAttribute("data-studio-viewport"));
+        return;
+      }
+      var zoom = event.target.closest("button[data-studio-zoom], [role='button'][data-studio-zoom]");
+      if (zoom && form.contains(zoom)) {
+        event.preventDefault();
+        syncZoomIsland(form, zoom.getAttribute("data-studio-zoom"));
+        return;
+      }
+      var styleState = event.target.closest("button[data-studio-style-state], [role='button'][data-studio-style-state]");
+      if (styleState && form.contains(styleState)) {
+        event.preventDefault();
+        setStyleStateIsland(form, styleState.getAttribute("data-studio-style-state"));
+        return;
+      }
+      var rail = event.target.closest("[data-studio-rail-toggle]");
+      if (rail && form.contains(rail)) {
+        event.preventDefault();
+        toggleRailIsland(form, rail.getAttribute("data-studio-rail-toggle"));
+        return;
+      }
+      var focus = event.target.closest("[data-studio-focus-toggle]");
+      if (focus && form.contains(focus)) {
+        event.preventDefault();
+        toggleFocusIsland(form);
+        return;
+      }
+      var activity = event.target.closest("[data-studio-activity-toggle]");
+      if (activity && form.contains(activity)) {
+        event.preventDefault();
+        toggleActivityIsland(form);
+      }
+    });
+    doc.addEventListener("gosxstudio:rail-width-change", function (event) {
+      if (!doc.contains(form)) return;
+      if (event.detail && event.detail.form && event.detail.form !== form) return;
+      saveLayoutSoon(form);
+      refreshWorkbenchCanvas();
+    });
+    doc.addEventListener("gosxstudio:rail-width-commit", function (event) {
+      if (!doc.contains(form)) return;
+      if (event.detail && event.detail.form && event.detail.form !== form) return;
+      saveLayoutIsland(form);
+      refreshWorkbenchCanvas();
+    });
+    applyWorkbenchLayout(form);
+    setModeIsland(form, form.getAttribute("data-studio-mode") || "home", false);
+    if (!form.hasAttribute("data-studio-left")) form.setAttribute("data-studio-left", "open");
+    if (!form.hasAttribute("data-studio-right")) form.setAttribute("data-studio-right", "open");
+    if (!form.hasAttribute("data-studio-focus")) form.setAttribute("data-studio-focus", "false");
+    if (!form.hasAttribute("data-studio-activity-state")) form.setAttribute("data-studio-activity-state", "open");
+    syncWorkbenchRailButtons(form);
+    syncWorkbenchActivityButtons(form);
+    bindCommandPaletteIsland(form);
+    syncViewportIsland(form, "desktop");
+    var canvas = form.querySelector("[data-studio-canvas]");
+    syncZoomIsland(form, canvas ? canvas.getAttribute("data-studio-canvas-zoom") || "fit" : "fit");
+  }
+
+  window.__gosx_workbench_runtime_island_bindChrome = bindChromeIsland;
+
+  // bindCommandPaletteIsland — mirrors bindWorkbenchCommandPalette at
+  // studio-engines.js:497. Wires the [data-studio-command-palette]
+  // gosxstudio:command listener to the same fan-out (setMode /
+  // activateViewport / activateZoom / toggleRail / toggleActivity /
+  // toggleFocus). Used internally by bindChromeIsland; not exposed as a
+  // public island global because the legacy contract didn't expose it.
+  function bindCommandPaletteIsland(form) {
+    var node = form.querySelector("[data-studio-command-palette]");
+    if (!node || node.dataset.gosxStudioWorkbenchCommandsIslandBound === "true") return;
+    node.dataset.gosxStudioWorkbenchCommandsIslandBound = "true";
+    node.addEventListener("gosxstudio:command", function (event) {
+      var detail = event.detail || {};
+      var kind = detail.kind || "";
+      var target = detail.target || "";
+      if (kind === "mode") setModeIsland(form, target, true);
+      else if (kind === "viewport") activateViewportIsland(form, target);
+      else if (kind === "zoom") activateZoomIsland(form, target);
+      else if (kind === "toggle") {
+        if (target === "left" || target === "right") toggleRailIsland(form, target);
+        else if (target === "activity") toggleActivityIsland(form);
+        else if (target === "focus") toggleFocusIsland(form);
+      }
+    });
+  }
 })();
