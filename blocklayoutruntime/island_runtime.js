@@ -243,4 +243,48 @@
   }
 
   window.__gosx_blocklayout_runtime_island_updateBlockLibraryState = updateBlockLibraryStateIsland;
+
+  // ===== Group 3: iframe-crossing transitional =====
+
+  // blockPreviewRuntime — accessor for the legacy preview runtime the
+  // transitional updateVisibilityState delegates to. Mirrors the
+  // setPreviewBlockVisibility helper at studio-engines.js:1987. Slice 6
+  // will replace this delegation with a $preview.block.<key>.visible
+  // shared-signal write per
+  // ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md.
+  function blockPreviewRuntime() {
+    return window.GoSXStudioPreviewRuntime || {};
+  }
+
+  // updateVisibilityState(check) — mirrors updateBlockLayoutVisibilityState at
+  // studio-engines.js:1994. Mutates the row's classes / status text / pill
+  // className, then calls the legacy PreviewRuntime.setBlockVisibility for
+  // the cross-frame mutation, then refreshes library state so the
+  // [data-editor-add-block] buttons stay in sync.
+  //
+  // Per ADR 0008 transitional pattern (same shape as brandruntime's
+  // updateHeaderLogo island), ownership has moved to the blocklayout island
+  // but the iframe-crossing mechanism stays the same — slice 6 will swap to
+  // a $preview.block.<key>.visible shared-signal write subscribed by the
+  // preview document without revisiting blocklayout ownership.
+  function updateVisibilityStateIsland(check) {
+    var row = check && check.closest ? check.closest("[data-block-studio-block]") : null;
+    if (!row) return;
+    var visible = !!check.checked;
+    var key = rowKeyIsland(row);
+    var statuses = row.querySelectorAll("[data-editor-block-status], [data-editor-block-pill]");
+    row.classList.toggle("editor-block--hidden", !visible);
+    Array.prototype.forEach.call(statuses, function (status) {
+      status.textContent = visible ? "Visible" : "Hidden";
+    });
+    var pill = row.querySelector("[data-editor-block-pill]");
+    if (pill) pill.className = visible ? "status status--ready" : "status";
+    var preview = blockPreviewRuntime();
+    if (preview && typeof preview.setBlockVisibility === "function") {
+      preview.setBlockVisibility(key, visible);
+    }
+    updateBlockLibraryStateIsland(doc);
+  }
+
+  window.__gosx_blocklayout_runtime_island_updateVisibilityState = updateVisibilityStateIsland;
 })();
