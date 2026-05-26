@@ -496,6 +496,22 @@
 
   window.__gosx_workbench_runtime_island_syncViewport = syncViewportIsland;
 
+  // activateViewport(form, viewport) — mirrors activateWorkbenchViewport at
+  // studio-engines.js:382. Clicks the matching [data-studio-viewport="<x>"]
+  // button if present; otherwise falls through to syncViewportIsland.
+  function activateViewportIsland(form, viewport) {
+    if (!form) return;
+    viewport = viewport || "desktop";
+    var button = form.querySelector('[data-studio-viewport="' + attrValue(viewport) + '"]');
+    if (button && button.click) {
+      button.click();
+      return;
+    }
+    syncViewportIsland(form, viewport);
+  }
+
+  window.__gosx_workbench_runtime_island_activateViewport = activateViewportIsland;
+
   // bindCommandPaletteIsland — mirrors bindWorkbenchCommandPalette at
   // studio-engines.js:497. Wires the [data-studio-command-palette]
   // gosxstudio:command listener to the same fan-out (setMode /
