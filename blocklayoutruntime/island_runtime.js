@@ -114,4 +114,27 @@
   }
 
   window.__gosx_blocklayout_runtime_island_rowForKey = rowForKeyIsland;
+
+  // ===== Group 2: editor-side mutations =====
+
+  // moveRow(list, row, direction) — mirrors moveBlockLayoutRow at
+  // studio-engines.js:2072. direction = "up" or "down". DOM neighbor swap
+  // via insertBefore, then renumber(list, "engine-buttons") +
+  // selectRow(list, rowKey(row)) to refresh order inputs / button states /
+  // selection class. No-op when row is null or sibling is missing (legacy
+  // behavior — moving the first row up or the last row down is a silent
+  // no-op so callers can dispatch unconditionally).
+  function moveRowIsland(list, row, direction) {
+    if (!row || !list) return;
+    if (direction === "up" && row.previousElementSibling) {
+      list.insertBefore(row, row.previousElementSibling);
+    }
+    if (direction === "down" && row.nextElementSibling) {
+      list.insertBefore(row.nextElementSibling, row);
+    }
+    renumberIsland(list, "engine-buttons");
+    selectRowIsland(list, rowKeyIsland(row));
+  }
+
+  window.__gosx_blocklayout_runtime_island_moveRow = moveRowIsland;
 })();
