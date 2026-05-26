@@ -270,4 +270,85 @@
   }
 
   // ===== Method implementations (15 globals published below as TDD progresses) =====
+
+  // bindRailResizers(root) — mirrors bindWorkbenchRailResizers at
+  // studio-engines.js:194. Binds the [data-studio-resizer] pointer drag +
+  // ArrowLeft/ArrowRight keyboard nudges on rail handles.
+  //
+  // Idempotency: each handle gets [data-gosx-studio-resizer-island-bound]
+  // distinct from the legacy [data-gosx-studio-resizer-bound] so both
+  // paths can coexist during the additive shipping window.
+  function bindRailResizersIsland(root) {
+    var form = editorWorkbench(root);
+    var stage = workbenchStage(form);
+    if (!form || !stage) return;
+    Array.prototype.forEach.call(form.querySelectorAll("[data-studio-resizer]"), function (handle) {
+      if (handle.dataset.gosxStudioResizerIslandBound === "true") return;
+      handle.dataset.gosxStudioResizerIslandBound = "true";
+      handle.addEventListener("pointerdown", function (event) {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        var side = handle.getAttribute("data-studio-resizer");
+        var rect = stage.getBoundingClientRect();
+        handle.classList.add("is-resizing");
+        if (handle.setPointerCapture) handle.setPointerCapture(event.pointerId);
+        function widthFor(pointerEvent) {
+          return side === "left" ? pointerEvent.clientX - rect.left : rect.right - pointerEvent.clientX;
+        }
+        function move(pointerEvent) {
+          setRailWidthIsland(form, side, widthFor(pointerEvent), handle, false);
+        }
+        function finish(pointerEvent) {
+          handle.classList.remove("is-resizing");
+          if (pointerEvent && pointerEvent.clientX !== undefined) {
+            setRailWidthIsland(form, side, widthFor(pointerEvent), handle, true);
+          } else {
+            emitWorkbenchRailWidth(form, side, currentRailWidthIsland(form, side, handle), true);
+          }
+          doc.removeEventListener("pointermove", move);
+          doc.removeEventListener("pointerup", finish);
+          doc.removeEventListener("pointercancel", finish);
+        }
+        setRailWidthIsland(form, side, widthFor(event), handle, false);
+        doc.addEventListener("pointermove", move);
+        doc.addEventListener("pointerup", finish);
+        doc.addEventListener("pointercancel", finish);
+      });
+      handle.addEventListener("keydown", function (event) {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        event.preventDefault();
+        var side = handle.getAttribute("data-studio-resizer");
+        var step = event.shiftKey ? 48 : 24;
+        var delta = event.key === "ArrowRight" ? step : -step;
+        setRailWidthIsland(form, side, currentRailWidthIsland(form, side, handle) + (side === "left" ? delta : -delta), handle, true);
+      });
+    });
+  }
+
+  window.__gosx_workbench_runtime_island_bindRailResizers = bindRailResizersIsland;
+
+  // setRailWidthIsland and currentRailWidthIsland are forward-declared
+  // helpers — their public island publications happen at the end of this
+  // IIFE (methods 14/15 + 15/15 in the TDD sequence). Function
+  // declarations hoist within scope so the forward references above work
+  // without warning. Same pattern as slice 5's bindThemeIsland referencing
+  // applyThemeIsland before it's published.
+  function setRailWidthIsland(form, side, width, handle, committed) {
+    if (!form || (side !== "left" && side !== "right")) return;
+    var bounds = railBounds(handle, side);
+    var next = clampNumber(Math.round(width), bounds.min, bounds.max);
+    form.style.setProperty(railWidthProperty(side), next + "px");
+    if (handle) handle.setAttribute("aria-valuenow", String(next));
+    emitWorkbenchRailWidth(form, side, next, !!committed);
+  }
+
+  function currentRailWidthIsland(form, side, handle) {
+    if (!form) return railBounds(handle, side).fallback;
+    var custom = form.style.getPropertyValue(railWidthProperty(side));
+    var parsed = parseInt(custom, 10);
+    if (Number.isFinite(parsed)) return parsed;
+    var node = railSidebar(form, side);
+    if (node) return Math.round(node.getBoundingClientRect().width);
+    return railBounds(handle, side).fallback;
+  }
 })();
