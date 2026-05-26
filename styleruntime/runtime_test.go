@@ -364,6 +364,37 @@ func TestIslandRuntimeJSPublishesRestoreImpactGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesSetControlValueGlobal(t *testing.T) {
+	// Method 9/10: setControlValue(name, value) — legacy setStyleControlValue
+	// at studio-engines.js:1821. When name targets a custom-* control (other
+	// than customTemplateName), force-checks the [name="themeTemplate"]
+	// [value="custom"] radio (with input + change events) so the custom
+	// template builder activates. Then sets the named control's value (radio
+	// match by [value] or namedControl assignment), dispatches input + change
+	// events, runs syncControlButtons(document), and finally calls
+	// showImpact(name, value, true) to commit the impact panel.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.SetControlValue + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// The custom-template-radio coercion contract: when name starts with
+		// "custom" but isn't "customTemplateName", set themeTemplate=custom.
+		`"themeTemplate"`,
+		`"custom"`,
+		"customTemplateName",
+		// Event contract — both input and change are dispatched on the
+		// control after the value is set so any downstream listener fires.
+		`new Event("input"`,
+		`new Event("change"`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() setControlValue must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
