@@ -623,6 +623,31 @@
 
   window.__gosx_workbench_runtime_island_toggleFocus = toggleFocusIsland;
 
+  // setActivityIsland — internal helper mirroring setWorkbenchActivity at
+  // studio-engines.js:467. Writes data-studio-activity-state, re-syncs
+  // activity-toggle buttons, persists via saveLayout, emits the change
+  // event, refreshes the canvas. Used by toggleActivityIsland — not
+  // published as a public island global because the legacy contract
+  // doesn't expose it.
+  function setActivityIsland(form, state) {
+    if (!form) return;
+    form.setAttribute("data-studio-activity-state", state === "collapsed" ? "collapsed" : "open");
+    syncWorkbenchActivityButtons(form);
+    saveLayoutIsland(form);
+    emitWorkbenchChange("activity-change", form, { state: workbenchActivityState(form) });
+    refreshWorkbenchCanvas();
+  }
+
+  // toggleActivity(form) — mirrors toggleWorkbenchActivity at
+  // studio-engines.js:476. Flips data-studio-activity-state between "open"
+  // and "collapsed" via setActivityIsland, which handles the readout
+  // updates / persistence / event dispatch / canvas refresh.
+  function toggleActivityIsland(form) {
+    setActivityIsland(form, workbenchActivityState(form) === "open" ? "collapsed" : "open");
+  }
+
+  window.__gosx_workbench_runtime_island_toggleActivity = toggleActivityIsland;
+
   // bindCommandPaletteIsland — mirrors bindWorkbenchCommandPalette at
   // studio-engines.js:497. Wires the [data-studio-command-palette]
   // gosxstudio:command listener to the same fan-out (setMode /
