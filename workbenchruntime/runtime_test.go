@@ -292,6 +292,35 @@ func TestIslandRuntimeJSPublishesActivateViewportGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesCurrentBreakpointGlobal(t *testing.T) {
+	// Method 6/15: currentBreakpoint(form) — legacy
+	// currentWorkbenchBreakpoint at studio-engines.js:393. Pure read: derives
+	// the form's data-studio-breakpoint attribute (or the preview-shell's
+	// data-studio-preview-viewport fallback, or "desktop"). Per the slice
+	// plan, this method is implemented as a pure derivation from existing
+	// form state — no mutator side effects, no signal writes; the BridgeShim
+	// routes through it uniformly for API consistency with the rest of the
+	// contract.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.CurrentBreakpoint + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// The two read sources currentBreakpoint derives from
+		// (studio-engines.js:395-398).
+		"data-studio-breakpoint",
+		"data-studio-preview-viewport",
+		"editor-preview-shell",
+		// Default returned when nothing matches.
+		`"desktop"`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() currentBreakpoint must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
