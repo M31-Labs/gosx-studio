@@ -461,6 +461,40 @@ func TestIslandRuntimeJSPublishesToggleFocusGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesToggleActivityGlobal(t *testing.T) {
+	// Method 12/15: toggleActivity(form) — legacy toggleWorkbenchActivity at
+	// studio-engines.js:476 (via setWorkbenchActivity at 467). Flips
+	// data-studio-activity-state between "open" and "collapsed", re-syncs
+	// activity-toggle buttons (Show/Hide textContent + aria-pressed),
+	// persists via saveLayout, emits gosxstudio:workbench-activity-change,
+	// refreshes the canvas.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.ToggleActivity + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// Form attribute toggleActivity flips.
+		"data-studio-activity-state",
+		// Activity-toggle button selector + drawer wrapper selector the
+		// helper queries for the Show/Hide text update.
+		"data-studio-activity-toggle",
+		"data-studio-activity-drawer",
+		// Show/Hide labels written to drawer-housed buttons.
+		`"Show"`,
+		`"Hide"`,
+		// Activity state values toggled between.
+		`"open"`,
+		`"collapsed"`,
+		// Event name dispatched on activity change.
+		"workbench-activity-change",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() toggleActivity must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
