@@ -830,4 +830,17 @@
   }
 
   window.__gosx_style_runtime_island_setControlValue = setControlValueIsland;
+
+  // resetControlValue(name) — mirrors resetStyleControlValue at
+  // studio-engines.js:1842. Looks up the kit default for name via
+  // kitDefaultForControl; if a default exists, calls
+  // setControlValueIsland(name, default). No-op when name has no kit
+  // default (the legacy returns silently in this case — preserved).
+  function resetControlValueIsland(name) {
+    var value = kitDefaultForControl(name);
+    if (!value) return;
+    setControlValueIsland(name, value);
+  }
+
+  window.__gosx_style_runtime_island_resetControlValue = resetControlValueIsland;
 })();
