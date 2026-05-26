@@ -370,6 +370,12 @@
     if (builder) builder.classList.toggle("is-active", active === "custom");
   }
 
+  // applyTheme is also published as the public island global so the
+  // BridgeShim can dispatch GoSXStudioStyleRuntime.applyTheme() calls into
+  // it. Defined above as applyThemeIsland (shared with bindTheme's update
+  // dispatch).
+  window.__gosx_style_runtime_island_applyTheme = applyThemeIsland;
+
   // bindWorkbench(root) — mirrors bindStyleWorkbench at studio-engines.js:1884.
   // Resolves the [data-editor-workbench] form (or root if it matches),
   // guards re-entry via [data-gosx-studio-style-workbench-island-bound]
