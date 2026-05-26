@@ -798,4 +798,36 @@
   }
 
   window.__gosx_style_runtime_island_restoreImpact = restoreImpactIsland;
+
+  // setControlValue(name, value) — mirrors setStyleControlValue at
+  // studio-engines.js:1821. No-op when name or value is empty (parity with
+  // legacy line 1822). When name targets a custom-* slot (other than
+  // customTemplateName), force-checks the [name="themeTemplate"][value="custom"]
+  // radio with input + change dispatches so the custom builder activates.
+  // Then resolves the actual control (radio by [name][value=] when present,
+  // else namedControl by [name]), assigns the value, dispatches input +
+  // change events, runs syncControlButtons(document), and commits the
+  // impact panel via showImpact(name, value, true).
+  function setControlValueIsland(name, value) {
+    if (!name || !value) return;
+    if (name.indexOf("custom") === 0 && name !== "customTemplateName") {
+      var customTemplate = doc.querySelector('input[name="themeTemplate"][value="custom"]');
+      if (customTemplate && !customTemplate.checked) {
+        customTemplate.checked = true;
+        customTemplate.dispatchEvent(new Event("input", { bubbles: true }));
+        customTemplate.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    }
+    var radio = doc.querySelector('input[name="' + attrValue(name) + '"][value="' + attrValue(value) + '"]');
+    var control = radio || namedControl(name);
+    if (!control) return;
+    if (radio) radio.checked = true;
+    else control.value = value;
+    control.dispatchEvent(new Event("input", { bubbles: true }));
+    control.dispatchEvent(new Event("change", { bubbles: true }));
+    syncControlButtonsIsland(doc);
+    showImpactIsland(name, value, true);
+  }
+
+  window.__gosx_style_runtime_island_setControlValue = setControlValueIsland;
 })();
