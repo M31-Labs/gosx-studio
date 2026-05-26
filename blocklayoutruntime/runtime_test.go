@@ -87,6 +87,17 @@ func TestIslandRuntimeJSPublishesRowsGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesRowKeyGlobal(t *testing.T) {
+	// Method 2/9: rowKey(row) — legacy blockRowKey at studio-engines.js:1964.
+	// Pure helper: row.getAttribute("data-block-studio-block") || "".
+	// Read-only; returns string. The island global must publish the function.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.RowKey + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
