@@ -648,6 +648,28 @@
 
   window.__gosx_workbench_runtime_island_toggleActivity = toggleActivityIsland;
 
+  // saveLayout(form) — mirrors saveWorkbenchLayout at
+  // studio-engines.js:294. Persistence wrapper: serializes the form's
+  // --studio-left-width / --studio-right-width custom properties and
+  // data-studio-activity-state attribute to localStorage under the
+  // gosx-studio-editor-layout key (workbenchLayoutStorageKey declared
+  // above). Swallows storage errors silently — the layout is a UX
+  // convenience, not a correctness invariant.
+  function saveLayoutIsland(form) {
+    if (!form) return;
+    try {
+      window.localStorage.setItem(workbenchLayoutStorageKey, JSON.stringify({
+        left: form.style.getPropertyValue("--studio-left-width"),
+        right: form.style.getPropertyValue("--studio-right-width"),
+        activity: form.getAttribute("data-studio-activity-state")
+      }));
+    } catch (error) {
+      return;
+    }
+  }
+
+  window.__gosx_workbench_runtime_island_saveLayout = saveLayoutIsland;
+
   // bindCommandPaletteIsland — mirrors bindWorkbenchCommandPalette at
   // studio-engines.js:497. Wires the [data-studio-command-palette]
   // gosxstudio:command listener to the same fan-out (setMode /
