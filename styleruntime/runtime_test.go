@@ -209,6 +209,52 @@ func TestIslandRuntimeJSPublishesBindFontsGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesApplyThemeGlobal(t *testing.T) {
+	// Method 5/10: applyTheme() — legacy updateTheme at studio-engines.js:1396.
+	// Reads theme form state (kit / template / palette / image-ratio /
+	// custom-template / style classes / color tokens), calls
+	// PreviewRuntime.applyTheme(payload) for the cross-frame DOM mutation
+	// (per ADR 0008 transitional pattern — see
+	// ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md),
+	// updates editor-side swatches / kit cards / template cards / custom-
+	// template builder, then runs syncControlButtons(document).
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.ApplyTheme + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// Transitional iframe delegation per ADR 0008 — until slice 6 swaps
+		// to $preview.theme.*, the cross-frame mutation rides on the legacy
+		// PreviewRuntime contract. Catching drift here before the deletion-
+		// window CI clock starts.
+		"GoSXStudioPreviewRuntime",
+		"applyTheme",
+		// Payload fields the legacy populates and the preview consumes
+		// (studio-engines.js:1404). Drift in any of these silently breaks
+		// the iframe applyTheme contract.
+		"kit:",
+		"template:",
+		"palette:",
+		"imageRatio:",
+		"customClasses:",
+		"styleClasses:",
+		"colors:",
+		// Theme form inputs the helper reads to compose the payload.
+		`name="themeImageRatio"`,
+		"data-editor-color-token",
+		// DOM contracts the editor-side post-mutation updates touch.
+		"data-editor-theme-swatches",
+		"data-editor-kit-card",
+		"data-editor-template-card",
+		"data-custom-template-builder",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() applyTheme must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
