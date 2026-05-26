@@ -230,6 +230,41 @@ func TestIslandRuntimeJSPublishesSetModeGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesSyncViewportGlobal(t *testing.T) {
+	// Method 4/15: syncViewport(form, viewport) — legacy syncWorkbenchViewport
+	// at studio-engines.js:369. Sets data-studio-breakpoint on the form,
+	// data-studio-preview-viewport on the .editor-preview-shell (only when
+	// the viewport island is not already managing it), updates
+	// [data-studio-viewport-label] readouts, emits
+	// gosxstudio:workbench-viewport-change, refreshes the canvas.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.SyncViewport + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// Form attribute syncViewport writes.
+		"data-studio-breakpoint",
+		// Preview-shell selector + attribute syncViewport defers to when
+		// the viewport island is not managing it.
+		"editor-preview-shell",
+		"data-studio-preview-viewport",
+		// Viewport-island opt-out marker so the inline island can prevent
+		// double-writes during the additive shipping window.
+		"data-studio-viewport-island",
+		// Viewport label readout selector.
+		"data-studio-viewport-label",
+		// Event name dispatched on viewport change.
+		"workbench-viewport-change",
+		// Default viewport when none provided.
+		`"desktop"`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() syncViewport must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
