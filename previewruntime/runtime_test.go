@@ -42,3 +42,392 @@ func TestFeatureFlagKey(t *testing.T) {
 		t.Fatalf("FeatureFlagKey %q should end with -runtime-islands per Phase 3 convention", FeatureFlagKey)
 	}
 }
+
+func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
+	shim := string(BridgeShim())
+	if shim == "" {
+		t.Fatal("BridgeShim() must return a non-empty JS snippet")
+	}
+	// The shim must reference each method-specific island global, the
+	// public global it shims (window.GoSXStudioPreviewRuntime), and the
+	// feature flag so the legacy path stays reachable when the flag is
+	// off. The IslandGlobals struct holds the canonical names; any drift
+	// between the struct and the shim is caught here.
+	for _, fragment := range []string{
+		"window.GoSXStudioPreviewRuntime",
+		"data-gosx-studio-feature-flag-preview-runtime-islands",
+		IslandGlobals.Mount,
+		IslandGlobals.SetBlockVisibility,
+		IslandGlobals.ApplyTextUpdate,
+		IslandGlobals.ApplyTheme,
+		IslandGlobals.ApplyStyleImpact,
+		IslandGlobals.ApplyCSS,
+		IslandGlobals.ApplyFonts,
+		IslandGlobals.UpdateHeaderLogo,
+		IslandGlobals.RequestInlineEdit,
+		IslandGlobals.CycleField,
+		FeatureFlagKey,
+	} {
+		if !strings.Contains(shim, fragment) {
+			t.Fatalf("BridgeShim() missing %q:\n%s", fragment, shim)
+		}
+	}
+}
+
+func TestIslandRuntimeJSPublishesMountGlobal(t *testing.T) {
+	// Method 1/10: mount(root) — legacy
+	// window.GoSXStudioPreviewRuntime.mount at preview-runtime.js:1119
+	// (bound to init at line 1113). The legacy walks every
+	// [data-editor-workbench] in root and calls bindPreview(form). The
+	// island writer publishes $preview.mount.epoch — the subscriber
+	// re-runs its mount-acknowledged routine when the epoch changes.
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	want := "window." + IslandGlobals.Mount + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// Signal target — drift here breaks the cross-frame contract.
+		"$preview.mount.epoch",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() mount must preserve %q contract", contract)
+		}
+	}
+}
+
+func TestIslandRuntimeJSPublishesSetBlockVisibilityGlobal(t *testing.T) {
+	// Method 2/10: setBlockVisibility(key, visible) — legacy at preview-
+	// runtime.js:873 (calls setPreviewBlockVisibility per .editor-preview-
+	// frame at line 866). The island writer publishes
+	// $preview.block.<key>.visible — the subscriber toggles
+	// display: none on the matching [data-studio-block-key="<key>"] node.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.SetBlockVisibility + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// Signal target — uses dynamic <key> infix, so the static prefix
+		// is what we assert.
+		"$preview.block.",
+		".visible",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() setBlockVisibility must preserve %q contract", contract)
+		}
+	}
+}
+
+func TestIslandRuntimeJSPublishesApplyTextUpdateGlobal(t *testing.T) {
+	// Method 3/10: applyTextUpdate(detail) — legacy at preview-
+	// runtime.js:912. The legacy applies the value to three potential
+	// targets: [data-editor-preview="<sourceKey>"] textContent,
+	// detail.frameTarget selector textContent, and detail.attrTarget
+	// attribute (with prefix/suffix). The island writer publishes the
+	// whole detail object to $preview.text.<key> where key falls back
+	// through sourceKey / frameTarget / attrTarget / "_". The subscriber
+	// re-emits all three branches.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.ApplyTextUpdate + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		"$preview.text.",
+		// Payload fields the legacy and signal-based subscriber both
+		// consume — drift here silently breaks the text-update fan-out.
+		"sourceKey",
+		"frameTarget",
+		"attrTarget",
+		"attrName",
+		"attrPrefix",
+		"attrSuffix",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() applyTextUpdate must preserve %q contract", contract)
+		}
+	}
+}
+
+func TestIslandRuntimeJSPublishesApplyThemeGlobal(t *testing.T) {
+	// Method 4/10: applyTheme(detail) — legacy at preview-runtime.js:938.
+	// The legacy rebuilds .site-shell classes (clearing theme--template-
+	// / -kit- / -custom- / -nav- / -buttons- / -cards- / -spacing- /
+	// -images- / -motion- / -palette- / -image- prefixes) and reapplies
+	// new classes; sets each color-token CSS variable. The island writer
+	// publishes a family of $preview.theme.* signals; the subscriber
+	// reassembles them in a module-scope buffer and applies on every
+	// write.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.ApplyTheme + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		"$preview.theme.kit",
+		"$preview.theme.template",
+		"$preview.theme.palette",
+		"$preview.theme.imageRatio",
+		"$preview.theme.customClasses",
+		"$preview.theme.styleClasses",
+		"$preview.theme.colors",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() applyTheme must preserve %q contract", contract)
+		}
+	}
+}
+
+func TestIslandRuntimeJSPublishesApplyStyleImpactGlobal(t *testing.T) {
+	// Method 5/10: applyStyleImpact(selector) — legacy at preview-
+	// runtime.js:986. The legacy marks every matching node with
+	// [data-studio-style-impact-node] and returns the count. The signal-
+	// based path publishes the selector and returns a best-effort
+	// editor-side count (queried via the editor's view of the iframe);
+	// the subscriber performs the authoritative attribute mutation.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.ApplyStyleImpact + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		"$preview.style.impact.selector",
+		// Editor-side advisory count: the editor's view of the iframe
+		// via .editor-preview-frame contentDocument.
+		".editor-preview-frame",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() applyStyleImpact must preserve %q contract", contract)
+		}
+	}
+}
+
+func TestIslandRuntimeJSPublishesApplyCSSGlobal(t *testing.T) {
+	// Method 6/10: applyCSS(cssText) — legacy at preview-runtime.js:1019.
+	// The legacy ensures a <style data-editor-live-css> element in the
+	// iframe head and sets its textContent. The island writer publishes
+	// to $preview.theme.cssCustom.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.ApplyCSS + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	if !strings.Contains(body, "$preview.theme.cssCustom") {
+		t.Fatalf("IslandRuntimeJS() applyCSS must publish $preview.theme.cssCustom")
+	}
+}
+
+func TestIslandRuntimeJSPublishesApplyFontsGlobal(t *testing.T) {
+	// Method 7/10: applyFonts(cssText) — legacy at preview-runtime.js:1023.
+	// Same shape as applyCSS but with [data-editor-live-fonts] marker.
+	// The island writer publishes to $preview.theme.fontsCustom.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.ApplyFonts + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	if !strings.Contains(body, "$preview.theme.fontsCustom") {
+		t.Fatalf("IslandRuntimeJS() applyFonts must publish $preview.theme.fontsCustom")
+	}
+}
+
+func TestIslandRuntimeJSPublishesUpdateHeaderLogoGlobal(t *testing.T) {
+	// Method 8/10: updateHeaderLogo(detail) — legacy at preview-
+	// runtime.js:1027. The legacy applies the payload to the iframe's
+	// .brand element (img src/alt, --brand-logo-width / -offset-x /
+	// -offset-y CSS variables, .brand--with-logo class toggle). The
+	// island writer publishes a single $preview.brand.headerLogo signal
+	// carrying src / alt / width / x / y.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.UpdateHeaderLogo + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		"$preview.brand.headerLogo",
+		// Payload fields the subscriber decomposes onto the .brand DOM.
+		// The slice plan lists src / alt / width as the sub-keys;
+		// offsets x / y are carried in the payload for legacy parity.
+		"src:",
+		"alt:",
+		"width:",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() updateHeaderLogo must preserve %q contract", contract)
+		}
+	}
+}
+
+func TestIslandRuntimeJSPublishesRequestInlineEditGlobal(t *testing.T) {
+	// Method 9/10: requestInlineEdit(detail) — legacy at preview-
+	// runtime.js:1049. The legacy walks previewControllers (the
+	// bindPreview state) and dispatches requestInlineEdit on the first
+	// matching one. The signal-based path publishes a monotonic
+	// requestId to $preview.editor.inlineEdit.requestId so repeated
+	// identical detail payloads still trigger the subscriber.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.RequestInlineEdit + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	if !strings.Contains(body, "$preview.editor.inlineEdit.requestId") {
+		t.Fatalf("IslandRuntimeJS() requestInlineEdit must publish $preview.editor.inlineEdit.requestId")
+	}
+}
+
+func TestIslandRuntimeJSPublishesCycleFieldGlobal(t *testing.T) {
+	// Method 10/10: cycleField(detail) — legacy at preview-
+	// runtime.js:1058. Same shape as requestInlineEdit. The signal-based
+	// path publishes a monotonic requestId to
+	// $preview.editor.fieldCycle.requestId.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.CycleField + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	if !strings.Contains(body, "$preview.editor.fieldCycle.requestId") {
+		t.Fatalf("IslandRuntimeJS() cycleField must publish $preview.editor.fieldCycle.requestId")
+	}
+}
+
+func TestSubscriberRuntimeScriptPublishesObservers(t *testing.T) {
+	// The preview-side subscriber registers observers for each
+	// $preview.* signal family. This test guards against drift between
+	// the writer's signal names (asserted above) and the subscriber's
+	// observers — if the writer publishes a signal the subscriber
+	// doesn't observe, the cross-frame contract silently breaks.
+	body := string(PreviewSubscriberScript())
+	if body == "" {
+		t.Fatal("PreviewSubscriberScript() must return a non-empty JS snippet")
+	}
+	for _, signalName := range []string{
+		"$preview.mount.epoch",
+		"$preview.block.",
+		"$preview.text.",
+		"$preview.theme.kit",
+		"$preview.theme.template",
+		"$preview.theme.palette",
+		"$preview.theme.imageRatio",
+		"$preview.theme.customClasses",
+		"$preview.theme.styleClasses",
+		"$preview.theme.colors",
+		"$preview.style.impact.selector",
+		"$preview.theme.cssCustom",
+		"$preview.theme.fontsCustom",
+		"$preview.brand.headerLogo",
+		"$preview.editor.inlineEdit.requestId",
+		"$preview.editor.fieldCycle.requestId",
+	} {
+		if !strings.Contains(body, signalName) {
+			t.Fatalf("PreviewSubscriberScript() missing observer for %q", signalName)
+		}
+	}
+	// The subscriber resolves observers through the in-frame fan-out
+	// hook. Drift in the hook name would silently disable the entire
+	// subscriber side of the cross-frame contract.
+	if !strings.Contains(body, "__gosx_observe_shared_signal") {
+		t.Fatalf("PreviewSubscriberScript() must call window.__gosx_observe_shared_signal")
+	}
+}
+
+func TestSubscriberRuntimeScriptPreservesLegacyDOMMutations(t *testing.T) {
+	// The subscriber applies the same DOM mutations the legacy
+	// preview-runtime.js performed cross-frame. This test guards
+	// against drift between the legacy mutation shape (asserted by
+	// existing parity tests in slices 3/4/5 against their iframe-
+	// crossing methods) and the subscriber's local-frame implementation.
+	body := string(PreviewSubscriberScript())
+	for _, contract := range []string{
+		// setBlockVisibility — display style toggle on matching key.
+		"data-studio-block-key",
+		// applyTextUpdate — [data-editor-preview="<sourceKey>"] target.
+		"data-editor-preview",
+		// applyTheme — .site-shell class manipulation + color CSS vars.
+		".site-shell",
+		"theme--template-",
+		"theme--kit-",
+		"theme--palette-",
+		"theme--image-",
+		// applyStyleImpact — [data-studio-style-impact-node] attribute.
+		"data-studio-style-impact-node",
+		// applyCSS / applyFonts — <style data-editor-live-*> markers.
+		"data-editor-live-css",
+		"data-editor-live-fonts",
+		// updateHeaderLogo — .brand / .brand__logo + CSS variables.
+		".brand",
+		".brand__logo",
+		"--brand-logo-width",
+		"--brand-logo-offset-x",
+		"--brand-logo-offset-y",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("PreviewSubscriberScript() missing legacy DOM contract %q", contract)
+		}
+	}
+}
+
+func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
+	bundle := string(Bundle())
+	if bundle == "" {
+		t.Fatal("Bundle() must return a non-empty JS snippet")
+	}
+	// Island runtime must come before the BridgeShim — the shim
+	// consults the globals the island runtime publishes. Order matters:
+	// if the shim ran first it would close over an undefined global and
+	// every dispatch would fall through to the legacy path, silently
+	// disabling the slice.
+	islandIdx := strings.Index(bundle, IslandGlobals.Mount+" ")
+	shimIdx := strings.Index(bundle, "window.GoSXStudioPreviewRuntime =")
+	if islandIdx < 0 || shimIdx < 0 {
+		t.Fatalf("Bundle() missing island runtime or shim:\n%s", bundle)
+	}
+	if islandIdx > shimIdx {
+		t.Fatalf("Bundle() must place island runtime before shim (island=%d shim=%d)", islandIdx, shimIdx)
+	}
+}
+
+func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
+	shim := string(BridgeShim())
+	// The shim is additive — when the island global is missing or the
+	// flag is off, the legacy JS path must still run. The legacy lives
+	// at preview-runtime.js's IIFE-exported window.GoSXStudioPreviewRuntime
+	// object; the shim reads its methods via legacy.<name> before
+	// replacing the object. Sanity check: look for each legacy method
+	// reference so a future refactor that drops the fallback is caught
+	// here.
+	for _, legacy := range []string{
+		"legacy.mount",
+		"legacy.setBlockVisibility",
+		"legacy.applyTextUpdate",
+		"legacy.applyTheme",
+		"legacy.applyStyleImpact",
+		"legacy.applyCSS",
+		"legacy.applyFonts",
+		"legacy.updateHeaderLogo",
+		"legacy.requestInlineEdit",
+		"legacy.cycleField",
+	} {
+		if !strings.Contains(shim, legacy) {
+			t.Fatalf("BridgeShim() must retain legacy fallback for %q:\n%s", legacy, shim)
+		}
+	}
+}
+
+func TestPreviewSubscriberScriptIsNonEmpty(t *testing.T) {
+	// PreviewSubscriberScript() is the bundle the storefront mounts when
+	// loaded in the editor preview iframe. It must be non-empty AND
+	// separate from the editor-side bundle so storefront pages don't
+	// ship the editor-side island writer code.
+	subscriber := PreviewSubscriberScript()
+	if len(subscriber) == 0 {
+		t.Fatal("PreviewSubscriberScript() must return a non-empty bundle")
+	}
+	bundle := Bundle()
+	if strings.Contains(string(bundle), string(subscriber[:min(len(subscriber), 200)])) {
+		t.Fatal("PreviewSubscriberScript() must not be a substring of Bundle() — they ship on different pages")
+	}
+}
