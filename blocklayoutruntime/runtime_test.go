@@ -205,6 +205,38 @@ func TestIslandRuntimeJSPublishesCommitReorderGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesUpdateBlockLibraryStateGlobal(t *testing.T) {
+	// Method 8/9: updateBlockLibraryState(root) — legacy
+	// updateBlockLayoutLibraryState at studio-engines.js:1972. For every
+	// [data-editor-add-block] button in root, resolves the corresponding row
+	// in document via rowForKey, reads the row's [data-editor-block-visible]
+	// checkbox state, and updates the button's className / aria-pressed /
+	// <small> label text.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.UpdateBlockLibraryState + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	// DOM contract these helpers query / mutate. Drift in any of these
+	// silently breaks the library-button sync after a visibility toggle.
+	for _, contract := range []string{
+		// Source-of-truth attribute for the library button -> block-key map.
+		"data-editor-add-block",
+		// Visibility checkbox the helper reads to decide button state.
+		"data-editor-block-visible",
+		// Base-class attribute the legacy reads to compose the final
+		// className (button + base + button--ghost is-active / button--secondary).
+		"data-editor-button-base",
+		// Two button modifier classes the helper toggles.
+		"button--ghost is-active",
+		"button--secondary",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() updateBlockLibraryState must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
