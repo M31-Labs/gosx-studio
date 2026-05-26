@@ -333,6 +333,12 @@
   // declarations hoist within scope so the forward references above work
   // without warning. Same pattern as slice 5's bindThemeIsland referencing
   // applyThemeIsland before it's published.
+  // setRailWidth(form, side, width, handle, committed) — mirrors
+  // setWorkbenchRailWidth at studio-engines.js:185. Clamps width to the
+  // handle's min/max bounds, writes --studio-{left,right}-width on the
+  // form, updates the handle's aria-valuenow, emits
+  // gosxstudio:rail-width-change or gosxstudio:rail-width-commit
+  // depending on the committed flag.
   function setRailWidthIsland(form, side, width, handle, committed) {
     if (!form || (side !== "left" && side !== "right")) return;
     var bounds = railBounds(handle, side);
@@ -341,6 +347,8 @@
     if (handle) handle.setAttribute("aria-valuenow", String(next));
     emitWorkbenchRailWidth(form, side, next, !!committed);
   }
+
+  window.__gosx_workbench_runtime_island_setRailWidth = setRailWidthIsland;
 
   // currentRailWidth(form, side, handle) — mirrors currentWorkbenchRailWidth
   // at studio-engines.js:165. Pure read: returns the form's
