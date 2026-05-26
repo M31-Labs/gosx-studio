@@ -705,4 +705,69 @@
   }
 
   window.__gosx_style_runtime_island_syncControlButtons = syncControlButtonsIsland;
+
+  // ===== Group 3: iframe-crossing transitional (continued) =====
+
+  // lastStyleImpact — module-scope state tracking the most-recent committed
+  // impact, mirroring the legacy bridge's `lastStyleImpact` variable at
+  // studio-engines.js:4. restoreImpact uses this to repaint the panel when
+  // pointer leaves a control after a commit.
+  var lastStyleImpact = null;
+
+  function setImpactReadout(selector, value) {
+    Array.prototype.forEach.call(doc.querySelectorAll(selector), function (node) {
+      node.textContent = value;
+    });
+  }
+
+  function styleScopePath(form) {
+    var bits = ["site", "home"];
+    if (form) {
+      var selection = form.getAttribute("data-studio-selection") || "";
+      var field = form.getAttribute("data-studio-field-selection") || "";
+      if (selection) bits.push(selection);
+      if (field) bits.push(field);
+    }
+    return bits.join(" > ");
+  }
+
+  function styleStatePath(form) {
+    var state = form && form.getAttribute("data-studio-style-state") || "default";
+    var breakpoint = form && form.getAttribute("data-studio-breakpoint") || "desktop";
+    return state + " / " + breakpoint;
+  }
+
+  function clearStyleImpactNodes() {
+    var preview = stylePreviewRuntime();
+    if (typeof preview.applyStyleImpact === "function") preview.applyStyleImpact("");
+  }
+
+  // showImpact(name, value, committed) — mirrors showStyleImpact at
+  // studio-engines.js:1785. The legacy uses a single ternary for the
+  // affected-count label, "1 affected" vs "N affected" — both branches
+  // emit " affected" with a space prefix so the singular and plural read
+  // identically; preserved verbatim for parity.
+  //
+  // Transitional iframe delegation per ADR 0008 — slice 6 will swap the
+  // PreviewRuntime.applyStyleImpact call for a $preview.style.impact.selector
+  // shared-signal write subscribed by the preview document.
+  function showImpactIsland(name, value, committed) {
+    var meta = styleImpactFor(name);
+    var form = editorWorkbench(doc);
+    var preview = stylePreviewRuntime();
+    var count = typeof preview.applyStyleImpact === "function" ? preview.applyStyleImpact(meta.selector) : 0;
+    var label = meta.label + " / " + ownerLabel(value || styleControlValue(name));
+    setImpactReadout("[data-studio-style-impact-label]", label);
+    setImpactReadout("[data-studio-style-impact-summary]", meta.summary);
+    setImpactReadout("[data-studio-style-impact-count]", count + (count === 1 ? " affected" : " affected"));
+    setImpactReadout("[data-studio-style-impact-scope]", styleScopePath(form));
+    setImpactReadout("[data-studio-style-impact-state]", styleStatePath(form));
+    Array.prototype.forEach.call(doc.querySelectorAll("[data-studio-style-impact-panel]"), function (panel) {
+      panel.classList.toggle("is-live", !committed);
+      panel.classList.toggle("has-change", !!committed);
+    });
+    if (committed) lastStyleImpact = { name: name, value: value };
+  }
+
+  window.__gosx_style_runtime_island_showImpact = showImpactIsland;
 })();
