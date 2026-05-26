@@ -92,4 +92,14 @@
   }
 
   window.__gosx_blocklayout_runtime_island_rows = rowsIsland;
+
+  // rowKey(row) — mirrors blockRowKey at studio-engines.js:1964.
+  // Reads data-block-studio-block off the row. Returns "" when row is null
+  // or the attribute is missing — callers rely on this to no-op safely on
+  // empty results from rowForKey lookups.
+  function rowKeyIsland(row) {
+    return row ? row.getAttribute("data-block-studio-block") || "" : "";
+  }
+
+  window.__gosx_blocklayout_runtime_island_rowKey = rowKeyIsland;
 })();
