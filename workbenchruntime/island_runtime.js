@@ -342,6 +342,15 @@
     emitWorkbenchRailWidth(form, side, next, !!committed);
   }
 
+  // currentRailWidth(form, side, handle) — mirrors currentWorkbenchRailWidth
+  // at studio-engines.js:165. Pure read: returns the form's
+  // --studio-{left,right}-width custom property as an integer (or the
+  // sidebar's bounding-rect width fallback, or the handle's bounds
+  // fallback). Per the slice plan, this method ships as a
+  // signal-derivation rather than a mutator — it reads the same DOM state
+  // setRailWidth writes (--studio-{left,right}-width CSS custom
+  // properties) and returns it unmodified. No event dispatch, no canvas
+  // refresh.
   function currentRailWidthIsland(form, side, handle) {
     if (!form) return railBounds(handle, side).fallback;
     var custom = form.style.getPropertyValue(railWidthProperty(side));
@@ -351,6 +360,8 @@
     if (node) return Math.round(node.getBoundingClientRect().width);
     return railBounds(handle, side).fallback;
   }
+
+  window.__gosx_workbench_runtime_island_currentRailWidth = currentRailWidthIsland;
 
   // bindChrome(root) — mirrors bindWorkbenchChrome at studio-engines.js:516.
   // Binds the workbench form's delegated click handler (fans out to
