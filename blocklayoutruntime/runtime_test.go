@@ -163,6 +163,28 @@ func TestIslandRuntimeJSPublishesRenumberGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesSelectRowGlobal(t *testing.T) {
+	// Method 6/9: selectRow(root, key) — legacy selectBlockLayoutRow at
+	// studio-engines.js:2099. Toggles the .is-selected class on every row to
+	// match the supplied key, scrollIntoView's the newly-selected row, and
+	// dispatches a blockstudio:select CustomEvent on document. No-op when key
+	// is empty.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.SelectRow + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	// CustomEvent contract — the selection commandbar + inspector form watch
+	// for blockstudio:select.
+	if !strings.Contains(body, "blockstudio:select") {
+		t.Fatalf("IslandRuntimeJS() selectRow must dispatch %q", "blockstudio:select")
+	}
+	// CSS class used to highlight the selected row in the editor.
+	if !strings.Contains(body, "is-selected") {
+		t.Fatalf("IslandRuntimeJS() selectRow must toggle is-selected class")
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
