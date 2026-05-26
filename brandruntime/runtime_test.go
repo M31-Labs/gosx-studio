@@ -71,3 +71,75 @@ func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 		}
 	}
 }
+
+func TestIslandRuntimeJSPublishesIslandGlobals(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	// The globals published here are the delegation targets BridgeShim consults.
+	for _, fragment := range []string{
+		"window." + IslandGlobals.BindLogo + " ",
+		"window." + IslandGlobals.UpdateHeaderLogo + " ",
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing global assignment %q", fragment)
+		}
+	}
+	// The island runtime must preserve the legacy bindBrandLogo DOM
+	// attribute contract — every input + handle + reset button it reads —
+	// plus its idempotency-guard dataset key. Missing any of these silently
+	// breaks the corresponding sub-behavior; the test fails before the
+	// parity suite (which can't run until the cross-module bump lands) ever
+	// gets a chance to catch the regression.
+	for _, contract := range []string{
+		// bindLogo sub-behavior — editor-side DOM contract
+		"data-editor-brand-preview",
+		"data-editor-brand-logo",
+		"data-editor-brand-handle",
+		"data-editor-logo-url",
+		"data-editor-logo-alt",
+		"data-editor-logo-width",
+		"data-editor-logo-offset-x",
+		"data-editor-logo-offset-y",
+		"data-editor-logo-snap",
+		"data-editor-logo-snap-size",
+		"data-editor-logo-reset",
+		"data-editor-logo-readout",
+		// CSS custom properties the preview updates
+		"--brand-logo-width",
+		"--brand-logo-offset-x",
+		"--brand-logo-offset-y",
+		"--editor-logo-grid-size",
+		// updateHeaderLogo sub-behavior — transitional iframe delegation
+		// via GoSXStudioPreviewRuntime (slice 6 will swap for
+		// $preview.brand.headerLogo per
+		// ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md).
+		"GoSXStudioPreviewRuntime",
+		// Idempotency guard — distinct from legacy gosxStudioBrandLogoBound
+		// so both implementations can coexist on the same DOM during the
+		// additive shipping window without double-binding.
+		"gosxStudioBrandLogoIslandBound",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() brand contract missing %q", contract)
+		}
+	}
+}
+
+func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
+	bundle := string(Bundle())
+	if bundle == "" {
+		t.Fatal("Bundle() must return a non-empty JS snippet")
+	}
+	// Island runtime must come before the BridgeShim — the shim consults
+	// the global the island runtime publishes. Order matters.
+	islandIdx := strings.Index(bundle, IslandGlobals.BindLogo+" ")
+	shimIdx := strings.Index(bundle, "window.GoSXStudioBrandRuntime =")
+	if islandIdx < 0 || shimIdx < 0 {
+		t.Fatalf("Bundle() missing island runtime or shim:\n%s", bundle)
+	}
+	if islandIdx > shimIdx {
+		t.Fatalf("Bundle() must place island runtime before shim (island=%d shim=%d)", islandIdx, shimIdx)
+	}
+}
