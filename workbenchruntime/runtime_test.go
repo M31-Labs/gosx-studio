@@ -265,6 +265,33 @@ func TestIslandRuntimeJSPublishesSyncViewportGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesActivateViewportGlobal(t *testing.T) {
+	// Method 5/15: activateViewport(form, viewport) — legacy
+	// activateWorkbenchViewport at studio-engines.js:382. Clicks the
+	// matching [data-studio-viewport="<x>"] button if present; otherwise
+	// falls through to syncViewport. Routes user-initiated viewport
+	// activation through the same dispatch as the toolbar / command palette.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.ActivateViewport + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// Button selector activateViewport prefers when present.
+		"data-studio-viewport",
+		// Fallback delegation when no button is matched.
+		"syncViewportIsland",
+		// Default viewport when none provided.
+		`"desktop"`,
+		// attrValue escape helper used to build the button selector.
+		"attrValue",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() activateViewport must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
