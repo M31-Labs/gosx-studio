@@ -185,6 +185,26 @@ func TestIslandRuntimeJSPublishesSelectRowGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesCommitReorderGlobal(t *testing.T) {
+	// Method 7/9: commitReorder(list, key, targetKey, position) — legacy
+	// commitBlockLayoutReorder at studio-engines.js:2084. position="before"|
+	// "after". Guards no-op (returns false when key/targetKey missing or
+	// equal); otherwise insertBefore + renumber(list, "engine-preview") +
+	// selectRow(list, key); returns true.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.CommitReorder + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	// The "engine-preview" source string is passed to renumber so the form
+	// listeners can distinguish a canvas-preview reorder from an
+	// engine-buttons reorder. Drift here would silently miscategorise the
+	// source on subscribers.
+	if !strings.Contains(body, "engine-preview") {
+		t.Fatalf("IslandRuntimeJS() commitReorder must pass renumber source %q", "engine-preview")
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
