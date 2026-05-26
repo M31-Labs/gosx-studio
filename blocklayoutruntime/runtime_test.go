@@ -237,6 +237,41 @@ func TestIslandRuntimeJSPublishesUpdateBlockLibraryStateGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesUpdateVisibilityStateGlobal(t *testing.T) {
+	// Method 9/9: updateVisibilityState(check) — legacy
+	// updateBlockLayoutVisibilityState at studio-engines.js:1994. Mutates the
+	// enclosing [data-block-studio-block] row's classes / status text / pill
+	// className based on the supplied [data-editor-block-visible] checkbox,
+	// then delegates the cross-frame mutation to
+	// window.GoSXStudioPreviewRuntime.setBlockVisibility(key, visible) — see
+	// ADR 0008 transitional pattern
+	// (~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md) —
+	// and then refreshes library state.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.UpdateVisibilityState + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// DOM contract — the row class toggled on hidden state, the status
+		// text + pill labels users see in the editor.
+		"editor-block--hidden",
+		"data-editor-block-status",
+		"data-editor-block-pill",
+		"status--ready",
+		// Transitional iframe delegation per ADR 0008 — until slice 6
+		// swaps to $preview.block.<key>.visible, the cross-frame mutation
+		// rides on the legacy PreviewRuntime contract. Catching drift here
+		// before the deletion-window CI clock starts.
+		"GoSXStudioPreviewRuntime",
+		"setBlockVisibility",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() updateVisibilityState must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
