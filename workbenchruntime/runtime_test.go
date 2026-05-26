@@ -190,6 +190,46 @@ func TestIslandRuntimeJSPublishesBindChromeGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesSetModeGlobal(t *testing.T) {
+	// Method 3/15: setMode(form, mode, scroll) — legacy setWorkbenchMode at
+	// studio-engines.js:343. Sets data-studio-mode on the form, toggles
+	// aria-pressed on [data-studio-mode-control] buttons, toggles
+	// is-mode-active / hidden / aria-hidden on [data-studio-mode-panel]
+	// siblings, scrolls active panel into view when requested, updates
+	// [data-studio-mode-label] readouts, emits
+	// gosxstudio:workbench-mode-change. The mode alias mapping
+	// (structure/content → home, style → look, preview → publish,
+	// manage/flows → advanced) is preserved verbatim.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.SetMode + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// Form attribute written by setMode.
+		"data-studio-mode",
+		// DOM contracts the helper queries / mutates.
+		"data-studio-mode-control",
+		"data-studio-mode-panel",
+		"data-studio-mode-label",
+		// Class toggled on active mode panels (studio-engines.js:352).
+		"is-mode-active",
+		// Custom event name dispatched on mode change.
+		"workbench-mode-change",
+		// Mode aliases (mirror studio-engines.js:316-322 normalizer).
+		`"structure"`,
+		`"content"`,
+		`"style"`,
+		`"preview"`,
+		`"manage"`,
+		`"flows"`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() setMode must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
