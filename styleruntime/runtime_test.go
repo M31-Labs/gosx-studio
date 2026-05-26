@@ -212,34 +212,32 @@ func TestIslandRuntimeJSPublishesBindFontsGlobal(t *testing.T) {
 func TestIslandRuntimeJSPublishesApplyThemeGlobal(t *testing.T) {
 	// Method 5/10: applyTheme() — legacy updateTheme at studio-engines.js:1396.
 	// Reads theme form state (kit / template / palette / image-ratio /
-	// custom-template / style classes / color tokens), calls
-	// PreviewRuntime.applyTheme(payload) for the cross-frame DOM mutation
-	// (per ADR 0008 transitional pattern — see
-	// ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md),
-	// updates editor-side swatches / kit cards / template cards / custom-
-	// template builder, then runs syncControlButtons(document).
+	// custom-template / style classes / color tokens) and publishes the
+	// $preview.theme.* signal family. Slice 6 transitional cleanup
+	// (Section G.4) swapped the previous
+	// window.GoSXStudioPreviewRuntime.applyTheme delegation for direct
+	// $preview.theme.* writes — the cross-frame relay (per ADR 0009)
+	// delivers them to the iframe's preview_subscriber which reassembles
+	// the payload and applies .site-shell class transitions + color CSS
+	// vars. Editor-side swatches / kit cards / template cards / custom-
+	// template builder updates remain editor-frame-only.
 	body := string(IslandRuntimeJS())
 	want := "window." + IslandGlobals.ApplyTheme + " "
 	if !strings.Contains(body, want) {
 		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
 	}
 	for _, contract := range []string{
-		// Transitional iframe delegation per ADR 0008 — until slice 6 swaps
-		// to $preview.theme.*, the cross-frame mutation rides on the legacy
-		// PreviewRuntime contract. Catching drift here before the deletion-
-		// window CI clock starts.
-		"GoSXStudioPreviewRuntime",
-		"applyTheme",
-		// Payload fields the legacy populates and the preview consumes
-		// (studio-engines.js:1404). Drift in any of these silently breaks
-		// the iframe applyTheme contract.
-		"kit:",
-		"template:",
-		"palette:",
-		"imageRatio:",
-		"customClasses:",
-		"styleClasses:",
-		"colors:",
+		// Slice 6 transitional cleanup — the signal-family the writer
+		// publishes. Drift in any of these silently breaks the cross-
+		// frame applyTheme contract (subscriber observes these names
+		// in gosx-studio/previewruntime/subscriber_runtime.js).
+		"$preview.theme.kit",
+		"$preview.theme.template",
+		"$preview.theme.palette",
+		"$preview.theme.imageRatio",
+		"$preview.theme.customClasses",
+		"$preview.theme.styleClasses",
+		"$preview.theme.colors",
 		// Theme form inputs the helper reads to compose the payload.
 		`name="themeImageRatio"`,
 		"data-editor-color-token",
@@ -298,23 +296,23 @@ func TestIslandRuntimeJSPublishesSyncControlButtonsGlobal(t *testing.T) {
 func TestIslandRuntimeJSPublishesShowImpactGlobal(t *testing.T) {
 	// Method 7/10: showImpact(name, value, committed) — legacy showStyleImpact
 	// at studio-engines.js:1785. Looks up impact metadata for the named
-	// control, calls PreviewRuntime.applyStyleImpact(selector) for the count
-	// (per ADR 0008 transitional pattern — see
-	// ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md),
-	// writes the editor-side impact-readout labels (label / summary / count /
-	// scope / state), and toggles the impact panel's is-live / has-change
-	// classes against the committed flag.
+	// control, publishes $preview.style.impact.selector for the cross-
+	// frame mutation (slice 6 transitional cleanup, Section G.5 — was
+	// PreviewRuntime.applyStyleImpact), writes the editor-side impact-
+	// readout labels (label / summary / count / scope / state), and
+	// toggles the impact panel's is-live / has-change classes against
+	// the committed flag. The cross-frame relay (per ADR 0009) delivers
+	// the selector to the iframe's preview_subscriber, which marks
+	// matching nodes via [data-studio-style-impact-node].
 	body := string(IslandRuntimeJS())
 	want := "window." + IslandGlobals.ShowImpact + " "
 	if !strings.Contains(body, want) {
 		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
 	}
 	for _, contract := range []string{
-		// Transitional iframe delegation per ADR 0008 — slice 6 will swap to
-		// $preview.style.impact.selector. Catching drift here before the
-		// deletion-window CI clock starts.
-		"GoSXStudioPreviewRuntime",
-		"applyStyleImpact",
+		// Slice 6 transitional cleanup — the signal carrying the selector
+		// across the iframe boundary. Drift breaks the cross-frame contract.
+		"$preview.style.impact.selector",
 		// The five impact-readout selectors the helper writes (line 1791-1795).
 		"data-studio-style-impact-label",
 		"data-studio-style-impact-summary",
@@ -339,10 +337,12 @@ func TestIslandRuntimeJSPublishesRestoreImpactGlobal(t *testing.T) {
 	// Method 8/10: restoreImpact() — legacy restoreStyleImpact at
 	// studio-engines.js:1803. If a lastStyleImpact is recorded, replays
 	// showImpact(name, value, true) to bring the panel back to its committed
-	// state; otherwise clears the readouts to a "No active recipe" state and
-	// calls PreviewRuntime.applyStyleImpact("") to remove the overlay
-	// markers (per ADR 0008 transitional pattern — see
-	// ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md).
+	// state; otherwise clears the readouts to a "No active recipe" state
+	// and publishes $preview.style.impact.selector := "" (slice 6
+	// transitional cleanup, Section G.6 — was
+	// PreviewRuntime.applyStyleImpact("")) to clear the iframe-side
+	// markers. The cross-frame relay (per ADR 0009) delivers the empty-
+	// selector write to the iframe's preview_subscriber.
 	body := string(IslandRuntimeJS())
 	want := "window." + IslandGlobals.RestoreImpact + " "
 	if !strings.Contains(body, want) {

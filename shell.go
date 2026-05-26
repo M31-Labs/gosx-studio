@@ -6,18 +6,20 @@ import (
 	"m31labs.dev/gosx-studio/blocklayoutruntime"
 	"m31labs.dev/gosx-studio/brandruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
+	"m31labs.dev/gosx-studio/previewruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
 	"m31labs.dev/gosx-studio/styleruntime"
 	"m31labs.dev/gosx-studio/workbenchruntime"
 )
 
 const (
-	RuntimeRoot          = "/_gosx/studio"
-	StylesheetPath       = RuntimeRoot + "/studio.css"
-	EngineRuntimePath    = RuntimeRoot + "/studio-engines.js"
-	WorkbenchRuntimePath = RuntimeRoot + "/workbench-runtime.js"
-	CommandRuntimePath   = RuntimeRoot + "/command-palette.js"
-	StateRuntimePath     = RuntimeRoot + "/state-runtime.js"
+	RuntimeRoot             = "/_gosx/studio"
+	StylesheetPath          = RuntimeRoot + "/studio.css"
+	EngineRuntimePath       = RuntimeRoot + "/studio-engines.js"
+	WorkbenchRuntimePath    = RuntimeRoot + "/workbench-runtime.js"
+	CommandRuntimePath      = RuntimeRoot + "/command-palette.js"
+	StateRuntimePath        = RuntimeRoot + "/state-runtime.js"
+	PreviewSubscriberPath   = RuntimeRoot + "/preview-subscriber.js"
 
 	CanvasEngineName      = "GoSXStudioCanvas"
 	SiteMapEngineName     = "GoSXStudioSiteMap"
@@ -155,6 +157,7 @@ func DefaultShellConfig() ShellConfig {
 			blocklayoutruntime.FeatureFlagKey: false,
 			styleruntime.FeatureFlagKey:       false,
 			workbenchruntime.FeatureFlagKey:   false,
+			previewruntime.FeatureFlagKey:     false,
 		},
 	}
 }

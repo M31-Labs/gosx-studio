@@ -311,20 +311,87 @@ func TestEngineRuntimeIncludesWorkbenchRuntimeIslandBundle(t *testing.T) {
 		"__gosx_workbench_runtime_island_currentRailWidth",
 		"__gosx_workbench_runtime_island_setRailWidth",
 		"workbench-runtime-islands",
-		// The shim's flag check must be in the bundle so the runtime is
-		// actually gated, not just loaded.
 		"data-gosx-studio-feature-flag-workbench-runtime-islands",
 	} {
 		if !strings.Contains(engines, fragment) {
 			t.Fatalf("engine runtime missing workbenchruntime fragment %q", fragment)
 		}
 	}
-	// The shim must override window.GoSXStudioWorkbenchRuntime; without
-	// that assignment the legacy methods are never wrapped. The bundle
-	// already declares the legacy version of the global via
-	// studio-engines.js at line 2312; the slice-7 shim reassigns it.
 	if !strings.Contains(engines, "window.GoSXStudioWorkbenchRuntime =") {
 		t.Fatalf("engine runtime missing workbenchruntime shim assignment")
+	}
+}
+
+func TestEngineRuntimeIncludesPreviewRuntimeIslandBundle(t *testing.T) {
+	// Phase 3 slice-6 architectural burn-down of GoSXStudioPreviewRuntime
+	// per ADR 0008 (canonical) + ADR 0009 (cross-frame transport).
+	engines := string(EngineRuntimeScript())
+	for _, fragment := range []string{
+		"__gosx_preview_runtime_island_mount",
+		"__gosx_preview_runtime_island_setBlockVisibility",
+		"__gosx_preview_runtime_island_applyTextUpdate",
+		"__gosx_preview_runtime_island_applyTheme",
+		"__gosx_preview_runtime_island_applyStyleImpact",
+		"__gosx_preview_runtime_island_applyCSS",
+		"__gosx_preview_runtime_island_applyFonts",
+		"__gosx_preview_runtime_island_updateHeaderLogo",
+		"__gosx_preview_runtime_island_requestInlineEdit",
+		"__gosx_preview_runtime_island_cycleField",
+		"preview-runtime-islands",
+		"data-gosx-studio-feature-flag-preview-runtime-islands",
+		"$preview.mount.epoch",
+		"$preview.block.",
+		"$preview.text.",
+		"$preview.theme.kit",
+		"$preview.style.impact.selector",
+		"$preview.theme.cssCustom",
+		"$preview.theme.fontsCustom",
+		"$preview.brand.headerLogo",
+		"$preview.editor.inlineEdit.requestId",
+		"$preview.editor.fieldCycle.requestId",
+	} {
+		if !strings.Contains(engines, fragment) {
+			t.Fatalf("engine runtime missing previewruntime fragment %q", fragment)
+		}
+	}
+	if !strings.Contains(engines, "window.GoSXStudioPreviewRuntime =") {
+		t.Fatalf("engine runtime missing previewruntime shim assignment")
+	}
+}
+
+func TestPreviewSubscriberScriptIsNonEmpty(t *testing.T) {
+	subscriber := string(PreviewSubscriberScript())
+	if subscriber == "" {
+		t.Fatal("PreviewSubscriberScript() must return non-empty bundle")
+	}
+	for _, signalName := range []string{
+		"$preview.mount.epoch",
+		"$preview.block.",
+		"$preview.text.",
+		"$preview.theme.kit",
+		"$preview.brand.headerLogo",
+	} {
+		if !strings.Contains(subscriber, signalName) {
+			t.Fatalf("PreviewSubscriberScript() missing observer for %q", signalName)
+		}
+	}
+}
+
+func TestPreviewSubscriberHandlerServesSubscriberScript(t *testing.T) {
+	rec := httptest.NewRecorder()
+	PreviewSubscriberHandler().ServeHTTP(rec, httptest.NewRequest("GET", PreviewSubscriberPath, nil))
+	if rec.Code != 200 {
+		t.Fatalf("preview subscriber status = %d", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.Contains(ct, "text/javascript") {
+		t.Fatalf("preview subscriber content type = %q", ct)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "$preview.") {
+		t.Fatalf("preview subscriber should observe $preview.* signals: %s", body)
+	}
+	if strings.Contains(body, "__gosx_preview_runtime_island_mount") {
+		t.Fatalf("preview subscriber must not contain editor-side island writer globals")
 	}
 }
 

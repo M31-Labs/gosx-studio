@@ -14,11 +14,12 @@
 //     Scans root for [data-editor-source], [data-editor-frame-attr-target];
 //     attaches an input listener that, on every keystroke (frame-throttled
 //     via rAF), writes the value to the shared signal
-//     $preview.field.<sourceKey> AND calls the legacy preview runtime's
-//     applyTextUpdate path. The dual write is intentional during the slice
-//     overlap window: slice 6 ships the preview-side subscriber for
-//     $preview.field.*, after which the applyTextUpdate fan-out is
-//     removed. See ADR 0008.
+//     $preview.field.<sourceKey>. Slice 6's preview subscriber receives the
+//     signal via the cross-frame relay (per ADR 0009) and applies the
+//     textContent / attribute update inside the iframe. Slice 6's
+//     transitional cleanup (Section G.1 of the slice-6 plan) removed the
+//     legacy GoSXStudioPreviewRuntime.applyTextUpdate fallback — the
+//     signal write is the sole delivery mechanism now.
 //
 //   bindClipboard(root)
 //     Idempotently installs the document-level click handler for
@@ -64,15 +65,15 @@
     return doc;
   }
 
-  function bridgePreview() {
-    return window.GoSXStudioPreviewRuntime || {};
-  }
-
-  // Set a shared signal value through the WASM bridge, if available. The
-  // bridge exposes window.__gosx_set_shared_signal_json(name, valueJSON)
-  // after the runtime boots; before then the call is a no-op (mirroring
-  // still works because the legacy applyTextUpdate path is also invoked
-  // during the slice overlap — see ADR 0008 and the slice plan's risks).
+  // Set a shared signal value through the WASM bridge. The bridge exposes
+  // window.__gosx_set_shared_signal_json(name, valueJSON) after the
+  // runtime boots; the cross-frame relay (per ADR 0009 +
+  // Bridge.EnableCrossFrameRelay) routes writes whose name starts with
+  // "$preview." to the storefront iframe's Bridge, where slice 6's
+  // preview_subscriber observes them and applies the matching DOM
+  // mutation. Before the bridge boots, the call is a no-op — but the
+  // BridgeShim's flag gate ensures we only run this path when the host
+  // has opted in (which implies the bridge is mounted).
   function writeSharedSignal(name, value) {
     try {
       var setter = window.__gosx_set_shared_signal_json;
@@ -80,7 +81,7 @@
         setter(name, JSON.stringify(value));
       }
     } catch (error) {
-      // Shared-signal channel not ready yet. Legacy path keeps preview live.
+      // Shared-signal channel not ready yet.
     }
   }
 
@@ -98,25 +99,29 @@
       var attrSuffix = input.getAttribute("data-editor-frame-attr-suffix") || "";
 
       var updateNow = function () {
-        // Per ADR 0008, mirroring writes go through $preview.field.<key>.
-        // The slice-6 preview subscriber will consume these and apply to
-        // the iframe DOM; until slice 6 lands, the legacy preview runtime
-        // call below keeps the preview live.
+        // Per ADR 0008 + 0009: mirroring writes go through $preview.field
+        // .<key> and $preview.text.<key> (the latter carries the full
+        // applyTextUpdate detail object so the preview subscriber can
+        // dispatch all three legacy fan-out branches: sourceKey
+        // textContent, frameTarget textContent, attrTarget attribute).
+        // Slice 6's transitional cleanup (Section G.1) removed the
+        // legacy window.GoSXStudioPreviewRuntime.applyTextUpdate
+        // delegation — the cross-frame relay (per ADR 0009) delivers
+        // the signals to the iframe's subscriber where the mutation
+        // happens locally.
         if (key) {
           writeSharedSignal("$preview.field." + key, input.value);
         }
-        var preview = bridgePreview();
-        if (preview.applyTextUpdate) {
-          preview.applyTextUpdate({
-            sourceKey: key,
-            frameTarget: frameTarget,
-            attrTarget: attrTarget,
-            attrName: attrName,
-            attrPrefix: attrPrefix,
-            attrSuffix: attrSuffix,
-            value: input.value
-          });
-        }
+        var detailKey = key || frameTarget || attrTarget || "_";
+        writeSharedSignal("$preview.text." + detailKey, {
+          sourceKey: key || "",
+          frameTarget: frameTarget || "",
+          attrTarget: attrTarget || "",
+          attrName: attrName || "",
+          attrPrefix: attrPrefix || "",
+          attrSuffix: attrSuffix || "",
+          value: input.value
+        });
       };
       var update = frameTask(updateNow);
       input.addEventListener("input", update);

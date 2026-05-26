@@ -242,11 +242,12 @@ func TestIslandRuntimeJSPublishesUpdateVisibilityStateGlobal(t *testing.T) {
 	// updateBlockLayoutVisibilityState at studio-engines.js:1994. Mutates the
 	// enclosing [data-block-studio-block] row's classes / status text / pill
 	// className based on the supplied [data-editor-block-visible] checkbox,
-	// then delegates the cross-frame mutation to
-	// window.GoSXStudioPreviewRuntime.setBlockVisibility(key, visible) — see
-	// ADR 0008 transitional pattern
-	// (~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md) —
-	// and then refreshes library state.
+	// then publishes $preview.block.<key>.visible (slice 6 transitional
+	// cleanup, Section G.3 — previously delegated cross-frame mutation to
+	// window.GoSXStudioPreviewRuntime.setBlockVisibility). The cross-frame
+	// relay (per ADR 0009) delivers the signal to the iframe's
+	// preview_subscriber, where the [data-studio-block-key] node's display
+	// gets toggled.
 	body := string(IslandRuntimeJS())
 	want := "window." + IslandGlobals.UpdateVisibilityState + " "
 	if !strings.Contains(body, want) {
@@ -259,12 +260,13 @@ func TestIslandRuntimeJSPublishesUpdateVisibilityStateGlobal(t *testing.T) {
 		"data-editor-block-status",
 		"data-editor-block-pill",
 		"status--ready",
-		// Transitional iframe delegation per ADR 0008 — until slice 6
-		// swaps to $preview.block.<key>.visible, the cross-frame mutation
-		// rides on the legacy PreviewRuntime contract. Catching drift here
-		// before the deletion-window CI clock starts.
-		"GoSXStudioPreviewRuntime",
-		"setBlockVisibility",
+		// Slice 6 transitional cleanup (Section G.3) — the cross-frame
+		// mutation now rides on $preview.block.<key>.visible. The signal
+		// name prefix is asserted here so drift in either the writer or
+		// the subscriber (gosx-studio/previewruntime/subscriber_runtime.js)
+		// surfaces immediately.
+		"$preview.block.",
+		".visible",
 	} {
 		if !strings.Contains(body, contract) {
 			t.Fatalf("IslandRuntimeJS() updateVisibilityState must preserve %q contract", contract)
