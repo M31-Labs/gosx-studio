@@ -407,6 +407,35 @@ func TestIslandRuntimeJSPublishesActivateZoomGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesToggleRailGlobal(t *testing.T) {
+	// Method 10/15: toggleRail(form, side) — legacy toggleWorkbenchRail at
+	// studio-engines.js:480. Flips data-studio-{left,right} between "open"
+	// and "collapsed", sets data-studio-focus to "false", re-syncs the rail
+	// toggle aria-pressed states, emits gosxstudio:workbench-rail-change,
+	// refreshes the canvas.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.ToggleRail + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// Form attributes toggleRail writes (mirrors studio-engines.js:482-483).
+		"data-studio-focus",
+		// Side discriminator strings.
+		`"left"`,
+		`"right"`,
+		// Rail state values toggled between.
+		`"open"`,
+		`"collapsed"`,
+		// Event name dispatched on rail change.
+		"workbench-rail-change",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() toggleRail must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
