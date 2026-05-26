@@ -198,4 +198,27 @@
   }
 
   window.__gosx_blocklayout_runtime_island_selectRow = selectRowIsland;
+
+  // commitReorder(list, key, targetKey, position) — mirrors
+  // commitBlockLayoutReorder at studio-engines.js:2084. position="before"|
+  // "after". Returns false on no-op (missing key/target or key===target);
+  // otherwise true. Caller-facing return value matters — the
+  // canvas-preview-drop handler in preview-runtime.js branches on the
+  // return to decide whether to revert its visual hint.
+  function commitReorderIsland(list, key, targetKey, position) {
+    if (!key || !targetKey || key === targetKey) return false;
+    var row = rowForKeyIsland(list, key);
+    var target = rowForKeyIsland(list, targetKey);
+    if (!row || !target) return false;
+    if (position === "after") {
+      list.insertBefore(row, target.nextElementSibling);
+    } else {
+      list.insertBefore(row, target);
+    }
+    renumberIsland(list, "engine-preview");
+    selectRowIsland(list, key);
+    return true;
+  }
+
+  window.__gosx_blocklayout_runtime_island_commitReorder = commitReorderIsland;
 })();
