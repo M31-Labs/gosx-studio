@@ -378,6 +378,35 @@ func TestIslandRuntimeJSPublishesSyncZoomGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesActivateZoomGlobal(t *testing.T) {
+	// Method 9/15: activateZoom(form, zoom) — legacy activateWorkbenchZoom
+	// at studio-engines.js:430. Clicks the matching
+	// [data-studio-zoom="<x>"] button if present; otherwise falls through
+	// to syncZoom. Routes user-initiated zoom activation through the same
+	// dispatch as the toolbar / command palette.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.ActivateZoom + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// Button selectors activateZoom prefers when present (mirrors
+		// studio-engines.js:433 — both button[data-studio-zoom] and
+		// [role='button'][data-studio-zoom]).
+		"data-studio-zoom",
+		// Fallback delegation when no button is matched.
+		"syncZoomIsland",
+		// Default zoom when none provided.
+		`"fit"`,
+		// attrValue escape helper used to build the button selector.
+		"attrValue",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() activateZoom must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
