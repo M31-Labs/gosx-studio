@@ -130,6 +130,39 @@ func TestIslandRuntimeJSPublishesMoveRowGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesRenumberGlobal(t *testing.T) {
+	// Method 5/9: renumber(list, source) — legacy renumberBlockLayoutList at
+	// studio-engines.js:2047. Re-indexes [data-block-studio-order] inputs to
+	// 1-based positions, writes data-block-studio-index attrs, refreshes
+	// up/down move-button disabled states (updateBlockMoveButtons at
+	// studio-engines.js:2062), and dispatches blockstudio:reorder + input +
+	// change events on the list.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.Renumber + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	// DOM + event contracts the engine listeners depend on. Drift in any of
+	// these silently breaks the reorder fan-out.
+	for _, contract := range []string{
+		// Order-input attribute the legacy reads + writes.
+		"data-block-studio-order",
+		// Move-button disabled state — the up/down buttons sit on every row
+		// and disable at the list ends.
+		"data-block-studio-move",
+		// Index attribute that records the row's position after renumbering.
+		"data-block-studio-index",
+		// CustomEvent name the form's reorder listener watches.
+		"blockstudio:reorder",
+		// Default source string when caller passes no source argument.
+		"block-layout-engine",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() renumber must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
