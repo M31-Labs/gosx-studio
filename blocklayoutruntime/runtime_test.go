@@ -98,6 +98,19 @@ func TestIslandRuntimeJSPublishesRowKeyGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesRowForKeyGlobal(t *testing.T) {
+	// Method 3/9: rowForKey(root, key) — legacy blockRowForKey at
+	// studio-engines.js:1968. Pure helper:
+	// root.querySelector('[data-block-studio-block="<key>"]').
+	// Uses the same attrValue escape as the legacy attrValue helper so keys
+	// containing double quotes or backslashes don't break the selector.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.RowForKey + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
