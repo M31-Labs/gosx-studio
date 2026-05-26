@@ -36,3 +36,64 @@ func TestFeatureFlagKey(t *testing.T) {
 		t.Fatalf("FeatureFlagKey %q should end with -runtime-islands per Phase 3 convention", FeatureFlagKey)
 	}
 }
+
+func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
+	shim := string(BridgeShim())
+	if shim == "" {
+		t.Fatal("BridgeShim() must return a non-empty JS snippet")
+	}
+	// The shim must reference each method-specific island global, the public
+	// global it shims (window.GoSXStudioStyleRuntime), and the feature flag
+	// so the legacy path stays reachable when the flag is off. The
+	// IslandGlobals struct holds the canonical names; any drift between the
+	// struct and the shim is caught here.
+	for _, fragment := range []string{
+		"window.GoSXStudioStyleRuntime",
+		IslandGlobals.BindTheme,
+		IslandGlobals.BindWorkbench,
+		IslandGlobals.BindCSS,
+		IslandGlobals.BindFonts,
+		IslandGlobals.ApplyTheme,
+		IslandGlobals.SyncControlButtons,
+		IslandGlobals.ShowImpact,
+		IslandGlobals.RestoreImpact,
+		IslandGlobals.SetControlValue,
+		IslandGlobals.ResetControlValue,
+		FeatureFlagKey,
+	} {
+		if !strings.Contains(shim, fragment) {
+			t.Fatalf("BridgeShim() missing %q:\n%s", fragment, shim)
+		}
+	}
+}
+
+func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
+	shim := string(BridgeShim())
+	// The shim is additive — when the island global is missing, the legacy
+	// JS path must still run. Sanity check: look for the legacy function
+	// names so a future refactor that drops the fallback is caught here.
+	// The ten legacy function names are the catalog of GoSXStudioStyleRuntime
+	// methods as wired in assets/studio-engines.js:2341 — note four method
+	// names differ from the public method name (bindWorkbench →
+	// bindStyleWorkbench, applyTheme → updateTheme, showImpact →
+	// showStyleImpact, restoreImpact → restoreStyleImpact, syncControlButtons
+	// → syncStyleControlButtons, setControlValue → setStyleControlValue,
+	// resetControlValue → resetStyleControlValue). bindTheme / bindCSS /
+	// bindFonts have matching legacy names.
+	for _, legacy := range []string{
+		"bindTheme",
+		"bindStyleWorkbench",
+		"bindCSS",
+		"bindFonts",
+		"updateTheme",
+		"syncStyleControlButtons",
+		"showStyleImpact",
+		"restoreStyleImpact",
+		"setStyleControlValue",
+		"resetStyleControlValue",
+	} {
+		if !strings.Contains(shim, legacy) {
+			t.Fatalf("BridgeShim() must retain legacy fallback for %q:\n%s", legacy, shim)
+		}
+	}
+}
