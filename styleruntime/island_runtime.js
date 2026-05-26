@@ -462,4 +462,74 @@
   }
 
   window.__gosx_style_runtime_island_bindCSS = bindCSSIsland;
+
+  // cssString / cssURL / fontFormat — mirror the helpers at
+  // studio-engines.js:1585 / 1589 / 1593. cssString escapes a font family
+  // name for safe embedding in a CSS string literal; cssURL escapes a font
+  // file URL; fontFormat picks the appropriate format() hint from the URL
+  // file extension.
+  function cssString(value) {
+    return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/[\n\r]/g, " ").trim();
+  }
+
+  function cssURL(value) {
+    return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, "%22").replace(/[\n\r]/g, "").trim();
+  }
+
+  function fontFormat(url) {
+    var clean = String(url || "").split("?")[0].toLowerCase();
+    if (clean.endsWith(".woff2")) return ' format("woff2")';
+    if (clean.endsWith(".woff")) return ' format("woff")';
+    if (clean.endsWith(".ttf")) return ' format("truetype")';
+    if (clean.endsWith(".otf")) return ' format("opentype")';
+    return "";
+  }
+
+  // bindFonts(root) — mirrors bindFonts at studio-engines.js:1602.
+  // For each of the three slots (display / body / mono) reads the matching
+  // [data-editor-font-name] + [data-editor-font-url] inputs, composes the
+  // @font-face rule (when both family and source are present) and the
+  // :root font-variable assignment (when family is present), and dispatches
+  // PreviewRuntime.applyFonts(combined-css). frameTask-coalesced. Re-binds
+  // on preview-frame load and calls updateNow once on bind to seed the
+  // preview with the current state.
+  //
+  // Idempotency: per-input [data-gosx-studio-font-island-bound] distinct
+  // from the legacy [data-gosx-studio-font-bound] so both paths coexist.
+  function bindFontsIsland(root) {
+    var scope = root && root.querySelectorAll ? root : doc;
+    var inputs = scope.querySelectorAll("[data-editor-font-name], [data-editor-font-url]");
+    if (!inputs.length) return;
+    var updateNow = function () {
+      var css = [];
+      var vars = [];
+      ["display", "body", "mono"].forEach(function (slot) {
+        var name = scope.querySelector('[data-editor-font-name="' + slot + '"]');
+        var url = scope.querySelector('[data-editor-font-url="' + slot + '"]');
+        var family = name && name.value ? name.value.trim() : "";
+        var source = url && url.value ? url.value.trim() : "";
+        if (family && source) {
+          css.push('@font-face{font-family:"' + cssString(family) + '";src:url("' + cssURL(source) + '")' + fontFormat(source) + ';font-display:swap;}');
+        }
+        if (family) {
+          var token = slot === "display" ? "--font-display" : slot === "body" ? "--font-body" : "--font-mono";
+          vars.push(token + ':"' + cssString(family) + '";');
+        }
+      });
+      if (vars.length) css.push(":root{" + vars.join("") + "}");
+      var preview = stylePreviewRuntime();
+      if (typeof preview.applyFonts === "function") preview.applyFonts(css.join("\n"));
+    };
+    var update = frameTask(updateNow);
+    Array.prototype.forEach.call(inputs, function (input) {
+      if (input.dataset.gosxStudioFontIslandBound === "true") return;
+      input.dataset.gosxStudioFontIslandBound = "true";
+      input.addEventListener("input", update);
+      input.addEventListener("change", update);
+    });
+    bindStudioFrameLoad("data-editor-font-island-frame-bound", update);
+    updateNow();
+  }
+
+  window.__gosx_style_runtime_island_bindFonts = bindFontsIsland;
 })();
