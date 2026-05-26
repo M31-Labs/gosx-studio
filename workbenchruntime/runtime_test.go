@@ -436,6 +436,31 @@ func TestIslandRuntimeJSPublishesToggleRailGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesToggleFocusGlobal(t *testing.T) {
+	// Method 11/15: toggleFocus(form) — legacy toggleWorkbenchFocus at
+	// studio-engines.js:489. Flips data-studio-focus between "true" and
+	// "false", re-syncs the rail toggle aria-pressed states, emits
+	// gosxstudio:workbench-focus-change, refreshes the canvas.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.ToggleFocus + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// Form attribute toggleFocus flips.
+		"data-studio-focus",
+		// Event name dispatched on focus change.
+		"workbench-focus-change",
+		// Boolean state strings the toggle flips between.
+		`"true"`,
+		`"false"`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() toggleFocus must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
