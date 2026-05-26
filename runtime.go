@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"m31labs.dev/gosx-studio/fieldruntime"
+	"m31labs.dev/gosx-studio/selectionruntime"
 )
 
 //go:embed assets/preview-runtime.js assets/studio-engines.js assets/studio.css
@@ -35,6 +36,7 @@ func EngineRuntimeScript() []byte {
 	// the same way.
 	slices := [][]byte{
 		fieldruntime.Bundle(),
+		selectionruntime.Bundle(),
 	}
 	totalSliceLen := 0
 	for _, slice := range slices {
