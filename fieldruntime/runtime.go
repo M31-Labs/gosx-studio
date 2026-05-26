@@ -20,6 +20,13 @@
 // rather than reaching across the preview iframe directly.
 package fieldruntime
 
+import (
+	_ "embed"
+)
+
+//go:embed island_runtime.js
+var islandRuntimeJS []byte
+
 // FeatureFlagKey is the studio.ShellConfig.FeatureFlags key consumers set to
 // activate the .gsx-island FieldRuntime path. Default value (omitted from a
 // host's flag map) keeps the legacy JS implementation active.
@@ -62,6 +69,30 @@ var IslandGlobals = struct {
 // shim is rewritten to remove the fallback branch.
 func BridgeShim() []byte {
 	return []byte(bridgeShimJS)
+}
+
+// IslandRuntimeJS returns the JS that publishes the
+// window.__gosx_field_runtime_island_* globals BridgeShim delegates to.
+// Sourced from island_runtime.js (embedded). Companion to the .gsx islands
+// in this package: the .gsx files are the mount-point markers in the
+// editor DOM; this script is the actual behavior layer for slice 1, sized
+// so the slice ships independently of the inspector form being
+// signal-driven (which is a separate workstream).
+func IslandRuntimeJS() []byte {
+	return islandRuntimeJS
+}
+
+// Bundle returns the IslandRuntimeJS + BridgeShim concatenation that the
+// studio runtime asset pipeline appends to studio-engines.js. Order matters:
+// the island runtime publishes globals; the shim consults them.
+func Bundle() []byte {
+	island := IslandRuntimeJS()
+	shim := BridgeShim()
+	out := make([]byte, 0, len(island)+1+len(shim))
+	out = append(out, island...)
+	out = append(out, '\n')
+	out = append(out, shim...)
+	return out
 }
 
 const bridgeShimJS = `;(function () {

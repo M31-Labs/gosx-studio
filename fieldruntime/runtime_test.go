@@ -69,3 +69,67 @@ func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 		}
 	}
 }
+
+func TestIslandRuntimeJSPublishesIslandGlobals(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	// Globals published here are the delegation targets BridgeShim consults.
+	for _, fragment := range []string{
+		"window.__gosx_field_runtime_island_bind ",
+		"window.__gosx_field_runtime_island_bindMirroring ",
+		"window.__gosx_field_runtime_island_bindClipboard ",
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing global assignment %q", fragment)
+		}
+	}
+	// The mirroring path must route through $preview.field.* shared signals
+	// per ADR 0008.
+	if !strings.Contains(body, "$preview.field.") {
+		t.Fatalf("IslandRuntimeJS() mirroring must use $preview.field.* shared signals (see ADR 0008)")
+	}
+	// Clipboard must preserve the data-studio-copy-target contract from
+	// the legacy bindFieldClipboard implementation.
+	for _, contract := range []string{
+		"data-studio-copy-target",
+		"data-studio-copy-state",
+		"data-studio-copy-label",
+		"navigator.clipboard",
+		"execCommand",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() clipboard contract missing %q", contract)
+		}
+	}
+	// Mirroring must preserve the data-editor-source / data-editor-frame-*
+	// attribute contract from legacy bindFieldMirroring.
+	for _, contract := range []string{
+		"data-editor-source",
+		"data-editor-frame-attr-target",
+		"data-editor-frame-attr-prefix",
+		"data-editor-frame-attr-suffix",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() mirroring contract missing %q", contract)
+		}
+	}
+}
+
+func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
+	bundle := string(Bundle())
+	if bundle == "" {
+		t.Fatal("Bundle() must return a non-empty JS snippet")
+	}
+	// Island runtime must come before the BridgeShim — the shim consults
+	// the globals the island runtime publishes. Order matters.
+	islandIdx := strings.Index(bundle, "__gosx_field_runtime_island_bind ")
+	shimIdx := strings.Index(bundle, "window.GoSXStudioFieldRuntime =")
+	if islandIdx < 0 || shimIdx < 0 {
+		t.Fatalf("Bundle() missing island runtime or shim:\n%s", bundle)
+	}
+	if islandIdx > shimIdx {
+		t.Fatalf("Bundle() must place island runtime before shim (island=%d shim=%d)", islandIdx, shimIdx)
+	}
+}
