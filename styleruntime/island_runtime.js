@@ -369,4 +369,73 @@
     var builder = doc.querySelector("[data-custom-template-builder]");
     if (builder) builder.classList.toggle("is-active", active === "custom");
   }
+
+  // bindWorkbench(root) — mirrors bindStyleWorkbench at studio-engines.js:1884.
+  // Resolves the [data-editor-workbench] form (or root if it matches),
+  // guards re-entry via [data-gosx-studio-style-workbench-island-bound]
+  // distinct from the legacy [data-gosx-studio-style-workbench-bound], and
+  // binds the click / pointer / focus / input / change listeners that fan
+  // out to setControlValue / resetControlValue / showImpact / restoreImpact.
+  // bindStudioFrameLoad("data-editor-style-impact-island-frame-bound") so
+  // restoreImpact re-runs after the storefront iframe reloads. Calls
+  // syncControlButtons(form) + restoreImpact() on bind to seed the panel.
+  function bindWorkbenchIsland(root) {
+    var form = editorWorkbench(root);
+    if (!form || form.dataset.gosxStudioStyleWorkbenchIslandBound === "true") return;
+    form.dataset.gosxStudioStyleWorkbenchIslandBound = "true";
+    var previewImpact = frameTask(showImpactIsland);
+    var restoreImpactFrame = frameTask(restoreImpactIsland);
+    var syncControlsFrame = frameTask(function () {
+      syncControlButtonsIsland(form);
+      restoreImpactIsland();
+    });
+    form.addEventListener("click", function (event) {
+      var resetButton = event.target.closest("[data-studio-style-reset]");
+      if (resetButton && form.contains(resetButton)) {
+        event.preventDefault();
+        resetControlValueIsland(resetButton.getAttribute("data-studio-style-reset"));
+        return;
+      }
+      var button = event.target.closest("[data-studio-style-control]");
+      if (!button || !form.contains(button)) return;
+      event.preventDefault();
+      setControlValueIsland(button.getAttribute("data-studio-style-control"), button.getAttribute("data-studio-style-value"));
+    });
+    form.addEventListener("pointerover", function (event) {
+      var button = event.target.closest("[data-studio-style-control]");
+      if (!button || !form.contains(button)) return;
+      previewImpact(button.getAttribute("data-studio-style-control"), button.getAttribute("data-studio-style-value"), false);
+    });
+    form.addEventListener("pointerout", function (event) {
+      var button = event.target.closest("[data-studio-style-control]");
+      if (!button || !form.contains(button)) return;
+      if (button.contains(event.relatedTarget)) return;
+      restoreImpactFrame();
+    });
+    form.addEventListener("focusin", function (event) {
+      var button = event.target.closest("[data-studio-style-control]");
+      if (!button || !form.contains(button)) return;
+      previewImpact(button.getAttribute("data-studio-style-control"), button.getAttribute("data-studio-style-value"), false);
+    });
+    form.addEventListener("focusout", function (event) {
+      var button = event.target.closest("[data-studio-style-control]");
+      if (!button || !form.contains(button)) return;
+      restoreImpactFrame();
+    });
+    form.addEventListener("input", function (event) {
+      if (event.target && event.target.matches && event.target.matches('[name="themeTemplate"], [name="themeImageRatio"], [data-editor-custom-class], [data-editor-style-class]')) {
+        syncControlsFrame();
+      }
+    });
+    form.addEventListener("change", function (event) {
+      if (event.target && event.target.matches && event.target.matches('[name="themeTemplate"], [name="themeImageRatio"], [data-editor-custom-class], [data-editor-style-class]')) {
+        syncControlsFrame();
+      }
+    });
+    bindStudioFrameLoad("data-editor-style-impact-island-frame-bound", restoreImpactFrame);
+    syncControlButtonsIsland(form);
+    restoreImpactIsland();
+  }
+
+  window.__gosx_style_runtime_island_bindWorkbench = bindWorkbenchIsland;
 })();
