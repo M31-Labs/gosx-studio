@@ -36,3 +36,38 @@ func TestFeatureFlagKey(t *testing.T) {
 		t.Fatalf("FeatureFlagKey %q should end with -runtime-islands per Phase 3 convention", FeatureFlagKey)
 	}
 }
+
+func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
+	shim := string(BridgeShim())
+	if shim == "" {
+		t.Fatal("BridgeShim() must return a non-empty JS snippet")
+	}
+	// The shim must reference each method-specific island global, the public
+	// global it shims (window.GoSXStudioBrandRuntime), and the feature flag
+	// so the legacy path stays reachable when the flag is off.
+	for _, fragment := range []string{
+		"window.GoSXStudioBrandRuntime",
+		IslandGlobals.BindLogo,
+		IslandGlobals.UpdateHeaderLogo,
+		FeatureFlagKey,
+	} {
+		if !strings.Contains(shim, fragment) {
+			t.Fatalf("BridgeShim() missing %q:\n%s", fragment, shim)
+		}
+	}
+}
+
+func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
+	shim := string(BridgeShim())
+	// The shim is additive — when the island global is missing, the legacy
+	// JS path must still run. Sanity check: look for the legacy function
+	// names so a future refactor that drops the fallback is caught here.
+	for _, legacy := range []string{
+		"bindBrandLogo",
+		"updateHeaderLogo",
+	} {
+		if !strings.Contains(shim, legacy) {
+			t.Fatalf("BridgeShim() must retain legacy fallback for %q:\n%s", legacy, shim)
+		}
+	}
+}
