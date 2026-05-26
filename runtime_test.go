@@ -286,6 +286,48 @@ func TestEngineRuntimeIncludesBrandRuntimeIslandBundle(t *testing.T) {
 	}
 }
 
+func TestEngineRuntimeIncludesWorkbenchRuntimeIslandBundle(t *testing.T) {
+	// Phase 3 slice-7 burn-down of GoSXStudioWorkbenchRuntime. The engine
+	// runtime asset must include both the island-runtime JS (publishes the
+	// fifteen __gosx_workbench_runtime_island_* globals) and the BridgeShim
+	// that delegates window.GoSXStudioWorkbenchRuntime calls when the
+	// "workbench-runtime-islands" feature flag is on. See
+	// gosx-studio/workbenchruntime/runtime.go.
+	engines := string(EngineRuntimeScript())
+	for _, fragment := range []string{
+		"__gosx_workbench_runtime_island_bindRailResizers",
+		"__gosx_workbench_runtime_island_bindChrome",
+		"__gosx_workbench_runtime_island_setMode",
+		"__gosx_workbench_runtime_island_syncViewport",
+		"__gosx_workbench_runtime_island_activateViewport",
+		"__gosx_workbench_runtime_island_currentBreakpoint",
+		"__gosx_workbench_runtime_island_setStyleState",
+		"__gosx_workbench_runtime_island_syncZoom",
+		"__gosx_workbench_runtime_island_activateZoom",
+		"__gosx_workbench_runtime_island_toggleRail",
+		"__gosx_workbench_runtime_island_toggleFocus",
+		"__gosx_workbench_runtime_island_toggleActivity",
+		"__gosx_workbench_runtime_island_saveLayout",
+		"__gosx_workbench_runtime_island_currentRailWidth",
+		"__gosx_workbench_runtime_island_setRailWidth",
+		"workbench-runtime-islands",
+		// The shim's flag check must be in the bundle so the runtime is
+		// actually gated, not just loaded.
+		"data-gosx-studio-feature-flag-workbench-runtime-islands",
+	} {
+		if !strings.Contains(engines, fragment) {
+			t.Fatalf("engine runtime missing workbenchruntime fragment %q", fragment)
+		}
+	}
+	// The shim must override window.GoSXStudioWorkbenchRuntime; without
+	// that assignment the legacy methods are never wrapped. The bundle
+	// already declares the legacy version of the global via
+	// studio-engines.js at line 2312; the slice-7 shim reassigns it.
+	if !strings.Contains(engines, "window.GoSXStudioWorkbenchRuntime =") {
+		t.Fatalf("engine runtime missing workbenchruntime shim assignment")
+	}
+}
+
 func TestEngineRuntimeHandlerServesCombinedRuntime(t *testing.T) {
 	rec := httptest.NewRecorder()
 	EngineRuntimeHandler().ServeHTTP(rec, httptest.NewRequest("GET", EngineRuntimePath, nil))
