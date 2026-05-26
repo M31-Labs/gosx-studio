@@ -186,6 +186,42 @@ func TestEngineRuntimeIncludesSelectionRuntimeIslandBundle(t *testing.T) {
 	}
 }
 
+func TestEngineRuntimeIncludesBlockLayoutRuntimeIslandBundle(t *testing.T) {
+	// Phase 3 slice-4 burn-down of GoSXStudioBlockLayoutRuntime. The engine
+	// runtime asset must include both the island-runtime JS (publishes the
+	// nine __gosx_blocklayout_runtime_island_* globals) and the BridgeShim
+	// that delegates window.GoSXStudioBlockLayoutRuntime calls when the
+	// "block-layout-runtime-islands" feature flag is on. See
+	// gosx-studio/blocklayoutruntime/runtime.go.
+	engines := string(EngineRuntimeScript())
+	for _, fragment := range []string{
+		"__gosx_blocklayout_runtime_island_rows",
+		"__gosx_blocklayout_runtime_island_rowKey",
+		"__gosx_blocklayout_runtime_island_rowForKey",
+		"__gosx_blocklayout_runtime_island_moveRow",
+		"__gosx_blocklayout_runtime_island_renumber",
+		"__gosx_blocklayout_runtime_island_selectRow",
+		"__gosx_blocklayout_runtime_island_commitReorder",
+		"__gosx_blocklayout_runtime_island_updateBlockLibraryState",
+		"__gosx_blocklayout_runtime_island_updateVisibilityState",
+		"block-layout-runtime-islands",
+		// The shim's flag check must be in the bundle so the runtime is
+		// actually gated, not just loaded.
+		"data-gosx-studio-feature-flag-block-layout-runtime-islands",
+	} {
+		if !strings.Contains(engines, fragment) {
+			t.Fatalf("engine runtime missing blocklayoutruntime fragment %q", fragment)
+		}
+	}
+	// The shim must override window.GoSXStudioBlockLayoutRuntime; without
+	// that assignment the legacy methods are never wrapped. The bundle
+	// already declares the legacy version of the global via studio-engines.js
+	// at line 2353; the slice-4 shim reassigns it.
+	if !strings.Contains(engines, "window.GoSXStudioBlockLayoutRuntime =") {
+		t.Fatalf("engine runtime missing blocklayoutruntime shim assignment")
+	}
+}
+
 func TestEngineRuntimeIncludesBrandRuntimeIslandBundle(t *testing.T) {
 	// Phase 3 slice-3 burn-down of GoSXStudioBrandRuntime. The engine
 	// runtime asset must include both the island-runtime JS (publishes the
