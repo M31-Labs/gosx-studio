@@ -438,4 +438,28 @@
   }
 
   window.__gosx_style_runtime_island_bindWorkbench = bindWorkbenchIsland;
+
+  // bindCSS(root) — mirrors bindCSS at studio-engines.js:1570.
+  // Binds the [data-editor-css] textarea: input -> frameTask -> apply via
+  // PreviewRuntime.applyCSS(value). Re-binds on preview-frame load. Calls
+  // applyCSS once on bind so the preview starts in sync with the textarea.
+  //
+  // Idempotency: per-textarea [data-gosx-studio-css-island-bound] distinct
+  // from legacy [data-gosx-studio-css-bound] so both paths coexist.
+  function bindCSSIsland(root) {
+    var scope = root && root.querySelectorAll ? root : doc;
+    var input = scope.querySelector("[data-editor-css]");
+    if (!input || input.dataset.gosxStudioCSSIslandBound === "true") return;
+    input.dataset.gosxStudioCSSIslandBound = "true";
+    var updateNow = function () {
+      var preview = stylePreviewRuntime();
+      if (typeof preview.applyCSS === "function") preview.applyCSS(input.value || "");
+    };
+    var update = frameTask(updateNow);
+    input.addEventListener("input", update);
+    bindStudioFrameLoad("data-editor-css-island-frame-bound", update);
+    updateNow();
+  }
+
+  window.__gosx_style_runtime_island_bindCSS = bindCSSIsland;
 })();
