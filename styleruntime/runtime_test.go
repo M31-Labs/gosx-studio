@@ -295,6 +295,46 @@ func TestIslandRuntimeJSPublishesSyncControlButtonsGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesShowImpactGlobal(t *testing.T) {
+	// Method 7/10: showImpact(name, value, committed) — legacy showStyleImpact
+	// at studio-engines.js:1785. Looks up impact metadata for the named
+	// control, calls PreviewRuntime.applyStyleImpact(selector) for the count
+	// (per ADR 0008 transitional pattern — see
+	// ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md),
+	// writes the editor-side impact-readout labels (label / summary / count /
+	// scope / state), and toggles the impact panel's is-live / has-change
+	// classes against the committed flag.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.ShowImpact + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// Transitional iframe delegation per ADR 0008 — slice 6 will swap to
+		// $preview.style.impact.selector. Catching drift here before the
+		// deletion-window CI clock starts.
+		"GoSXStudioPreviewRuntime",
+		"applyStyleImpact",
+		// The five impact-readout selectors the helper writes (line 1791-1795).
+		"data-studio-style-impact-label",
+		"data-studio-style-impact-summary",
+		"data-studio-style-impact-count",
+		"data-studio-style-impact-scope",
+		"data-studio-style-impact-state",
+		// Impact-panel class state — is-live during hover/focus preview,
+		// has-change after a commit.
+		"data-studio-style-impact-panel",
+		"is-live",
+		"has-change",
+		// Affected-count suffix and the no-active-recipe text the user sees.
+		"affected",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() showImpact must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
