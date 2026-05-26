@@ -106,6 +106,42 @@ func TestIslandRuntimeJSPublishesBindThemeGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesBindWorkbenchGlobal(t *testing.T) {
+	// Method 2/10: bindWorkbench(root) — legacy bindStyleWorkbench at
+	// studio-engines.js:1884. Resolves the [data-editor-workbench] form,
+	// guards re-entry via the per-form idempotency dataset key, binds click /
+	// pointerover / pointerout / focusin / focusout / input / change
+	// listeners that dispatch setControlValue / resetControlValue /
+	// showImpact / restoreImpact, registers bindStudioFrameLoad("data-editor-
+	// style-impact-island-frame-bound") so the impact restores on iframe
+	// reload, and runs syncControlButtons(form) + restoreImpact() on bind.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.BindWorkbench + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// DOM contracts the workbench listeners attach against.
+		"data-editor-workbench",
+		"data-studio-style-control",
+		"data-studio-style-reset",
+		"data-studio-style-value",
+		// Per-form idempotency guard — distinct from legacy
+		// gosxStudioStyleWorkbenchBound so both paths coexist additively.
+		"gosxStudioStyleWorkbenchIslandBound",
+		// Theme/template/custom-class controls the input/change handler
+		// re-syncs on so the workbench buttons stay current with form state.
+		`name="themeTemplate"`,
+		`name="themeImageRatio"`,
+		"data-editor-custom-class",
+		"data-editor-style-class",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() bindWorkbench must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
