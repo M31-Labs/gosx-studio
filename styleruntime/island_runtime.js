@@ -138,13 +138,47 @@
     });
   }
 
-  // stylePreviewRuntime — accessor for the legacy preview runtime the three
-  // transitional iframe-crossing methods delegate to. Slice 6 will replace
-  // these delegations with $preview.theme.* / $preview.style.impact.*
-  // shared-signal writes per
-  // ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md.
-  function stylePreviewRuntime() {
-    return window.GoSXStudioPreviewRuntime || {};
+  // writeSharedSignal — publish a $preview.* shared signal through the
+  // WASM bridge. The cross-frame relay (per ADR 0009 +
+  // Bridge.EnableCrossFrameRelay) routes writes whose name starts with
+  // "$preview." to the storefront iframe's Bridge, where slice 6's
+  // preview_subscriber observes them and applies the matching DOM
+  // mutation. Slice 6's transitional cleanup (Section G.4/G.5/G.6)
+  // swapped the previous window.GoSXStudioPreviewRuntime.applyTheme /
+  // applyStyleImpact delegations for direct $preview.theme.* and
+  // $preview.style.impact.selector signal writes.
+  function writeSharedSignal(name, value) {
+    try {
+      var setter = window.__gosx_set_shared_signal_json;
+      if (typeof setter === "function") {
+        setter(name, JSON.stringify(value));
+      }
+    } catch (error) {
+      // Shared-signal channel not ready yet.
+    }
+  }
+
+  // styleImpactCountInIframe — same advisory count used by the slice-6
+  // editor-side island writer. The legacy applyStyleImpact returned the
+  // count synchronously; the signal-based path is asynchronous, so we
+  // best-effort count matching nodes in the editor's view of the iframe
+  // (works when same-origin). Drives showImpact's "N affected" readout.
+  function styleImpactCountInIframe(selector) {
+    var count = 0;
+    if (!selector) return 0;
+    try {
+      Array.prototype.forEach.call(doc.querySelectorAll(".editor-preview-frame"), function (frame) {
+        var idoc = frame && frame.contentDocument;
+        if (!idoc) return;
+        var scope = idoc.querySelector(".site-shell") || idoc;
+        Array.prototype.forEach.call(scope.querySelectorAll(selector), function () {
+          count += 1;
+        });
+      });
+    } catch (error) {
+      // Cross-origin iframe or detached doc; advisory count stays 0.
+    }
+    return count;
   }
 
   // editorWorkbench — resolve the [data-editor-workbench] form (or root if it
@@ -323,18 +357,19 @@
     var palette = themePaletteValue();
     var ratio = doc.querySelector('input[name="themeImageRatio"]:checked');
     var colors = themeColors();
-    var preview = stylePreviewRuntime();
-    if (typeof preview.applyTheme === "function") {
-      preview.applyTheme({
-        kit: kit,
-        template: template,
-        palette: palette,
-        imageRatio: ratio ? ratio.value : "",
-        customClasses: template === "custom" ? customTemplateClasses() : [],
-        styleClasses: styleClasses(),
-        colors: colors
-      });
-    }
+    // Slice 6 transitional cleanup (Section G.4) — the previous shape
+    // delegated cross-frame mutation to
+    // window.GoSXStudioPreviewRuntime.applyTheme. The cross-frame relay
+    // (per ADR 0009) now delivers the theme payload via a family of
+    // $preview.theme.* signals. The preview subscriber reassembles them
+    // and applies the .site-shell class transitions + color CSS vars.
+    writeSharedSignal("$preview.theme.kit", kit || "");
+    writeSharedSignal("$preview.theme.template", template || "");
+    writeSharedSignal("$preview.theme.palette", palette || "");
+    writeSharedSignal("$preview.theme.imageRatio", ratio ? ratio.value : "");
+    writeSharedSignal("$preview.theme.customClasses", template === "custom" ? customTemplateClasses() : []);
+    writeSharedSignal("$preview.theme.styleClasses", styleClasses());
+    writeSharedSignal("$preview.theme.colors", colors);
     updateThemeSwatchesIsland(colors);
     updateKitCardsIsland(kit);
     updateTemplateCardsIsland(template);
@@ -458,8 +493,11 @@
     if (!input || input.dataset.gosxStudioCSSIslandBound === "true") return;
     input.dataset.gosxStudioCSSIslandBound = "true";
     var updateNow = function () {
-      var preview = stylePreviewRuntime();
-      if (typeof preview.applyCSS === "function") preview.applyCSS(input.value || "");
+      // Slice 6 transitional cleanup — was preview.applyCSS(value); now
+      // a direct $preview.theme.cssCustom signal write. The subscriber
+      // ensures a <style data-editor-live-css> element in the iframe
+      // and sets its textContent.
+      writeSharedSignal("$preview.theme.cssCustom", String(input.value || ""));
     };
     var update = frameTask(updateNow);
     input.addEventListener("input", update);
@@ -523,8 +561,11 @@
         }
       });
       if (vars.length) css.push(":root{" + vars.join("") + "}");
-      var preview = stylePreviewRuntime();
-      if (typeof preview.applyFonts === "function") preview.applyFonts(css.join("\n"));
+      // Slice 6 transitional cleanup — was preview.applyFonts(value); now
+      // a direct $preview.theme.fontsCustom signal write. The subscriber
+      // ensures a <style data-editor-live-fonts> element in the iframe
+      // and sets its textContent.
+      writeSharedSignal("$preview.theme.fontsCustom", css.join("\n"));
     };
     var update = frameTask(updateNow);
     Array.prototype.forEach.call(inputs, function (input) {
@@ -738,8 +779,11 @@
   }
 
   function clearStyleImpactNodes() {
-    var preview = stylePreviewRuntime();
-    if (typeof preview.applyStyleImpact === "function") preview.applyStyleImpact("");
+    // Slice 6 transitional cleanup (Section G.6) — was
+    // preview.applyStyleImpact(""); now a direct
+    // $preview.style.impact.selector := "" signal write. The subscriber
+    // clears every [data-studio-style-impact-node] attribute.
+    writeSharedSignal("$preview.style.impact.selector", "");
   }
 
   // showImpact(name, value, committed) — mirrors showStyleImpact at
@@ -748,14 +792,18 @@
   // emit " affected" with a space prefix so the singular and plural read
   // identically; preserved verbatim for parity.
   //
-  // Transitional iframe delegation per ADR 0008 — slice 6 will swap the
-  // PreviewRuntime.applyStyleImpact call for a $preview.style.impact.selector
-  // shared-signal write subscribed by the preview document.
+  // Slice 6 transitional cleanup (Section G.5) — the previous shape
+  // delegated to window.GoSXStudioPreviewRuntime.applyStyleImpact for
+  // the cross-frame marker writes + count. The cross-frame relay (per
+  // ADR 0009) now delivers the selector via
+  // $preview.style.impact.selector; the editor-side advisory count is
+  // computed locally by styleImpactCountInIframe (best-effort,
+  // same-origin only — matches slice 6's editor-side island writer).
   function showImpactIsland(name, value, committed) {
     var meta = styleImpactFor(name);
     var form = editorWorkbench(doc);
-    var preview = stylePreviewRuntime();
-    var count = typeof preview.applyStyleImpact === "function" ? preview.applyStyleImpact(meta.selector) : 0;
+    writeSharedSignal("$preview.style.impact.selector", meta.selector || "");
+    var count = styleImpactCountInIframe(meta.selector);
     var label = meta.label + " / " + ownerLabel(value || styleControlValue(name));
     setImpactReadout("[data-studio-style-impact-label]", label);
     setImpactReadout("[data-studio-style-impact-summary]", meta.summary);
