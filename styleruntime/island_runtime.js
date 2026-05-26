@@ -538,4 +538,171 @@
   }
 
   window.__gosx_style_runtime_island_bindFonts = bindFontsIsland;
+
+  // ===== Group 2: editor-side state =====
+
+  // ownerLabel — mirror studio-engines.js:1637. Convert kebab/snake_case
+  // value into a Title-cased label for the editor readouts.
+  function ownerLabel(value) {
+    value = String(value || "").replace(/[-_]/g, " ");
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  }
+
+  // styleControlValue — mirror studio-engines.js:1652. Return the live form
+  // value for the named control (checked radio takes precedence; else the
+  // namedControl's value).
+  function styleControlValue(name) {
+    var checked = doc.querySelector('input[name="' + attrValue(name) + '"]:checked');
+    if (checked) return checked.value;
+    var control = namedControl(name);
+    return control ? control.value || "" : "";
+  }
+
+  // kitDefaultForControl — mirror studio-engines.js:1659. For named style
+  // controls, look up the active kit card's per-control default attribute;
+  // fall back to the per-control hardcoded fallback when no card matches.
+  function kitDefaultForControl(name) {
+    var attrs = {
+      customHeroLayout: "data-kit-custom-hero-layout",
+      customContentWidth: "data-kit-custom-content-width",
+      customProductDensity: "data-kit-custom-product-density",
+      customHeroHeight: "data-kit-custom-hero-height",
+      styleNav: "data-kit-style-nav",
+      styleButtons: "data-kit-style-buttons",
+      styleCards: "data-kit-style-cards",
+      styleSpacing: "data-kit-style-spacing",
+      styleImageFrame: "data-kit-style-image-frame",
+      styleMotion: "data-kit-style-motion",
+      themeImageRatio: "data-kit-image-ratio"
+    };
+    var fallbacks = {
+      customHeroLayout: "overlay",
+      customContentWidth: "standard",
+      customProductDensity: "balanced",
+      customHeroHeight: "standard",
+      styleNav: "links",
+      styleButtons: "pill",
+      styleCards: "quiet",
+      styleSpacing: "balanced",
+      styleImageFrame: "sharp",
+      styleMotion: "subtle",
+      themeImageRatio: "landscape"
+    };
+    var card = selectedKitCard();
+    var attr = attrs[name];
+    var value = card && attr ? card.getAttribute(attr) : "";
+    return value || fallbacks[name] || "";
+  }
+
+  // styleImpactFor — mirror studio-engines.js:1692. Returns the {label,
+  // summary, selector} metadata for a named style control. Used by
+  // showImpact for the preview overlay + readouts and by syncControlButtons
+  // for the reset-button aria-label.
+  function styleImpactFor(name) {
+    var catalog = {
+      customHeroLayout: {
+        label: "Page shape",
+        summary: "Hero composition and above-the-fold frame",
+        selector: ".hero, .hero__copy, .hero__media"
+      },
+      customContentWidth: {
+        label: "Page width",
+        summary: "Site frame, sections, and reading measure",
+        selector: ".site-shell, .hero, .section"
+      },
+      customHeroHeight: {
+        label: "Hero height",
+        summary: "Hero depth and first viewport balance",
+        selector: ".hero"
+      },
+      styleSpacing: {
+        label: "Section rhythm",
+        summary: "Vertical rhythm, grids, and section breathing room",
+        selector: ".hero, .section, .product-grid, .post-grid, .gallery-strip"
+      },
+      styleCards: {
+        label: "Cards",
+        summary: "Product, post, and gallery card treatment",
+        selector: ".product-card, .post-card, .gallery-card"
+      },
+      customProductDensity: {
+        label: "Product rhythm",
+        summary: "Product grid density and commerce scan rhythm",
+        selector: ".product-grid, .product-card"
+      },
+      styleNav: {
+        label: "Navigation",
+        summary: "Header, brand, and primary navigation treatment",
+        selector: ".site-header, .brand, nav, .nav"
+      },
+      styleButtons: {
+        label: "Buttons",
+        summary: "Primary and secondary action treatment",
+        selector: ".button"
+      },
+      styleImageFrame: {
+        label: "Image frame",
+        summary: "Media corner shape and card image treatment",
+        selector: ".hero__media, img, .product-card, .post-card, .gallery-card"
+      },
+      themeImageRatio: {
+        label: "Image crop",
+        summary: "Image aspect rhythm across product, blog, and gallery media",
+        selector: ".hero__media, img, .product-card img, .post-card img, .gallery-card img"
+      },
+      styleMotion: {
+        label: "Motion",
+        summary: "Interactive movement across links, cards, and actions",
+        selector: ".site-shell, .hero, .section, .button, .product-card, .post-card, .gallery-card"
+      }
+    };
+    return catalog[name] || {
+      label: ownerLabel(name),
+      summary: "Scoped style surface",
+      selector: ".site-shell"
+    };
+  }
+
+  // syncControlButtons(root) — mirrors syncStyleControlButtons at
+  // studio-engines.js:1848. Walks the three sub-control families in scope
+  // (controls / readouts / resets) and syncs each against the live form
+  // value + kit defaults. Used by bindWorkbench / applyTheme /
+  // setControlValue to keep panel state coherent after any input change.
+  function syncControlButtonsIsland(root) {
+    root = root || doc;
+    Array.prototype.forEach.call(root.querySelectorAll("[data-studio-style-control]"), function (button) {
+      var name = button.getAttribute("data-studio-style-control") || "";
+      var value = button.getAttribute("data-studio-style-value") || "";
+      var active = !!name && styleControlValue(name) === value;
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+      button.classList.toggle("is-selected", active);
+    });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-studio-style-readout]"), function (readout) {
+      var name = readout.getAttribute("data-studio-style-readout") || "";
+      var value = styleControlValue(name);
+      var defaultValue = kitDefaultForControl(name);
+      var inherited = !!defaultValue && value === defaultValue;
+      readout.textContent = value ? ownerLabel(value) : "Inherited";
+      readout.setAttribute("data-studio-style-inherited", inherited ? "true" : "false");
+    });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-studio-style-reset]"), function (button) {
+      var name = button.getAttribute("data-studio-style-reset") || "";
+      var value = styleControlValue(name);
+      var defaultValue = kitDefaultForControl(name);
+      var inherited = !!defaultValue && value === defaultValue;
+      var group = button.closest(".studio-style-control-group");
+      var meta = styleImpactFor(name);
+      if (group) group.setAttribute("data-studio-style-inherited", inherited ? "true" : "false");
+      button.disabled = inherited;
+      button.textContent = inherited ? "Kit" : "Reset";
+      button.setAttribute(
+        "aria-label",
+        inherited
+          ? meta.label + " is using the starter kit"
+          : "Reset " + meta.label + " to " + ownerLabel(defaultValue)
+      );
+    });
+  }
+
+  window.__gosx_style_runtime_island_syncControlButtons = syncControlButtonsIsland;
 })();
