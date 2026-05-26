@@ -102,4 +102,16 @@
   }
 
   window.__gosx_blocklayout_runtime_island_rowKey = rowKeyIsland;
+
+  // rowForKey(root, key) — mirrors blockRowForKey at studio-engines.js:1968.
+  // Selects the row whose data-block-studio-block matches the supplied key,
+  // scoped to root. attrValue() escape mirrors the legacy attrValue helper so
+  // keys with backslashes / double quotes (rare in practice but allowed by
+  // the data-attribute spec) don't break the selector.
+  function rowForKeyIsland(root, key) {
+    if (!root || !root.querySelector) return null;
+    return root.querySelector('[data-block-studio-block="' + attrValue(key) + '"]');
+  }
+
+  window.__gosx_blocklayout_runtime_island_rowForKey = rowForKeyIsland;
 })();
