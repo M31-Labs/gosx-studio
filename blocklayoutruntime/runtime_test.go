@@ -66,6 +66,27 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesRowsGlobal(t *testing.T) {
+	// Method 1/9: rows(list) — legacy blockRows at studio-engines.js:1960.
+	// Pure helper: Array.from(list.querySelectorAll("[data-block-studio-block]")).
+	// Read-only DOM query; no side effects. The island global must be
+	// published as a function value so BridgeShim.delegate sees it.
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	want := "window." + IslandGlobals.Rows + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	// DOM contract — the block-list query selector. If muddy-noni renames
+	// data-block-studio-block, this test fails and the slice author surfaces
+	// the drift before parity tests start lying.
+	if !strings.Contains(body, "data-block-studio-block") {
+		t.Fatalf("IslandRuntimeJS() rows must query data-block-studio-block")
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
