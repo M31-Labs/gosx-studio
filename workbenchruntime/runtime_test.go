@@ -558,6 +558,39 @@ func TestIslandRuntimeJSPublishesCurrentRailWidthGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesSetRailWidthGlobal(t *testing.T) {
+	// Method 15/15: setRailWidth(form, side, width, handle, committed) —
+	// legacy setWorkbenchRailWidth at studio-engines.js:185. Clamps width
+	// to the handle's min/max bounds, writes --studio-{left,right}-width
+	// on the form, updates the handle's aria-valuenow, emits
+	// gosxstudio:rail-width-change or gosxstudio:rail-width-commit
+	// depending on the committed flag.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.SetRailWidth + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// CSS custom properties the method writes.
+		"--studio-left-width",
+		"--studio-right-width",
+		// ARIA attribute the helper updates.
+		"aria-valuenow",
+		// The two rail-width events emitWorkbenchRailWidth dispatches.
+		"gosxstudio:rail-width-change",
+		"gosxstudio:rail-width-commit",
+		// Side discriminator strings.
+		`"left"`,
+		`"right"`,
+		// Clamp helper used to enforce min/max bounds.
+		"clampNumber",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() setRailWidth must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
