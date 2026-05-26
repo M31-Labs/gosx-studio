@@ -104,6 +104,50 @@ func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesBindRailResizersGlobal(t *testing.T) {
+	// Method 1/15: bindRailResizers(root) — legacy bindWorkbenchRailResizers
+	// at studio-engines.js:194. Binds the [data-studio-resizer] pointer drag
+	// + ArrowLeft/ArrowRight keyboard nudges on rail handles. Uses
+	// gosxStudioResizerIslandBound as the per-handle idempotency guard
+	// (distinct from the legacy gosxStudioResizerBound to allow both paths
+	// to coexist additively).
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	want := "window." + IslandGlobals.BindRailResizers + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	// DOM contract — the resizer handle selectors and side discriminator
+	// the legacy binds against (see studio-engines.js:198-237). Drift here
+	// silently breaks the rail-resizer pointer / keyboard fan-out.
+	for _, contract := range []string{
+		"data-studio-resizer",
+		// Idempotency guard key — distinct from legacy
+		// gosxStudioResizerBound so both paths can coexist additively.
+		"gosxStudioResizerIslandBound",
+		// Pointer events the drag handler attaches.
+		`"pointerdown"`,
+		`"pointermove"`,
+		`"pointerup"`,
+		`"pointercancel"`,
+		// Keyboard events the arrow-key handler attaches.
+		`"keydown"`,
+		`"ArrowLeft"`,
+		`"ArrowRight"`,
+		// Visual state contract toggled during a drag.
+		"is-resizing",
+		// Step sizes for ArrowLeft/Right + Shift modifier.
+		"24",
+		"48",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() bindRailResizers must preserve %q contract:\n%s", contract, body)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
