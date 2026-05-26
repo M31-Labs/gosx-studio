@@ -111,6 +111,25 @@ func TestIslandRuntimeJSPublishesRowForKeyGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesMoveRowGlobal(t *testing.T) {
+	// Method 4/9: moveRow(list, row, direction) — legacy moveBlockLayoutRow at
+	// studio-engines.js:2072. Mutates the block-list by insertBefore'ing the
+	// row before its previousElementSibling (direction="up") or its
+	// nextElementSibling's nextSibling (direction="down"), then calls
+	// renumber(list, "engine-buttons") + selectRow(list, rowKey(row)).
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.MoveRow + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	// The renumber source string is part of the contract — engine listeners
+	// branch on it (see assets/studio-engines.js:2054). Catching drift here
+	// before parity tests run.
+	if !strings.Contains(body, "engine-buttons") {
+		t.Fatalf("IslandRuntimeJS() moveRow must pass renumber source %q", "engine-buttons")
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
