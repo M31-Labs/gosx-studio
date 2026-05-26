@@ -592,6 +592,22 @@
 
   window.__gosx_workbench_runtime_island_activateZoom = activateZoomIsland;
 
+  // toggleRail(form, side) — mirrors toggleWorkbenchRail at
+  // studio-engines.js:480. Flips data-studio-{left,right} between "open"
+  // and "collapsed", sets data-studio-focus to "false" (any rail toggle
+  // exits focus mode), re-syncs the rail toggle aria-pressed states,
+  // emits gosxstudio:workbench-rail-change, refreshes the canvas.
+  function toggleRailIsland(form, side) {
+    if (!form || (side !== "left" && side !== "right")) return;
+    form.setAttribute("data-studio-focus", "false");
+    form.setAttribute("data-studio-" + side, workbenchRailState(form, side) === "open" ? "collapsed" : "open");
+    syncWorkbenchRailButtons(form);
+    emitWorkbenchChange("rail-change", form, { side: side, state: workbenchRailState(form, side) });
+    refreshWorkbenchCanvas();
+  }
+
+  window.__gosx_workbench_runtime_island_toggleRail = toggleRailIsland;
+
   // bindCommandPaletteIsland — mirrors bindWorkbenchCommandPalette at
   // studio-engines.js:497. Wires the [data-studio-command-palette]
   // gosxstudio:command listener to the same fan-out (setMode /
