@@ -395,6 +395,31 @@ func TestIslandRuntimeJSPublishesSetControlValueGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesResetControlValueGlobal(t *testing.T) {
+	// Method 10/10: resetControlValue(name) — legacy resetStyleControlValue
+	// at studio-engines.js:1842. Looks up the kit default for name via
+	// kitDefaultForControl and calls setControlValue(name, default). No-op
+	// when no default is found.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.ResetControlValue + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	// resetControlValue is a 4-line delegation to setControlValue + the kit-
+	// default lookup. The implementation must reference the helper / global
+	// it composes — drift here would silently break the reset semantics.
+	for _, contract := range []string{
+		// The setControlValue island the reset composes.
+		"setControlValueIsland",
+		// The kit-default lookup helper.
+		"kitDefaultForControl",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() resetControlValue must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
