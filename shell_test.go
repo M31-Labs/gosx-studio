@@ -3,6 +3,7 @@ package studio
 import (
 	"testing"
 
+	"m31labs.dev/gosx-studio/brandruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
 )
@@ -45,6 +46,15 @@ func TestDefaultShellConfigOwnsReusableStudioChrome(t *testing.T) {
 	}
 	if config.FeatureEnabled(selectionruntime.FeatureFlagKey) {
 		t.Fatalf("%q must default to false (production legacy JS path); got true", selectionruntime.FeatureFlagKey)
+	}
+	// Phase 3 slice-3: the BrandRuntime island flag must be registered
+	// with the default-off value so hosts can opt in once parity is proven.
+	// See ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-3-brandruntime.md.
+	if _, ok := config.FeatureFlags[brandruntime.FeatureFlagKey]; !ok {
+		t.Fatalf("default shell config must register %q flag (got %#v)", brandruntime.FeatureFlagKey, config.FeatureFlags)
+	}
+	if config.FeatureEnabled(brandruntime.FeatureFlagKey) {
+		t.Fatalf("%q must default to false (production legacy JS path); got true", brandruntime.FeatureFlagKey)
 	}
 	if _, ok := config.Adapter(ResourceProducts); !ok {
 		t.Fatalf("expected product resource adapter in %#v", config.Adapters)

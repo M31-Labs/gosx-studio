@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"m31labs.dev/gosx-studio/brandruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
 )
@@ -37,6 +38,7 @@ func EngineRuntimeScript() []byte {
 	slices := [][]byte{
 		fieldruntime.Bundle(),
 		selectionruntime.Bundle(),
+		brandruntime.Bundle(),
 	}
 	totalSliceLen := 0
 	for _, slice := range slices {
