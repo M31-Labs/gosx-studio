@@ -353,6 +353,31 @@ func TestIslandRuntimeJSPublishesSetStyleStateGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesSyncZoomGlobal(t *testing.T) {
+	// Method 8/15: syncZoom(form, zoom) — legacy syncWorkbenchZoom at
+	// studio-engines.js:421. Sets data-studio-canvas-zoom on the
+	// [data-studio-canvas] element, emits gosxstudio:workbench-zoom-change,
+	// refreshes the canvas via a resize event.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.SyncZoom + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// DOM contracts the helper queries / writes.
+		"data-studio-canvas",
+		"data-studio-canvas-zoom",
+		// Event name dispatched on zoom change.
+		"workbench-zoom-change",
+		// Default zoom when none provided.
+		`"fit"`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() syncZoom must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
