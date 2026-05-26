@@ -176,4 +176,26 @@
   }
 
   window.__gosx_blocklayout_runtime_island_renumber = renumberIsland;
+
+  // selectRow(root, key) — mirrors selectBlockLayoutRow at
+  // studio-engines.js:2099. Toggles .is-selected on every row to match the
+  // supplied key, scrollIntoView's the newly-selected row (block: "nearest"
+  // so it doesn't bounce when already in view), and dispatches a
+  // blockstudio:select CustomEvent on document so the selection commandbar
+  // / inspector form can react. No-op when key is empty — callers rely on
+  // this to skip the dispatch on initial bind when nothing is selected yet.
+  function selectRowIsland(root, key) {
+    if (!key) return;
+    rowsIsland(root).forEach(function (row) {
+      row.classList.toggle("is-selected", rowKeyIsland(row) === key);
+    });
+    var row = rowForKeyIsland(root, key);
+    if (row && row.scrollIntoView) row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    doc.dispatchEvent(new CustomEvent("blockstudio:select", {
+      bubbles: true,
+      detail: { key: key }
+    }));
+  }
+
+  window.__gosx_blocklayout_runtime_island_selectRow = selectRowIsland;
 })();
