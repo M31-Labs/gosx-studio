@@ -7,6 +7,7 @@ import (
 	"m31labs.dev/gosx-studio/brandruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
+	"m31labs.dev/gosx-studio/styleruntime"
 )
 
 func TestDefaultShellConfigOwnsReusableStudioChrome(t *testing.T) {
@@ -65,6 +66,15 @@ func TestDefaultShellConfigOwnsReusableStudioChrome(t *testing.T) {
 	}
 	if config.FeatureEnabled(blocklayoutruntime.FeatureFlagKey) {
 		t.Fatalf("%q must default to false (production legacy JS path); got true", blocklayoutruntime.FeatureFlagKey)
+	}
+	// Phase 3 slice-5: the StyleRuntime island flag must be registered
+	// with the default-off value so hosts can opt in once parity is proven.
+	// See ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-5-styleruntime.md.
+	if _, ok := config.FeatureFlags[styleruntime.FeatureFlagKey]; !ok {
+		t.Fatalf("default shell config must register %q flag (got %#v)", styleruntime.FeatureFlagKey, config.FeatureFlags)
+	}
+	if config.FeatureEnabled(styleruntime.FeatureFlagKey) {
+		t.Fatalf("%q must default to false (production legacy JS path); got true", styleruntime.FeatureFlagKey)
 	}
 	if _, ok := config.Adapter(ResourceProducts); !ok {
 		t.Fatalf("expected product resource adapter in %#v", config.Adapters)

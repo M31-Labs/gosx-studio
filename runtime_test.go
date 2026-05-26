@@ -186,6 +186,43 @@ func TestEngineRuntimeIncludesSelectionRuntimeIslandBundle(t *testing.T) {
 	}
 }
 
+func TestEngineRuntimeIncludesStyleRuntimeIslandBundle(t *testing.T) {
+	// Phase 3 slice-5 burn-down of GoSXStudioStyleRuntime. The engine
+	// runtime asset must include both the island-runtime JS (publishes the
+	// ten __gosx_style_runtime_island_* globals) and the BridgeShim that
+	// delegates window.GoSXStudioStyleRuntime calls when the
+	// "style-runtime-islands" feature flag is on. See
+	// gosx-studio/styleruntime/runtime.go.
+	engines := string(EngineRuntimeScript())
+	for _, fragment := range []string{
+		"__gosx_style_runtime_island_bindTheme",
+		"__gosx_style_runtime_island_bindWorkbench",
+		"__gosx_style_runtime_island_bindCSS",
+		"__gosx_style_runtime_island_bindFonts",
+		"__gosx_style_runtime_island_applyTheme",
+		"__gosx_style_runtime_island_syncControlButtons",
+		"__gosx_style_runtime_island_showImpact",
+		"__gosx_style_runtime_island_restoreImpact",
+		"__gosx_style_runtime_island_setControlValue",
+		"__gosx_style_runtime_island_resetControlValue",
+		"style-runtime-islands",
+		// The shim's flag check must be in the bundle so the runtime is
+		// actually gated, not just loaded.
+		"data-gosx-studio-feature-flag-style-runtime-islands",
+	} {
+		if !strings.Contains(engines, fragment) {
+			t.Fatalf("engine runtime missing styleruntime fragment %q", fragment)
+		}
+	}
+	// The shim must override window.GoSXStudioStyleRuntime; without that
+	// assignment the legacy methods are never wrapped. The bundle already
+	// declares the legacy version of the global via studio-engines.js at
+	// line 2341; the slice-5 shim reassigns it.
+	if !strings.Contains(engines, "window.GoSXStudioStyleRuntime =") {
+		t.Fatalf("engine runtime missing styleruntime shim assignment")
+	}
+}
+
 func TestEngineRuntimeIncludesBlockLayoutRuntimeIslandBundle(t *testing.T) {
 	// Phase 3 slice-4 burn-down of GoSXStudioBlockLayoutRuntime. The engine
 	// runtime asset must include both the island-runtime JS (publishes the
