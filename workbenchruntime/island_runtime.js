@@ -438,6 +438,40 @@
 
   window.__gosx_workbench_runtime_island_bindChrome = bindChromeIsland;
 
+  // setMode(form, mode, scroll) — mirrors setWorkbenchMode at
+  // studio-engines.js:343. Sets data-studio-mode on the form, toggles
+  // aria-pressed on [data-studio-mode-control] buttons, toggles
+  // is-mode-active / hidden / aria-hidden on [data-studio-mode-panel]
+  // siblings, scrolls active panel into view when requested, updates
+  // [data-studio-mode-label] readouts, emits gosxstudio:workbench-mode-change.
+  function setModeIsland(form, mode, scroll) {
+    if (!form) return;
+    mode = normalizeWorkbenchMode(mode);
+    form.setAttribute("data-studio-mode", mode);
+    Array.prototype.forEach.call(form.querySelectorAll("[data-studio-mode-control]"), function (button) {
+      button.setAttribute("aria-pressed", normalizeWorkbenchMode(button.getAttribute("data-studio-mode-control")) === mode ? "true" : "false");
+    });
+    Array.prototype.forEach.call(form.querySelectorAll("[data-studio-mode-panel]"), function (panel) {
+      var active = normalizeWorkbenchMode(panel.getAttribute("data-studio-mode-panel")) === mode;
+      panel.classList.toggle("is-mode-active", active);
+      if (workbenchPanelFollowsMode(panel)) {
+        panel.hidden = !active;
+        panel.setAttribute("aria-hidden", active ? "false" : "true");
+      } else {
+        panel.hidden = false;
+        panel.setAttribute("aria-hidden", "false");
+      }
+    });
+    var target = workbenchModePanel(form, mode);
+    if (scroll && target && target.scrollIntoView) {
+      target.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "nearest" });
+    }
+    updateWorkbenchModeLabel(form, mode);
+    emitWorkbenchChange("mode-change", form, { mode: mode, scroll: !!scroll });
+  }
+
+  window.__gosx_workbench_runtime_island_setMode = setModeIsland;
+
   // bindCommandPaletteIsland — mirrors bindWorkbenchCommandPalette at
   // studio-engines.js:497. Wires the [data-studio-command-palette]
   // gosxstudio:command listener to the same fan-out (setMode /
