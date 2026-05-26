@@ -67,6 +67,45 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesBindThemeGlobal(t *testing.T) {
+	// Method 1/10: bindTheme(root) — legacy bindTheme at studio-engines.js:1421.
+	// Binds theme kit / template / palette / image-ratio / custom-template /
+	// style-class / color-token controls; on input/change dispatches the
+	// internal updateTheme + applies kit/preset side effects via applyKit /
+	// applyPresetDefaults. Uses [data-gosx-studio-theme-bound] dataset key as
+	// the per-control idempotency guard (distinct from the legacy key to allow
+	// both paths to coexist additively).
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	want := "window." + IslandGlobals.BindTheme + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	// DOM contract — the seven theme input selectors the legacy binds (see
+	// studio-engines.js:1423). Drift in any of these silently breaks the
+	// theme fan-out.
+	for _, contract := range []string{
+		// Top-level theme controls.
+		`name="themeKit"`,
+		`name="themeTemplate"`,
+		`name="themePalette"`,
+		`name="customTemplateName"`,
+		"data-editor-custom-class",
+		"data-editor-style-class",
+		`name="themeImageRatio"`,
+		"data-editor-color-token",
+		// Idempotency guard key — distinct from legacy gosxStudioThemeBound
+		// so both paths can coexist during the additive window.
+		"gosxStudioThemeIslandBound",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() bindTheme must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
