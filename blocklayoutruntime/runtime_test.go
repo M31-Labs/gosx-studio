@@ -295,3 +295,22 @@ func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 		}
 	}
 }
+
+func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
+	bundle := string(Bundle())
+	if bundle == "" {
+		t.Fatal("Bundle() must return a non-empty JS snippet")
+	}
+	// Island runtime must come before the BridgeShim — the shim consults
+	// the global the island runtime publishes. Order matters: if the shim
+	// ran first it would close over an undefined global and every dispatch
+	// would fall through to the legacy path, silently disabling the slice.
+	islandIdx := strings.Index(bundle, IslandGlobals.Rows+" ")
+	shimIdx := strings.Index(bundle, "window.GoSXStudioBlockLayoutRuntime =")
+	if islandIdx < 0 || shimIdx < 0 {
+		t.Fatalf("Bundle() missing island runtime or shim:\n%s", bundle)
+	}
+	if islandIdx > shimIdx {
+		t.Fatalf("Bundle() must place island runtime before shim (island=%d shim=%d)", islandIdx, shimIdx)
+	}
+}
