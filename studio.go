@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	PackageCMS    = "github.com/odvcencio/gosx-cms"
-	PackageAdmin  = "github.com/odvcencio/gosx-admin"
+	PackageCMS    = "m31labs.dev/gosx-cms"
+	PackageAdmin  = "m31labs.dev/gosx-admin"
 	PackageStudio = "m31labs.dev/gosx-studio"
 )
 
