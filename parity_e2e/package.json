@@ -1,0 +1,17 @@
+{
+  "name": "@m31labs/gosx-studio-parity-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Playwright parity test harness for the gosx-studio runtime burn-down (Phase 3). Shared across all 7 slices.",
+  "type": "commonjs",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "smoke": "playwright test --grep @smoke"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.9.1",
+    "typescript": "^6.0.3"
+  }
+}
