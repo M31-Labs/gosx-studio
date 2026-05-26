@@ -335,6 +335,35 @@ func TestIslandRuntimeJSPublishesShowImpactGlobal(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSPublishesRestoreImpactGlobal(t *testing.T) {
+	// Method 8/10: restoreImpact() — legacy restoreStyleImpact at
+	// studio-engines.js:1803. If a lastStyleImpact is recorded, replays
+	// showImpact(name, value, true) to bring the panel back to its committed
+	// state; otherwise clears the readouts to a "No active recipe" state and
+	// calls PreviewRuntime.applyStyleImpact("") to remove the overlay
+	// markers (per ADR 0008 transitional pattern — see
+	// ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md).
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.RestoreImpact + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// The clear-state readout strings users see when no impact is
+		// active. Drift here changes the editor copy silently.
+		`"No active recipe"`,
+		`"Awaiting scoped change."`,
+		`"0 affected"`,
+		// The impact-panel classes restoreImpact removes when clearing.
+		"is-live",
+		"has-change",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() restoreImpact must preserve %q contract", contract)
+		}
+	}
+}
+
 func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing, the legacy
