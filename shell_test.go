@@ -1,6 +1,10 @@
 package studio
 
-import "testing"
+import (
+	"testing"
+
+	"m31labs.dev/gosx-studio/fieldruntime"
+)
 
 func TestDefaultShellConfigOwnsReusableStudioChrome(t *testing.T) {
 	config := DefaultShellConfig().Normalize()
@@ -22,6 +26,15 @@ func TestDefaultShellConfigOwnsReusableStudioChrome(t *testing.T) {
 	}
 	if !config.FeatureEnabled("brand-media-picker") || !config.FeatureEnabled("publish-review") {
 		t.Fatalf("feature flags = %#v", config.FeatureFlags)
+	}
+	// Phase 3 burn-down: the FieldRuntime island flag must be registered
+	// with the default-off value so hosts can opt in per-slice once
+	// parity is proven. See ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-25-phase-3-slice-1-fieldruntime.md.
+	if _, ok := config.FeatureFlags[fieldruntime.FeatureFlagKey]; !ok {
+		t.Fatalf("default shell config must register %q flag (got %#v)", fieldruntime.FeatureFlagKey, config.FeatureFlags)
+	}
+	if config.FeatureEnabled(fieldruntime.FeatureFlagKey) {
+		t.Fatalf("%q must default to false (production legacy JS path); got true", fieldruntime.FeatureFlagKey)
 	}
 	if _, ok := config.Adapter(ResourceProducts); !ok {
 		t.Fatalf("expected product resource adapter in %#v", config.Adapters)

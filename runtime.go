@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"m31labs.dev/gosx-studio/fieldruntime"
 )
 
 //go:embed assets/preview-runtime.js assets/studio-engines.js assets/studio.css
@@ -23,16 +25,49 @@ func StudioEngineRuntimeScript() []byte {
 func EngineRuntimeScript() []byte {
 	preview := PreviewRuntimeScript()
 	engines := StudioEngineRuntimeScript()
-	if len(preview) == 0 {
-		return engines
+	// Phase 3 burn-down append: each slice's island runtime + bridge shim
+	// gets concatenated here so the legacy and island paths ship together
+	// in one bundle, with a feature-flag selecting which runs (see
+	// ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-25-phase-3-slice-1-fieldruntime.md
+	// Section C). Order: legacy bundle (preview + engines) first so the
+	// island runtime can reference its globals (window.GoSXStudioPreviewRuntime
+	// for the mirroring fallback). Slices 2..7 will append their bundles
+	// the same way.
+	slices := [][]byte{
+		fieldruntime.Bundle(),
 	}
-	if len(engines) == 0 {
-		return preview
+	totalSliceLen := 0
+	for _, slice := range slices {
+		totalSliceLen += len(slice) + 1
 	}
-	out := make([]byte, 0, len(preview)+1+len(engines))
-	out = append(out, preview...)
-	out = append(out, '\n')
-	out = append(out, engines...)
+	if len(preview) == 0 && len(engines) == 0 {
+		// No legacy bundle at all; just return the slice bundles joined.
+		out := make([]byte, 0, totalSliceLen)
+		for _, slice := range slices {
+			if len(slice) == 0 {
+				continue
+			}
+			out = append(out, slice...)
+			out = append(out, '\n')
+		}
+		return out
+	}
+	out := make([]byte, 0, len(preview)+1+len(engines)+totalSliceLen)
+	if len(preview) > 0 {
+		out = append(out, preview...)
+		out = append(out, '\n')
+	}
+	if len(engines) > 0 {
+		out = append(out, engines...)
+		out = append(out, '\n')
+	}
+	for _, slice := range slices {
+		if len(slice) == 0 {
+			continue
+		}
+		out = append(out, slice...)
+		out = append(out, '\n')
+	}
 	return out
 }
 

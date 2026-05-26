@@ -127,6 +127,39 @@ func TestStylesheetHandlerServesStudioChromeTokens(t *testing.T) {
 	}
 }
 
+func TestEngineRuntimeIncludesFieldRuntimeIslandBundle(t *testing.T) {
+	// Phase 3 slice-1 burn-down of GoSXStudioFieldRuntime. The engine
+	// runtime asset must include both the island-runtime JS (publishes the
+	// __gosx_field_runtime_island_* globals) and the BridgeShim that
+	// delegates window.GoSXStudioFieldRuntime calls when the
+	// "field-runtime-islands" feature flag is on. See
+	// gosx-studio/fieldruntime/runtime.go.
+	engines := string(EngineRuntimeScript())
+	for _, fragment := range []string{
+		"__gosx_field_runtime_island_bind",
+		"__gosx_field_runtime_island_bindMirroring",
+		"__gosx_field_runtime_island_bindClipboard",
+		"field-runtime-islands",
+		// The shim's flag check must be in the bundle so the runtime is
+		// actually gated, not just loaded.
+		"data-gosx-studio-feature-flag-field-runtime-islands",
+	} {
+		if !strings.Contains(engines, fragment) {
+			t.Fatalf("engine runtime missing fieldruntime fragment %q", fragment)
+		}
+	}
+	// The shim must override window.GoSXStudioFieldRuntime; without that
+	// assignment the legacy methods are never wrapped.
+	shimAssign := "window.GoSXStudioFieldRuntime = {"
+	if !strings.Contains(engines, shimAssign) {
+		// Allow for whitespace tolerance — the shim uses a multi-line
+		// object literal. Check for the LHS at least.
+		if !strings.Contains(engines, "window.GoSXStudioFieldRuntime =") {
+			t.Fatalf("engine runtime missing fieldruntime shim assignment")
+		}
+	}
+}
+
 func TestEngineRuntimeHandlerServesCombinedRuntime(t *testing.T) {
 	rec := httptest.NewRecorder()
 	EngineRuntimeHandler().ServeHTTP(rec, httptest.NewRequest("GET", EngineRuntimePath, nil))

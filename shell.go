@@ -1,6 +1,10 @@
 package studio
 
-import "strings"
+import (
+	"strings"
+
+	"m31labs.dev/gosx-studio/fieldruntime"
+)
 
 const (
 	RuntimeRoot          = "/_gosx/studio"
@@ -131,7 +135,17 @@ func DefaultShellConfig() ShellConfig {
 			{Key: "restore", Label: "Restore", Method: "POST"},
 		},
 		Permissions:  PermissionConfig{CanEdit: true, CanPublish: true, CanManage: true},
-		FeatureFlags: map[string]bool{"brand-media-picker": true, "publish-review": true},
+		FeatureFlags: map[string]bool{
+			"brand-media-picker": true,
+			"publish-review":     true,
+			// Phase 3 burn-down flags. Default off in production — the
+			// legacy JS implementation in assets/studio-engines.js stays
+			// active. Hosts opt in per slice by setting the flag to true
+			// once parity is proven. See
+			// ~/.hyphae/spaces/m31labs-gosx/specs/gosx-studio-runtime-parity-matrix.md
+			// for the full slice catalogue.
+			fieldruntime.FeatureFlagKey: false,
+		},
 	}
 }
 
