@@ -122,15 +122,13 @@
     if (commit) input.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
-  function brandPreviewRuntime() {
-    return window.GoSXStudioPreviewRuntime || {};
-  }
-
-  // Set a shared signal value through the WASM bridge, if available. The
-  // bridge exposes window.__gosx_set_shared_signal_json(name, valueJSON)
-  // after the runtime boots; before then the call is a no-op (the legacy
-  // attribute writes / preview-runtime delegation below still keep the UI
-  // live).
+  // Set a shared signal value through the WASM bridge. The bridge exposes
+  // window.__gosx_set_shared_signal_json(name, valueJSON) once the runtime
+  // boots; the cross-frame relay (per ADR 0009 +
+  // Bridge.EnableCrossFrameRelay) routes writes whose name starts with
+  // "$preview." to the storefront iframe's Bridge, where slice 6's
+  // preview_subscriber observes them and applies the matching DOM
+  // mutation. Before the bridge boots, the call is a no-op.
   function writeSharedSignal(name, value) {
     try {
       var setter = window.__gosx_set_shared_signal_json;
@@ -142,18 +140,37 @@
     }
   }
 
-  // Transitional iframe delegation. Slice 6 will replace the
-  // brandPreviewRuntime() call below with a shared-signal write to
-  // $preview.brand.headerLogo; the editor-side contract stays the same.
+  // updateHeaderLogo(payload) — slice 6 transitional cleanup (Section G.2).
+  //
+  // The previous shape delegated cross-frame mutation to
+  // window.GoSXStudioPreviewRuntime.updateHeaderLogo (the 1130-line
+  // bridge in gosx-studio/assets/preview-runtime.js). Slice 6 swaps the
+  // delivery mechanism: instead of reach-across-frame DOM mutation, we
+  // publish to $preview.brand.headerLogo and let the cross-frame relay
+  // (ADR 0009) deliver the write to the iframe's subscriber where the
+  // .brand element gets the actual class/src/CSS-variable updates.
+  //
+  // Editor-side bookkeeping retains the $brand.headerLogo signal so any
+  // editor-frame consumer (e.g., the readout in brand_header_logo.gsx)
+  // can subscribe; this is the same shape slices 3/5 used pre-cleanup.
   function updateHeaderLogoIsland(payload) {
     payload = payload || {};
-    var preview = brandPreviewRuntime();
-    if (preview && typeof preview.updateHeaderLogo === "function") {
-      preview.updateHeaderLogo(payload);
-    }
-    // Also write the $brand.headerLogo signal for island bookkeeping. This
-    // is the editor-side observable; the preview-side observable is the
-    // iframe DOM mutation done by PreviewRuntime above.
+    // $preview.brand.headerLogo carries src / alt / width / x / y — the
+    // exact payload slice 6's subscriber decomposes onto the iframe's
+    // .brand DOM. The signal name and payload shape MUST match
+    // gosx-studio/previewruntime/subscriber_runtime.js or the cross-
+    // frame contract silently breaks.
+    writeSharedSignal("$preview.brand.headerLogo", {
+      src: payload.url || "",
+      alt: payload.alt || "Site logo",
+      width: payload.width || "96",
+      x: payload.x || "0",
+      y: payload.y || "0"
+    });
+    // $brand.headerLogo is the editor-side observable retained for
+    // brand-island bookkeeping (used by sibling islands in the editor
+    // frame). The slice-6 cleanup keeps this — it's an editor-frame-only
+    // contract that doesn't cross the iframe boundary.
     writeSharedSignal("$brand.headerLogo", {
       url: payload.url || "",
       width: payload.width || "96",

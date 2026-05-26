@@ -111,11 +111,14 @@ func TestIslandRuntimeJSPublishesIslandGlobals(t *testing.T) {
 		"--brand-logo-offset-x",
 		"--brand-logo-offset-y",
 		"--editor-logo-grid-size",
-		// updateHeaderLogo sub-behavior — transitional iframe delegation
-		// via GoSXStudioPreviewRuntime (slice 6 will swap for
-		// $preview.brand.headerLogo per
-		// ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md).
-		"GoSXStudioPreviewRuntime",
+		// updateHeaderLogo sub-behavior — slice 6's transitional cleanup
+		// (Section G.2) swapped the legacy
+		// window.GoSXStudioPreviewRuntime.updateHeaderLogo delegation for
+		// a direct $preview.brand.headerLogo signal write. The cross-
+		// frame relay (per ADR 0009) delivers the signal to the
+		// iframe's preview_subscriber, where the .brand DOM mutation
+		// happens locally.
+		"$preview.brand.headerLogo",
 		// Idempotency guard — distinct from legacy gosxStudioBrandLogoBound
 		// so both implementations can coexist on the same DOM during the
 		// additive shipping window without double-binding.
