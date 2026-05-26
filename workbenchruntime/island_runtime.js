@@ -561,6 +561,21 @@
 
   window.__gosx_workbench_runtime_island_setStyleState = setStyleStateIsland;
 
+  // syncZoom(form, zoom) — mirrors syncWorkbenchZoom at
+  // studio-engines.js:421. Sets data-studio-canvas-zoom on the
+  // [data-studio-canvas] element, emits gosxstudio:workbench-zoom-change,
+  // refreshes the canvas via a resize event.
+  function syncZoomIsland(form, zoom) {
+    if (!form) return;
+    zoom = zoom || "fit";
+    var canvas = form.querySelector("[data-studio-canvas]");
+    if (canvas) canvas.setAttribute("data-studio-canvas-zoom", zoom);
+    emitWorkbenchChange("zoom-change", form, { zoom: zoom });
+    refreshWorkbenchCanvas();
+  }
+
+  window.__gosx_workbench_runtime_island_syncZoom = syncZoomIsland;
+
   // bindCommandPaletteIsland — mirrors bindWorkbenchCommandPalette at
   // studio-engines.js:497. Wires the [data-studio-command-palette]
   // gosxstudio:command listener to the same fan-out (setMode /
