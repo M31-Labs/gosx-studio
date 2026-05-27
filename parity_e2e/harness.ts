@@ -123,12 +123,12 @@ export async function assertEditorRoute(page: Page, mode: ParityMode): Promise<v
     .first()
     .waitFor({ state: "attached" });
 
-  // The studio-engines bundle exposes its runtime globals on `window`; if
-  // any of them are missing the bundle didn't execute and the parity test
-  // would silently pass against a broken bundle. Fail loudly here instead.
+  // The studio bundle exposes its runtime globals on `window`; if they're
+  // missing the bundle didn't execute and the parity test would silently
+  // pass against a broken bundle. Fail loudly here instead.
   await page.waitForFunction(() => {
     const w = window as unknown as Record<string, unknown>;
-    return Boolean(w.GoSXStudioEngineRuntime && w.GoSXStudioFieldRuntime);
+    return Boolean(w.GoSXStudioFieldRuntime);
   }, undefined, { timeout: 10_000 });
 }
 

@@ -142,5 +142,31 @@ const bridgeShimJS = `;(function () {
       typeof bindFieldClipboard === "function" ? bindFieldClipboard : legacy.bindClipboard
     )
   };
+  // Auto-mount on document ready. The deleted studio-engines.js bundle ran a
+  // top-level init() at DOMContentLoaded that called bindFieldRuntime(document)
+  // (plus the six sibling runtime binds). When the bundle was deleted the per-
+  // slice BridgeShims correctly re-published window.GoSXStudio*Runtime but the
+  // auto-mount was lost — the field-mirror parity test caught the gap because
+  // it asserts the input's bound-attr marker exists after page load, which
+  // only happens if .bind ran. Restoring the auto-mount inside the shim keeps
+  // the responsibility local to the slice and matches the legacy contract.
+  // Idempotent: a per-document marker attribute guards against double-mount
+  // if a host also calls .bind explicitly during SSR hydration.
+  function autoMount() {
+    try {
+      var marker = "data-gosx-studio-field-runtime-auto-mounted";
+      if (document.documentElement && document.documentElement.getAttribute(marker) === "true") return;
+      if (document.documentElement) document.documentElement.setAttribute(marker, "true");
+      window.GoSXStudioFieldRuntime.bind(document.body || document);
+    } catch (e) {
+      // Auto-mount must never break the page; the host can always invoke
+      // window.GoSXStudioFieldRuntime.bind manually if it needs to recover.
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", autoMount);
+  } else {
+    autoMount();
+  }
 })();
 `
