@@ -8,8 +8,8 @@
 // ## Architecture
 //
 // Phase 3 ships each runtime contract additively: the legacy JS implementation
-// in `assets/studio-engines.js` keeps living, and the new `.gsx`-authored
-// island ships beside it. A bridge shim in studio-engines.js decides which
+// in `the legacy bundle (removed 2026-05-27)` keeps living, and the new `.gsx`-authored
+// island ships beside it. A bridge shim in the legacy bundle decides which
 // path runs based on a feature flag (`field-runtime-islands`,
 // `selection-runtime-islands`, etc.) declared in
 // `studio.ShellConfig.FeatureFlags`.

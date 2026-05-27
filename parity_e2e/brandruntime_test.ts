@@ -154,7 +154,7 @@ async function snapshotHeaderLogo(page: Page): Promise<HeaderLogoSnapshot> {
   return await page.evaluate(() => {
     const w = window as unknown as Record<string, unknown>;
     // Try to reach into every iframe's preview document (matches legacy
-    // editorDocuments() behavior in preview-runtime.js).
+    // editorDocuments() behavior in the legacy bundle).
     const frames = Array.prototype.slice.call(document.querySelectorAll("iframe")) as HTMLIFrameElement[];
     let target: { doc: Document; brand: Element } | null = null;
     let reachable = false;
@@ -288,7 +288,7 @@ test.describe("GoSXStudioBrandRuntime parity", () => {
   // both legacy and candidate paths call into
   // window.GoSXStudioPreviewRuntime.updateHeaderLogo. The candidate path
   // just owns the call from the brand island instead of from the legacy
-  // updateHeaderLogo function in studio-engines.js. The observable
+  // updateHeaderLogo function in the legacy bundle. The observable
   // behavior — iframe .brand DOM mutations — must be identical.
   test("brandruntime.updateHeaderLogo parity", async ({ browser }) => {
     const baseline = await bootBaseline(browser);

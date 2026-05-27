@@ -2,8 +2,8 @@
 //
 // Phase 3 of the gosx-studio runtime burn-down (see
 // ~/.hyphae/spaces/m31labs-gosx/plans/gosx-vm-unification-and-editor-bridge-burn-down.md)
-// replaces seven JavaScript runtime contracts in `assets/studio-engines.js`
-// and `assets/preview-runtime.js` with compiled `.gsx` islands and engines.
+// replaces seven JavaScript runtime contracts in `the legacy bundle (removed 2026-05-27)`
+// and `the legacy bundle (removed 2026-05-27)` with compiled `.gsx` islands and engines.
 // Each slice ships additively (legacy JS + island both live, gated by a
 // feature flag in `studio.ShellConfig.FeatureFlags`) and proves equivalence
 // against the legacy bundle through these Playwright suites before the JS
