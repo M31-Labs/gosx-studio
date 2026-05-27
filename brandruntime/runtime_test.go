@@ -115,6 +115,29 @@ func TestIslandRuntimeJSPublishesIslandGlobals(t *testing.T) {
 	}
 }
 
+func TestBridgeShimAutoMountsOnDocumentReady(t *testing.T) {
+	// Pre-2026-05-27 the deleted studio-engines.js bundle auto-mounted every
+	// runtime contract at DOMContentLoaded. When the bundle was deleted the
+	// per-slice BridgeShim correctly re-published window.GoSXStudioBrandRuntime
+	// but the auto-mount call was lost — nothing invoked .bindLogo(document)
+	// on page load anymore, so brand-logo URL/width/offset input listeners
+	// were never attached on initial load. The v0.4.1 fix landed this same
+	// contract for fieldruntime; v0.5.0 restores it across the remaining six
+	// islands. updateHeaderLogo is NOT auto-mounted (it's a host-driven
+	// preview-side write, not a boot binding). Defer to DOMContentLoaded if
+	// the document is still loading so we don't double-mount during SSR
+	// hydration.
+	shim := string(BridgeShim())
+	for _, fragment := range []string{
+		"DOMContentLoaded",
+		"window.GoSXStudioBrandRuntime.bindLogo",
+	} {
+		if !strings.Contains(shim, fragment) {
+			t.Fatalf("BridgeShim() missing auto-mount fragment %q:\n%s", fragment, shim)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {

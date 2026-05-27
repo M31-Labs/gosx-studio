@@ -173,5 +173,33 @@ const bridgeShimJS = `;(function () {
       typeof updateHeaderLogo === "function" ? updateHeaderLogo : legacy.updateHeaderLogo
     )
   };
+  // Auto-mount on document ready. Mirrors the v0.4.1 fieldruntime fix: the
+  // deleted studio-engines.js bundle ran a top-level init() at
+  // DOMContentLoaded that called bindBrandLogo(document) along with the six
+  // sibling runtime binds. When the bundle was deleted the per-slice
+  // BridgeShim correctly re-published window.GoSXStudioBrandRuntime but the
+  // auto-mount was lost — the brand logo URL/width/offset input listeners
+  // were never attached on initial load, so authoring the brand logo from a
+  // cold boot did nothing. updateHeaderLogo is NOT auto-mounted because the
+  // legacy init() only called bindBrandLogo at boot; updateHeaderLogo is a
+  // host-driven preview-side write triggered by user edits. Idempotent: a
+  // per-document marker attribute guards against double-mount if a host also
+  // calls .bindLogo explicitly during SSR hydration.
+  function autoMount() {
+    try {
+      var marker = "data-gosx-studio-brand-runtime-auto-mounted";
+      if (document.documentElement && document.documentElement.getAttribute(marker) === "true") return;
+      if (document.documentElement) document.documentElement.setAttribute(marker, "true");
+      window.GoSXStudioBrandRuntime.bindLogo(document.body || document);
+    } catch (e) {
+      // Auto-mount must never break the page; the host can always invoke
+      // window.GoSXStudioBrandRuntime.bindLogo manually if it needs to recover.
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", autoMount);
+  } else {
+    autoMount();
+  }
 })();
 `
