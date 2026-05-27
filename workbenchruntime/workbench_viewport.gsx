@@ -1,8 +1,8 @@
 // workbench_viewport.gsx — GoSXStudioWorkbenchRuntime.{syncViewport,
 // activateViewport,currentBreakpoint} island.
 //
-// Phase 3 slice-7 burn-down of three viewport-related JS functions in
-// gosx-studio/assets/studio-engines.js:
+// Phase 3 slice-7 island implementation of three viewport-related JS functions in
+// the legacy bundle (removed 2026-05-27):
 //
 //   - syncWorkbenchViewport(form, viewport) — line 369; sets
 //                                              data-studio-breakpoint on the

@@ -1,7 +1,7 @@
 // block_library.gsx — GoSXStudioBlockLayoutRuntime.updateBlockLibraryState island.
 //
-// Phase 3 slice-4 burn-down of the JS function updateBlockLayoutLibraryState
-// in gosx-studio/assets/studio-engines.js:1972. For every
+// Phase 3 slice-4 island implementation of the JS function updateBlockLayoutLibraryState
+// in the legacy bundle (removed 2026-05-27). For every
 // [data-editor-add-block] button in the supplied root, the helper resolves
 // the corresponding block-row in document via blockRowForKey, reads the
 // row's [data-editor-block-visible] checkbox state, and writes the button's:
@@ -25,8 +25,8 @@
 // "block-layout-runtime-islands" feature flag is on. During the additive
 // shipping window (Section G of the slice plan), the BridgeShim only
 // invokes this island when ShellConfig.FeatureFlags has
-// "block-layout-runtime-islands"=true; otherwise the legacy
-// updateBlockLayoutLibraryState function in studio-engines.js runs.
+// Post 2026-05-27 the legacy JS bundle is gone; the island path is the
+// only path. See Phase 3 burn-down.
 
 package blocklayoutruntime
 

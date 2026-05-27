@@ -1,7 +1,7 @@
 // field_bind.gsx — GoSXStudioFieldRuntime.bind island.
 //
-// Phase 3 slice-1 burn-down of the JS function bindFieldRuntime in
-// gosx-studio/assets/studio-engines.js:692. See the slice plan at
+// Phase 3 slice-1 island implementation of the JS function bindFieldRuntime in
+// the legacy bundle (removed 2026-05-27). See the slice plan at
 // ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-25-phase-3-slice-1-fieldruntime.md
 // and the parity matrix at
 // ~/.hyphae/spaces/m31labs-gosx/specs/gosx-studio-runtime-parity-matrix.md.
@@ -13,8 +13,8 @@
 //
 // During the additive shipping window (Section C of the slice plan), the
 // BridgeShim only invokes this island when ShellConfig.FeatureFlags has
-// "field-runtime-islands"=true; otherwise the legacy bindFieldRuntime path
-// in studio-engines.js runs.
+// Post 2026-05-27 the legacy JS bundle is gone; the island path is the
+// only path. See Phase 3 burn-down.
 
 package fieldruntime
 

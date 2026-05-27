@@ -1,7 +1,7 @@
 // selection_bind.gsx — GoSXStudioSelectionRuntime.bind island.
 //
-// Phase 3 slice-2 burn-down of the JS function bindSelectionSurface in
-// gosx-studio/assets/studio-engines.js:713. See the slice plan at
+// Phase 3 slice-2 island implementation of the JS function bindSelectionSurface in
+// the legacy bundle (removed 2026-05-27). See the slice plan at
 // ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-2-selectionruntime.md
 // and the parity matrix at
 // ~/.hyphae/spaces/m31labs-gosx/specs/gosx-studio-runtime-parity-matrix.md.
@@ -31,8 +31,8 @@
 //
 // During the additive shipping window (Section B of the slice plan), the
 // BridgeShim only invokes this island when ShellConfig.FeatureFlags has
-// "selection-runtime-islands"=true; otherwise the legacy bindSelectionSurface
-// path in studio-engines.js runs.
+// Post 2026-05-27 the legacy JS bundle is gone; the island path is the
+// only path. See Phase 3 burn-down.
 
 package selectionruntime
 

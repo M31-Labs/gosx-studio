@@ -6,13 +6,13 @@ import (
 )
 
 // The fieldruntime package is the Go-side surface for the Phase 3 slice-1
-// burn-down of GoSXStudioFieldRuntime. It owns:
-//   1. The feature-flag key consumers add to studio.ShellConfig.FeatureFlags
-//      to flip from the legacy JS implementation in assets/studio-engines.js
-//      to the .gsx-authored islands in this package.
-//   2. The JS shim that studio-engines.js appends so the
-//      window.GoSXStudioFieldRuntime methods delegate to the islands when
-//      the flag is on.
+// island implementation of GoSXStudioFieldRuntime. It owns:
+//   1. The feature-flag key (retained for host-probe API stability — the
+//      island path always runs post-2026-05-27 since the legacy JS bundle
+//      was deleted then).
+//   2. The JS shim served alongside the island runtime so the
+//      window.GoSXStudioFieldRuntime methods dispatch to the island
+//      globals.
 //   3. (Future) Helper Go APIs the consumer can call to mount the islands
 //      into its editor route.
 //
@@ -50,22 +50,6 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 	} {
 		if !strings.Contains(shim, fragment) {
 			t.Fatalf("BridgeShim() missing %q:\n%s", fragment, shim)
-		}
-	}
-}
-
-func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
-	shim := string(BridgeShim())
-	// The shim is additive — when the island global is missing, the legacy
-	// JS path must still run. Sanity check: look for the legacy function
-	// names so a future refactor that drops the fallback is caught here.
-	for _, legacy := range []string{
-		"bindFieldRuntime",
-		"bindFieldMirroring",
-		"bindFieldClipboard",
-	} {
-		if !strings.Contains(shim, legacy) {
-			t.Fatalf("BridgeShim() must retain legacy fallback for %q:\n%s", legacy, shim)
 		}
 	}
 }

@@ -1,7 +1,7 @@
 // style_impact.gsx — GoSXStudioStyleRuntime.{showImpact,restoreImpact} island.
 //
-// Phase 3 slice-5 burn-down of two impact-overlay JS functions in
-// gosx-studio/assets/studio-engines.js:
+// Phase 3 slice-5 island implementation of two impact-overlay JS functions in
+// the legacy bundle (removed 2026-05-27):
 //
 //   - showStyleImpact(name, value, committed) — line 1785; looks up impact
 //     metadata for the named control, calls
@@ -47,8 +47,8 @@
 //   window.__gosx_style_runtime_island_showImpact
 //   window.__gosx_style_runtime_island_restoreImpact
 // that the slice-5 BridgeShim delegates to when the "style-runtime-islands"
-// feature flag is on; otherwise the legacy showStyleImpact /
-// restoreStyleImpact functions in studio-engines.js run (which also
+// Post 2026-05-27 the legacy JS bundle is gone; the island path is the
+// only path. See Phase 3 burn-down.
 // delegate to PreviewRuntime).
 
 package styleruntime

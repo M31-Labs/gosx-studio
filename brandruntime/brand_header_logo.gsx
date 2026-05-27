@@ -1,8 +1,8 @@
 // brand_header_logo.gsx — GoSXStudioBrandRuntime.updateHeaderLogo island.
 //
-// Phase 3 slice-3 burn-down of the JS function updateHeaderLogo in
-// gosx-studio/assets/studio-engines.js:1264 (which itself is a thin
-// delegate to assets/preview-runtime.js:1027). See the slice plan at
+// Phase 3 slice-3 island implementation of updateHeaderLogo (originally a
+// thin JS delegate in the now-deleted studio-engines.js bundle). See the
+// slice plan at
 // ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-3-brandruntime.md
 // and the parity matrix at
 // ~/.hyphae/spaces/m31labs-gosx/specs/gosx-studio-runtime-parity-matrix.md.
@@ -33,10 +33,9 @@
 // window.__gosx_brand_runtime_island_updateHeaderLogo that calls
 // previewRuntime().updateHeaderLogo(payload).
 //
-// During the additive shipping window (Section B of the slice plan), the
-// BridgeShim only invokes this island when ShellConfig.FeatureFlags has
-// "brand-runtime-islands"=true; otherwise the legacy updateHeaderLogo path
-// in studio-engines.js runs (which also delegates to PreviewRuntime).
+// Post 2026-05-27 the legacy JS bundle is gone; the island path always
+// runs. The shim's data-gosx-studio-feature-flag-brand-runtime-islands
+// flag is retained for host-probe API stability.
 
 package brandruntime
 

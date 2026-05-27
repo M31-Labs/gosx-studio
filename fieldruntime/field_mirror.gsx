@@ -1,7 +1,7 @@
 // field_mirror.gsx — GoSXStudioFieldRuntime.bindMirroring island.
 //
-// Phase 3 slice-1 burn-down of the JS function bindFieldMirroring in
-// gosx-studio/assets/studio-engines.js:592.
+// Phase 3 slice-1 island implementation of the JS function bindFieldMirroring in
+// the legacy bundle (removed 2026-05-27).
 //
 // The legacy implementation scans the inspector for inputs with
 // data-editor-source / data-editor-frame-attr-target, attaches input event

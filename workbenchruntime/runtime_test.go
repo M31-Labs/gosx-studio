@@ -8,9 +8,9 @@ import (
 // The workbenchruntime package is the Go-side surface for the Phase 3 slice-7
 // burn-down of GoSXStudioWorkbenchRuntime. It owns:
 //  1. The feature-flag key consumers add to studio.ShellConfig.FeatureFlags
-//     to flip from the legacy JS implementation in assets/studio-engines.js
+//     to flip the island path (legacy bundle deleted 2026-05-27)
 //     to the .gsx-authored islands in this package.
-//  2. The JS shim that studio-engines.js appends so the
+//  2. The JS shim that the legacy bundle appends so the
 //     window.GoSXStudioWorkbenchRuntime methods delegate to the islands when
 //     the flag is on.
 //  3. The island runtime JS that publishes window.__gosx_workbench_runtime_*
@@ -71,42 +71,9 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 	}
 }
 
-func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
-	shim := string(BridgeShim())
-	// The shim is additive — when the island global is missing, the legacy
-	// JS path must still run. Sanity check: look for the legacy function
-	// names so a future refactor that drops the fallback is caught here.
-	// The fifteen legacy function names are the catalog of
-	// GoSXStudioWorkbenchRuntime methods as wired in
-	// assets/studio-engines.js:2312 — every method name in the public
-	// contract maps to a legacy function with a "Workbench" prefix
-	// (bindRailResizers → bindWorkbenchRailResizers, etc).
-	for _, legacy := range []string{
-		"bindWorkbenchRailResizers",
-		"bindWorkbenchChrome",
-		"setWorkbenchMode",
-		"syncWorkbenchViewport",
-		"activateWorkbenchViewport",
-		"currentWorkbenchBreakpoint",
-		"setWorkbenchStyleState",
-		"syncWorkbenchZoom",
-		"activateWorkbenchZoom",
-		"toggleWorkbenchRail",
-		"toggleWorkbenchFocus",
-		"toggleWorkbenchActivity",
-		"saveWorkbenchLayout",
-		"currentWorkbenchRailWidth",
-		"setWorkbenchRailWidth",
-	} {
-		if !strings.Contains(shim, legacy) {
-			t.Fatalf("BridgeShim() must retain legacy fallback for %q:\n%s", legacy, shim)
-		}
-	}
-}
-
 func TestIslandRuntimeJSPublishesBindRailResizersGlobal(t *testing.T) {
 	// Method 1/15: bindRailResizers(root) — legacy bindWorkbenchRailResizers
-	// at studio-engines.js:194. Binds the [data-studio-resizer] pointer drag
+	// at the legacy bundle:194. Binds the [data-studio-resizer] pointer drag
 	// + ArrowLeft/ArrowRight keyboard nudges on rail handles. Uses
 	// gosxStudioResizerIslandBound as the per-handle idempotency guard
 	// (distinct from the legacy gosxStudioResizerBound to allow both paths
@@ -120,7 +87,7 @@ func TestIslandRuntimeJSPublishesBindRailResizersGlobal(t *testing.T) {
 		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
 	}
 	// DOM contract — the resizer handle selectors and side discriminator
-	// the legacy binds against (see studio-engines.js:198-237). Drift here
+	// the legacy binds against (see the legacy bundle:198-237). Drift here
 	// silently breaks the rail-resizer pointer / keyboard fan-out.
 	for _, contract := range []string{
 		"data-studio-resizer",
@@ -150,7 +117,7 @@ func TestIslandRuntimeJSPublishesBindRailResizersGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesBindChromeGlobal(t *testing.T) {
 	// Method 2/15: bindChrome(root) — legacy bindWorkbenchChrome at
-	// studio-engines.js:516. Binds the workbench form's delegated click
+	// the legacy bundle:516. Binds the workbench form's delegated click
 	// handler (fans out to setMode / syncViewport / syncZoom / setStyleState
 	// / toggleRail / toggleFocus / toggleActivity), wires saveLayoutSoon to
 	// rail-width-change/commit events, applies the persisted layout, and
@@ -165,7 +132,7 @@ func TestIslandRuntimeJSPublishesBindChromeGlobal(t *testing.T) {
 		// gosxStudioWorkbenchChromeBound so both paths coexist additively.
 		"gosxStudioWorkbenchChromeIslandBound",
 		// DOM selectors the delegated click handler walks (mirrors
-		// studio-engines.js:520-561).
+		// the legacy bundle:520-561).
 		"data-studio-mode-control",
 		"data-studio-viewport",
 		"data-studio-zoom",
@@ -178,7 +145,7 @@ func TestIslandRuntimeJSPublishesBindChromeGlobal(t *testing.T) {
 		"gosxstudio:rail-width-change",
 		"gosxstudio:rail-width-commit",
 		// Initial seeded form attributes the bind sets when absent
-		// (mirrors studio-engines.js:577-580).
+		// (mirrors the legacy bundle:577-580).
 		"data-studio-left",
 		"data-studio-right",
 		"data-studio-focus",
@@ -192,7 +159,7 @@ func TestIslandRuntimeJSPublishesBindChromeGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesSetModeGlobal(t *testing.T) {
 	// Method 3/15: setMode(form, mode, scroll) — legacy setWorkbenchMode at
-	// studio-engines.js:343. Sets data-studio-mode on the form, toggles
+	// the legacy bundle:343. Sets data-studio-mode on the form, toggles
 	// aria-pressed on [data-studio-mode-control] buttons, toggles
 	// is-mode-active / hidden / aria-hidden on [data-studio-mode-panel]
 	// siblings, scrolls active panel into view when requested, updates
@@ -212,11 +179,11 @@ func TestIslandRuntimeJSPublishesSetModeGlobal(t *testing.T) {
 		"data-studio-mode-control",
 		"data-studio-mode-panel",
 		"data-studio-mode-label",
-		// Class toggled on active mode panels (studio-engines.js:352).
+		// Class toggled on active mode panels (the legacy bundle:352).
 		"is-mode-active",
 		// Custom event name dispatched on mode change.
 		"workbench-mode-change",
-		// Mode aliases (mirror studio-engines.js:316-322 normalizer).
+		// Mode aliases (mirror the legacy bundle:316-322 normalizer).
 		`"structure"`,
 		`"content"`,
 		`"style"`,
@@ -232,7 +199,7 @@ func TestIslandRuntimeJSPublishesSetModeGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesSyncViewportGlobal(t *testing.T) {
 	// Method 4/15: syncViewport(form, viewport) — legacy syncWorkbenchViewport
-	// at studio-engines.js:369. Sets data-studio-breakpoint on the form,
+	// at the legacy bundle:369. Sets data-studio-breakpoint on the form,
 	// data-studio-preview-viewport on the .editor-preview-shell (only when
 	// the viewport island is not already managing it), updates
 	// [data-studio-viewport-label] readouts, emits
@@ -267,7 +234,7 @@ func TestIslandRuntimeJSPublishesSyncViewportGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesActivateViewportGlobal(t *testing.T) {
 	// Method 5/15: activateViewport(form, viewport) — legacy
-	// activateWorkbenchViewport at studio-engines.js:382. Clicks the
+	// activateWorkbenchViewport at the legacy bundle:382. Clicks the
 	// matching [data-studio-viewport="<x>"] button if present; otherwise
 	// falls through to syncViewport. Routes user-initiated viewport
 	// activation through the same dispatch as the toolbar / command palette.
@@ -294,7 +261,7 @@ func TestIslandRuntimeJSPublishesActivateViewportGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesCurrentBreakpointGlobal(t *testing.T) {
 	// Method 6/15: currentBreakpoint(form) — legacy
-	// currentWorkbenchBreakpoint at studio-engines.js:393. Pure read: derives
+	// currentWorkbenchBreakpoint at the legacy bundle:393. Pure read: derives
 	// the form's data-studio-breakpoint attribute (or the preview-shell's
 	// data-studio-preview-viewport fallback, or "desktop"). Per the slice
 	// plan, this method is implemented as a pure derivation from existing
@@ -308,7 +275,7 @@ func TestIslandRuntimeJSPublishesCurrentBreakpointGlobal(t *testing.T) {
 	}
 	for _, contract := range []string{
 		// The two read sources currentBreakpoint derives from
-		// (studio-engines.js:395-398).
+		// (the legacy bundle:395-398).
 		"data-studio-breakpoint",
 		"data-studio-preview-viewport",
 		"editor-preview-shell",
@@ -323,7 +290,7 @@ func TestIslandRuntimeJSPublishesCurrentBreakpointGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesSetStyleStateGlobal(t *testing.T) {
 	// Method 7/15: setStyleState(form, state) — legacy setWorkbenchStyleState
-	// at studio-engines.js:405. Sets data-studio-style-state on the form,
+	// at the legacy bundle:405. Sets data-studio-style-state on the form,
 	// toggles aria-pressed on [data-studio-style-state] buttons, writes
 	// data-style-state / data-style-breakpoint / data-style-valid on
 	// [data-studio-style-scope] wrappers, emits
@@ -344,7 +311,7 @@ func TestIslandRuntimeJSPublishesSetStyleStateGlobal(t *testing.T) {
 		// Event name dispatched on style-state change.
 		"workbench-style-state-change",
 		// Default state when none provided (mirrors normalizer at
-		// studio-engines.js:401).
+		// the legacy bundle:401).
 		`"default"`,
 	} {
 		if !strings.Contains(body, contract) {
@@ -355,7 +322,7 @@ func TestIslandRuntimeJSPublishesSetStyleStateGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesSyncZoomGlobal(t *testing.T) {
 	// Method 8/15: syncZoom(form, zoom) — legacy syncWorkbenchZoom at
-	// studio-engines.js:421. Sets data-studio-canvas-zoom on the
+	// the legacy bundle:421. Sets data-studio-canvas-zoom on the
 	// [data-studio-canvas] element, emits gosxstudio:workbench-zoom-change,
 	// refreshes the canvas via a resize event.
 	body := string(IslandRuntimeJS())
@@ -380,7 +347,7 @@ func TestIslandRuntimeJSPublishesSyncZoomGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesActivateZoomGlobal(t *testing.T) {
 	// Method 9/15: activateZoom(form, zoom) — legacy activateWorkbenchZoom
-	// at studio-engines.js:430. Clicks the matching
+	// at the legacy bundle:430. Clicks the matching
 	// [data-studio-zoom="<x>"] button if present; otherwise falls through
 	// to syncZoom. Routes user-initiated zoom activation through the same
 	// dispatch as the toolbar / command palette.
@@ -391,7 +358,7 @@ func TestIslandRuntimeJSPublishesActivateZoomGlobal(t *testing.T) {
 	}
 	for _, contract := range []string{
 		// Button selectors activateZoom prefers when present (mirrors
-		// studio-engines.js:433 — both button[data-studio-zoom] and
+		// the legacy bundle:433 — both button[data-studio-zoom] and
 		// [role='button'][data-studio-zoom]).
 		"data-studio-zoom",
 		// Fallback delegation when no button is matched.
@@ -409,7 +376,7 @@ func TestIslandRuntimeJSPublishesActivateZoomGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesToggleRailGlobal(t *testing.T) {
 	// Method 10/15: toggleRail(form, side) — legacy toggleWorkbenchRail at
-	// studio-engines.js:480. Flips data-studio-{left,right} between "open"
+	// the legacy bundle:480. Flips data-studio-{left,right} between "open"
 	// and "collapsed", sets data-studio-focus to "false", re-syncs the rail
 	// toggle aria-pressed states, emits gosxstudio:workbench-rail-change,
 	// refreshes the canvas.
@@ -419,7 +386,7 @@ func TestIslandRuntimeJSPublishesToggleRailGlobal(t *testing.T) {
 		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
 	}
 	for _, contract := range []string{
-		// Form attributes toggleRail writes (mirrors studio-engines.js:482-483).
+		// Form attributes toggleRail writes (mirrors the legacy bundle:482-483).
 		"data-studio-focus",
 		// Side discriminator strings.
 		`"left"`,
@@ -438,7 +405,7 @@ func TestIslandRuntimeJSPublishesToggleRailGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesToggleFocusGlobal(t *testing.T) {
 	// Method 11/15: toggleFocus(form) — legacy toggleWorkbenchFocus at
-	// studio-engines.js:489. Flips data-studio-focus between "true" and
+	// the legacy bundle:489. Flips data-studio-focus between "true" and
 	// "false", re-syncs the rail toggle aria-pressed states, emits
 	// gosxstudio:workbench-focus-change, refreshes the canvas.
 	body := string(IslandRuntimeJS())
@@ -463,7 +430,7 @@ func TestIslandRuntimeJSPublishesToggleFocusGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesToggleActivityGlobal(t *testing.T) {
 	// Method 12/15: toggleActivity(form) — legacy toggleWorkbenchActivity at
-	// studio-engines.js:476 (via setWorkbenchActivity at 467). Flips
+	// the legacy bundle:476 (via setWorkbenchActivity at 467). Flips
 	// data-studio-activity-state between "open" and "collapsed", re-syncs
 	// activity-toggle buttons (Show/Hide textContent + aria-pressed),
 	// persists via saveLayout, emits gosxstudio:workbench-activity-change,
@@ -500,7 +467,7 @@ func TestIslandRuntimeJSPublishesToggleActivityGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesSaveLayoutGlobal(t *testing.T) {
 	// Method 13/15: saveLayout(form) — legacy saveWorkbenchLayout at
-	// studio-engines.js:294. Persistence wrapper: serializes the form's
+	// the legacy bundle:294. Persistence wrapper: serializes the form's
 	// --studio-left-width / --studio-right-width custom properties and
 	// data-studio-activity-state attribute to localStorage under the
 	// gosx-studio-editor-layout key. Used as both the public island and
@@ -511,9 +478,9 @@ func TestIslandRuntimeJSPublishesSaveLayoutGlobal(t *testing.T) {
 		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
 	}
 	for _, contract := range []string{
-		// localStorage key the legacy writes under (studio-engines.js:241).
+		// localStorage key the legacy writes under (the legacy bundle:241).
 		`"gosx-studio-editor-layout"`,
-		// The three persisted properties (studio-engines.js:297-300).
+		// The three persisted properties (the legacy bundle:297-300).
 		"--studio-left-width",
 		"--studio-right-width",
 		"data-studio-activity-state",
@@ -528,7 +495,7 @@ func TestIslandRuntimeJSPublishesSaveLayoutGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesCurrentRailWidthGlobal(t *testing.T) {
 	// Method 14/15: currentRailWidth(form, side, handle) — legacy
-	// currentWorkbenchRailWidth at studio-engines.js:165. Pure read:
+	// currentWorkbenchRailWidth at the legacy bundle:165. Pure read:
 	// returns the form's --studio-{left,right}-width custom property as an
 	// integer (or the sidebar's bounding-rect width fallback, or the
 	// handle's bounds fallback). Per the slice plan, this method ships as
@@ -544,7 +511,7 @@ func TestIslandRuntimeJSPublishesCurrentRailWidthGlobal(t *testing.T) {
 		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
 	}
 	for _, contract := range []string{
-		// CSS custom properties the method reads (mirrors studio-engines.js:166).
+		// CSS custom properties the method reads (mirrors the legacy bundle:166).
 		"--studio-left-width",
 		"--studio-right-width",
 		// Sidebar fallback selector (railSidebar helper).
@@ -560,7 +527,7 @@ func TestIslandRuntimeJSPublishesCurrentRailWidthGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesSetRailWidthGlobal(t *testing.T) {
 	// Method 15/15: setRailWidth(form, side, width, handle, committed) —
-	// legacy setWorkbenchRailWidth at studio-engines.js:185. Clamps width
+	// legacy setWorkbenchRailWidth at the legacy bundle:185. Clamps width
 	// to the handle's min/max bounds, writes --studio-{left,right}-width
 	// on the form, updates the handle's aria-valuenow, emits
 	// gosxstudio:rail-width-change or gosxstudio:rail-width-commit

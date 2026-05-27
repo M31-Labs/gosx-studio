@@ -54,7 +54,7 @@
 //   - cycleField parity             — same shape as requestInlineEdit.
 //
 // Each test runs the same user interaction in baseline (legacy
-// preview-runtime.js path) and candidate (signal-based island path) modes,
+// the legacy bundle path) and candidate (signal-based island path) modes,
 // snapshots observable state, and asserts equivalence. See ./harness.ts
 // and the slice plan
 // (~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-6-previewruntime.md)
@@ -85,7 +85,7 @@ import { bootBaseline, bootCandidate, disposeBoot } from "./harness";
 
 // Editor preview chrome selectors. These come from the editor route's
 // stable structure — see muddy-noni-commerce/app/admin/editor/page.gsx
-// and the legacy preview-runtime.js reading at lines 884-906.
+// and the legacy the legacy bundle reading at lines 884-906.
 const PREVIEW_FRAME_SELECTOR = ".editor-preview-frame";
 
 type IslandShape = {

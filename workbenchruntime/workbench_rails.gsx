@@ -1,8 +1,8 @@
 // workbench_rails.gsx — GoSXStudioWorkbenchRuntime.{bindRailResizers,
 // currentRailWidth,setRailWidth,toggleRail} island.
 //
-// Phase 3 slice-7 burn-down of four rail-related JS functions in
-// gosx-studio/assets/studio-engines.js:
+// Phase 3 slice-7 island implementation of four rail-related JS functions in
+// the legacy bundle (removed 2026-05-27):
 //
 //   - bindWorkbenchRailResizers(root) — line 194; binds the
 //                                       [data-studio-resizer] pointer drag

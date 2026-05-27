@@ -1,8 +1,8 @@
 // workbench_zoom.gsx — GoSXStudioWorkbenchRuntime.{syncZoom,activateZoom}
 // island.
 //
-// Phase 3 slice-7 burn-down of two zoom-related JS functions in
-// gosx-studio/assets/studio-engines.js:
+// Phase 3 slice-7 island implementation of two zoom-related JS functions in
+// the legacy bundle (removed 2026-05-27):
 //
 //   - syncWorkbenchZoom(form, zoom) — line 421; sets data-studio-canvas-zoom
 //                                      on the [data-studio-canvas] element,

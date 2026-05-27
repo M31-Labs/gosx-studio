@@ -1,7 +1,7 @@
 // block_select.gsx — GoSXStudioBlockLayoutRuntime.selectRow island.
 //
-// Phase 3 slice-4 burn-down of the JS function selectBlockLayoutRow in
-// gosx-studio/assets/studio-engines.js:2099. It toggles the .is-selected
+// Phase 3 slice-4 island implementation of the JS function selectBlockLayoutRow in
+// the legacy bundle (removed 2026-05-27). It toggles the .is-selected
 // class on every block-row to match the supplied key, scrollIntoView's the
 // newly-selected row, and dispatches a blockstudio:select CustomEvent on
 // document so other engines (selection commandbar, inspector form) can
@@ -21,8 +21,8 @@
 //
 // During the additive shipping window (Section G of the slice plan), the
 // BridgeShim only invokes this island when ShellConfig.FeatureFlags has
-// "block-layout-runtime-islands"=true; otherwise the legacy
-// selectBlockLayoutRow function in studio-engines.js runs. Slice-2's
+// Post 2026-05-27 the legacy JS bundle is gone; the island path is the
+// only path. See Phase 3 burn-down.
 // GoSXStudioSelectionRuntime.bind also calls into selectRow as part of its
 // block-selection sub-behavior; the parity matrix's selection row
 // (~/.hyphae/spaces/m31labs-gosx/specs/gosx-studio-runtime-parity-matrix.md)

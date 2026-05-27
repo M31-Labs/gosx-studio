@@ -1,7 +1,7 @@
 // block_reorder.gsx — GoSXStudioBlockLayoutRuntime.{moveRow,renumber,commitReorder} island.
 //
-// Phase 3 slice-4 burn-down of the three reorder JS functions in
-// gosx-studio/assets/studio-engines.js:
+// Phase 3 slice-4 island implementation of the three reorder JS functions in
+// the legacy bundle (removed 2026-05-27):
 //
 //   - moveBlockLayoutRow(list, row, direction) — line 2072; DOM insertBefore +
 //     renumberBlockLayoutList(list, "engine-buttons") + selectBlockLayoutRow.
@@ -32,9 +32,8 @@
 //
 // During the additive shipping window (Section G of the slice plan), the
 // BridgeShim only invokes these islands when ShellConfig.FeatureFlags has
-// "block-layout-runtime-islands"=true; otherwise the legacy
-// moveBlockLayoutRow / renumberBlockLayoutList / commitBlockLayoutReorder
-// functions in studio-engines.js run.
+// Post 2026-05-27 the legacy JS bundle is gone; the island path is the
+// only path. See Phase 3 burn-down.
 
 package blocklayoutruntime
 

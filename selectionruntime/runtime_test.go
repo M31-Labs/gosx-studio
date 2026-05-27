@@ -8,9 +8,9 @@ import (
 // The selectionruntime package is the Go-side surface for the Phase 3 slice-2
 // burn-down of GoSXStudioSelectionRuntime. It owns:
 //   1. The feature-flag key consumers add to studio.ShellConfig.FeatureFlags
-//      to flip from the legacy JS implementation in assets/studio-engines.js
+//      to flip the island path (legacy bundle deleted 2026-05-27)
 //      to the .gsx-authored island in this package.
-//   2. The JS shim that studio-engines.js appends so the
+//   2. The JS shim that the legacy bundle appends so the
 //      window.GoSXStudioSelectionRuntime methods delegate to the island when
 //      the flag is on.
 //   3. The island runtime JS that publishes window.__gosx_selection_runtime_*
@@ -52,16 +52,6 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 		if !strings.Contains(shim, fragment) {
 			t.Fatalf("BridgeShim() missing %q:\n%s", fragment, shim)
 		}
-	}
-}
-
-func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
-	shim := string(BridgeShim())
-	// The shim is additive — when the island global is missing, the legacy
-	// JS path must still run. Sanity check: look for the legacy function
-	// name so a future refactor that drops the fallback is caught here.
-	if !strings.Contains(shim, "bindSelectionSurface") {
-		t.Fatalf("BridgeShim() must retain legacy fallback for %q:\n%s", "bindSelectionSurface", shim)
 	}
 }
 

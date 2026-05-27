@@ -8,9 +8,9 @@ import (
 // The brandruntime package is the Go-side surface for the Phase 3 slice-3
 // burn-down of GoSXStudioBrandRuntime. It owns:
 //  1. The feature-flag key consumers add to studio.ShellConfig.FeatureFlags
-//     to flip from the legacy JS implementation in assets/studio-engines.js
+//     to flip the island path (legacy bundle deleted 2026-05-27)
 //     to the .gsx-authored islands in this package.
-//  2. The JS shim that studio-engines.js appends so the
+//  2. The JS shim that the legacy bundle appends so the
 //     window.GoSXStudioBrandRuntime methods delegate to the islands when
 //     the flag is on.
 //  3. The island runtime JS that publishes window.__gosx_brand_runtime_*
@@ -53,21 +53,6 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 	} {
 		if !strings.Contains(shim, fragment) {
 			t.Fatalf("BridgeShim() missing %q:\n%s", fragment, shim)
-		}
-	}
-}
-
-func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
-	shim := string(BridgeShim())
-	// The shim is additive — when the island global is missing, the legacy
-	// JS path must still run. Sanity check: look for the legacy function
-	// names so a future refactor that drops the fallback is caught here.
-	for _, legacy := range []string{
-		"bindBrandLogo",
-		"updateHeaderLogo",
-	} {
-		if !strings.Contains(shim, legacy) {
-			t.Fatalf("BridgeShim() must retain legacy fallback for %q:\n%s", legacy, shim)
 		}
 	}
 }

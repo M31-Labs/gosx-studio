@@ -75,7 +75,7 @@ import { bootBaseline, bootCandidate, disposeBoot } from "./harness";
 // Editor style authoring surface selectors. These come from the editor
 // route's stable structure — see muddy-noni-commerce/app/admin/editor/page.gsx
 // and the legacy bindStyleWorkbench / syncStyleControlButtons readers in
-// gosx-studio/assets/studio-engines.js:1848-1940.
+// the legacy bundle (removed 2026-05-27).
 const WORKBENCH_SELECTOR = "[data-editor-workbench]";
 const STYLE_CONTROL_SELECTOR = "[data-studio-style-control]";
 const IMPACT_PANEL_SELECTOR = "[data-studio-style-impact-panel]";
@@ -232,7 +232,7 @@ interface ThemeApplySnapshot {
   // observation of applyTheme's editor-side fan-out.
   swatchBackgrounds: string[];
   // Iframe-side observability — best-effort same-origin probe of the
-  // storefront preview's <body> classList. The legacy preview-runtime.js
+  // storefront preview's <body> classList. The legacy the legacy bundle
   // applyTheme writes theme classes onto the storefront document; we
   // compare those across baseline / candidate when accessible.
   iframeReachable: boolean;
@@ -290,7 +290,7 @@ async function snapshotIframeImpact(page: Page): Promise<IframeImpactSnapshot> {
       try { d = f.contentDocument; } catch (_) { continue; }
       if (!d) continue;
       // Look for any node carrying a style-impact marker — exact class name
-      // is owned by preview-runtime.js, so we match on the data-* family
+      // is owned by the legacy bundle, so we match on the data-* family
       // the overlay writes when active. Empty matches => baseline / candidate
       // both consistently saw no overlay.
       const marked = d.querySelectorAll("[data-studio-style-impact-marker], [data-studio-style-impact]");

@@ -1,7 +1,7 @@
 // block_visibility.gsx — GoSXStudioBlockLayoutRuntime.updateVisibilityState island.
 //
-// Phase 3 slice-4 burn-down of the JS function updateBlockLayoutVisibilityState
-// in gosx-studio/assets/studio-engines.js:1994. Given a [data-editor-block-visible]
+// Phase 3 slice-4 island implementation of the JS function updateBlockLayoutVisibilityState
+// in the legacy bundle (removed 2026-05-27). Given a [data-editor-block-visible]
 // checkbox, the helper:
 //   1. Resolves the enclosing [data-block-studio-block] row.
 //   2. Toggles the row's .editor-block--hidden class against !check.checked.
@@ -50,8 +50,8 @@
 //
 // During the additive shipping window (Section G of the slice plan), the
 // BridgeShim only invokes this island when ShellConfig.FeatureFlags has
-// "block-layout-runtime-islands"=true; otherwise the legacy
-// updateBlockLayoutVisibilityState path in studio-engines.js runs (which
+// Post 2026-05-27 the legacy JS bundle is gone; the island path is the
+// only path. See Phase 3 burn-down.
 // also delegates to PreviewRuntime).
 
 package blocklayoutruntime

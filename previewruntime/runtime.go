@@ -2,7 +2,7 @@
 // architectural burn-down of GoSXStudioPreviewRuntime.
 //
 // The slice replaces the JavaScript-implemented PreviewRuntime (ten public
-// methods declared at gosx-studio/assets/preview-runtime.js:1118 —
+// methods declared at the legacy bundle (removed 2026-05-27) —
 // mount, setBlockVisibility, applyTextUpdate, applyTheme, applyStyleImpact,
 // applyCSS, applyFonts, updateHeaderLogo, requestInlineEdit, cycleField)
 // with two coordinated `.gsx`-authored pieces:
@@ -24,7 +24,7 @@
 // Both implementations ship additively for at least seven days of CI green
 // (see ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-6-previewruntime.md
 // Section I). After the deletion window closes, the legacy
-// gosx-studio/assets/preview-runtime.js (1,130 lines) is DELETED entirely
+// the legacy bundle (removed 2026-05-27) (1,130 lines) is DELETED entirely
 // — not just shrunk — as a follow-up commit.
 //
 // # The 10 methods + signal-namespace mapping
@@ -32,13 +32,13 @@
 // The catalog below mirrors the table in the slice plan (which itself
 // mirrors the parity matrix PreviewRuntime row). Each method's editor-side
 // writer publishes to a $preview.* signal; each preview-side subscriber
-// applies the same DOM action the legacy preview-runtime.js performed.
+// applies the same DOM action the legacy the legacy bundle performed.
 //
 //  1. mount(root)
 //     Signal target: $preview.mount.epoch (number).
 //     Subscriber action: re-runs the storefront's preview-readiness
 //     initialization (binds the preview workbench, hydrates outlines and
-//     field hotspots). The legacy preview-runtime.js mount(root) walked
+//     field hotspots). The legacy the legacy bundle mount(root) walked
 //     every [data-editor-workbench] in root and called bindPreview(form)
 //     to wire the drag/drop/inline-edit machinery for the editor preview
 //     overlay. Slice 6's subscriber runs the same bindPreview() routine
@@ -48,7 +48,7 @@
 //     Signal target: $preview.block.<key>.visible (boolean).
 //     Subscriber action: toggles display style of the matching
 //     [data-studio-block-key="<key>"] node in the iframe document.
-//     Mirrors setPreviewBlockVisibility at preview-runtime.js:866.
+//     Mirrors setPreviewBlockVisibility at the legacy bundle:866.
 //
 //  3. applyTextUpdate(detail)
 //     Signal target: $preview.text.<source> (string + attribute meta).
@@ -56,7 +56,7 @@
 //     [data-editor-preview="<source>"] target, and/or sets the attribute
 //     payload (frameTarget / attrTarget / attrName / attrPrefix /
 //     attrSuffix) on the matching selector. Mirrors applyTextUpdate at
-//     preview-runtime.js:912.
+//     the legacy bundle:912.
 //
 //  4. applyTheme(detail)
 //     Signal targets: $preview.theme.{kit, template, palette, imageRatio,
@@ -66,7 +66,7 @@
 //     cards- / -spacing- / -images- / -motion- / -palette- / -image-
 //     prefixes) and reapplies the new theme classes; sets each color-
 //     token CSS variable on documentElement / body / .site-shell. Mirrors
-//     applyTheme at preview-runtime.js:938.
+//     applyTheme at the legacy bundle:938.
 //
 //  5. applyStyleImpact(selector)
 //     Signal target: $preview.style.impact.selector (string).
@@ -75,7 +75,7 @@
 //     empty, sets the attribute on each matching node and counts. Returns
 //     the count via a $preview.style.impact.count echo signal so the
 //     editor's showImpact readout still has the affected-count value.
-//     Mirrors applyStyleImpact at preview-runtime.js:986.
+//     Mirrors applyStyleImpact at the legacy bundle:986.
 //
 //  6. applyCSS(cssText)
 //     Signal target: $preview.theme.cssCustom (string).
@@ -88,7 +88,7 @@
 //     Signal target: $preview.theme.fontsCustom (string).
 //     Subscriber action: same as applyCSS but with
 //     [data-editor-live-fonts] attribute marker. Mirrors applyFonts at
-//     preview-runtime.js:1023.
+//     the legacy bundle:1023.
 //
 //  8. updateHeaderLogo(detail)
 //     Signal targets: $preview.brand.headerLogo.{src, alt, width, x, y}
@@ -96,7 +96,7 @@
 //     Subscriber action: toggles the .brand--with-logo class, sets the
 //     .brand__logo src + alt + hidden, sets --brand-logo-width / -offset-
 //     x / -offset-y CSS variables on .brand. Mirrors updateHeaderLogo at
-//     preview-runtime.js:1027.
+//     the legacy bundle:1027.
 //
 //  9. requestInlineEdit(detail)
 //     Signal target: $preview.editor.inlineEdit.requestId (number).
@@ -104,7 +104,7 @@
 //     bindPreview state) and dispatches requestInlineEdit(detail) on the
 //     first matching one. Returns a handled boolean via
 //     $preview.editor.inlineEdit.handled.<requestId> echo. Mirrors
-//     requestInlineEdit at preview-runtime.js:1049.
+//     requestInlineEdit at the legacy bundle:1049.
 //
 //  10. cycleField(detail)
 //      Signal target: $preview.editor.fieldCycle.requestId (number).
@@ -139,7 +139,7 @@ var subscriberRuntimeJS []byte
 // FeatureFlagKey is the studio.ShellConfig.FeatureFlags key consumers set
 // to activate the .gsx-island PreviewRuntime path. Default value (omitted
 // from a host's flag map) keeps the legacy JS implementation active in
-// gosx-studio/assets/preview-runtime.js.
+// the legacy bundle (removed 2026-05-27).
 //
 // Phase 3 naming convention: "<contract>-runtime-islands". Slices 1, 2, 3,
 // 4, 5, 7 each declare their own constant of the same shape.
@@ -148,7 +148,7 @@ const FeatureFlagKey = "preview-runtime-islands"
 // IslandGlobals lists the window globals the editor-side island writer
 // publishes itself at when it loads. The shim returned by BridgeShim looks
 // these up at call time so an absent global falls back to the legacy
-// implementation in preview-runtime.js.
+// implementation in the legacy bundle.
 //
 // Naming convention: window.__gosx_preview_runtime_island_<methodName>.
 // PreviewRuntime declares ten public methods (mount, setBlockVisibility,
@@ -188,7 +188,7 @@ var IslandGlobals = struct {
 // runtime-islands="true" attribute), the shim dispatches each method to
 // its IslandGlobals entry on window. When the flag is off or the island
 // global is missing (the writer never loaded), the shim falls back to the
-// legacy implementation that already lives in preview-runtime.js.
+// legacy implementation that lived in the now-deleted legacy bundle.
 //
 // The shim references the legacy implementations by their preview-
 // runtime.js IIFE-exported names (window.GoSXStudioPreviewRuntime.mount /
@@ -225,7 +225,7 @@ func PreviewSubscriberScript() []byte {
 }
 
 // Bundle returns the IslandRuntimeJS + BridgeShim concatenation that the
-// studio runtime asset pipeline appends to studio-engines.js. Order
+// studio runtime asset pipeline serves. Order
 // matters: the island runtime publishes globals; the shim consults them.
 func Bundle() []byte {
 	island := IslandRuntimeJS()
@@ -274,9 +274,9 @@ const bridgeShimJS = `;(function () {
       return undefined;
     };
   }
-  // Replace the runtime object emitted by preview-runtime.js with a shim
-  // that consults the feature flag on every call. preview-runtime.js's
-  // IIFE has already run by the time this shim runs (preview-runtime.js
+  // Install the runtime object (the legacy bundle that previously emitted it was removed 2026-05-27) with a shim
+  // that consults the feature flag on every call. the legacy bundle's
+  // IIFE has already run by the time this shim runs (the legacy bundle
   // is concatenated into the bundle BEFORE the slice bundles — see
   // gosx-studio/runtime.go EngineRuntimeScript()), so
   // window.GoSXStudioPreviewRuntime is the legacy object whose methods

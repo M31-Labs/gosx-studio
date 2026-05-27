@@ -1,7 +1,7 @@
 // style_theme.gsx — GoSXStudioStyleRuntime.{bindTheme,applyTheme} island.
 //
-// Phase 3 slice-5 burn-down of two theme-related JS functions in
-// gosx-studio/assets/studio-engines.js:
+// Phase 3 slice-5 island implementation of two theme-related JS functions in
+// the legacy bundle (removed 2026-05-27):
 //
 //   - bindTheme(root)  — line 1421; binds theme kit / template / palette /
 //                        image-ratio / custom-template / style-class /
@@ -44,9 +44,8 @@
 // Studio chrome and the runtime bundle's island_runtime.js publishes
 // window.__gosx_style_runtime_island_bindTheme +
 // window.__gosx_style_runtime_island_applyTheme that the slice-5 BridgeShim
-// delegates to when the "style-runtime-islands" feature flag is on;
-// otherwise the legacy bindTheme / updateTheme functions in studio-engines.js
-// run.
+// delegates to. Post 2026-05-27 the legacy bundle is gone, so the island
+// path always runs.
 
 package styleruntime
 
