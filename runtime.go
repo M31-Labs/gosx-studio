@@ -17,28 +17,16 @@ import (
 	"m31labs.dev/gosx-studio/workbenchruntime"
 )
 
-//go:embed assets/preview-runtime.js assets/studio-engines.js assets/studio.css
+//go:embed assets/studio.css
 var runtimeFS embed.FS
 
-func PreviewRuntimeScript() []byte {
-	return readRuntime("assets/preview-runtime.js")
-}
-
-func StudioEngineRuntimeScript() []byte {
-	return readRuntime("assets/studio-engines.js")
-}
-
+// EngineRuntimeScript returns the concatenated island runtime bundles for
+// every Phase 3 slice. The legacy monolithic JS bundles
+// (assets/studio-engines.js, assets/preview-runtime.js) were deleted on
+// 2026-05-27 — the island paths now own every runtime contract by default.
+// See ~/.hyphae/spaces/m31labs-gosx/plans/gosx-vm-unification-and-editor-bridge-burn-down.md
+// Phase 3 Section E for the burn-down history.
 func EngineRuntimeScript() []byte {
-	preview := PreviewRuntimeScript()
-	engines := StudioEngineRuntimeScript()
-	// Phase 3 burn-down append: each slice's island runtime + bridge shim
-	// gets concatenated here so the legacy and island paths ship together
-	// in one bundle, with a feature-flag selecting which runs (see
-	// ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-25-phase-3-slice-1-fieldruntime.md
-	// Section C). Order: legacy bundle (preview + engines) first so the
-	// island runtime can reference its globals (window.GoSXStudioPreviewRuntime
-	// for the mirroring fallback). Slices 2..7 will append their bundles
-	// the same way.
 	slices := [][]byte{
 		fieldruntime.Bundle(),
 		selectionruntime.Bundle(),
@@ -48,31 +36,13 @@ func EngineRuntimeScript() []byte {
 		workbenchruntime.Bundle(),
 		previewruntime.Bundle(),
 	}
-	totalSliceLen := 0
+	total := 0
 	for _, slice := range slices {
-		totalSliceLen += len(slice) + 1
-	}
-	if len(preview) == 0 && len(engines) == 0 {
-		// No legacy bundle at all; just return the slice bundles joined.
-		out := make([]byte, 0, totalSliceLen)
-		for _, slice := range slices {
-			if len(slice) == 0 {
-				continue
-			}
-			out = append(out, slice...)
-			out = append(out, '\n')
+		if len(slice) > 0 {
+			total += len(slice) + 1
 		}
-		return out
 	}
-	out := make([]byte, 0, len(preview)+1+len(engines)+totalSliceLen)
-	if len(preview) > 0 {
-		out = append(out, preview...)
-		out = append(out, '\n')
-	}
-	if len(engines) > 0 {
-		out = append(out, engines...)
-		out = append(out, '\n')
-	}
+	out := make([]byte, 0, total)
 	for _, slice := range slices {
 		if len(slice) == 0 {
 			continue

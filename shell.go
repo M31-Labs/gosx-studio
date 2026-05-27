@@ -145,19 +145,19 @@ func DefaultShellConfig() ShellConfig {
 		FeatureFlags: map[string]bool{
 			"brand-media-picker": true,
 			"publish-review":     true,
-			// Phase 3 burn-down flags. Default off in production — the
-			// legacy JS implementation in assets/studio-engines.js stays
-			// active. Hosts opt in per slice by setting the flag to true
-			// once parity is proven. See
-			// ~/.hyphae/spaces/m31labs-gosx/specs/gosx-studio-runtime-parity-matrix.md
-			// for the full slice catalogue.
-			fieldruntime.FeatureFlagKey:       false,
-			selectionruntime.FeatureFlagKey:   false,
-			brandruntime.FeatureFlagKey:       false,
-			blocklayoutruntime.FeatureFlagKey: false,
-			styleruntime.FeatureFlagKey:       false,
-			workbenchruntime.FeatureFlagKey:   false,
-			previewruntime.FeatureFlagKey:     false,
+			// Phase 3 burn-down flags. Production-default ON after the
+			// legacy JS bundles were deleted on 2026-05-27. The flags
+			// remain in the registry so host apps that probe them via
+			// FeatureEnabled continue to see a stable shape. See
+			// ~/.hyphae/spaces/m31labs-gosx/plans/gosx-vm-unification-and-editor-bridge-burn-down.md
+			// Phase 3 Section E.
+			fieldruntime.FeatureFlagKey:       true,
+			selectionruntime.FeatureFlagKey:   true,
+			brandruntime.FeatureFlagKey:       true,
+			blocklayoutruntime.FeatureFlagKey: true,
+			styleruntime.FeatureFlagKey:       true,
+			workbenchruntime.FeatureFlagKey:   true,
+			previewruntime.FeatureFlagKey:     true,
 		},
 	}
 }

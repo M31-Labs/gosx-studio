@@ -33,71 +33,28 @@ func TestDefaultShellConfigOwnsReusableStudioChrome(t *testing.T) {
 	if !config.FeatureEnabled("brand-media-picker") || !config.FeatureEnabled("publish-review") {
 		t.Fatalf("feature flags = %#v", config.FeatureFlags)
 	}
-	// Phase 3 burn-down: the FieldRuntime island flag must be registered
-	// with the default-off value so hosts can opt in per-slice once
-	// parity is proven. See ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-25-phase-3-slice-1-fieldruntime.md.
-	if _, ok := config.FeatureFlags[fieldruntime.FeatureFlagKey]; !ok {
-		t.Fatalf("default shell config must register %q flag (got %#v)", fieldruntime.FeatureFlagKey, config.FeatureFlags)
-	}
-	if config.FeatureEnabled(fieldruntime.FeatureFlagKey) {
-		t.Fatalf("%q must default to false (production legacy JS path); got true", fieldruntime.FeatureFlagKey)
-	}
-	// Phase 3 slice-2: the SelectionRuntime island flag must be registered
-	// with the default-off value so hosts can opt in once parity is proven.
-	// See ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-2-selectionruntime.md.
-	if _, ok := config.FeatureFlags[selectionruntime.FeatureFlagKey]; !ok {
-		t.Fatalf("default shell config must register %q flag (got %#v)", selectionruntime.FeatureFlagKey, config.FeatureFlags)
-	}
-	if config.FeatureEnabled(selectionruntime.FeatureFlagKey) {
-		t.Fatalf("%q must default to false (production legacy JS path); got true", selectionruntime.FeatureFlagKey)
-	}
-	// Phase 3 slice-3: the BrandRuntime island flag must be registered
-	// with the default-off value so hosts can opt in once parity is proven.
-	// See ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-3-brandruntime.md.
-	if _, ok := config.FeatureFlags[brandruntime.FeatureFlagKey]; !ok {
-		t.Fatalf("default shell config must register %q flag (got %#v)", brandruntime.FeatureFlagKey, config.FeatureFlags)
-	}
-	if config.FeatureEnabled(brandruntime.FeatureFlagKey) {
-		t.Fatalf("%q must default to false (production legacy JS path); got true", brandruntime.FeatureFlagKey)
-	}
-	// Phase 3 slice-4: the BlockLayoutRuntime island flag must be registered
-	// with the default-off value so hosts can opt in once parity is proven.
-	// See ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-4-blocklayoutruntime.md.
-	if _, ok := config.FeatureFlags[blocklayoutruntime.FeatureFlagKey]; !ok {
-		t.Fatalf("default shell config must register %q flag (got %#v)", blocklayoutruntime.FeatureFlagKey, config.FeatureFlags)
-	}
-	if config.FeatureEnabled(blocklayoutruntime.FeatureFlagKey) {
-		t.Fatalf("%q must default to false (production legacy JS path); got true", blocklayoutruntime.FeatureFlagKey)
-	}
-	// Phase 3 slice-5: the StyleRuntime island flag must be registered
-	// with the default-off value so hosts can opt in once parity is proven.
-	// See ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-5-styleruntime.md.
-	if _, ok := config.FeatureFlags[styleruntime.FeatureFlagKey]; !ok {
-		t.Fatalf("default shell config must register %q flag (got %#v)", styleruntime.FeatureFlagKey, config.FeatureFlags)
-	}
-	if config.FeatureEnabled(styleruntime.FeatureFlagKey) {
-		t.Fatalf("%q must default to false (production legacy JS path); got true", styleruntime.FeatureFlagKey)
-	}
-	// Phase 3 slice-7: the WorkbenchRuntime island flag must be registered
-	// with the default-off value so hosts can opt in once parity is proven.
-	// See ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-7-workbenchruntime.md.
-	if _, ok := config.FeatureFlags[workbenchruntime.FeatureFlagKey]; !ok {
-		t.Fatalf("default shell config must register %q flag (got %#v)", workbenchruntime.FeatureFlagKey, config.FeatureFlags)
-	}
-	if config.FeatureEnabled(workbenchruntime.FeatureFlagKey) {
-		t.Fatalf("%q must default to false (production legacy JS path); got true", workbenchruntime.FeatureFlagKey)
-	}
-	// Phase 3 slice-6: the PreviewRuntime island flag must be registered
-	// with the default-off value so hosts can opt in once parity is proven.
-	// See ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-6-previewruntime.md
-	// and ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md
-	// (status-corrected by ADR 0009 — the cross-frame relay that makes
-	// this slice deliverable).
-	if _, ok := config.FeatureFlags[previewruntime.FeatureFlagKey]; !ok {
-		t.Fatalf("default shell config must register %q flag (got %#v)", previewruntime.FeatureFlagKey, config.FeatureFlags)
-	}
-	if config.FeatureEnabled(previewruntime.FeatureFlagKey) {
-		t.Fatalf("%q must default to false (production legacy JS path); got true", previewruntime.FeatureFlagKey)
+	// Phase 3 burn-down: the per-slice island flags must be registered
+	// and default to true post-2026-05-27 — the legacy JS bundles
+	// (assets/studio-engines.js, assets/preview-runtime.js) were deleted
+	// then. The flags remain in the registry so host probes via
+	// FeatureEnabled keep returning a stable shape. See
+	// ~/.hyphae/spaces/m31labs-gosx/plans/gosx-vm-unification-and-editor-bridge-burn-down.md
+	// Phase 3 Section E.
+	for _, flag := range []string{
+		fieldruntime.FeatureFlagKey,
+		selectionruntime.FeatureFlagKey,
+		brandruntime.FeatureFlagKey,
+		blocklayoutruntime.FeatureFlagKey,
+		styleruntime.FeatureFlagKey,
+		workbenchruntime.FeatureFlagKey,
+		previewruntime.FeatureFlagKey,
+	} {
+		if _, ok := config.FeatureFlags[flag]; !ok {
+			t.Fatalf("default shell config must register %q flag (got %#v)", flag, config.FeatureFlags)
+		}
+		if !config.FeatureEnabled(flag) {
+			t.Fatalf("%q must default to true post-legacy-deletion; got false", flag)
+		}
 	}
 	if _, ok := config.Adapter(ResourceProducts); !ok {
 		t.Fatalf("expected product resource adapter in %#v", config.Adapters)
