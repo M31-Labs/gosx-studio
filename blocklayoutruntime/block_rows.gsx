@@ -1,7 +1,7 @@
 // block_rows.gsx — GoSXStudioBlockLayoutRuntime.{rows,rowKey,rowForKey} island.
 //
-// Phase 3 slice-4 burn-down of the three pure-helper JS functions in
-// gosx-studio/assets/studio-engines.js:
+// Phase 3 slice-4 island implementation of the three pure-helper JS functions in
+// the legacy bundle (removed 2026-05-27):
 //
 //   - blockRows(list)        — line 1960; Array.from(list.querySelectorAll("[data-block-studio-block]")).
 //   - blockRowKey(row)       — line 1964; row.getAttribute("data-block-studio-block") || "".
@@ -19,8 +19,8 @@
 //   window.__gosx_blocklayout_runtime_island_rowKey
 //   window.__gosx_blocklayout_runtime_island_rowForKey
 // that the slice-4 BridgeShim delegates to when the
-// "block-layout-runtime-islands" feature flag is on; otherwise the legacy
-// blockRows / blockRowKey / blockRowForKey functions in studio-engines.js
+// Post 2026-05-27 the legacy JS bundle is gone; the island path is the
+// only path. See Phase 3 burn-down.
 // run.
 //
 // The block-list DOM contract these helpers query against

@@ -8,9 +8,9 @@ import (
 // The blocklayoutruntime package is the Go-side surface for the Phase 3
 // slice-4 burn-down of GoSXStudioBlockLayoutRuntime. It owns:
 //  1. The feature-flag key consumers add to studio.ShellConfig.FeatureFlags
-//     to flip from the legacy JS implementation in assets/studio-engines.js
+//     to flip the island path (legacy bundle deleted 2026-05-27)
 //     to the .gsx-authored islands in this package.
-//  2. The JS shim that studio-engines.js appends so the
+//  2. The JS shim that the legacy bundle appends so the
 //     window.GoSXStudioBlockLayoutRuntime methods delegate to the islands
 //     when the flag is on.
 //  3. The island runtime JS that publishes window.__gosx_blocklayout_runtime_*
@@ -67,7 +67,7 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 }
 
 func TestIslandRuntimeJSPublishesRowsGlobal(t *testing.T) {
-	// Method 1/9: rows(list) — legacy blockRows at studio-engines.js:1960.
+	// Method 1/9: rows(list) — legacy blockRows at the legacy bundle:1960.
 	// Pure helper: Array.from(list.querySelectorAll("[data-block-studio-block]")).
 	// Read-only DOM query; no side effects. The island global must be
 	// published as a function value so BridgeShim.delegate sees it.
@@ -88,7 +88,7 @@ func TestIslandRuntimeJSPublishesRowsGlobal(t *testing.T) {
 }
 
 func TestIslandRuntimeJSPublishesRowKeyGlobal(t *testing.T) {
-	// Method 2/9: rowKey(row) — legacy blockRowKey at studio-engines.js:1964.
+	// Method 2/9: rowKey(row) — legacy blockRowKey at the legacy bundle:1964.
 	// Pure helper: row.getAttribute("data-block-studio-block") || "".
 	// Read-only; returns string. The island global must publish the function.
 	body := string(IslandRuntimeJS())
@@ -100,7 +100,7 @@ func TestIslandRuntimeJSPublishesRowKeyGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesRowForKeyGlobal(t *testing.T) {
 	// Method 3/9: rowForKey(root, key) — legacy blockRowForKey at
-	// studio-engines.js:1968. Pure helper:
+	// the legacy bundle:1968. Pure helper:
 	// root.querySelector('[data-block-studio-block="<key>"]').
 	// Uses the same attrValue escape as the legacy attrValue helper so keys
 	// containing double quotes or backslashes don't break the selector.
@@ -113,7 +113,7 @@ func TestIslandRuntimeJSPublishesRowForKeyGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesMoveRowGlobal(t *testing.T) {
 	// Method 4/9: moveRow(list, row, direction) — legacy moveBlockLayoutRow at
-	// studio-engines.js:2072. Mutates the block-list by insertBefore'ing the
+	// the legacy bundle:2072. Mutates the block-list by insertBefore'ing the
 	// row before its previousElementSibling (direction="up") or its
 	// nextElementSibling's nextSibling (direction="down"), then calls
 	// renumber(list, "engine-buttons") + selectRow(list, rowKey(row)).
@@ -123,7 +123,7 @@ func TestIslandRuntimeJSPublishesMoveRowGlobal(t *testing.T) {
 		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
 	}
 	// The renumber source string is part of the contract — engine listeners
-	// branch on it (see assets/studio-engines.js:2054). Catching drift here
+	// branch on it (see the legacy bundle (removed 2026-05-27)). Catching drift here
 	// before parity tests run.
 	if !strings.Contains(body, "engine-buttons") {
 		t.Fatalf("IslandRuntimeJS() moveRow must pass renumber source %q", "engine-buttons")
@@ -132,10 +132,10 @@ func TestIslandRuntimeJSPublishesMoveRowGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesRenumberGlobal(t *testing.T) {
 	// Method 5/9: renumber(list, source) — legacy renumberBlockLayoutList at
-	// studio-engines.js:2047. Re-indexes [data-block-studio-order] inputs to
+	// the legacy bundle:2047. Re-indexes [data-block-studio-order] inputs to
 	// 1-based positions, writes data-block-studio-index attrs, refreshes
 	// up/down move-button disabled states (updateBlockMoveButtons at
-	// studio-engines.js:2062), and dispatches blockstudio:reorder + input +
+	// the legacy bundle:2062), and dispatches blockstudio:reorder + input +
 	// change events on the list.
 	body := string(IslandRuntimeJS())
 	want := "window." + IslandGlobals.Renumber + " "
@@ -165,7 +165,7 @@ func TestIslandRuntimeJSPublishesRenumberGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesSelectRowGlobal(t *testing.T) {
 	// Method 6/9: selectRow(root, key) — legacy selectBlockLayoutRow at
-	// studio-engines.js:2099. Toggles the .is-selected class on every row to
+	// the legacy bundle:2099. Toggles the .is-selected class on every row to
 	// match the supplied key, scrollIntoView's the newly-selected row, and
 	// dispatches a blockstudio:select CustomEvent on document. No-op when key
 	// is empty.
@@ -187,7 +187,7 @@ func TestIslandRuntimeJSPublishesSelectRowGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesCommitReorderGlobal(t *testing.T) {
 	// Method 7/9: commitReorder(list, key, targetKey, position) — legacy
-	// commitBlockLayoutReorder at studio-engines.js:2084. position="before"|
+	// commitBlockLayoutReorder at the legacy bundle:2084. position="before"|
 	// "after". Guards no-op (returns false when key/targetKey missing or
 	// equal); otherwise insertBefore + renumber(list, "engine-preview") +
 	// selectRow(list, key); returns true.
@@ -207,7 +207,7 @@ func TestIslandRuntimeJSPublishesCommitReorderGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesUpdateBlockLibraryStateGlobal(t *testing.T) {
 	// Method 8/9: updateBlockLibraryState(root) — legacy
-	// updateBlockLayoutLibraryState at studio-engines.js:1972. For every
+	// updateBlockLayoutLibraryState at the legacy bundle:1972. For every
 	// [data-editor-add-block] button in root, resolves the corresponding row
 	// in document via rowForKey, reads the row's [data-editor-block-visible]
 	// checkbox state, and updates the button's className / aria-pressed /
@@ -239,7 +239,7 @@ func TestIslandRuntimeJSPublishesUpdateBlockLibraryStateGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesUpdateVisibilityStateGlobal(t *testing.T) {
 	// Method 9/9: updateVisibilityState(check) — legacy
-	// updateBlockLayoutVisibilityState at studio-engines.js:1994. Mutates the
+	// updateBlockLayoutVisibilityState at the legacy bundle:1994. Mutates the
 	// enclosing [data-block-studio-block] row's classes / status text / pill
 	// className based on the supplied [data-editor-block-visible] checkbox,
 	// then publishes $preview.block.<key>.visible (slice 6 transitional
@@ -280,7 +280,7 @@ func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	// JS path must still run. Sanity check: look for the legacy function
 	// names so a future refactor that drops the fallback is caught here.
 	// The nine legacy function names are the catalog of GoSXStudioBlockLayoutRuntime
-	// methods as wired in assets/studio-engines.js:2353.
+	// methods as wired in the legacy bundle (removed 2026-05-27).
 	for _, legacy := range []string{
 		"blockRows",
 		"blockRowKey",

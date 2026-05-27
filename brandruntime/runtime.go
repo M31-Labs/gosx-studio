@@ -3,7 +3,7 @@
 //
 // The slice replaces the JavaScript-implemented BrandRuntime (two public
 // methods: bindLogo / updateHeaderLogo, declared at
-// gosx-studio/assets/studio-engines.js:2337 and implemented as
+// the legacy bundle (removed 2026-05-27) and implemented as
 // bindBrandLogo / updateHeaderLogo at lines 1269 / 1264) with .gsx-authored
 // islands living in this package's *.gsx files. Each island publishes itself
 // onto a well-known window global (see BridgeShim below); the JS shim emitted
@@ -25,7 +25,7 @@
 //
 //  2. updateHeaderLogo (transitional iframe delegation) — the legacy JS
 //     implementation reaches across the storefront preview iframe to mutate
-//     the .brand / .brand__logo DOM directly (see assets/preview-runtime.js
+//     the .brand / .brand__logo DOM directly (see the legacy bundle (removed 2026-05-27)
 //     line 1027). Per
 //     ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md
 //     the long-term destination is a $preview.brand.headerLogo shared signal
@@ -84,7 +84,7 @@ var IslandGlobals = struct {
 // dispatches each method to its corresponding IslandGlobals entry on
 // window. When the flag is off or the island global is missing (island
 // never mounted), the shim falls back to the legacy JS implementation that
-// already lives in studio-engines.js.
+// lived in the now-deleted legacy bundle.
 //
 // The shim itself never imports the legacy implementation directly; it
 // references the existing in-bundle functions by name (bindBrandLogo,
@@ -107,7 +107,7 @@ func IslandRuntimeJS() []byte {
 }
 
 // Bundle returns the IslandRuntimeJS + BridgeShim concatenation that the
-// studio runtime asset pipeline appends to studio-engines.js. Order matters:
+// studio runtime asset pipeline serves. Order matters:
 // the island runtime publishes globals; the shim consults them.
 func Bundle() []byte {
 	island := IslandRuntimeJS()
@@ -156,7 +156,7 @@ const bridgeShimJS = `;(function () {
       return undefined;
     };
   }
-  // Replace the runtime object emitted by studio-engines.js with a shim
+  // Install the runtime object (the legacy bundle that previously emitted it was removed 2026-05-27) with a shim
   // that consults the feature flag on every call. The legacy functions
   // (bindBrandLogo / updateHeaderLogo) remain defined in the bundle and
   // are passed in as the fallback path. The literal island-global names

@@ -35,9 +35,9 @@ func TestDefaultShellConfigOwnsReusableStudioChrome(t *testing.T) {
 	}
 	// Phase 3 burn-down: the per-slice island flags must be registered
 	// and default to true post-2026-05-27 — the legacy JS bundles
-	// (assets/studio-engines.js, assets/preview-runtime.js) were deleted
-	// then. The flags remain in the registry so host probes via
-	// FeatureEnabled keep returning a stable shape. See
+	// (studio-engines.js and preview-runtime.js) were deleted then. The
+	// flags remain in the registry so host probes via FeatureEnabled keep
+	// returning a stable shape. See
 	// ~/.hyphae/spaces/m31labs-gosx/plans/gosx-vm-unification-and-editor-bridge-burn-down.md
 	// Phase 3 Section E.
 	for _, flag := range []string{

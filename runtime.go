@@ -21,10 +21,10 @@ import (
 var runtimeFS embed.FS
 
 // EngineRuntimeScript returns the concatenated island runtime bundles for
-// every Phase 3 slice. The legacy monolithic JS bundles
-// (assets/studio-engines.js, assets/preview-runtime.js) were deleted on
-// 2026-05-27 — the island paths now own every runtime contract by default.
-// See ~/.hyphae/spaces/m31labs-gosx/plans/gosx-vm-unification-and-editor-bridge-burn-down.md
+// every Phase 3 slice. The legacy monolithic JS bundles (studio-engines.js
+// and preview-runtime.js) were deleted on 2026-05-27 — the island paths
+// now own every runtime contract by default. See
+// ~/.hyphae/spaces/m31labs-gosx/plans/gosx-vm-unification-and-editor-bridge-burn-down.md
 // Phase 3 Section E for the burn-down history.
 func EngineRuntimeScript() []byte {
 	slices := [][]byte{

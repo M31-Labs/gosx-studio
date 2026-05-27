@@ -1,8 +1,8 @@
 // workbench_style_state.gsx — GoSXStudioWorkbenchRuntime.setStyleState
 // island.
 //
-// Phase 3 slice-7 burn-down of one style-state JS function in
-// gosx-studio/assets/studio-engines.js:
+// Phase 3 slice-7 island implementation of one style-state JS function in
+// the legacy bundle (removed 2026-05-27):
 //
 //   - setWorkbenchStyleState(form, state) — line 405; sets
 //                                            data-studio-style-state on the

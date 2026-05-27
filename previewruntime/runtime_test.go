@@ -8,7 +8,7 @@ import (
 // The previewruntime package is the Go-side surface for the Phase 3 slice-6
 // architectural burn-down of GoSXStudioPreviewRuntime. It owns:
 //  1. The feature-flag key consumers add to studio.ShellConfig.FeatureFlags
-//     to flip from the legacy JS implementation in assets/preview-runtime.js
+//     to flip the island path (legacy bundle deleted 2026-05-27)
 //     to the .gsx-authored subscriber + island writer in this package.
 //  2. The JS shim that gosx-studio's runtime bundle appends so the
 //     window.GoSXStudioPreviewRuntime methods publish to $preview.* shared
@@ -76,7 +76,7 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesMountGlobal(t *testing.T) {
 	// Method 1/10: mount(root) — legacy
-	// window.GoSXStudioPreviewRuntime.mount at preview-runtime.js:1119
+	// window.GoSXStudioPreviewRuntime.mount at the legacy bundle:1119
 	// (bound to init at line 1113). The legacy walks every
 	// [data-editor-workbench] in root and calls bindPreview(form). The
 	// island writer publishes $preview.mount.epoch — the subscriber
@@ -154,7 +154,7 @@ func TestIslandRuntimeJSPublishesApplyTextUpdateGlobal(t *testing.T) {
 }
 
 func TestIslandRuntimeJSPublishesApplyThemeGlobal(t *testing.T) {
-	// Method 4/10: applyTheme(detail) — legacy at preview-runtime.js:938.
+	// Method 4/10: applyTheme(detail) — legacy at the legacy bundle:938.
 	// The legacy rebuilds .site-shell classes (clearing theme--template-
 	// / -kit- / -custom- / -nav- / -buttons- / -cards- / -spacing- /
 	// -images- / -motion- / -palette- / -image- prefixes) and reapplies
@@ -207,7 +207,7 @@ func TestIslandRuntimeJSPublishesApplyStyleImpactGlobal(t *testing.T) {
 }
 
 func TestIslandRuntimeJSPublishesApplyCSSGlobal(t *testing.T) {
-	// Method 6/10: applyCSS(cssText) — legacy at preview-runtime.js:1019.
+	// Method 6/10: applyCSS(cssText) — legacy at the legacy bundle:1019.
 	// The legacy ensures a <style data-editor-live-css> element in the
 	// iframe head and sets its textContent. The island writer publishes
 	// to $preview.theme.cssCustom.
@@ -222,7 +222,7 @@ func TestIslandRuntimeJSPublishesApplyCSSGlobal(t *testing.T) {
 }
 
 func TestIslandRuntimeJSPublishesApplyFontsGlobal(t *testing.T) {
-	// Method 7/10: applyFonts(cssText) — legacy at preview-runtime.js:1023.
+	// Method 7/10: applyFonts(cssText) — legacy at the legacy bundle:1023.
 	// Same shape as applyCSS but with [data-editor-live-fonts] marker.
 	// The island writer publishes to $preview.theme.fontsCustom.
 	body := string(IslandRuntimeJS())
@@ -336,7 +336,7 @@ func TestSubscriberRuntimeScriptPublishesObservers(t *testing.T) {
 
 func TestSubscriberRuntimeScriptPreservesLegacyDOMMutations(t *testing.T) {
 	// The subscriber applies the same DOM mutations the legacy
-	// preview-runtime.js performed cross-frame. This test guards
+	// the legacy bundle performed cross-frame. This test guards
 	// against drift between the legacy mutation shape (asserted by
 	// existing parity tests in slices 3/4/5 against their iframe-
 	// crossing methods) and the subscriber's local-frame implementation.
@@ -394,7 +394,7 @@ func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	shim := string(BridgeShim())
 	// The shim is additive — when the island global is missing or the
 	// flag is off, the legacy JS path must still run. The legacy lives
-	// at preview-runtime.js's IIFE-exported window.GoSXStudioPreviewRuntime
+	// at the legacy bundle's IIFE-exported window.GoSXStudioPreviewRuntime
 	// object; the shim reads its methods via legacy.<name> before
 	// replacing the object. Sanity check: look for each legacy method
 	// reference so a future refactor that drops the fallback is caught

@@ -1,7 +1,7 @@
 // workbench_chrome.gsx — GoSXStudioWorkbenchRuntime.{bindChrome,setMode,saveLayout} island.
 //
-// Phase 3 slice-7 burn-down of three workbench-chrome JS functions in
-// gosx-studio/assets/studio-engines.js:
+// Phase 3 slice-7 island implementation of three workbench-chrome JS functions in
+// the legacy bundle (removed 2026-05-27):
 //
 //   - bindWorkbenchChrome(root) — line 516; binds the workbench form's
 //                                  delegated click handler (fans out to
@@ -35,8 +35,8 @@
 // window.__gosx_workbench_runtime_island_setMode /
 // window.__gosx_workbench_runtime_island_saveLayout that the slice-7
 // BridgeShim delegates to when the "workbench-runtime-islands" feature flag
-// is on; otherwise the legacy bindWorkbenchChrome / setWorkbenchMode /
-// saveWorkbenchLayout functions in studio-engines.js run.
+// Post 2026-05-27 the legacy JS bundle is gone; the island path is the
+// only path. See Phase 3 burn-down.
 //
 // All three methods are editor-chrome — no iframe crossing required (this
 // slice is independent of the slice 6 cross-frame-transport block).

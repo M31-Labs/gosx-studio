@@ -1,7 +1,7 @@
 // style_css.gsx — GoSXStudioStyleRuntime.{bindCSS,bindFonts} island.
 //
-// Phase 3 slice-5 burn-down of two CSS-injection JS functions in
-// gosx-studio/assets/studio-engines.js:
+// Phase 3 slice-5 island implementation of two CSS-injection JS functions in
+// the legacy bundle (removed 2026-05-27):
 //
 //   - bindCSS(root)   — line 1570; binds the [data-editor-css] textarea so
 //                       input dispatches PreviewRuntime.applyCSS(value).
@@ -25,8 +25,8 @@
 //   window.__gosx_style_runtime_island_bindCSS
 //   window.__gosx_style_runtime_island_bindFonts
 // that the slice-5 BridgeShim delegates to when the
-// "style-runtime-islands" feature flag is on; otherwise the legacy bindCSS /
-// bindFonts functions in studio-engines.js run.
+// Post 2026-05-27 the legacy JS bundle is gone; the island path is the
+// only path. See Phase 3 burn-down.
 
 package styleruntime
 

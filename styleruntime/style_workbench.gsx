@@ -1,7 +1,7 @@
 // style_workbench.gsx — GoSXStudioStyleRuntime.bindWorkbench island.
 //
-// Phase 3 slice-5 burn-down of the JS function bindStyleWorkbench in
-// gosx-studio/assets/studio-engines.js:1884. Given an editor workbench root,
+// Phase 3 slice-5 island implementation of the JS function bindStyleWorkbench in
+// the legacy bundle (removed 2026-05-27). Given an editor workbench root,
 // the helper:
 //   1. Resolves the [data-editor-workbench] form (or the root itself when it
 //      matches).
@@ -29,8 +29,8 @@
 // runtime bundle's island_runtime.js publishes:
 //   window.__gosx_style_runtime_island_bindWorkbench
 // that the slice-5 BridgeShim delegates to when the
-// "style-runtime-islands" feature flag is on; otherwise the legacy
-// bindStyleWorkbench function in studio-engines.js runs.
+// Post 2026-05-27 the legacy JS bundle is gone; the island path is the
+// only path. See Phase 3 burn-down.
 
 package styleruntime
 

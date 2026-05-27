@@ -1,8 +1,8 @@
 // workbench_toggles.gsx — GoSXStudioWorkbenchRuntime.{toggleFocus,toggleActivity}
 // island.
 //
-// Phase 3 slice-7 burn-down of two toggle-related JS functions in
-// gosx-studio/assets/studio-engines.js (toggleWorkbenchRail is covered by
+// Phase 3 slice-7 island implementation of two toggle-related JS functions in
+// the legacy bundle (removed 2026-05-27) (toggleWorkbenchRail is covered by
 // workbench_rails.gsx since it's intrinsically tied to the rail-state model):
 //
 //   - toggleWorkbenchFocus(form) — line 489; flips data-studio-focus

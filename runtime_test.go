@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// The legacy monolithic JS bundles (assets/studio-engines.js,
-// assets/preview-runtime.js) were deleted on 2026-05-27 — see Phase 3
+// The legacy monolithic JS bundles (studio-engines.js and
+// preview-runtime.js) were deleted on 2026-05-27 — see Phase 3
 // burn-down. The tests below cover the post-deletion contract: the
 // engine runtime bundle is the concatenation of per-slice island
 // bundles, and each slice publishes its shim globals so consumer code

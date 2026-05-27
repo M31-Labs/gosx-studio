@@ -1,19 +1,18 @@
 // Package fieldruntime is the Go-side surface for the Phase 3 slice-1
-// burn-down of GoSXStudioFieldRuntime.
+// island implementation of GoSXStudioFieldRuntime.
 //
-// The slice replaces the JavaScript-implemented FieldRuntime (three methods:
-// bind / bindMirroring / bindClipboard, declared at
-// gosx-studio/assets/studio-engines.js:2332) with .gsx-authored islands
-// living in this package's *.gsx files. Each island publishes itself onto a
-// well-known window global (see BridgeShim below); the JS shim emitted by
-// BridgeShim delegates window.GoSXStudioFieldRuntime calls to those globals
-// when the FeatureFlagKey flag is on in studio.ShellConfig.FeatureFlags.
+// FieldRuntime (three methods: bind / bindMirroring / bindClipboard) is
+// implemented by the .gsx-authored islands living in this package's *.gsx
+// files. Each island publishes itself onto a well-known window global (see
+// BridgeShim below); the JS shim emitted by BridgeShim installs
+// window.GoSXStudioFieldRuntime and dispatches each method to its island
+// global at call time.
 //
-// Both implementations ship additively for at least seven days of CI green
-// (see ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-25-phase-3-slice-1-fieldruntime.md
-// Section E). After the deletion window closes, the legacy JS implementation
-// (bindFieldRuntime / bindFieldMirroring / bindFieldClipboard) is removed
-// and the shim collapses to a thin pass-through.
+// The legacy monolithic JS implementation (bindFieldRuntime,
+// bindFieldMirroring, bindFieldClipboard from the now-deleted
+// studio-engines.js bundle) is gone as of 2026-05-27. The FeatureFlagKey
+// flag remains in the registry for host-probe stability but no longer
+// gates anything — the island path always runs.
 //
 // Mirroring writes go through $preview.field.<name> shared signals per
 // ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md
@@ -27,9 +26,10 @@ import (
 //go:embed island_runtime.js
 var islandRuntimeJS []byte
 
-// FeatureFlagKey is the studio.ShellConfig.FeatureFlags key consumers set to
-// activate the .gsx-island FieldRuntime path. Default value (omitted from a
-// host's flag map) keeps the legacy JS implementation active.
+// FeatureFlagKey is the studio.ShellConfig.FeatureFlags key for the
+// FieldRuntime island path. Post-2026-05-27 the legacy fallback is gone
+// and the flag is kept only for host-probe API stability — the island
+// path runs regardless of its value.
 //
 // Phase 3 naming convention: "<contract>-runtime-islands". Slices 2..7 each
 // declare their own constant of the same shape.
@@ -37,7 +37,7 @@ const FeatureFlagKey = "field-runtime-islands"
 
 // IslandGlobals lists the window globals each Field island publishes itself
 // at when it mounts. The shim returned by BridgeShim looks these up at call
-// time so unmounted islands fall back to the legacy implementation.
+// time.
 //
 // Naming convention: window.__gosx_field_runtime_island_<methodName>.
 var IslandGlobals = struct {
@@ -51,22 +51,10 @@ var IslandGlobals = struct {
 }
 
 // BridgeShim returns the JavaScript snippet that gosx-studio's runtime
-// bundle appends to gate window.GoSXStudioFieldRuntime through the
-// FeatureFlagKey flag.
-//
-// When the host has marked FeatureFlagKey true (read by the consumer and
-// surfaced to the page via the data-gosx-studio-feature-flag-<flag>
-// attribute on <html> or any element with that attribute), the shim
-// dispatches each method to its corresponding IslandGlobals entry on
-// window. When the flag is off or the island global is missing (island
-// never mounted), the shim falls back to the legacy JS implementation that
-// already lives in studio-engines.js.
-//
-// The shim itself never imports the legacy implementation directly; it
-// references the existing in-bundle functions by name (bindFieldRuntime,
-// bindFieldMirroring, bindFieldClipboard) so the bundle remains a single
-// self-contained IIFE. After Section E deletes the legacy functions, the
-// shim is rewritten to remove the fallback branch.
+// bundle appends to install window.GoSXStudioFieldRuntime. Each method
+// dispatches to the corresponding IslandGlobals entry on window. If the
+// island is not yet mounted, the shim returns undefined (the legacy JS
+// fallback was deleted on 2026-05-27).
 func BridgeShim() []byte {
 	return []byte(bridgeShimJS)
 }
@@ -83,8 +71,8 @@ func IslandRuntimeJS() []byte {
 }
 
 // Bundle returns the IslandRuntimeJS + BridgeShim concatenation that the
-// studio runtime asset pipeline appends to studio-engines.js. Order matters:
-// the island runtime publishes globals; the shim consults them.
+// studio runtime asset pipeline serves. Order matters: the island runtime
+// publishes globals; the shim consults them.
 func Bundle() []byte {
 	island := IslandRuntimeJS()
 	shim := BridgeShim()
@@ -132,7 +120,7 @@ const bridgeShimJS = `;(function () {
       return undefined;
     };
   }
-  // Replace the runtime object emitted by studio-engines.js with shims
+  // Install the runtime object (the legacy bundle that previously emitted it was removed 2026-05-27) with shims
   // that consult the feature flag on every call. Legacy functions
   // (bindFieldRuntime / bindFieldMirroring / bindFieldClipboard) remain
   // defined in the bundle and are passed in as the fallback path. The

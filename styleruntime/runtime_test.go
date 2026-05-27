@@ -8,9 +8,9 @@ import (
 // The styleruntime package is the Go-side surface for the Phase 3 slice-5
 // burn-down of GoSXStudioStyleRuntime. It owns:
 //  1. The feature-flag key consumers add to studio.ShellConfig.FeatureFlags
-//     to flip from the legacy JS implementation in assets/studio-engines.js
+//     to flip the island path (legacy bundle deleted 2026-05-27)
 //     to the .gsx-authored islands in this package.
-//  2. The JS shim that studio-engines.js appends so the
+//  2. The JS shim that the legacy bundle appends so the
 //     window.GoSXStudioStyleRuntime methods delegate to the islands when the
 //     flag is on.
 //  3. The island runtime JS that publishes window.__gosx_style_runtime_*
@@ -68,7 +68,7 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 }
 
 func TestIslandRuntimeJSPublishesBindThemeGlobal(t *testing.T) {
-	// Method 1/10: bindTheme(root) — legacy bindTheme at studio-engines.js:1421.
+	// Method 1/10: bindTheme(root) — legacy bindTheme at the legacy bundle:1421.
 	// Binds theme kit / template / palette / image-ratio / custom-template /
 	// style-class / color-token controls; on input/change dispatches the
 	// internal updateTheme + applies kit/preset side effects via applyKit /
@@ -84,7 +84,7 @@ func TestIslandRuntimeJSPublishesBindThemeGlobal(t *testing.T) {
 		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
 	}
 	// DOM contract — the seven theme input selectors the legacy binds (see
-	// studio-engines.js:1423). Drift in any of these silently breaks the
+	// the legacy bundle:1423). Drift in any of these silently breaks the
 	// theme fan-out.
 	for _, contract := range []string{
 		// Top-level theme controls.
@@ -108,7 +108,7 @@ func TestIslandRuntimeJSPublishesBindThemeGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesBindWorkbenchGlobal(t *testing.T) {
 	// Method 2/10: bindWorkbench(root) — legacy bindStyleWorkbench at
-	// studio-engines.js:1884. Resolves the [data-editor-workbench] form,
+	// the legacy bundle:1884. Resolves the [data-editor-workbench] form,
 	// guards re-entry via the per-form idempotency dataset key, binds click /
 	// pointerover / pointerout / focusin / focusout / input / change
 	// listeners that dispatch setControlValue / resetControlValue /
@@ -143,7 +143,7 @@ func TestIslandRuntimeJSPublishesBindWorkbenchGlobal(t *testing.T) {
 }
 
 func TestIslandRuntimeJSPublishesBindCSSGlobal(t *testing.T) {
-	// Method 3/10: bindCSS(root) — legacy bindCSS at studio-engines.js:1570.
+	// Method 3/10: bindCSS(root) — legacy bindCSS at the legacy bundle:1570.
 	// Binds the [data-editor-css] textarea so input dispatches
 	// PreviewRuntime.applyCSS(value) via a frameTask-coalesced handler.
 	// Re-binds on preview-frame load via bindStudioFrameLoad. Calls applyCSS
@@ -170,7 +170,7 @@ func TestIslandRuntimeJSPublishesBindCSSGlobal(t *testing.T) {
 }
 
 func TestIslandRuntimeJSPublishesBindFontsGlobal(t *testing.T) {
-	// Method 4/10: bindFonts(root) — legacy bindFonts at studio-engines.js:1602.
+	// Method 4/10: bindFonts(root) — legacy bindFonts at the legacy bundle:1602.
 	// For each of the three slots (display / body / mono), reads
 	// [data-editor-font-name="<slot>"] and [data-editor-font-url="<slot>"]
 	// inputs and recomputes the combined @font-face + :root font-variable
@@ -210,7 +210,7 @@ func TestIslandRuntimeJSPublishesBindFontsGlobal(t *testing.T) {
 }
 
 func TestIslandRuntimeJSPublishesApplyThemeGlobal(t *testing.T) {
-	// Method 5/10: applyTheme() — legacy updateTheme at studio-engines.js:1396.
+	// Method 5/10: applyTheme() — legacy updateTheme at the legacy bundle:1396.
 	// Reads theme form state (kit / template / palette / image-ratio /
 	// custom-template / style classes / color tokens) and publishes the
 	// $preview.theme.* signal family. Slice 6 transitional cleanup
@@ -255,7 +255,7 @@ func TestIslandRuntimeJSPublishesApplyThemeGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesSyncControlButtonsGlobal(t *testing.T) {
 	// Method 6/10: syncControlButtons(root) — legacy syncStyleControlButtons
-	// at studio-engines.js:1848. For every [data-studio-style-control] /
+	// at the legacy bundle:1848. For every [data-studio-style-control] /
 	// [data-studio-style-readout] / [data-studio-style-reset] in root:
 	//   - control button: aria-pressed + .is-selected vs live form value.
 	//   - readout: textContent (ownerLabel) + data-studio-style-inherited
@@ -295,7 +295,7 @@ func TestIslandRuntimeJSPublishesSyncControlButtonsGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesShowImpactGlobal(t *testing.T) {
 	// Method 7/10: showImpact(name, value, committed) — legacy showStyleImpact
-	// at studio-engines.js:1785. Looks up impact metadata for the named
+	// at the legacy bundle:1785. Looks up impact metadata for the named
 	// control, publishes $preview.style.impact.selector for the cross-
 	// frame mutation (slice 6 transitional cleanup, Section G.5 — was
 	// PreviewRuntime.applyStyleImpact), writes the editor-side impact-
@@ -335,7 +335,7 @@ func TestIslandRuntimeJSPublishesShowImpactGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesRestoreImpactGlobal(t *testing.T) {
 	// Method 8/10: restoreImpact() — legacy restoreStyleImpact at
-	// studio-engines.js:1803. If a lastStyleImpact is recorded, replays
+	// the legacy bundle:1803. If a lastStyleImpact is recorded, replays
 	// showImpact(name, value, true) to bring the panel back to its committed
 	// state; otherwise clears the readouts to a "No active recipe" state
 	// and publishes $preview.style.impact.selector := "" (slice 6
@@ -366,7 +366,7 @@ func TestIslandRuntimeJSPublishesRestoreImpactGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesSetControlValueGlobal(t *testing.T) {
 	// Method 9/10: setControlValue(name, value) — legacy setStyleControlValue
-	// at studio-engines.js:1821. When name targets a custom-* control (other
+	// at the legacy bundle:1821. When name targets a custom-* control (other
 	// than customTemplateName), force-checks the [name="themeTemplate"]
 	// [value="custom"] radio (with input + change events) so the custom
 	// template builder activates. Then sets the named control's value (radio
@@ -397,7 +397,7 @@ func TestIslandRuntimeJSPublishesSetControlValueGlobal(t *testing.T) {
 
 func TestIslandRuntimeJSPublishesResetControlValueGlobal(t *testing.T) {
 	// Method 10/10: resetControlValue(name) — legacy resetStyleControlValue
-	// at studio-engines.js:1842. Looks up the kit default for name via
+	// at the legacy bundle:1842. Looks up the kit default for name via
 	// kitDefaultForControl and calls setControlValue(name, default). No-op
 	// when no default is found.
 	body := string(IslandRuntimeJS())
@@ -445,7 +445,7 @@ func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
 	// JS path must still run. Sanity check: look for the legacy function
 	// names so a future refactor that drops the fallback is caught here.
 	// The ten legacy function names are the catalog of GoSXStudioStyleRuntime
-	// methods as wired in assets/studio-engines.js:2341 — note four method
+	// methods as wired in the legacy bundle (removed 2026-05-27) — note four method
 	// names differ from the public method name (bindWorkbench →
 	// bindStyleWorkbench, applyTheme → updateTheme, showImpact →
 	// showStyleImpact, restoreImpact → restoreStyleImpact, syncControlButtons

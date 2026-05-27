@@ -1,7 +1,7 @@
 // field_clipboard.gsx — GoSXStudioFieldRuntime.bindClipboard island.
 //
-// Phase 3 slice-1 burn-down of the JS function bindFieldClipboard in
-// gosx-studio/assets/studio-engines.js:628.
+// Phase 3 slice-1 island implementation of the JS function bindFieldClipboard in
+// the legacy bundle (removed 2026-05-27).
 //
 // Behavior mirrored from the legacy implementation:
 //   - Idempotent document-level click handler for [data-studio-copy-target].

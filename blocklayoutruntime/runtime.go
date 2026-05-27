@@ -2,7 +2,7 @@
 // burn-down of GoSXStudioBlockLayoutRuntime.
 //
 // The slice replaces the JavaScript-implemented BlockLayoutRuntime (nine
-// public methods declared at gosx-studio/assets/studio-engines.js:2353 —
+// public methods declared at the legacy bundle (removed 2026-05-27) —
 // rows, rowKey, rowForKey, moveRow, renumber, selectRow, commitReorder,
 // updateBlockLibraryState, updateVisibilityState) with .gsx-authored islands
 // living in this package's *.gsx files. Each island publishes itself onto a
@@ -117,7 +117,7 @@ var IslandGlobals = struct {
 // dispatches each method to its corresponding IslandGlobals entry on
 // window. When the flag is off or the island global is missing (island
 // never mounted), the shim falls back to the legacy JS implementation that
-// already lives in studio-engines.js.
+// lived in the now-deleted legacy bundle.
 //
 // The shim itself never imports the legacy implementation directly; it
 // references the existing in-bundle functions by name (blockRows /
@@ -142,7 +142,7 @@ func IslandRuntimeJS() []byte {
 }
 
 // Bundle returns the IslandRuntimeJS + BridgeShim concatenation that the
-// studio runtime asset pipeline appends to studio-engines.js. Order matters:
+// studio runtime asset pipeline serves. Order matters:
 // the island runtime publishes globals; the shim consults them.
 func Bundle() []byte {
 	island := IslandRuntimeJS()
@@ -191,7 +191,7 @@ const bridgeShimJS = `;(function () {
       return undefined;
     };
   }
-  // Replace the runtime object emitted by studio-engines.js with a shim
+  // Install the runtime object (the legacy bundle that previously emitted it was removed 2026-05-27) with a shim
   // that consults the feature flag on every call. The legacy functions
   // (blockRows / blockRowKey / blockRowForKey / moveBlockLayoutRow /
   // renumberBlockLayoutList / selectBlockLayoutRow / commitBlockLayoutReorder /
