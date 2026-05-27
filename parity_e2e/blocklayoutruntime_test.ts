@@ -86,8 +86,12 @@ interface CandidateFlagSnapshot {
 
 async function snapshotFlag(page: Page): Promise<CandidateFlagSnapshot> {
   return await page.evaluate(() => {
-    const root = document.documentElement;
+    // The feature flag attribute is surfaced on the workbench root (see
+    // lessons/phase-3-slice-1-fieldruntime-deletion-log.md), not on
+    // documentElement. Fall back to documentElement for backward compat.
     const attr = "data-gosx-studio-feature-flag-block-layout-runtime-islands";
+    const root =
+      document.querySelector(`[${attr}]`) ?? document.documentElement;
     const w = window as unknown as Record<string, unknown>;
     const runtime = (w.GoSXStudioBlockLayoutRuntime ?? {}) as Record<string, unknown>;
     return {
