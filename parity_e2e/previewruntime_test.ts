@@ -110,8 +110,12 @@ interface CandidateFlagSnapshot {
 
 async function snapshotFlag(page: Page): Promise<CandidateFlagSnapshot> {
   return await page.evaluate(() => {
-    const root = document.documentElement;
+    // The feature flag attribute is surfaced on the workbench root (see
+    // lessons/phase-3-slice-1-fieldruntime-deletion-log.md), not on
+    // documentElement. Fall back to documentElement for backward compat.
     const attr = "data-gosx-studio-feature-flag-preview-runtime-islands";
+    const root =
+      document.querySelector(`[${attr}]`) ?? document.documentElement;
     const w = window as unknown as Record<string, unknown>;
     const runtime = (w.GoSXStudioPreviewRuntime ?? {}) as Record<string, unknown>;
     return {
@@ -234,11 +238,16 @@ async function snapshotIframeBrand(page: Page): Promise<IframeBrandSnapshot> {
       if (!d) continue;
       const brand = d.querySelector(".brand") as HTMLElement | null;
       const logo = brand?.querySelector(".brand__logo") as HTMLImageElement | null;
+      // Use getAttribute("src") rather than .src so an unset / empty attribute
+      // doesn't get resolved against the iframe's document URL (which carries
+      // a per-boot _gosx_preview=<timestamp> query parameter, making the two
+      // sides non-equal even when both have an effectively empty logo src).
+      const logoSrcAttr = logo ? logo.getAttribute("src") : null;
       return {
         iframeReachable: true,
         brandClasses: brand ? Array.prototype.slice.call(brand.classList) : [],
-        logoSrc: logo ? logo.src : "",
-        logoAlt: logo ? logo.alt : "",
+        logoSrc: logoSrcAttr ?? "",
+        logoAlt: logo ? logo.getAttribute("alt") ?? "" : "",
         cssWidth: brand ? brand.style.getPropertyValue("--brand-logo-width") : "",
       };
     }
