@@ -164,5 +164,32 @@ const bridgeShimJS = `;(function () {
       typeof bindSelectionSurface === "function" ? bindSelectionSurface : legacy.bind
     )
   };
+  // Auto-mount on document ready. Mirrors the v0.4.1 fieldruntime fix: the
+  // deleted studio-engines.js bundle ran a top-level init() at
+  // DOMContentLoaded that called bindSelectionSurface(document) along with
+  // the six sibling runtime binds. When the bundle was deleted the per-
+  // slice BridgeShim correctly re-published window.GoSXStudioSelectionRuntime
+  // but the auto-mount was lost — selection click handlers (block selection,
+  // workspace target, field focus, commandbar, style-scope readouts) were
+  // never attached on initial load. Restoring the auto-mount inside the shim
+  // keeps the responsibility local to the slice and matches the legacy
+  // contract. Idempotent: a per-document marker attribute guards against
+  // double-mount if a host also calls .bind explicitly during SSR hydration.
+  function autoMount() {
+    try {
+      var marker = "data-gosx-studio-selection-runtime-auto-mounted";
+      if (document.documentElement && document.documentElement.getAttribute(marker) === "true") return;
+      if (document.documentElement) document.documentElement.setAttribute(marker, "true");
+      window.GoSXStudioSelectionRuntime.bind(document.body || document);
+    } catch (e) {
+      // Auto-mount must never break the page; the host can always invoke
+      // window.GoSXStudioSelectionRuntime.bind manually if it needs to recover.
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", autoMount);
+  } else {
+    autoMount();
+  }
 })();
 `

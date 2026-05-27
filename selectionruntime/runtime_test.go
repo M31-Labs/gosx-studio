@@ -98,6 +98,31 @@ func TestIslandRuntimeJSPublishesIslandGlobal(t *testing.T) {
 	}
 }
 
+func TestBridgeShimAutoMountsOnDocumentReady(t *testing.T) {
+	// Pre-2026-05-27 the deleted studio-engines.js bundle auto-mounted every
+	// runtime contract at DOMContentLoaded via its top-level init() function.
+	// When the bundle was deleted the per-slice BridgeShim correctly re-
+	// published window.GoSXStudioSelectionRuntime, but the auto-mount call
+	// was lost — nothing invoked .bind(document) on page load anymore, so
+	// none of the five selection sub-behaviors (block selection, workspace
+	// target, field focus, commandbar, style-scope readouts) wired their
+	// listeners on initial load.
+	//
+	// v0.5.0 restores the auto-mount inside the shim so the contract is
+	// local to each slice and doesn't depend on the deleted global init()
+	// coming back. Defer to DOMContentLoaded if the document is still
+	// loading so we don't double-mount during SSR hydration.
+	shim := string(BridgeShim())
+	for _, fragment := range []string{
+		"DOMContentLoaded",
+		"window.GoSXStudioSelectionRuntime.bind",
+	} {
+		if !strings.Contains(shim, fragment) {
+			t.Fatalf("BridgeShim() missing auto-mount fragment %q:\n%s", fragment, shim)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
