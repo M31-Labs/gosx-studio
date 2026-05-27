@@ -439,33 +439,3 @@ func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	}
 }
 
-func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
-	shim := string(BridgeShim())
-	// The shim is additive — when the island global is missing, the legacy
-	// JS path must still run. Sanity check: look for the legacy function
-	// names so a future refactor that drops the fallback is caught here.
-	// The ten legacy function names are the catalog of GoSXStudioStyleRuntime
-	// methods as wired in the legacy bundle (removed 2026-05-27) — note four method
-	// names differ from the public method name (bindWorkbench →
-	// bindStyleWorkbench, applyTheme → updateTheme, showImpact →
-	// showStyleImpact, restoreImpact → restoreStyleImpact, syncControlButtons
-	// → syncStyleControlButtons, setControlValue → setStyleControlValue,
-	// resetControlValue → resetStyleControlValue). bindTheme / bindCSS /
-	// bindFonts have matching legacy names.
-	for _, legacy := range []string{
-		"bindTheme",
-		"bindStyleWorkbench",
-		"bindCSS",
-		"bindFonts",
-		"updateTheme",
-		"syncStyleControlButtons",
-		"showStyleImpact",
-		"restoreStyleImpact",
-		"setStyleControlValue",
-		"resetStyleControlValue",
-	} {
-		if !strings.Contains(shim, legacy) {
-			t.Fatalf("BridgeShim() must retain legacy fallback for %q:\n%s", legacy, shim)
-		}
-	}
-}

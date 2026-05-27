@@ -390,33 +390,6 @@ func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	}
 }
 
-func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
-	shim := string(BridgeShim())
-	// The shim is additive — when the island global is missing or the
-	// flag is off, the legacy JS path must still run. The legacy lives
-	// at the legacy bundle's IIFE-exported window.GoSXStudioPreviewRuntime
-	// object; the shim reads its methods via legacy.<name> before
-	// replacing the object. Sanity check: look for each legacy method
-	// reference so a future refactor that drops the fallback is caught
-	// here.
-	for _, legacy := range []string{
-		"legacy.mount",
-		"legacy.setBlockVisibility",
-		"legacy.applyTextUpdate",
-		"legacy.applyTheme",
-		"legacy.applyStyleImpact",
-		"legacy.applyCSS",
-		"legacy.applyFonts",
-		"legacy.updateHeaderLogo",
-		"legacy.requestInlineEdit",
-		"legacy.cycleField",
-	} {
-		if !strings.Contains(shim, legacy) {
-			t.Fatalf("BridgeShim() must retain legacy fallback for %q:\n%s", legacy, shim)
-		}
-	}
-}
-
 func TestPreviewSubscriberScriptIsNonEmpty(t *testing.T) {
 	// PreviewSubscriberScript() is the bundle the storefront mounts when
 	// loaded in the editor preview iframe. It must be non-empty AND

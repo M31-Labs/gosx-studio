@@ -57,21 +57,6 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 	}
 }
 
-func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
-	shim := string(BridgeShim())
-	// The shim is additive — when the island global is missing, the legacy
-	// JS path must still run. Sanity check: look for the legacy function
-	// names so a future refactor that drops the fallback is caught here.
-	for _, legacy := range []string{
-		"bindBrandLogo",
-		"updateHeaderLogo",
-	} {
-		if !strings.Contains(shim, legacy) {
-			t.Fatalf("BridgeShim() must retain legacy fallback for %q:\n%s", legacy, shim)
-		}
-	}
-}
-
 func TestIslandRuntimeJSPublishesIslandGlobals(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {

@@ -274,30 +274,6 @@ func TestIslandRuntimeJSPublishesUpdateVisibilityStateGlobal(t *testing.T) {
 	}
 }
 
-func TestBridgeShimPreservesLegacyPathWhenFlagOff(t *testing.T) {
-	shim := string(BridgeShim())
-	// The shim is additive — when the island global is missing, the legacy
-	// JS path must still run. Sanity check: look for the legacy function
-	// names so a future refactor that drops the fallback is caught here.
-	// The nine legacy function names are the catalog of GoSXStudioBlockLayoutRuntime
-	// methods as wired in the legacy bundle (removed 2026-05-27).
-	for _, legacy := range []string{
-		"blockRows",
-		"blockRowKey",
-		"blockRowForKey",
-		"moveBlockLayoutRow",
-		"renumberBlockLayoutList",
-		"selectBlockLayoutRow",
-		"commitBlockLayoutReorder",
-		"updateBlockLayoutLibraryState",
-		"updateBlockLayoutVisibilityState",
-	} {
-		if !strings.Contains(shim, legacy) {
-			t.Fatalf("BridgeShim() must retain legacy fallback for %q:\n%s", legacy, shim)
-		}
-	}
-}
-
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
