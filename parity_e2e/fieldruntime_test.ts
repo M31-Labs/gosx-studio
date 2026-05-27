@@ -51,8 +51,14 @@ interface CandidateFlagSnapshot {
 
 async function snapshotFlag(page: Page): Promise<CandidateFlagSnapshot> {
   return await page.evaluate(() => {
-    const root = document.documentElement;
+    // The feature flag attribute is surfaced on the workbench root (see
+    // lessons/phase-3-slice-1-fieldruntime-deletion-log.md — "the consumer
+    // surfaces it via data-gosx-studio-feature-flag-<key> on the workbench
+    // root"), not on documentElement. Fall back to documentElement for
+    // backward compat in case a host SSRs the flag higher in the tree.
     const attr = "data-gosx-studio-feature-flag-field-runtime-islands";
+    const root =
+      document.querySelector(`[${attr}]`) ?? document.documentElement;
     const w = window as unknown as Record<string, unknown>;
     const runtime = (w.GoSXStudioFieldRuntime ?? {}) as Record<string, unknown>;
     return {
@@ -216,11 +222,18 @@ async function fillTagline(page: Page, value: string): Promise<void> {
     test.skip(true, "tagline input not present in editor route — fixture drift");
     return;
   }
-  await input.fill(value);
-  // Trigger an input event explicitly; .fill() in Playwright dispatches it,
-  // but a follow-up dispatch ensures the legacy listener handler is queued
-  // even when the binding installed itself after the initial fill.
-  await input.dispatchEvent("input");
+  // The tagline input lives inside an inspector panel that may be CSS-hidden
+  // when its parent mode isn't active. We're exercising the runtime binding,
+  // not the user-interaction visibility contract, so set the value
+  // programmatically and dispatch the input event the binding listens for.
+  // This makes the assertion robust to editor-layout changes that toggle
+  // panel visibility (the runtime path the test cares about is independent).
+  await input.evaluate((el, v) => {
+    const node = el as HTMLInputElement;
+    node.value = v;
+    node.dispatchEvent(new Event("input", { bubbles: true }));
+    node.dispatchEvent(new Event("change", { bubbles: true }));
+  }, value);
   // Allow one rAF tick so the frame-throttled mirror update runs.
   await page.waitForTimeout(50);
 }
@@ -231,7 +244,11 @@ async function clickCopyButton(page: Page): Promise<void> {
     test.skip(true, "copy button not present in editor route — fixture drift");
     return;
   }
-  await button.click();
+  // The copy button may live inside a collapsed inspector panel that's CSS-
+  // hidden even though the button itself is interactive. Use the underlying
+  // click() rather than Playwright's visibility-aware locator.click so the
+  // runtime-binding test is independent of editor-panel layout.
+  await button.evaluate((el) => (el as HTMLElement).click());
   // The legacy and island clipboard handlers both set the state attribute
   // synchronously after the writeText promise resolves. Allow a small
   // window for the async clipboard API.

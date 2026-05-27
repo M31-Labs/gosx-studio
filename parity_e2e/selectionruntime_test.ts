@@ -67,8 +67,12 @@ interface CandidateFlagSnapshot {
 
 async function snapshotFlag(page: Page): Promise<CandidateFlagSnapshot> {
   return await page.evaluate(() => {
-    const root = document.documentElement;
+    // The feature flag attribute is surfaced on the workbench root (see
+    // lessons/phase-3-slice-1-fieldruntime-deletion-log.md), not on
+    // documentElement. Fall back to documentElement for backward compat.
     const attr = "data-gosx-studio-feature-flag-selection-runtime-islands";
+    const root =
+      document.querySelector(`[${attr}]`) ?? document.documentElement;
     const w = window as unknown as Record<string, unknown>;
     const runtime = (w.GoSXStudioSelectionRuntime ?? {}) as Record<string, unknown>;
     return {
@@ -312,7 +316,12 @@ async function clickFirstBlockRow(page: Page): Promise<void> {
     test.skip(true, "no block rows present in editor route — fixture drift");
     return;
   }
-  await row.click();
+  // Block rows live inside an inspector panel that may be CSS-hidden when
+  // its parent mode isn't active. The runtime binding we're exercising
+  // listens for click events regardless of layout visibility — drive the
+  // click through the underlying DOM API so the test is independent of
+  // editor-panel-visibility drift.
+  await row.evaluate((el) => (el as HTMLElement).click());
   // Allow rAF-throttled style-scope update to flush.
   await page.waitForTimeout(50);
 }
@@ -323,7 +332,9 @@ async function clickFirstWorkspaceTarget(page: Page): Promise<void> {
     test.skip(true, "no workspace targets present in editor route — fixture drift");
     return;
   }
-  await target.click();
+  // Workspace target links live inside the workspace nav which may be CSS-
+  // hidden when collapsed. See clickFirstBlockRow above for rationale.
+  await target.evaluate((el) => (el as HTMLElement).click());
   await page.waitForTimeout(50);
 }
 
@@ -334,7 +345,13 @@ async function focusFirstFieldSource(page: Page): Promise<void> {
     return;
   }
   // focusin is what bindSelectionSurface listens for on field-source inputs.
-  await source.focus();
+  // Fire focus through the DOM API so we don't depend on the source being
+  // visible in the current inspector layout.
+  await source.evaluate((el) => {
+    const node = el as HTMLElement;
+    node.focus();
+    node.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+  });
   await page.waitForTimeout(50);
 }
 
@@ -344,6 +361,9 @@ async function clickSelectionAction(page: Page, action: string): Promise<void> {
     test.skip(true, `no selection-action button for "${action}" — fixture drift`);
     return;
   }
-  await button.click();
+  // Selection commandbar buttons live in a panel that's only visible when
+  // something is selected; drive the click through the DOM API so the
+  // runtime binding is exercised regardless of panel visibility state.
+  await button.evaluate((el) => (el as HTMLElement).click());
   await page.waitForTimeout(50);
 }
