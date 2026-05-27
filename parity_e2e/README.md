@@ -38,13 +38,20 @@ Prerequisites:
 - Chromium installed via `npx playwright install chromium`
 - A running muddy-noni-commerce dev server on the URL below (or override
   via `GOSX_STUDIO_PARITY_BASE_URL`).
-- **An authenticated session for the editor route.** `/admin/editor`
-  redirects unauthenticated requests to `/login`. The parity tests require
-  the editor to be reachable. Configure
-  `ADMIN_EMAILS=<your-email>@<domain>` and sign in via Google OAuth, or
-  thread a pre-issued session cookie into the Playwright context (see
-  Playwright's `storageState`). Without auth, `bootBaseline` /
-  `bootCandidate` will fail at the canvas-attached wait.
+- **An authenticated session for the editor route, OR the auth-bypass env
+  var.** `/admin/editor` redirects unauthenticated requests to `/login`,
+  which makes the parity harness fail at the canvas-attached wait. Pick one:
+
+  - **For CI and one-shot runs (recommended)** — boot muddy-noni with
+    `MUDDY_MOCK_AUTH=1`. This bypasses the `/admin/*` auth guard for the
+    lifetime of that process only (mirrors `MUDDY_MOCK_CHECKOUT=1`). See
+    `cmd/muddy-noni/main.go` (`adminSessionMiddleware`) and
+    `.github/workflows/parity.yml` in muddy-noni-commerce. DO NOT enable
+    in production deployments.
+  - **For interactive debugging against a real auth flow** — configure
+    `ADMIN_EMAILS=<your-email>@<domain>` and sign in via Google OAuth,
+    or thread a pre-issued session cookie into the Playwright context
+    (see Playwright's `storageState`).
 - **The gosx-studio module bump must include the fieldruntime island
   bundle.** Until muddy-noni-commerce's `go.mod` pins a gosx-studio
   version that contains `m31labs.dev/gosx-studio/fieldruntime` (or a
@@ -55,7 +62,7 @@ Prerequisites:
 
 ```bash
 cd ~/work/muddy-noni-commerce
-PORT=3010 go run ./cmd/muddy-noni &
+MUDDY_MOCK_AUTH=1 PORT=3010 go run ./cmd/muddy-noni &
 
 cd ~/work/gosx-studio/parity_e2e   # or the active worktree
 npm install
@@ -63,6 +70,27 @@ npx playwright install chromium
 npm run smoke          # harness boots both modes
 npm test               # full parity suite
 ```
+
+## CI integration
+
+Authoritative CI runner: `.github/workflows/parity.yml` in
+`muddy-noni-commerce`. The workflow:
+
+1. Checks out `muddy-noni-commerce` (the consumer) and `gosx-studio` at
+   the tag this README ships with.
+2. Installs the `gosx` CLI (`go install m31labs.dev/gosx/cmd/gosx@<tag>`)
+   and runs `gosx build .` to populate `dist/` (where the WASM + bootstrap
+   assets land).
+3. Boots muddy-noni in the background with `MUDDY_MOCK_AUTH=1` +
+   `MUDDY_MOCK_CHECKOUT=1` and waits for `/admin/editor` to return 200.
+4. Runs the parity suite from this directory pointed at
+   `http://localhost:3010` via `GOSX_STUDIO_PARITY_BASE_URL`.
+5. Captures the muddy-noni log + playwright report as build artifacts on
+   failure.
+
+If you add a new parity test that needs additional muddy-noni env vars or
+a different boot path, edit both the workflow and the **Prerequisites**
+list above so interactive runs stay in sync with CI.
 
 Override the base URL when running against a different host:
 
