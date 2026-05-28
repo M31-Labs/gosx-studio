@@ -252,6 +252,64 @@ test.describe("GoSXStudioBrandRuntime parity", () => {
     }
   });
 
+  // Sentinel for v0.5.0 BridgeShim auto-mount restoration (all 7 islands).
+  //
+  // The other tests in this file explicitly drive the runtime — they type
+  // into inputs (relying on .bindLogo having attached listeners at boot)
+  // or call runtime methods directly via callRuntime. Both paths silently
+  // still pass if the binding happens for an unrelated reason (e.g., the
+  // host calls .bindLogo manually). This sentinel verifies the v0.5.0
+  // contract end-to-end: navigate the editor route in candidate mode, do
+  // NOTHING else, and assert that the per-slice BridgeShim's autoMount
+  // IIFE wrote its idempotency marker on documentElement for every island
+  // that owns one. If any island's autoMount silently regresses, this is
+  // the first test to fail — every other test would still pass because
+  // they invoke the runtime methods themselves. Pre-v0.5.0 (post legacy-
+  // bundle deletion), all six markers were null because the deleted
+  // studio-engines.js bundle's init() was the only thing that invoked the
+  // boot binds; v0.4.1 restored fieldruntime, v0.5.0 restored the rest.
+  //
+  // The island-side bound-attr (e.g., data-gosx-studio-brand-logo-island-
+  // bound) is NOT asserted here because individual islands' bind() early-
+  // return when required DOM fixtures aren't present in the editor route
+  // (e.g., the brand-logo URL input lives in an inspector panel that's
+  // not always rendered). The shim's autoMount marker is the right
+  // observable — it proves the BridgeShim's auto-mount IIFE ran and
+  // invoked the runtime method, regardless of what the island binder did
+  // with the call.
+  test("BridgeShim auto-mount sentinel: every island marks documentElement on boot", async ({ browser }) => {
+    const handle = await bootCandidate(browser);
+    try {
+      // Wait a tick past assertEditorRoute's GoSXStudioFieldRuntime
+      // presence-check so every slice's autoMount IIFE has run (each
+      // either fires inline or on the already-dispatched DOMContentLoaded
+      // event).
+      await handle.page.waitForTimeout(100);
+      const markers = await handle.page.evaluate(() => ({
+        field: document.documentElement.getAttribute("data-gosx-studio-field-runtime-auto-mounted"),
+        selection: document.documentElement.getAttribute("data-gosx-studio-selection-runtime-auto-mounted"),
+        brand: document.documentElement.getAttribute("data-gosx-studio-brand-runtime-auto-mounted"),
+        blocklayout: document.documentElement.getAttribute("data-gosx-studio-blocklayout-runtime-auto-mounted"),
+        style: document.documentElement.getAttribute("data-gosx-studio-style-runtime-auto-mounted"),
+        preview: document.documentElement.getAttribute("data-gosx-studio-preview-runtime-auto-mounted"),
+        workbench: document.documentElement.getAttribute("data-gosx-studio-workbench-runtime-auto-mounted"),
+      }));
+      // Each marker is set unconditionally by the autoMount IIFE before it
+      // dispatches the runtime call (see <slice>/runtime.go bridgeShimJS).
+      // A null marker means the IIFE either never ran or threw before the
+      // setAttribute — both regressions.
+      expect(markers.field).toBe("true");
+      expect(markers.selection).toBe("true");
+      expect(markers.brand).toBe("true");
+      expect(markers.blocklayout).toBe("true");
+      expect(markers.style).toBe("true");
+      expect(markers.preview).toBe("true");
+      expect(markers.workbench).toBe("true");
+    } finally {
+      await disposeBoot(handle);
+    }
+  });
+
   // Method 1 of 2: bindLogo (editor-side only).
   test("brandruntime.bindLogo parity", async ({ browser }) => {
     const baseline = await bootBaseline(browser);

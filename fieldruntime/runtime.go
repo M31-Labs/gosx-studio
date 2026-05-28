@@ -106,41 +106,28 @@ const bridgeShimJS = `;(function () {
       return false;
     }
   }
-  function delegate(islandGlobal, legacyFn) {
+  function delegate(islandGlobal) {
     return function () {
-      if (flagEnabled()) {
-        var island = window[islandGlobal];
-        if (typeof island === "function") {
-          return island.apply(null, arguments);
-        }
-      }
-      if (typeof legacyFn === "function") {
-        return legacyFn.apply(null, arguments);
+      if (!flagEnabled()) return undefined;
+      var island = window[islandGlobal];
+      if (typeof island === "function") {
+        return island.apply(null, arguments);
       }
       return undefined;
     };
   }
-  // Install the runtime object (the legacy bundle that previously emitted it was removed 2026-05-27) with shims
-  // that consult the feature flag on every call. Legacy functions
-  // (bindFieldRuntime / bindFieldMirroring / bindFieldClipboard) remain
-  // defined in the bundle and are passed in as the fallback path. The
-  // literal island-global names below MUST match
+  // Install the runtime object. Pre-2026-05-27 the BridgeShim wrapped the
+  // legacy bundle's bindFieldRuntime / bindFieldMirroring / bindFieldClipboard
+  // functions as a fallback path; with the legacy bundle deleted in Phase 3
+  // Section E those identifiers are undefined and the fallback branch was
+  // dead code. v0.5.0 removes the dead branch — the island global is the
+  // only path. The literal island-global names below MUST match
   // fieldruntime.IslandGlobals in runtime.go — the test
   // TestBridgeShimDelegatesToIslandGlobals enforces this.
-  var legacy = window.GoSXStudioFieldRuntime || {};
   window.GoSXStudioFieldRuntime = {
-    bind: delegate(
-      "__gosx_field_runtime_island_bind",
-      typeof bindFieldRuntime === "function" ? bindFieldRuntime : legacy.bind
-    ),
-    bindMirroring: delegate(
-      "__gosx_field_runtime_island_bindMirroring",
-      typeof bindFieldMirroring === "function" ? bindFieldMirroring : legacy.bindMirroring
-    ),
-    bindClipboard: delegate(
-      "__gosx_field_runtime_island_bindClipboard",
-      typeof bindFieldClipboard === "function" ? bindFieldClipboard : legacy.bindClipboard
-    )
+    bind: delegate("__gosx_field_runtime_island_bind"),
+    bindMirroring: delegate("__gosx_field_runtime_island_bindMirroring"),
+    bindClipboard: delegate("__gosx_field_runtime_island_bindClipboard")
   };
   // Auto-mount on document ready. The deleted studio-engines.js bundle ran a
   // top-level init() at DOMContentLoaded that called bindFieldRuntime(document)

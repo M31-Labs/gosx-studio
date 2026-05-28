@@ -137,32 +137,52 @@ const bridgeShimJS = `;(function () {
       return false;
     }
   }
-  function delegate(islandGlobal, legacyFn) {
+  function delegate(islandGlobal) {
     return function () {
-      if (flagEnabled()) {
-        var island = window[islandGlobal];
-        if (typeof island === "function") {
-          return island.apply(null, arguments);
-        }
-      }
-      if (typeof legacyFn === "function") {
-        return legacyFn.apply(null, arguments);
+      if (!flagEnabled()) return undefined;
+      var island = window[islandGlobal];
+      if (typeof island === "function") {
+        return island.apply(null, arguments);
       }
       return undefined;
     };
   }
-  // Install the runtime object (the legacy bundle that previously emitted it was removed 2026-05-27) with a shim
-  // that consults the feature flag on every call. The legacy function
-  // (bindSelectionSurface) remains defined in the bundle and is passed in
-  // as the fallback path. The literal island-global name below MUST match
-  // selectionruntime.IslandGlobals in runtime.go — the test
+  // Install the runtime object. Pre-2026-05-27 the BridgeShim wrapped the
+  // legacy bundle's bindSelectionSurface as a fallback path; with the
+  // legacy bundle deleted in Phase 3 Section E that identifier is undefined
+  // and the fallback branch was dead code. v0.5.0 removes the dead branch —
+  // the island global is the only path. The literal island-global name below
+  // MUST match selectionruntime.IslandGlobals in runtime.go — the test
   // TestBridgeShimDelegatesToIslandGlobals enforces this.
-  var legacy = window.GoSXStudioSelectionRuntime || {};
   window.GoSXStudioSelectionRuntime = {
-    bind: delegate(
-      "__gosx_selection_runtime_island_bind",
-      typeof bindSelectionSurface === "function" ? bindSelectionSurface : legacy.bind
-    )
+    bind: delegate("__gosx_selection_runtime_island_bind")
   };
+  // Auto-mount on document ready. Mirrors the v0.4.1 fieldruntime fix: the
+  // deleted studio-engines.js bundle ran a top-level init() at
+  // DOMContentLoaded that called bindSelectionSurface(document) along with
+  // the six sibling runtime binds. When the bundle was deleted the per-
+  // slice BridgeShim correctly re-published window.GoSXStudioSelectionRuntime
+  // but the auto-mount was lost — selection click handlers (block selection,
+  // workspace target, field focus, commandbar, style-scope readouts) were
+  // never attached on initial load. Restoring the auto-mount inside the shim
+  // keeps the responsibility local to the slice and matches the legacy
+  // contract. Idempotent: a per-document marker attribute guards against
+  // double-mount if a host also calls .bind explicitly during SSR hydration.
+  function autoMount() {
+    try {
+      var marker = "data-gosx-studio-selection-runtime-auto-mounted";
+      if (document.documentElement && document.documentElement.getAttribute(marker) === "true") return;
+      if (document.documentElement) document.documentElement.setAttribute(marker, "true");
+      window.GoSXStudioSelectionRuntime.bind(document.body || document);
+    } catch (e) {
+      // Auto-mount must never break the page; the host can always invoke
+      // window.GoSXStudioSelectionRuntime.bind manually if it needs to recover.
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", autoMount);
+  } else {
+    autoMount();
+  }
 })();
 `

@@ -142,36 +142,55 @@ const bridgeShimJS = `;(function () {
       return false;
     }
   }
-  function delegate(islandGlobal, legacyFn) {
+  function delegate(islandGlobal) {
     return function () {
-      if (flagEnabled()) {
-        var island = window[islandGlobal];
-        if (typeof island === "function") {
-          return island.apply(null, arguments);
-        }
-      }
-      if (typeof legacyFn === "function") {
-        return legacyFn.apply(null, arguments);
+      if (!flagEnabled()) return undefined;
+      var island = window[islandGlobal];
+      if (typeof island === "function") {
+        return island.apply(null, arguments);
       }
       return undefined;
     };
   }
-  // Install the runtime object (the legacy bundle that previously emitted it was removed 2026-05-27) with a shim
-  // that consults the feature flag on every call. The legacy functions
-  // (bindBrandLogo / updateHeaderLogo) remain defined in the bundle and
-  // are passed in as the fallback path. The literal island-global names
-  // below MUST match brandruntime.IslandGlobals in runtime.go — the test
-  // TestBridgeShimDelegatesToIslandGlobals enforces this.
-  var legacy = window.GoSXStudioBrandRuntime || {};
+  // Install the runtime object. Pre-2026-05-27 the BridgeShim wrapped the
+  // legacy bundle's bindBrandLogo / updateHeaderLogo as fallback paths;
+  // with the legacy bundle deleted in Phase 3 Section E those identifiers
+  // are undefined and the fallback branches were dead code. v0.5.0 removes
+  // the dead branches — the island global is the only path. The literal
+  // island-global names below MUST match brandruntime.IslandGlobals in
+  // runtime.go — the test TestBridgeShimDelegatesToIslandGlobals enforces
+  // this.
   window.GoSXStudioBrandRuntime = {
-    bindLogo: delegate(
-      "__gosx_brand_runtime_island_bindLogo",
-      typeof bindBrandLogo === "function" ? bindBrandLogo : legacy.bindLogo
-    ),
-    updateHeaderLogo: delegate(
-      "__gosx_brand_runtime_island_updateHeaderLogo",
-      typeof updateHeaderLogo === "function" ? updateHeaderLogo : legacy.updateHeaderLogo
-    )
+    bindLogo: delegate("__gosx_brand_runtime_island_bindLogo"),
+    updateHeaderLogo: delegate("__gosx_brand_runtime_island_updateHeaderLogo")
   };
+  // Auto-mount on document ready. Mirrors the v0.4.1 fieldruntime fix: the
+  // deleted studio-engines.js bundle ran a top-level init() at
+  // DOMContentLoaded that called bindBrandLogo(document) along with the six
+  // sibling runtime binds. When the bundle was deleted the per-slice
+  // BridgeShim correctly re-published window.GoSXStudioBrandRuntime but the
+  // auto-mount was lost — the brand logo URL/width/offset input listeners
+  // were never attached on initial load, so authoring the brand logo from a
+  // cold boot did nothing. updateHeaderLogo is NOT auto-mounted because the
+  // legacy init() only called bindBrandLogo at boot; updateHeaderLogo is a
+  // host-driven preview-side write triggered by user edits. Idempotent: a
+  // per-document marker attribute guards against double-mount if a host also
+  // calls .bindLogo explicitly during SSR hydration.
+  function autoMount() {
+    try {
+      var marker = "data-gosx-studio-brand-runtime-auto-mounted";
+      if (document.documentElement && document.documentElement.getAttribute(marker) === "true") return;
+      if (document.documentElement) document.documentElement.setAttribute(marker, "true");
+      window.GoSXStudioBrandRuntime.bindLogo(document.body || document);
+    } catch (e) {
+      // Auto-mount must never break the page; the host can always invoke
+      // window.GoSXStudioBrandRuntime.bindLogo manually if it needs to recover.
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", autoMount);
+  } else {
+    autoMount();
+  }
 })();
 `

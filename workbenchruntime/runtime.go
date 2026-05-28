@@ -246,93 +246,76 @@ const bridgeShimJS = `;(function () {
       return false;
     }
   }
-  function delegate(islandGlobal, legacyFn) {
+  function delegate(islandGlobal) {
     return function () {
-      if (flagEnabled()) {
-        var island = window[islandGlobal];
-        if (typeof island === "function") {
-          return island.apply(null, arguments);
-        }
-      }
-      if (typeof legacyFn === "function") {
-        return legacyFn.apply(null, arguments);
+      if (!flagEnabled()) return undefined;
+      var island = window[islandGlobal];
+      if (typeof island === "function") {
+        return island.apply(null, arguments);
       }
       return undefined;
     };
   }
-  // Install the runtime object (the legacy bundle that previously emitted it was removed 2026-05-27) with a shim
-  // that consults the feature flag on every call. The legacy functions
-  // (bindWorkbenchRailResizers / bindWorkbenchChrome / setWorkbenchMode /
-  // syncWorkbenchViewport / activateWorkbenchViewport /
-  // currentWorkbenchBreakpoint / setWorkbenchStyleState / syncWorkbenchZoom /
-  // activateWorkbenchZoom / toggleWorkbenchRail / toggleWorkbenchFocus /
-  // toggleWorkbenchActivity / saveWorkbenchLayout / currentWorkbenchRailWidth /
-  // setWorkbenchRailWidth) remain defined in the bundle and are passed in
-  // as the fallback path. The literal island-global names below MUST match
+  // Install the runtime object. Pre-2026-05-27 the BridgeShim wrapped the
+  // legacy bundle's fifteen workbench functions (bindWorkbenchRailResizers
+  // / bindWorkbenchChrome / setWorkbenchMode / syncWorkbenchViewport /
+  // activateWorkbenchViewport / currentWorkbenchBreakpoint /
+  // setWorkbenchStyleState / syncWorkbenchZoom / activateWorkbenchZoom /
+  // toggleWorkbenchRail / toggleWorkbenchFocus / toggleWorkbenchActivity /
+  // saveWorkbenchLayout / currentWorkbenchRailWidth / setWorkbenchRailWidth)
+  // as fallback paths; with the legacy bundle deleted in Phase 3 Section E
+  // those identifiers are undefined and the fallback branches were dead
+  // code. v0.5.0 removes the dead branches — the island global is the only
+  // path. The literal island-global names below MUST match
   // workbenchruntime.IslandGlobals in runtime.go — the test
   // TestBridgeShimDelegatesToIslandGlobals enforces this.
-  var legacy = window.GoSXStudioWorkbenchRuntime || {};
   window.GoSXStudioWorkbenchRuntime = {
-    bindRailResizers: delegate(
-      "__gosx_workbench_runtime_island_bindRailResizers",
-      typeof bindWorkbenchRailResizers === "function" ? bindWorkbenchRailResizers : legacy.bindRailResizers
-    ),
-    bindChrome: delegate(
-      "__gosx_workbench_runtime_island_bindChrome",
-      typeof bindWorkbenchChrome === "function" ? bindWorkbenchChrome : legacy.bindChrome
-    ),
-    setMode: delegate(
-      "__gosx_workbench_runtime_island_setMode",
-      typeof setWorkbenchMode === "function" ? setWorkbenchMode : legacy.setMode
-    ),
-    syncViewport: delegate(
-      "__gosx_workbench_runtime_island_syncViewport",
-      typeof syncWorkbenchViewport === "function" ? syncWorkbenchViewport : legacy.syncViewport
-    ),
-    activateViewport: delegate(
-      "__gosx_workbench_runtime_island_activateViewport",
-      typeof activateWorkbenchViewport === "function" ? activateWorkbenchViewport : legacy.activateViewport
-    ),
-    currentBreakpoint: delegate(
-      "__gosx_workbench_runtime_island_currentBreakpoint",
-      typeof currentWorkbenchBreakpoint === "function" ? currentWorkbenchBreakpoint : legacy.currentBreakpoint
-    ),
-    setStyleState: delegate(
-      "__gosx_workbench_runtime_island_setStyleState",
-      typeof setWorkbenchStyleState === "function" ? setWorkbenchStyleState : legacy.setStyleState
-    ),
-    syncZoom: delegate(
-      "__gosx_workbench_runtime_island_syncZoom",
-      typeof syncWorkbenchZoom === "function" ? syncWorkbenchZoom : legacy.syncZoom
-    ),
-    activateZoom: delegate(
-      "__gosx_workbench_runtime_island_activateZoom",
-      typeof activateWorkbenchZoom === "function" ? activateWorkbenchZoom : legacy.activateZoom
-    ),
-    toggleRail: delegate(
-      "__gosx_workbench_runtime_island_toggleRail",
-      typeof toggleWorkbenchRail === "function" ? toggleWorkbenchRail : legacy.toggleRail
-    ),
-    toggleFocus: delegate(
-      "__gosx_workbench_runtime_island_toggleFocus",
-      typeof toggleWorkbenchFocus === "function" ? toggleWorkbenchFocus : legacy.toggleFocus
-    ),
-    toggleActivity: delegate(
-      "__gosx_workbench_runtime_island_toggleActivity",
-      typeof toggleWorkbenchActivity === "function" ? toggleWorkbenchActivity : legacy.toggleActivity
-    ),
-    saveLayout: delegate(
-      "__gosx_workbench_runtime_island_saveLayout",
-      typeof saveWorkbenchLayout === "function" ? saveWorkbenchLayout : legacy.saveLayout
-    ),
-    currentRailWidth: delegate(
-      "__gosx_workbench_runtime_island_currentRailWidth",
-      typeof currentWorkbenchRailWidth === "function" ? currentWorkbenchRailWidth : legacy.currentRailWidth
-    ),
-    setRailWidth: delegate(
-      "__gosx_workbench_runtime_island_setRailWidth",
-      typeof setWorkbenchRailWidth === "function" ? setWorkbenchRailWidth : legacy.setRailWidth
-    )
+    bindRailResizers: delegate("__gosx_workbench_runtime_island_bindRailResizers"),
+    bindChrome: delegate("__gosx_workbench_runtime_island_bindChrome"),
+    setMode: delegate("__gosx_workbench_runtime_island_setMode"),
+    syncViewport: delegate("__gosx_workbench_runtime_island_syncViewport"),
+    activateViewport: delegate("__gosx_workbench_runtime_island_activateViewport"),
+    currentBreakpoint: delegate("__gosx_workbench_runtime_island_currentBreakpoint"),
+    setStyleState: delegate("__gosx_workbench_runtime_island_setStyleState"),
+    syncZoom: delegate("__gosx_workbench_runtime_island_syncZoom"),
+    activateZoom: delegate("__gosx_workbench_runtime_island_activateZoom"),
+    toggleRail: delegate("__gosx_workbench_runtime_island_toggleRail"),
+    toggleFocus: delegate("__gosx_workbench_runtime_island_toggleFocus"),
+    toggleActivity: delegate("__gosx_workbench_runtime_island_toggleActivity"),
+    saveLayout: delegate("__gosx_workbench_runtime_island_saveLayout"),
+    currentRailWidth: delegate("__gosx_workbench_runtime_island_currentRailWidth"),
+    setRailWidth: delegate("__gosx_workbench_runtime_island_setRailWidth")
   };
+  // Auto-mount on document ready. Mirrors the v0.4.1 fieldruntime fix: the
+  // deleted studio-engines.js bundle ran a top-level init() at
+  // DOMContentLoaded that called bindWorkbenchRailResizers(document) and
+  // bindWorkbenchChrome(document). When the bundle was deleted the per-slice
+  // BridgeShim correctly re-published window.GoSXStudioWorkbenchRuntime but
+  // the two auto-mounts were lost — the rail-resizer drag handles and
+  // workbench chrome (toolbar mode/viewport buttons, command palette
+  // listener) were never wired on initial load. The remaining thirteen
+  // methods on the WorkbenchRuntime contract are host-driven writes (mode
+  // switches, viewport changes, zoom updates, layout save, etc.), not boot
+  // bindings, so they're NOT auto-mounted. Idempotent: a per-document marker
+  // attribute guards against double-mount if a host also calls .bind*
+  // explicitly during SSR hydration.
+  function autoMount() {
+    try {
+      var marker = "data-gosx-studio-workbench-runtime-auto-mounted";
+      if (document.documentElement && document.documentElement.getAttribute(marker) === "true") return;
+      if (document.documentElement) document.documentElement.setAttribute(marker, "true");
+      var root = document.body || document;
+      window.GoSXStudioWorkbenchRuntime.bindRailResizers(root);
+      window.GoSXStudioWorkbenchRuntime.bindChrome(root);
+    } catch (e) {
+      // Auto-mount must never break the page; the host can always invoke
+      // window.GoSXStudioWorkbenchRuntime.bind* manually if it needs to recover.
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", autoMount);
+  } else {
+    autoMount();
+  }
 })();
 `
