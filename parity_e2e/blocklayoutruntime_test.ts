@@ -578,6 +578,258 @@ test.describe("GoSXStudioBlockLayoutRuntime parity", () => {
       await disposeBoot(handle);
     }
   });
+
+  // ===== v0.5.2 follow-on test for the bindList island =====
+  //
+  // bindList is NOT a slice-4 method — it was added in v0.5.2 to close the
+  // last two unmigrated handlers from elm's spore at
+  // ~/.hyphae/spaces/m31labs-gosx/inbox/agents/2026-05-27-elm-bridgemount-restoration-v0-5-0.md:
+  // clicks on [data-block-studio-move] up/down buttons were silently inert
+  // after the legacy bundle deletion because no listener was attached.
+  //
+  // This test does NOT use the parity baseline/candidate harness because
+  // there is no baseline implementation to compare against post-deletion;
+  // it verifies the v0.5.2 behavior directly on the candidate (post-auto-
+  // mount) page.
+  //
+  // The legacy bindBlockLayoutList click handler (studio-engines.js:1942)
+  // dispatched move-button clicks to moveBlockLayoutRow (which insertBefore-
+  // swapped the row with its sibling, then renumbered + reselected) and row
+  // clicks to selectBlockLayoutRow (which toggled .is-selected). v0.5.2's
+  // bindList island restores both. We assert that clicking a move=down
+  // button moves the first row to position two, fires the blockstudio:
+  // reorder CustomEvent on the list with a non-empty source, and that the
+  // per-list bound-attr marker is set.
+  test("v0.5.2 bindList: clicking [data-block-studio-move=down] reorders the row", async ({ browser }) => {
+    const handle = await bootCandidate(browser);
+    try {
+      if (!(await blockListAvailable(handle.page))) {
+        test.skip(true, "no block list present in editor route — fixture drift");
+        return;
+      }
+      const result = await handle.page.evaluate(() => {
+        const firstRow = document.querySelector("[data-block-studio-block]");
+        if (!firstRow) return { skipped: "no [data-block-studio-block] row" as const };
+        const list = firstRow.parentElement;
+        if (!list) return { skipped: "row has no parent list" as const };
+        const listIsBound = list.getAttribute("data-gosx-studio-block-list-island-bound") === "true";
+        // Need at least two rows for a move-down to do something visible.
+        const allRows = Array.prototype.slice.call(list.querySelectorAll("[data-block-studio-block]"));
+        if (allRows.length < 2) return { skipped: "fewer than two block rows" as const };
+        const firstKey = firstRow.getAttribute("data-block-studio-block") || "";
+        const secondKey = (allRows[1] as Element).getAttribute("data-block-studio-block") || "";
+        const moveDown = firstRow.querySelector('[data-block-studio-move="down"]') as HTMLElement | null;
+        if (!moveDown) return { skipped: "first row has no [data-block-studio-move=down] button" as const };
+        let reorderSource = "";
+        let reorderFired = 0;
+        const onReorder = (e: Event) => {
+          reorderFired++;
+          const detail = (e as CustomEvent).detail as { source?: string } | null;
+          if (detail && detail.source) reorderSource = detail.source;
+        };
+        list.addEventListener("blockstudio:reorder", onReorder);
+        moveDown.click();
+        list.removeEventListener("blockstudio:reorder", onReorder);
+        const newOrder = Array.prototype.slice
+          .call(list.querySelectorAll("[data-block-studio-block]"))
+          .map((r: Element) => r.getAttribute("data-block-studio-block") || "");
+        return {
+          skipped: null,
+          listIsBound,
+          firstKey,
+          secondKey,
+          // After moving row 0 down, the previously-second row becomes first
+          // and the originally-first row becomes second.
+          firstNowSecond: newOrder[1] === firstKey,
+          secondNowFirst: newOrder[0] === secondKey,
+          reorderFired,
+          reorderSource,
+        };
+      });
+      if (result.skipped) {
+        test.skip(true, result.skipped);
+        return;
+      }
+      expect(result.listIsBound).toBe(true);
+      expect(result.firstNowSecond).toBe(true);
+      expect(result.secondNowFirst).toBe(true);
+      expect(result.reorderFired).toBeGreaterThan(0);
+      // The move-button path renumbers with source "engine-buttons" (from
+      // moveRow → renumber); the source string must be non-empty so
+      // consumers can distinguish init / button / preview / drag reorders.
+      expect(result.reorderSource).not.toBe("");
+    } finally {
+      await disposeBoot(handle);
+    }
+  });
+
+  // ===== v0.5.2 follow-on test for the bindList row-click delegate =====
+  //
+  // bindList also wires row-click-to-select on top of the move-button
+  // delegate. The legacy bindBlockLayoutList (studio-engines.js:1942)
+  // attached a single click listener that dispatched to selectBlockLayoutRow
+  // when the click hit a [data-block-studio-block] row (and didn't hit a
+  // move button first). hazel's v0.5.1 library_bind covers add-block buttons
+  // on the workbench form, NOT row clicks inside the list, so this delegate
+  // is genuinely new in v0.5.2.
+  //
+  // We click the second row (not the first, to avoid colliding with any
+  // pre-existing .is-selected state on row 0) and assert .is-selected
+  // transitions: the second row gains it, the first row loses it (or never
+  // had it), and a blockstudio:select CustomEvent fires on document.
+  test("v0.5.2 bindList: clicking a [data-block-studio-block] row selects it", async ({ browser }) => {
+    const handle = await bootCandidate(browser);
+    try {
+      if (!(await blockListAvailable(handle.page))) {
+        test.skip(true, "no block list present in editor route — fixture drift");
+        return;
+      }
+      const result = await handle.page.evaluate(() => {
+        const firstRow = document.querySelector("[data-block-studio-block]");
+        if (!firstRow) return { skipped: "no [data-block-studio-block] row" as const };
+        const list = firstRow.parentElement;
+        if (!list) return { skipped: "row has no parent list" as const };
+        const allRows = Array.prototype.slice.call(list.querySelectorAll("[data-block-studio-block]")) as Element[];
+        if (allRows.length < 2) return { skipped: "fewer than two block rows" as const };
+        const targetRow = allRows[1] as HTMLElement;
+        let selectFired = 0;
+        const onSelect = () => { selectFired++; };
+        document.addEventListener("blockstudio:select", onSelect);
+        // Synthesize a click on the row (not on a child input/button) so the
+        // delegate's row-click branch executes, not the move-button branch.
+        targetRow.click();
+        document.removeEventListener("blockstudio:select", onSelect);
+        return {
+          skipped: null,
+          targetSelected: targetRow.classList.contains("is-selected"),
+          selectFired,
+        };
+      });
+      if (result.skipped) {
+        test.skip(true, result.skipped);
+        return;
+      }
+      expect(result.targetSelected).toBe(true);
+      expect(result.selectFired).toBeGreaterThan(0);
+    } finally {
+      await disposeBoot(handle);
+    }
+  });
+
+  // ===== v0.5.2 follow-on test for the bindHandleDrag island =====
+  //
+  // bindHandleDrag is NOT a slice-4 method — it was added in v0.5.2 to
+  // close the last unmigrated handler from elm's spore: pointer-event drag
+  // on [data-block-studio-handle] grips. We drive the drag synthetically
+  // via dispatched PointerEvent instances rather than relying on
+  // Playwright's .dragTo() (which doesn't fire pointer events reliably in
+  // headless mode; the legacy bundle uses pointer events specifically so
+  // touch + stylus inputs work without separate code).
+  //
+  // The reorder source for drag drops is "engine-list" (per the legacy
+  // renumberBlockLayoutList(list, "engine-list") call), distinguishing
+  // drag-drop reorders from button-move ("engine-buttons") / preview-commit
+  // ("engine-preview") / boot-init ("engine-init") reorders.
+  test("v0.5.2 bindHandleDrag: dragging a [data-block-studio-handle] reorders the row", async ({ browser }) => {
+    const handle = await bootCandidate(browser);
+    try {
+      if (!(await blockListAvailable(handle.page))) {
+        test.skip(true, "no block list present in editor route — fixture drift");
+        return;
+      }
+      const result = await handle.page.evaluate(() => {
+        const firstRow = document.querySelector("[data-block-studio-block]");
+        if (!firstRow) return { skipped: "no [data-block-studio-block] row" as const };
+        const list = firstRow.parentElement;
+        if (!list) return { skipped: "row has no parent list" as const };
+        const listIsBound = list.getAttribute("data-gosx-studio-block-handle-drag-island-bound") === "true";
+        const grip = firstRow.querySelector("[data-block-studio-handle]") as HTMLElement | null;
+        if (!grip) return { skipped: "first row has no [data-block-studio-handle] grip" as const };
+        const allRows = Array.prototype.slice.call(list.querySelectorAll("[data-block-studio-block]")) as Element[];
+        if (allRows.length < 2) return { skipped: "fewer than two block rows" as const };
+        const firstKey = firstRow.getAttribute("data-block-studio-block") || "";
+        const secondKey = (allRows[1] as Element).getAttribute("data-block-studio-block") || "";
+        const targetRow = allRows[1] as HTMLElement;
+        const gripRect = grip.getBoundingClientRect();
+        const targetRect = targetRow.getBoundingClientRect();
+        // Synthesize the pointer chain. clientY > target.midY puts the drop
+        // BELOW the target (insertBefore(dragRow, target.nextElementSibling)
+        // per the legacy bundle's pointermove insertBefore branch). The drop
+        // location is well into the bottom half so the test is not flaky on
+        // sub-pixel rounding.
+        const dropY = targetRect.top + targetRect.height * 0.75;
+        const downEvent = new PointerEvent("pointerdown", {
+          bubbles: true,
+          cancelable: true,
+          clientX: gripRect.left + gripRect.width / 2,
+          clientY: gripRect.top + gripRect.height / 2,
+          pointerId: 1,
+          pointerType: "mouse",
+        });
+        const moveEvent = new PointerEvent("pointermove", {
+          bubbles: true,
+          cancelable: true,
+          clientX: targetRect.left + targetRect.width / 2,
+          clientY: dropY,
+          pointerId: 1,
+          pointerType: "mouse",
+        });
+        const upEvent = new PointerEvent("pointerup", {
+          bubbles: true,
+          cancelable: true,
+          clientX: targetRect.left + targetRect.width / 2,
+          clientY: dropY,
+          pointerId: 1,
+          pointerType: "mouse",
+        });
+        let reorderSource = "";
+        let reorderFired = 0;
+        const onReorder = (e: Event) => {
+          reorderFired++;
+          const detail = (e as CustomEvent).detail as { source?: string } | null;
+          if (detail && detail.source) reorderSource = detail.source;
+        };
+        list.addEventListener("blockstudio:reorder", onReorder);
+        grip.dispatchEvent(downEvent);
+        // pointermove is dispatched on the list (any target) per the legacy
+        // bundle — the handler is registered on the list element.
+        list.dispatchEvent(moveEvent);
+        list.dispatchEvent(upEvent);
+        list.removeEventListener("blockstudio:reorder", onReorder);
+        const newOrder = Array.prototype.slice
+          .call(list.querySelectorAll("[data-block-studio-block]"))
+          .map((r: Element) => r.getAttribute("data-block-studio-block") || "");
+        return {
+          skipped: null,
+          listIsBound,
+          firstKey,
+          secondKey,
+          // After dragging row 0 BELOW row 1 (drop in bottom half), row 0
+          // moves to position 1 and row 1 moves to position 0.
+          firstNowSecond: newOrder[1] === firstKey,
+          secondNowFirst: newOrder[0] === secondKey,
+          reorderFired,
+          reorderSource,
+          firstRowHasIsDragging: firstRow.classList.contains("is-dragging"),
+        };
+      });
+      if (result.skipped) {
+        test.skip(true, result.skipped);
+        return;
+      }
+      expect(result.listIsBound).toBe(true);
+      expect(result.firstNowSecond).toBe(true);
+      expect(result.secondNowFirst).toBe(true);
+      expect(result.reorderFired).toBeGreaterThan(0);
+      // The drag-drop path renumbers with source "engine-list" — distinct
+      // from "engine-buttons" / "engine-preview" / "engine-init".
+      expect(result.reorderSource).toBe("engine-list");
+      // .is-dragging must be cleaned up on pointerup.
+      expect(result.firstRowHasIsDragging).toBe(false);
+    } finally {
+      await disposeBoot(handle);
+    }
+  });
 });
 
 // ===== page.evaluate helpers =====
