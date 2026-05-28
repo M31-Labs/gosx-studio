@@ -292,4 +292,116 @@
   }
 
   window.__gosx_blocklayout_runtime_island_updateVisibilityState = updateVisibilityStateIsland;
+
+  // ===== v0.5.1 follow-on: listener-binding islands =====
+  //
+  // The legacy studio-engines.js bundle (deleted 2026-05-27) installed two
+  // listener-binding helpers at boot — bindBlockLayoutLibrary and
+  // bindBlockLayoutVisibility — that the slice-4 island migration did not
+  // cover (slice 4 only owned the nine per-call methods on
+  // GoSXStudioBlockLayoutRuntime). After v0.5.0's bridgemount restoration
+  // the per-call methods are reachable, but add-block button clicks and
+  // visibility checkbox changes have no listener attached so the buttons /
+  // checkboxes render in the correct visual state and silently do nothing
+  // when interacted with.
+  //
+  // v0.5.1 closes the gap by adding two new listener-binding islands
+  // (window.GoSXStudioBlockLayoutRuntime.bindLibrary /
+  // window.GoSXStudioBlockLayoutRuntime.bindVisibility) and calling both
+  // at boot from the BridgeShim auto-mount alongside updateBlockLibraryState.
+  // See:
+  //   - inbox/agents/2026-05-27-elm-bridgemount-restoration-v0-5-0.md
+  //     (Open questions 1 + 2).
+  //   - the legacy bindings at
+  //     git -C ~/work/gosx-studio show 32dac98:assets/studio-engines.js
+  //     lines 2010-2034.
+
+  // editorWorkbenchIsland mirrors the legacy editorWorkbench helper at
+  // studio-engines.js:69. Used by bindLibrary to scope the click delegate
+  // to the workbench form so clicks outside it (e.g., in nav chrome) are
+  // ignored.
+  function editorWorkbenchIsland(root) {
+    if (root && root.matches && root.matches("[data-editor-workbench]")) return root;
+    var scope = root && root.querySelector ? root : doc;
+    return scope.querySelector ? scope.querySelector("[data-editor-workbench]") : null;
+  }
+
+  // bindLibrary(root) — mirrors the legacy bindBlockLayoutLibrary at
+  // studio-engines.js:2022. Resolves the editor workbench form under root,
+  // attaches a click delegate that activates the block named by every
+  // [data-editor-add-block] button: flips the row's visibility checkbox to
+  // checked + dispatches input/change events (so the visibility island
+  // fires updateVisibilityState), calls selectRow(form, key), scrolls the
+  // row into view, focuses it, and refreshes the library button states.
+  //
+  // Idempotency: guarded per-form via the
+  // data-gosx-studio-block-library-island-bound dataset key (renamed from
+  // the legacy gosxStudioBlockLibraryBound to make the post-deletion
+  // ownership obvious). A second call against the same form returns
+  // silently — listeners do not stack.
+  //
+  // The handler closes over the form scope and uses event.target.closest
+  // so dynamically-inserted add-block buttons (e.g., when a host re-renders
+  // the library) work without re-binding — only the form needs to be in
+  // the DOM at bind time.
+  function bindLibraryIsland(root) {
+    var form = editorWorkbenchIsland(root);
+    if (!form || form.dataset.gosxStudioBlockLibraryIslandBound === "true") return;
+    form.dataset.gosxStudioBlockLibraryIslandBound = "true";
+    form.addEventListener("click", function (event) {
+      var button = event.target && event.target.closest
+        ? event.target.closest("[data-editor-add-block]")
+        : null;
+      if (!button || !form.contains(button)) return;
+      var key = button.getAttribute("data-editor-add-block");
+      var row = rowForKeyIsland(form, key);
+      if (!row) return;
+      var checkbox = row.querySelector("[data-editor-block-visible]");
+      if (checkbox && !checkbox.checked) {
+        checkbox.checked = true;
+        checkbox.dispatchEvent(new Event("input", { bubbles: true }));
+        checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      selectRowIsland(form, key);
+      var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (row.scrollIntoView) {
+        row.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
+      }
+      window.setTimeout(function () {
+        if (row.focus) row.focus();
+      }, 180);
+      updateBlockLibraryStateIsland(doc);
+    });
+    updateBlockLibraryStateIsland(doc);
+  }
+
+  window.__gosx_blocklayout_runtime_island_bindLibrary = bindLibraryIsland;
+
+  // bindVisibility(root) — mirrors the legacy bindBlockLayoutVisibility at
+  // studio-engines.js:2010. For every [data-editor-block-visible] checkbox
+  // in scope, attaches a change listener that calls updateVisibilityState
+  // (the row hide-class / status text / pill class / library refresh +
+  // $preview.block.<key>.visible publish per ADR 0008 / slice 6 transitional
+  // cleanup). Also fires updateVisibilityState(check) once at bind time to
+  // sync the storefront preview's initial state to the checkbox state.
+  //
+  // Idempotency: guarded per-checkbox via the
+  // data-gosx-studio-block-visibility-island-bound dataset key (renamed
+  // from the legacy gosxStudioBlockVisibilityBound to make the post-deletion
+  // ownership obvious). A second call against the same checkbox returns
+  // silently — listeners do not stack and the initial-sync write does not
+  // re-fire.
+  function bindVisibilityIsland(root) {
+    var scope = root && root.querySelectorAll ? root : doc;
+    Array.prototype.forEach.call(scope.querySelectorAll("[data-editor-block-visible]"), function (check) {
+      if (check.dataset.gosxStudioBlockVisibilityIslandBound === "true") return;
+      check.dataset.gosxStudioBlockVisibilityIslandBound = "true";
+      check.addEventListener("change", function () {
+        updateVisibilityStateIsland(check);
+      });
+      updateVisibilityStateIsland(check);
+    });
+  }
+
+  window.__gosx_blocklayout_runtime_island_bindVisibility = bindVisibilityIsland;
 })();
