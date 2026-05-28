@@ -142,36 +142,27 @@ const bridgeShimJS = `;(function () {
       return false;
     }
   }
-  function delegate(islandGlobal, legacyFn) {
+  function delegate(islandGlobal) {
     return function () {
-      if (flagEnabled()) {
-        var island = window[islandGlobal];
-        if (typeof island === "function") {
-          return island.apply(null, arguments);
-        }
-      }
-      if (typeof legacyFn === "function") {
-        return legacyFn.apply(null, arguments);
+      if (!flagEnabled()) return undefined;
+      var island = window[islandGlobal];
+      if (typeof island === "function") {
+        return island.apply(null, arguments);
       }
       return undefined;
     };
   }
-  // Install the runtime object (the legacy bundle that previously emitted it was removed 2026-05-27) with a shim
-  // that consults the feature flag on every call. The legacy functions
-  // (bindBrandLogo / updateHeaderLogo) remain defined in the bundle and
-  // are passed in as the fallback path. The literal island-global names
-  // below MUST match brandruntime.IslandGlobals in runtime.go — the test
-  // TestBridgeShimDelegatesToIslandGlobals enforces this.
-  var legacy = window.GoSXStudioBrandRuntime || {};
+  // Install the runtime object. Pre-2026-05-27 the BridgeShim wrapped the
+  // legacy bundle's bindBrandLogo / updateHeaderLogo as fallback paths;
+  // with the legacy bundle deleted in Phase 3 Section E those identifiers
+  // are undefined and the fallback branches were dead code. v0.5.0 removes
+  // the dead branches — the island global is the only path. The literal
+  // island-global names below MUST match brandruntime.IslandGlobals in
+  // runtime.go — the test TestBridgeShimDelegatesToIslandGlobals enforces
+  // this.
   window.GoSXStudioBrandRuntime = {
-    bindLogo: delegate(
-      "__gosx_brand_runtime_island_bindLogo",
-      typeof bindBrandLogo === "function" ? bindBrandLogo : legacy.bindLogo
-    ),
-    updateHeaderLogo: delegate(
-      "__gosx_brand_runtime_island_updateHeaderLogo",
-      typeof updateHeaderLogo === "function" ? updateHeaderLogo : legacy.updateHeaderLogo
-    )
+    bindLogo: delegate("__gosx_brand_runtime_island_bindLogo"),
+    updateHeaderLogo: delegate("__gosx_brand_runtime_island_updateHeaderLogo")
   };
   // Auto-mount on document ready. Mirrors the v0.4.1 fieldruntime fix: the
   // deleted studio-engines.js bundle ran a top-level init() at
