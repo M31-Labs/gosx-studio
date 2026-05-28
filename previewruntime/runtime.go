@@ -260,71 +260,37 @@ const bridgeShimJS = `;(function () {
       return false;
     }
   }
-  function delegate(islandGlobal, legacyFn) {
+  function delegate(islandGlobal) {
     return function () {
-      if (flagEnabled()) {
-        var island = window[islandGlobal];
-        if (typeof island === "function") {
-          return island.apply(null, arguments);
-        }
-      }
-      if (typeof legacyFn === "function") {
-        return legacyFn.apply(null, arguments);
+      if (!flagEnabled()) return undefined;
+      var island = window[islandGlobal];
+      if (typeof island === "function") {
+        return island.apply(null, arguments);
       }
       return undefined;
     };
   }
-  // Install the runtime object (the legacy bundle that previously emitted it was removed 2026-05-27) with a shim
-  // that consults the feature flag on every call. the legacy bundle's
-  // IIFE has already run by the time this shim runs (the legacy bundle
-  // is concatenated into the bundle BEFORE the slice bundles — see
-  // gosx-studio/runtime.go EngineRuntimeScript()), so
-  // window.GoSXStudioPreviewRuntime is the legacy object whose methods
-  // we wrap as the fallback path. The island-global names below MUST
-  // match previewruntime.IslandGlobals in runtime.go — the test
+  // Install the runtime object. Pre-2026-05-27 the BridgeShim wrapped the
+  // legacy preview-runtime.js bundle's PreviewRuntime methods (mount /
+  // setBlockVisibility / applyTextUpdate / applyTheme / applyStyleImpact /
+  // applyCSS / applyFonts / updateHeaderLogo / requestInlineEdit /
+  // cycleField) as fallback paths; with the legacy bundle deleted in Phase
+  // 3 Section E those identifiers are undefined and the fallback branches
+  // were dead code. v0.5.0 removes the dead branches — the island global
+  // is the only path. The island-global names below MUST match
+  // previewruntime.IslandGlobals in runtime.go — the test
   // TestBridgeShimDelegatesToIslandGlobals enforces this.
-  var legacy = window.GoSXStudioPreviewRuntime || {};
   window.GoSXStudioPreviewRuntime = {
-    mount: delegate(
-      "__gosx_preview_runtime_island_mount",
-      typeof legacy.mount === "function" ? legacy.mount : undefined
-    ),
-    setBlockVisibility: delegate(
-      "__gosx_preview_runtime_island_setBlockVisibility",
-      typeof legacy.setBlockVisibility === "function" ? legacy.setBlockVisibility : undefined
-    ),
-    applyTextUpdate: delegate(
-      "__gosx_preview_runtime_island_applyTextUpdate",
-      typeof legacy.applyTextUpdate === "function" ? legacy.applyTextUpdate : undefined
-    ),
-    applyTheme: delegate(
-      "__gosx_preview_runtime_island_applyTheme",
-      typeof legacy.applyTheme === "function" ? legacy.applyTheme : undefined
-    ),
-    applyStyleImpact: delegate(
-      "__gosx_preview_runtime_island_applyStyleImpact",
-      typeof legacy.applyStyleImpact === "function" ? legacy.applyStyleImpact : undefined
-    ),
-    applyCSS: delegate(
-      "__gosx_preview_runtime_island_applyCSS",
-      typeof legacy.applyCSS === "function" ? legacy.applyCSS : undefined
-    ),
-    applyFonts: delegate(
-      "__gosx_preview_runtime_island_applyFonts",
-      typeof legacy.applyFonts === "function" ? legacy.applyFonts : undefined
-    ),
-    updateHeaderLogo: delegate(
-      "__gosx_preview_runtime_island_updateHeaderLogo",
-      typeof legacy.updateHeaderLogo === "function" ? legacy.updateHeaderLogo : undefined
-    ),
-    requestInlineEdit: delegate(
-      "__gosx_preview_runtime_island_requestInlineEdit",
-      typeof legacy.requestInlineEdit === "function" ? legacy.requestInlineEdit : undefined
-    ),
-    cycleField: delegate(
-      "__gosx_preview_runtime_island_cycleField",
-      typeof legacy.cycleField === "function" ? legacy.cycleField : undefined
-    )
+    mount: delegate("__gosx_preview_runtime_island_mount"),
+    setBlockVisibility: delegate("__gosx_preview_runtime_island_setBlockVisibility"),
+    applyTextUpdate: delegate("__gosx_preview_runtime_island_applyTextUpdate"),
+    applyTheme: delegate("__gosx_preview_runtime_island_applyTheme"),
+    applyStyleImpact: delegate("__gosx_preview_runtime_island_applyStyleImpact"),
+    applyCSS: delegate("__gosx_preview_runtime_island_applyCSS"),
+    applyFonts: delegate("__gosx_preview_runtime_island_applyFonts"),
+    updateHeaderLogo: delegate("__gosx_preview_runtime_island_updateHeaderLogo"),
+    requestInlineEdit: delegate("__gosx_preview_runtime_island_requestInlineEdit"),
+    cycleField: delegate("__gosx_preview_runtime_island_cycleField")
   };
   // Auto-mount on document ready. Mirrors the v0.4.1 fieldruntime fix: the
   // deleted preview-runtime.js bundle's CanvasEngine factory called
