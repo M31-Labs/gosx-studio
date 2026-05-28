@@ -404,4 +404,209 @@
   }
 
   window.__gosx_blocklayout_runtime_island_bindVisibility = bindVisibilityIsland;
+
+  // ===== v0.5.2 follow-on: bindList + bindHandleDrag islands =====
+  //
+  // The deleted studio-engines.js bundle (removed 2026-05-27) installed two
+  // further listener-binding helpers — bindBlockLayoutList (the per-list
+  // click delegate for move buttons + row click-to-select, plus initial
+  // boot-time renumber and rows-non-draggable flag) and bindBlockLayoutHandleDrag
+  // (the per-list pointer-event drag-and-drop reorder chain for
+  // [data-block-studio-handle] grips). The slice-4 island migration owned
+  // only the nine per-call methods on GoSXStudioBlockLayoutRuntime; the
+  // v0.5.1 follow-on covered bindLibrary + bindVisibility. v0.5.2 closes
+  // the burn-down by migrating these last two.
+  //
+  // After v0.5.2 the block-layout-runtime listener-binding surface is fully
+  // on islands. The only legacy bind* helpers remaining in the deleted
+  // bundle snapshot (32dac98:assets/studio-engines.js) belong to other
+  // contracts that already have their own island packages
+  // (workbenchruntime / fieldruntime / brandruntime / styleruntime /
+  // selectionruntime).
+  //
+  // See:
+  //   - inbox/agents/2026-05-27-elm-bridgemount-restoration-v0-5-0.md
+  //   - the legacy bindings at
+  //     git -C ~/work/gosx-studio show 32dac98:assets/studio-engines.js
+  //     lines 1942-1958 (bindBlockLayoutList) and 2112-2141 (bindBlockLayoutHandleDrag).
+
+  // listForRowIsland walks from a [data-block-studio-block] row to its
+  // nearest list ancestor — the parent element that contains the row
+  // siblings the delegate should swap with. The legacy bindBlockLayoutList
+  // was called from the engine-mount factory with the list element directly,
+  // so it didn't need this helper; v0.5.2 instead walks the document for
+  // every row and binds each row's parent list once, idempotently. This
+  // matches how the BridgeShim's auto-mount passes `document` as scope.
+  function listForRowIsland(row) {
+    return row && row.parentElement ? row.parentElement : null;
+  }
+
+  // bindListIsland(root) — mirrors the legacy bindBlockLayoutList at
+  // studio-engines.js:1942. For every block-row list (the parent of every
+  // [data-block-studio-block] row), attaches a single click delegate that
+  // dispatches to:
+  //   - moveRow(list, row, "up"|"down") when the click hits a
+  //     [data-block-studio-move] button inside the list.
+  //   - selectRow(list, rowKey(row)) when the click hits a
+  //     [data-block-studio-block] row inside the list.
+  // Also sets each row's .draggable = false (so the HTML5 native drag
+  // attribute does not interfere with the pointer-event drag handler that
+  // bindHandleDrag attaches) and calls renumber(list, "engine-init") once
+  // so [data-block-studio-order] inputs, [data-block-studio-index] attrs,
+  // and the move-button disabled states are correct on first paint —
+  // matching the legacy boot-time renumberBlockLayoutList(list, "engine-init")
+  // call at the tail of bindBlockLayoutList.
+  //
+  // Idempotency: guarded per-list via the
+  // data-gosx-studio-block-list-island-bound dataset key (renamed from the
+  // legacy gosxStudioBlockLayoutBound to make the post-deletion ownership
+  // obvious). A second call against the same list returns silently —
+  // listeners do not stack and the initial renumber does not re-fire.
+  function bindListIsland(root) {
+    var scope = root && root.querySelectorAll ? root : doc;
+    var seen = [];
+    Array.prototype.forEach.call(scope.querySelectorAll("[data-block-studio-block]"), function (row) {
+      var list = listForRowIsland(row);
+      if (!list) return;
+      // De-dup lists within a single bindList call (one bind per parent).
+      for (var i = 0; i < seen.length; i++) {
+        if (seen[i] === list) return;
+      }
+      seen.push(list);
+      if (list.dataset.gosxStudioBlockListIslandBound === "true") return;
+      list.dataset.gosxStudioBlockListIslandBound = "true";
+      // Disable the HTML5 native drag attribute on every row so the
+      // pointer-event drag handler (bindHandleDrag) owns drag interactions
+      // unambiguously. The legacy bundle did this at bind time too.
+      Array.prototype.forEach.call(list.querySelectorAll("[data-block-studio-block]"), function (r) {
+        r.draggable = false;
+      });
+      list.addEventListener("click", function (event) {
+        var move = event.target && event.target.closest
+          ? event.target.closest("[data-block-studio-move]")
+          : null;
+        if (move && list.contains(move)) {
+          event.preventDefault();
+          var moveRow = move.closest("[data-block-studio-block]");
+          moveRowIsland(list, moveRow, move.getAttribute("data-block-studio-move"));
+          return;
+        }
+        var clickedRow = event.target && event.target.closest
+          ? event.target.closest("[data-block-studio-block]")
+          : null;
+        if (clickedRow && list.contains(clickedRow)) {
+          selectRowIsland(list, rowKeyIsland(clickedRow));
+        }
+      });
+      // Initial renumber pass — preserves the legacy boot-time call
+      // renumberBlockLayoutList(list, "engine-init"). Source string is
+      // surfaced on the blockstudio:reorder CustomEvent so consumers can
+      // distinguish init from engine-buttons / engine-preview / engine-list.
+      renumberIsland(list, "engine-init");
+    });
+  }
+
+  window.__gosx_blocklayout_runtime_island_bindList = bindListIsland;
+
+  // closestRowByYIsland mirrors the legacy closestBlockLayoutRowByY at
+  // studio-engines.js:2143. Used by the pointermove handler to locate the
+  // nearest non-dragging row by midpoint Y so the dragged row can
+  // insertBefore-swap above or below it. Pure read-only DOM query; returns
+  // null when no candidate row exists.
+  function closestRowByYIsland(list, y, dragging) {
+    var best = null;
+    var bestDistance = Number.POSITIVE_INFINITY;
+    Array.prototype.forEach.call(list.querySelectorAll("[data-block-studio-block]"), function (row) {
+      if (row === dragging) return;
+      var rect = row.getBoundingClientRect();
+      var distance = Math.abs(y - (rect.top + rect.height / 2));
+      if (distance < bestDistance) {
+        best = row;
+        bestDistance = distance;
+      }
+    });
+    return best;
+  }
+
+  // bindHandleDragIsland(root) — mirrors the legacy bindBlockLayoutHandleDrag
+  // at studio-engines.js:2112. For every block-row list (the parent of every
+  // [data-block-studio-handle] grip), attaches the pointer-event drag chain:
+  //
+  //   - pointerdown on [data-block-studio-handle]: capture the row + key +
+  //     clientY into a per-list drag state; mark the row .is-dragging;
+  //     setPointerCapture on the handle so subsequent pointermove /
+  //     pointerup events stream to the handle even when the cursor leaves it.
+  //   - pointermove (any target): locate the nearest other row by midpoint
+  //     Y; insertBefore-swap the dragged row above or below it based on
+  //     whether the cursor is in the top or bottom half of that row.
+  //   - pointerup / pointercancel: remove .is-dragging; call
+  //     renumber(list, "engine-list") so [data-block-studio-order] /
+  //     [data-block-studio-index] reflect the final ordering and the
+  //     blockstudio:reorder event fires; selectRow(list, drag.key) so the
+  //     dropped row is the active selection.
+  //
+  // IMPORTANT: the legacy implementation uses pointer events (not HTML5
+  // native drag) and the handle selector is [data-block-studio-handle]
+  // (not [data-block-studio-drag-handle]). This island preserves both
+  // choices exactly so behavior parity holds against the deleted legacy
+  // snapshot.
+  //
+  // Idempotency: guarded per-list via the
+  // data-gosx-studio-block-handle-drag-island-bound dataset key. A second
+  // call against the same list returns silently — listeners do not stack
+  // and the per-list drag state is preserved.
+  function bindHandleDragIsland(root) {
+    var scope = root && root.querySelectorAll ? root : doc;
+    var seen = [];
+    Array.prototype.forEach.call(scope.querySelectorAll("[data-block-studio-handle]"), function (handle) {
+      var row = handle.closest ? handle.closest("[data-block-studio-block]") : null;
+      var list = row ? listForRowIsland(row) : null;
+      if (!list) return;
+      // De-dup lists within a single bindHandleDrag call (one bind per parent).
+      for (var i = 0; i < seen.length; i++) {
+        if (seen[i] === list) return;
+      }
+      seen.push(list);
+      if (list.dataset.gosxStudioBlockHandleDragIslandBound === "true") return;
+      list.dataset.gosxStudioBlockHandleDragIslandBound = "true";
+      var drag = null;
+      list.addEventListener("pointerdown", function (event) {
+        var pointerHandle = event.target && event.target.closest
+          ? event.target.closest("[data-block-studio-handle]")
+          : null;
+        if (!pointerHandle || !list.contains(pointerHandle)) return;
+        var pointerRow = pointerHandle.closest("[data-block-studio-block]");
+        if (!pointerRow) return;
+        event.preventDefault();
+        drag = { row: pointerRow, key: rowKeyIsland(pointerRow), y: event.clientY };
+        pointerRow.classList.add("is-dragging");
+        if (pointerHandle.setPointerCapture) {
+          try { pointerHandle.setPointerCapture(event.pointerId); } catch (e) { /* ignore */ }
+        }
+      });
+      list.addEventListener("pointermove", function (event) {
+        if (!drag) return;
+        event.preventDefault();
+        var target = closestRowByYIsland(list, event.clientY, drag.row);
+        if (!target) return;
+        var rect = target.getBoundingClientRect();
+        list.insertBefore(drag.row, event.clientY > rect.top + rect.height / 2 ? target.nextElementSibling : target);
+      });
+      function finish() {
+        if (!drag) return;
+        drag.row.classList.remove("is-dragging");
+        // Reorder source "engine-list" preserves the legacy
+        // renumberBlockLayoutList(list, "engine-list") call so consumers
+        // subscribing to blockstudio:reorder can distinguish drag-drop
+        // reorders from button-move / preview-commit reorders.
+        renumberIsland(list, "engine-list");
+        selectRowIsland(list, drag.key);
+        drag = null;
+      }
+      list.addEventListener("pointerup", finish);
+      list.addEventListener("pointercancel", finish);
+    });
+  }
+
+  window.__gosx_blocklayout_runtime_island_bindHandleDrag = bindHandleDragIsland;
 })();
