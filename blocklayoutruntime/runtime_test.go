@@ -62,6 +62,10 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 		// ~/.hyphae/spaces/m31labs-gosx/inbox/agents/2026-05-27-elm-bridgemount-restoration-v0-5-0.md).
 		IslandGlobals.BindLibrary,
 		IslandGlobals.BindVisibility,
+		// v0.5.2 listener-binding methods (last two unmigrated handlers
+		// from the same spore — bindBlockLayoutList + bindBlockLayoutHandleDrag).
+		IslandGlobals.BindList,
+		IslandGlobals.BindHandleDrag,
 		FeatureFlagKey,
 	} {
 		if !strings.Contains(shim, fragment) {
@@ -299,6 +303,13 @@ func TestBridgeShimAutoMountsOnDocumentReady(t *testing.T) {
 		"DOMContentLoaded",
 		"window.GoSXStudioBlockLayoutRuntime.bindLibrary",
 		"window.GoSXStudioBlockLayoutRuntime.bindVisibility",
+		// v0.5.2 follow-on: the last two listener-binding methods
+		// (bindBlockLayoutList + bindBlockLayoutHandleDrag from the
+		// deleted legacy bundle) now also fire at boot so move buttons,
+		// row click-to-select, initial renumber, and pointer-event drag-
+		// and-drop reorder work in production without host intervention.
+		"window.GoSXStudioBlockLayoutRuntime.bindList",
+		"window.GoSXStudioBlockLayoutRuntime.bindHandleDrag",
 		"window.GoSXStudioBlockLayoutRuntime.updateBlockLibraryState",
 	} {
 		if !strings.Contains(shim, fragment) {
@@ -370,6 +381,92 @@ func TestIslandRuntimeJSPublishesBindVisibilityGlobal(t *testing.T) {
 	} {
 		if !strings.Contains(body, contract) {
 			t.Fatalf("IslandRuntimeJS() bindVisibility must preserve %q contract", contract)
+		}
+	}
+}
+
+func TestIslandRuntimeJSPublishesBindListGlobal(t *testing.T) {
+	// v0.5.2 follow-on: bindList(root) restores the deleted
+	// bindBlockLayoutList helper (studio-engines.js:1942 in the legacy
+	// bundle deleted 2026-05-27). For every [data-block-studio-block] row's
+	// nearest list ancestor, attaches:
+	//   1. A click delegate that handles [data-block-studio-move] up/down
+	//      buttons (calls moveRow) and [data-block-studio-block] row clicks
+	//      (calls selectRow).
+	//   2. draggable=false on every row so the legacy HTML5 native drag
+	//      attribute does not race with the pointer-event drag handler that
+	//      bindHandleDrag attaches.
+	//   3. An initial renumber(list, "engine-init") pass so order inputs,
+	//      [data-block-studio-index] attrs, and the move-button disabled
+	//      states are correct on first paint.
+	//
+	// Idempotency: per-list marker
+	// data-gosx-studio-block-list-island-bound="true" (renamed from the
+	// legacy gosxStudioBlockLayoutBound to make the post-deletion ownership
+	// obvious — sibling to v0.5.1's per-form / per-checkbox markers).
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.BindList + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// DOM contracts the click handler queries against.
+		"data-block-studio-block",
+		"data-block-studio-move",
+		// Idempotency marker (camelCase dataset key form).
+		"gosxStudioBlockListIslandBound",
+		// Initial renumber pass — preserves the legacy boot-time
+		// renumberBlockLayoutList(list, "engine-init") call.
+		"engine-init",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() bindList must preserve %q contract", contract)
+		}
+	}
+}
+
+func TestIslandRuntimeJSPublishesBindHandleDragGlobal(t *testing.T) {
+	// v0.5.2 follow-on: bindHandleDrag(root) restores the deleted
+	// bindBlockLayoutHandleDrag helper (studio-engines.js:2112 in the
+	// legacy bundle deleted 2026-05-27). For every [data-block-studio-handle]
+	// grip's nearest list ancestor, attaches the pointer-event drag chain:
+	//   - pointerdown on the handle captures the row + key + clientY.
+	//   - pointermove finds the nearest other row by midpoint Y and
+	//     insertBefore-swaps the dragged row above or below it.
+	//   - pointerup / pointercancel removes .is-dragging, calls
+	//     renumber(list, "engine-list"), and reselects the dragged row.
+	//
+	// IMPORTANT: the legacy implementation uses pointer events — NOT HTML5
+	// native drag events — and the handle selector is
+	// [data-block-studio-handle], NOT [data-block-studio-drag-handle]. The
+	// v0.5.2 island preserves both choices exactly so behavior parity holds
+	// against the deleted legacy snapshot.
+	//
+	// Idempotency: per-list marker
+	// data-gosx-studio-block-handle-drag-island-bound="true" (sibling to
+	// v0.5.1's per-form / per-checkbox markers).
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.BindHandleDrag + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// DOM contracts the pointer chain queries against.
+		"data-block-studio-handle",
+		"data-block-studio-block",
+		// Pointer event names — NOT HTML5 drag events.
+		"pointerdown",
+		"pointermove",
+		"pointerup",
+		"pointercancel",
+		// Reorder source used on drop — preserves legacy
+		// renumberBlockLayoutList(list, "engine-list") call.
+		"engine-list",
+		// Idempotency marker (camelCase dataset key form).
+		"gosxStudioBlockHandleDragIslandBound",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() bindHandleDrag must preserve %q contract", contract)
 		}
 	}
 }

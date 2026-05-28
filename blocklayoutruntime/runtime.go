@@ -85,10 +85,18 @@ const FeatureFlagKey = "block-layout-runtime-islands"
 // BlockLayoutRuntime declares nine slice-4 per-call methods (rows, rowKey,
 // rowForKey, moveRow, renumber, selectRow, commitReorder,
 // updateBlockLibraryState, updateVisibilityState) plus two v0.5.1
-// listener-binding methods (bindLibrary, bindVisibility — see the trailing
-// "v0.5.1 follow-on" section in island_runtime.js for the rationale and the
-// elm spore at ~/.hyphae/spaces/m31labs-gosx/inbox/agents/2026-05-27-elm-bridgemount-restoration-v0-5-0.md
-// for the bug they close), so the struct holds eleven fields.
+// listener-binding methods (bindLibrary, bindVisibility — see the
+// "v0.5.1 follow-on" section in island_runtime.js for the rationale and
+// the elm spore at ~/.hyphae/spaces/m31labs-gosx/inbox/agents/2026-05-27-elm-bridgemount-restoration-v0-5-0.md
+// for the bug they close) plus two v0.5.2 listener-binding methods
+// (bindList, bindHandleDrag — see the trailing "v0.5.2 follow-on" section
+// in island_runtime.js; these close the last two unmigrated handlers the
+// elm spore surfaced: move-button click delegation, row click-to-select,
+// initial renumber-on-mount, and the pointer-event drag-and-drop reorder
+// chain). So the struct holds thirteen fields. With v0.5.2 the
+// listener-binding surface of GoSXStudioBlockLayoutRuntime is fully on
+// islands; the only legacy bind* helpers remaining in the deleted bundle
+// snapshot are unrelated to this contract.
 var IslandGlobals = struct {
 	Rows                    string
 	RowKey                  string
@@ -101,6 +109,8 @@ var IslandGlobals = struct {
 	UpdateVisibilityState   string
 	BindLibrary             string
 	BindVisibility          string
+	BindList                string
+	BindHandleDrag          string
 }{
 	Rows:                    "__gosx_blocklayout_runtime_island_rows",
 	RowKey:                  "__gosx_blocklayout_runtime_island_rowKey",
@@ -113,6 +123,8 @@ var IslandGlobals = struct {
 	UpdateVisibilityState:   "__gosx_blocklayout_runtime_island_updateVisibilityState",
 	BindLibrary:             "__gosx_blocklayout_runtime_island_bindLibrary",
 	BindVisibility:          "__gosx_blocklayout_runtime_island_bindVisibility",
+	BindList:                "__gosx_blocklayout_runtime_island_bindList",
+	BindHandleDrag:          "__gosx_blocklayout_runtime_island_bindHandleDrag",
 }
 
 // BridgeShim returns the JavaScript snippet that gosx-studio's runtime
@@ -225,7 +237,19 @@ const bridgeShimJS = `;(function () {
     // island_runtime.js and elm's spore at
     // ~/.hyphae/spaces/m31labs-gosx/inbox/agents/2026-05-27-elm-bridgemount-restoration-v0-5-0.md.
     bindLibrary: delegate("__gosx_blocklayout_runtime_island_bindLibrary"),
-    bindVisibility: delegate("__gosx_blocklayout_runtime_island_bindVisibility")
+    bindVisibility: delegate("__gosx_blocklayout_runtime_island_bindVisibility"),
+    // v0.5.2 follow-on: the last two listener-binding methods. The deleted
+    // studio-engines.js bundle also installed bindBlockLayoutList (per-list
+    // click delegation for [data-block-studio-move] up/down buttons and
+    // [data-block-studio-block] row click-to-select, plus initial
+    // renumber-on-mount) and bindBlockLayoutHandleDrag (per-list pointer-
+    // event drag-and-drop reorder over [data-block-studio-handle] grips).
+    // After v0.5.1 the add-block / visibility checkboxes worked but the
+    // move buttons, row clicks, and drag handles remained inert. v0.5.2
+    // closes the burn-down. See the trailing "v0.5.2 follow-on" section
+    // in island_runtime.js.
+    bindList: delegate("__gosx_blocklayout_runtime_island_bindList"),
+    bindHandleDrag: delegate("__gosx_blocklayout_runtime_island_bindHandleDrag")
   };
   // Auto-mount on document ready. Mirrors the v0.4.1 fieldruntime fix: the
   // deleted studio-engines.js bundle's engine-mount factory invoked
@@ -239,27 +263,40 @@ const bridgeShimJS = `;(function () {
   // explicitly deferred to a follow-up because their migration to islands
   // hadn't shipped yet.
   //
-  // v0.5.1 ships those island migrations (see library_bind.gsx +
-  // visibility_bind.gsx + the trailing "v0.5.1 follow-on" section in
-  // island_runtime.js) and the auto-mount now invokes all three observables
-  // so add-block button clicks and visibility checkbox changes actually
-  // work in production — the bug elm filed at
-  // ~/.hyphae/spaces/m31labs-gosx/inbox/agents/2026-05-27-elm-bridgemount-restoration-v0-5-0.md
-  // (Open questions 1 + 2) is closed.
+  // v0.5.1 shipped those island migrations (see library_bind.gsx +
+  // visibility_bind.gsx + the "v0.5.1 follow-on" section in
+  // island_runtime.js); v0.5.2 ships the last two listener-binding islands
+  // (see list_bind.gsx + handle_drag_bind.gsx + the trailing "v0.5.2 follow-
+  // on" section in island_runtime.js). The auto-mount now invokes the
+  // complete set of boot-time observables so add-block button clicks,
+  // visibility checkbox changes, move-button clicks, row click-to-select,
+  // initial renumber-on-mount, and pointer-event drag-and-drop reorder all
+  // work in production — the v0.5.0 spore (Open questions 1 + 2) and the
+  // last two unmigrated handlers are all closed.
   //
-  // Call order matters: bindVisibility attaches change handlers AND fires
-  // updateVisibilityState(check) once at bind time for each checkbox — the
-  // initial-sync write also refreshes the library state. We then call
-  // updateBlockLibraryState(document) explicitly so the library buttons
-  // reflect the post-sync row visibility even when there are zero
-  // checkboxes (in which case bindVisibility runs nothing). bindLibrary
-  // is order-independent (it just attaches a click delegate to the form).
+  // Call order matters:
+  //   1. bindVisibility attaches change handlers AND fires
+  //      updateVisibilityState(check) once at bind time for each checkbox —
+  //      the initial-sync write also refreshes the library state.
+  //   2. bindList walks every [data-block-studio-block]'s nearest list
+  //      ancestor, attaches the move-button + row-click delegate, marks
+  //      rows non-draggable (legacy HTML5 attribute would conflict with the
+  //      pointer-event drag handler), and calls renumber(list, "engine-init")
+  //      once per list so order inputs / button disabled states / the
+  //      blockstudio:reorder event fire on first paint.
+  //   3. bindHandleDrag walks every [data-block-studio-handle]'s nearest
+  //      list ancestor and attaches the pointer-event drag chain.
+  //   4. updateBlockLibraryState(document) explicitly so the library
+  //      buttons reflect the post-sync row visibility even when there are
+  //      zero checkboxes (in which case bindVisibility runs nothing).
+  // bindLibrary is order-independent (it just attaches a click delegate to
+  // the workbench form).
   //
   // Idempotent: a per-document marker attribute guards against double-mount
-  // of the outer auto-mount IIFE; the bindLibrary / bindVisibility islands
-  // additionally guard themselves per-form / per-checkbox via dataset
-  // markers so a host calling them directly during SSR hydration also
-  // doesn't stack listeners.
+  // of the outer auto-mount IIFE; the bindLibrary / bindVisibility /
+  // bindList / bindHandleDrag islands additionally guard themselves
+  // per-form / per-checkbox / per-list via dataset markers so a host
+  // calling them directly during SSR hydration also doesn't stack listeners.
   function autoMount() {
     try {
       var marker = "data-gosx-studio-blocklayout-runtime-auto-mounted";
@@ -267,12 +304,14 @@ const bridgeShimJS = `;(function () {
       if (document.documentElement) document.documentElement.setAttribute(marker, "true");
       window.GoSXStudioBlockLayoutRuntime.bindLibrary(document);
       window.GoSXStudioBlockLayoutRuntime.bindVisibility(document);
+      window.GoSXStudioBlockLayoutRuntime.bindList(document);
+      window.GoSXStudioBlockLayoutRuntime.bindHandleDrag(document);
       window.GoSXStudioBlockLayoutRuntime.updateBlockLibraryState(document);
     } catch (e) {
       // Auto-mount must never break the page; the host can always invoke
       // window.GoSXStudioBlockLayoutRuntime.bindLibrary /
-      // .bindVisibility / .updateBlockLibraryState manually if it needs to
-      // recover.
+      // .bindVisibility / .bindList / .bindHandleDrag /
+      // .updateBlockLibraryState manually if it needs to recover.
     }
   }
   if (document.readyState === "loading") {
