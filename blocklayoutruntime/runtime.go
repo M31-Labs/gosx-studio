@@ -82,9 +82,13 @@ const FeatureFlagKey = "block-layout-runtime-islands"
 // at call time so unmounted islands fall back to the legacy implementation.
 //
 // Naming convention: window.__gosx_blocklayout_runtime_island_<methodName>.
-// BlockLayoutRuntime declares nine public methods (rows, rowKey, rowForKey,
-// moveRow, renumber, selectRow, commitReorder, updateBlockLibraryState,
-// updateVisibilityState), so the struct holds nine fields.
+// BlockLayoutRuntime declares nine slice-4 per-call methods (rows, rowKey,
+// rowForKey, moveRow, renumber, selectRow, commitReorder,
+// updateBlockLibraryState, updateVisibilityState) plus two v0.5.1
+// listener-binding methods (bindLibrary, bindVisibility — see the trailing
+// "v0.5.1 follow-on" section in island_runtime.js for the rationale and the
+// elm spore at ~/.hyphae/spaces/m31labs-gosx/inbox/agents/2026-05-27-elm-bridgemount-restoration-v0-5-0.md
+// for the bug they close), so the struct holds eleven fields.
 var IslandGlobals = struct {
 	Rows                    string
 	RowKey                  string
@@ -95,6 +99,8 @@ var IslandGlobals = struct {
 	CommitReorder           string
 	UpdateBlockLibraryState string
 	UpdateVisibilityState   string
+	BindLibrary             string
+	BindVisibility          string
 }{
 	Rows:                    "__gosx_blocklayout_runtime_island_rows",
 	RowKey:                  "__gosx_blocklayout_runtime_island_rowKey",
@@ -105,6 +111,8 @@ var IslandGlobals = struct {
 	CommitReorder:           "__gosx_blocklayout_runtime_island_commitReorder",
 	UpdateBlockLibraryState: "__gosx_blocklayout_runtime_island_updateBlockLibraryState",
 	UpdateVisibilityState:   "__gosx_blocklayout_runtime_island_updateVisibilityState",
+	BindLibrary:             "__gosx_blocklayout_runtime_island_bindLibrary",
+	BindVisibility:          "__gosx_blocklayout_runtime_island_bindVisibility",
 }
 
 // BridgeShim returns the JavaScript snippet that gosx-studio's runtime
@@ -207,39 +215,64 @@ const bridgeShimJS = `;(function () {
     selectRow: delegate("__gosx_blocklayout_runtime_island_selectRow"),
     commitReorder: delegate("__gosx_blocklayout_runtime_island_commitReorder"),
     updateBlockLibraryState: delegate("__gosx_blocklayout_runtime_island_updateBlockLibraryState"),
-    updateVisibilityState: delegate("__gosx_blocklayout_runtime_island_updateVisibilityState")
+    updateVisibilityState: delegate("__gosx_blocklayout_runtime_island_updateVisibilityState"),
+    // v0.5.1 follow-on: listener-binding methods. The slice-4 island
+    // migration only covered the nine per-call methods above; the deleted
+    // studio-engines.js bundle's bindBlockLayoutLibrary and
+    // bindBlockLayoutVisibility helpers were the missing piece that made
+    // add-block button clicks and visibility checkbox changes actually
+    // do something. See the trailing "v0.5.1 follow-on" section in
+    // island_runtime.js and elm's spore at
+    // ~/.hyphae/spaces/m31labs-gosx/inbox/agents/2026-05-27-elm-bridgemount-restoration-v0-5-0.md.
+    bindLibrary: delegate("__gosx_blocklayout_runtime_island_bindLibrary"),
+    bindVisibility: delegate("__gosx_blocklayout_runtime_island_bindVisibility")
   };
   // Auto-mount on document ready. Mirrors the v0.4.1 fieldruntime fix: the
   // deleted studio-engines.js bundle's engine-mount factory invoked
   // bindBlockLayoutList / bindBlockLayoutLibrary / bindBlockLayoutVisibility
-  // for the block-layout engine at boot. Those three binders are NOT yet
-  // migrated to island globals (the legacy bundle is gone but the click-
-  // handler binding logic for data-editor-add-block / data-editor-block-
-  // visible was not yet re-implemented in an island). v0.5.0 restores the
-  // observable that DOES exist as an island global: updateBlockLibraryState
-  // refreshes the library button states (className / aria-pressed / label)
-  // against the current row visibility on initial load, matching the legacy
-  // updateBlockLayoutLibraryState(document) call at the tail of every
-  // boot-time bindBlockLayoutLibrary / bindBlockLayoutVisibility pass.
-  // Restoring the per-row click-handler attachment is a follow-up that needs
-  // its own island migration (a future blocklayoutruntime bindLibrary /
-  // bindVisibility contract); without that the buttons render in the
-  // correct visual state but clicks remain inert until the host wires them.
-  // updateVisibilityState is per-checkbox (not document-rooted) so it's NOT
-  // auto-called — calling it at boot without a checkbox argument would no-op
-  // and writing across all checkboxes individually would duplicate the
-  // library refresh that updateBlockLibraryState already issues. Idempotent:
-  // a per-document marker attribute guards against double-mount.
+  // for the block-layout engine at boot.
+  //
+  // v0.5.0 (the prior bridgemount restoration) only restored
+  // updateBlockLibraryState — the observable that refreshes the library
+  // button states (className / aria-pressed / label) against the current
+  // row visibility on initial load. The two listener-binding helpers were
+  // explicitly deferred to a follow-up because their migration to islands
+  // hadn't shipped yet.
+  //
+  // v0.5.1 ships those island migrations (see library_bind.gsx +
+  // visibility_bind.gsx + the trailing "v0.5.1 follow-on" section in
+  // island_runtime.js) and the auto-mount now invokes all three observables
+  // so add-block button clicks and visibility checkbox changes actually
+  // work in production — the bug elm filed at
+  // ~/.hyphae/spaces/m31labs-gosx/inbox/agents/2026-05-27-elm-bridgemount-restoration-v0-5-0.md
+  // (Open questions 1 + 2) is closed.
+  //
+  // Call order matters: bindVisibility attaches change handlers AND fires
+  // updateVisibilityState(check) once at bind time for each checkbox — the
+  // initial-sync write also refreshes the library state. We then call
+  // updateBlockLibraryState(document) explicitly so the library buttons
+  // reflect the post-sync row visibility even when there are zero
+  // checkboxes (in which case bindVisibility runs nothing). bindLibrary
+  // is order-independent (it just attaches a click delegate to the form).
+  //
+  // Idempotent: a per-document marker attribute guards against double-mount
+  // of the outer auto-mount IIFE; the bindLibrary / bindVisibility islands
+  // additionally guard themselves per-form / per-checkbox via dataset
+  // markers so a host calling them directly during SSR hydration also
+  // doesn't stack listeners.
   function autoMount() {
     try {
       var marker = "data-gosx-studio-blocklayout-runtime-auto-mounted";
       if (document.documentElement && document.documentElement.getAttribute(marker) === "true") return;
       if (document.documentElement) document.documentElement.setAttribute(marker, "true");
+      window.GoSXStudioBlockLayoutRuntime.bindLibrary(document);
+      window.GoSXStudioBlockLayoutRuntime.bindVisibility(document);
       window.GoSXStudioBlockLayoutRuntime.updateBlockLibraryState(document);
     } catch (e) {
       // Auto-mount must never break the page; the host can always invoke
-      // window.GoSXStudioBlockLayoutRuntime.updateBlockLibraryState manually
-      // if it needs to recover.
+      // window.GoSXStudioBlockLayoutRuntime.bindLibrary /
+      // .bindVisibility / .updateBlockLibraryState manually if it needs to
+      // recover.
     }
   }
   if (document.readyState === "loading") {
