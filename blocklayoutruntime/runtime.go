@@ -177,67 +177,37 @@ const bridgeShimJS = `;(function () {
       return false;
     }
   }
-  function delegate(islandGlobal, legacyFn) {
+  function delegate(islandGlobal) {
     return function () {
-      if (flagEnabled()) {
-        var island = window[islandGlobal];
-        if (typeof island === "function") {
-          return island.apply(null, arguments);
-        }
-      }
-      if (typeof legacyFn === "function") {
-        return legacyFn.apply(null, arguments);
+      if (!flagEnabled()) return undefined;
+      var island = window[islandGlobal];
+      if (typeof island === "function") {
+        return island.apply(null, arguments);
       }
       return undefined;
     };
   }
-  // Install the runtime object (the legacy bundle that previously emitted it was removed 2026-05-27) with a shim
-  // that consults the feature flag on every call. The legacy functions
-  // (blockRows / blockRowKey / blockRowForKey / moveBlockLayoutRow /
-  // renumberBlockLayoutList / selectBlockLayoutRow / commitBlockLayoutReorder /
-  // updateBlockLayoutLibraryState / updateBlockLayoutVisibilityState) remain
-  // defined in the bundle and are passed in as the fallback path. The
-  // literal island-global names below MUST match
+  // Install the runtime object. Pre-2026-05-27 the BridgeShim wrapped the
+  // legacy bundle's nine block-layout binders (blockRows / blockRowKey /
+  // blockRowForKey / moveBlockLayoutRow / renumberBlockLayoutList /
+  // selectBlockLayoutRow / commitBlockLayoutReorder /
+  // updateBlockLayoutLibraryState / updateBlockLayoutVisibilityState) as
+  // fallback paths; with the legacy bundle deleted in Phase 3 Section E
+  // those identifiers are undefined and the fallback branches were dead
+  // code. v0.5.0 removes the dead branches — the island global is the only
+  // path. The literal island-global names below MUST match
   // blocklayoutruntime.IslandGlobals in runtime.go — the test
   // TestBridgeShimDelegatesToIslandGlobals enforces this.
-  var legacy = window.GoSXStudioBlockLayoutRuntime || {};
   window.GoSXStudioBlockLayoutRuntime = {
-    rows: delegate(
-      "__gosx_blocklayout_runtime_island_rows",
-      typeof blockRows === "function" ? blockRows : legacy.rows
-    ),
-    rowKey: delegate(
-      "__gosx_blocklayout_runtime_island_rowKey",
-      typeof blockRowKey === "function" ? blockRowKey : legacy.rowKey
-    ),
-    rowForKey: delegate(
-      "__gosx_blocklayout_runtime_island_rowForKey",
-      typeof blockRowForKey === "function" ? blockRowForKey : legacy.rowForKey
-    ),
-    moveRow: delegate(
-      "__gosx_blocklayout_runtime_island_moveRow",
-      typeof moveBlockLayoutRow === "function" ? moveBlockLayoutRow : legacy.moveRow
-    ),
-    renumber: delegate(
-      "__gosx_blocklayout_runtime_island_renumber",
-      typeof renumberBlockLayoutList === "function" ? renumberBlockLayoutList : legacy.renumber
-    ),
-    selectRow: delegate(
-      "__gosx_blocklayout_runtime_island_selectRow",
-      typeof selectBlockLayoutRow === "function" ? selectBlockLayoutRow : legacy.selectRow
-    ),
-    commitReorder: delegate(
-      "__gosx_blocklayout_runtime_island_commitReorder",
-      typeof commitBlockLayoutReorder === "function" ? commitBlockLayoutReorder : legacy.commitReorder
-    ),
-    updateBlockLibraryState: delegate(
-      "__gosx_blocklayout_runtime_island_updateBlockLibraryState",
-      typeof updateBlockLayoutLibraryState === "function" ? updateBlockLayoutLibraryState : legacy.updateBlockLibraryState
-    ),
-    updateVisibilityState: delegate(
-      "__gosx_blocklayout_runtime_island_updateVisibilityState",
-      typeof updateBlockLayoutVisibilityState === "function" ? updateBlockLayoutVisibilityState : legacy.updateVisibilityState
-    )
+    rows: delegate("__gosx_blocklayout_runtime_island_rows"),
+    rowKey: delegate("__gosx_blocklayout_runtime_island_rowKey"),
+    rowForKey: delegate("__gosx_blocklayout_runtime_island_rowForKey"),
+    moveRow: delegate("__gosx_blocklayout_runtime_island_moveRow"),
+    renumber: delegate("__gosx_blocklayout_runtime_island_renumber"),
+    selectRow: delegate("__gosx_blocklayout_runtime_island_selectRow"),
+    commitReorder: delegate("__gosx_blocklayout_runtime_island_commitReorder"),
+    updateBlockLibraryState: delegate("__gosx_blocklayout_runtime_island_updateBlockLibraryState"),
+    updateVisibilityState: delegate("__gosx_blocklayout_runtime_island_updateVisibilityState")
   };
   // Auto-mount on document ready. Mirrors the v0.4.1 fieldruntime fix: the
   // deleted studio-engines.js bundle's engine-mount factory invoked
