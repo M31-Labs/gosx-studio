@@ -267,5 +267,39 @@ const bridgeShimJS = `;(function () {
       typeof resetStyleControlValue === "function" ? resetStyleControlValue : legacy.resetControlValue
     )
   };
+  // Auto-mount on document ready. Mirrors the v0.4.1 fieldruntime fix: the
+  // deleted studio-engines.js bundle ran a top-level init() at
+  // DOMContentLoaded that called four StyleRuntime binds — bindTheme,
+  // bindStyleWorkbench, bindCSS, bindFonts — against document. When the
+  // bundle was deleted the per-slice BridgeShim correctly re-published
+  // window.GoSXStudioStyleRuntime but the four auto-mounts were lost — none
+  // of the style control listeners (theme picker, workbench control buttons,
+  // CSS editor, font picker) were attached on initial load, so editing styles
+  // from a cold boot did nothing. The remaining six methods (applyTheme,
+  // syncControlButtons, showImpact, restoreImpact, setControlValue,
+  // resetControlValue) are NOT auto-mounted because the legacy init() only
+  // called the four bind* methods at boot; the rest are host-driven writes.
+  // Idempotent: a per-document marker attribute guards against double-mount
+  // if a host also calls .bind* explicitly during SSR hydration.
+  function autoMount() {
+    try {
+      var marker = "data-gosx-studio-style-runtime-auto-mounted";
+      if (document.documentElement && document.documentElement.getAttribute(marker) === "true") return;
+      if (document.documentElement) document.documentElement.setAttribute(marker, "true");
+      var root = document.body || document;
+      window.GoSXStudioStyleRuntime.bindTheme(root);
+      window.GoSXStudioStyleRuntime.bindWorkbench(root);
+      window.GoSXStudioStyleRuntime.bindCSS(root);
+      window.GoSXStudioStyleRuntime.bindFonts(root);
+    } catch (e) {
+      // Auto-mount must never break the page; the host can always invoke
+      // window.GoSXStudioStyleRuntime.bind* manually if it needs to recover.
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", autoMount);
+  } else {
+    autoMount();
+  }
 })();
 `
