@@ -438,6 +438,146 @@ test.describe("GoSXStudioBlockLayoutRuntime parity", () => {
       await disposeBoot(candidate);
     }
   });
+
+  // ===== v0.5.1 follow-on test for the bindLibrary island =====
+  //
+  // bindLibrary is NOT a slice-4 method — it was added in v0.5.1 to close
+  // Open question 1 in
+  // ~/.hyphae/spaces/m31labs-gosx/inbox/agents/2026-05-27-elm-bridgemount-restoration-v0-5-0.md:
+  // clicks on [data-editor-add-block] buttons were silently inert after
+  // the legacy bundle deletion because no listener was attached.
+  //
+  // This test does NOT use the parity baseline/candidate harness because
+  // there is no baseline implementation to compare against post-deletion;
+  // it verifies the v0.5.1 behavior directly on the candidate (post-auto-
+  // mount) page.
+  //
+  // The legacy bindBlockLayoutLibrary click handler (studio-engines.js:2022)
+  // flipped the row's [data-editor-block-visible] checkbox to checked +
+  // dispatched input/change events, selected the row, scrolled into view,
+  // focused it, and refreshed the library buttons. v0.5.1's bindLibrary
+  // island restores all of that. We assert the two observables that don't
+  // depend on viewport state (the checkbox transitions to checked, and a
+  // change event fires on it) plus the .is-selected class membership and
+  // the per-form bound-attr marker.
+  test("v0.5.1 bindLibrary: clicking [data-editor-add-block] activates the block", async ({ browser }) => {
+    const handle = await bootCandidate(browser);
+    try {
+      if (!(await blockListAvailable(handle.page))) {
+        test.skip(true, "no block list present in editor route — fixture drift");
+        return;
+      }
+      const result = await handle.page.evaluate(() => {
+        const form = document.querySelector("[data-editor-workbench]");
+        if (!form) return { skipped: "no [data-editor-workbench] form" as const };
+        const button = form.querySelector("[data-editor-add-block]") as HTMLElement | null;
+        if (!button) return { skipped: "no [data-editor-add-block] button" as const };
+        const key = button.getAttribute("data-editor-add-block") || "";
+        if (!key) return { skipped: "[data-editor-add-block] button missing key" as const };
+        const row = document.querySelector(`[data-block-studio-block="${key}"]`);
+        if (!row) return { skipped: "no row matches the add-block key" as const };
+        const checkbox = row.querySelector("[data-editor-block-visible]") as HTMLInputElement | null;
+        if (!checkbox) return { skipped: "row has no [data-editor-block-visible] checkbox" as const };
+        // Force the checkbox off so the click handler has work to do.
+        checkbox.checked = false;
+        let changeFired = 0;
+        const onChange = () => { changeFired++; };
+        checkbox.addEventListener("change", onChange);
+        button.click();
+        checkbox.removeEventListener("change", onChange);
+        const formIsBound = form.getAttribute("data-gosx-studio-block-library-island-bound") === "true";
+        return {
+          skipped: null,
+          formIsBound,
+          checkboxChecked: checkbox.checked,
+          changeEventFired: changeFired,
+          rowSelected: row.classList.contains("is-selected"),
+        };
+      });
+      if (result.skipped) {
+        test.skip(true, result.skipped);
+        return;
+      }
+      expect(result.formIsBound).toBe(true);
+      expect(result.checkboxChecked).toBe(true);
+      expect(result.changeEventFired).toBeGreaterThan(0);
+      expect(result.rowSelected).toBe(true);
+    } finally {
+      await disposeBoot(handle);
+    }
+  });
+
+  // ===== v0.5.1 follow-on test for the bindVisibility island =====
+  //
+  // bindVisibility is NOT a slice-4 method — it was added in v0.5.1 to
+  // close Open question 2 in
+  // ~/.hyphae/spaces/m31labs-gosx/inbox/agents/2026-05-27-elm-bridgemount-restoration-v0-5-0.md:
+  // changes to [data-editor-block-visible] checkboxes were silently inert
+  // after the legacy bundle deletion because no listener was attached.
+  //
+  // The legacy bindBlockLayoutVisibility change handler (studio-engines.js:
+  // 2010) called updateBlockLayoutVisibilityState(check) on every change,
+  // which toggled the row's editor-block--hidden class, updated the status
+  // text + pill className, and delegated the cross-frame mutation through
+  // GoSXStudioPreviewRuntime.setBlockVisibility. v0.5.1's bindVisibility
+  // island attaches the same change listener (the cross-frame mutation now
+  // rides on the $preview.block.<key>.visible shared signal per ADR 0008 /
+  // slice 6 transitional cleanup). We assert the editor-side observables —
+  // the row gains the hidden class and the status text flips to "Hidden" —
+  // when the checkbox is toggled off, plus the per-checkbox bound-attr
+  // marker.
+  test("v0.5.1 bindVisibility: toggling [data-editor-block-visible] hides the row", async ({ browser }) => {
+    const handle = await bootCandidate(browser);
+    try {
+      if (!(await blockListAvailable(handle.page))) {
+        test.skip(true, "no block list present in editor route — fixture drift");
+        return;
+      }
+      const result = await handle.page.evaluate(() => {
+        const row = document.querySelector("[data-block-studio-block]");
+        if (!row) return { skipped: "no [data-block-studio-block] row" as const };
+        const checkbox = row.querySelector("[data-editor-block-visible]") as HTMLInputElement | null;
+        if (!checkbox) return { skipped: "row has no [data-editor-block-visible] checkbox" as const };
+        const checkboxIsBound = checkbox.getAttribute("data-gosx-studio-block-visibility-island-bound") === "true";
+        // Force the checkbox on so the bind-time initial-sync write doesn't
+        // race with our assertion below. The bind already ran at auto-mount;
+        // setting checked here and dispatching change drives the listener.
+        checkbox.checked = true;
+        // Drive the listener that bindVisibility attached.
+        checkbox.checked = false;
+        checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+        const status = row.querySelector("[data-editor-block-status]") as HTMLElement | null;
+        const pill = row.querySelector("[data-editor-block-pill]") as HTMLElement | null;
+        return {
+          skipped: null,
+          checkboxIsBound,
+          rowHasHiddenClass: row.classList.contains("editor-block--hidden"),
+          statusText: status?.textContent?.trim() ?? "",
+          pillClassName: pill?.className ?? "",
+        };
+      });
+      if (result.skipped) {
+        test.skip(true, result.skipped);
+        return;
+      }
+      expect(result.checkboxIsBound).toBe(true);
+      expect(result.rowHasHiddenClass).toBe(true);
+      // The status text is set by updateVisibilityState to "Hidden" when
+      // the checkbox is unchecked (matches the legacy bundle's exact label).
+      // Skip the assertion when the status node isn't present in the
+      // fixture — some block rows render without an explicit status node.
+      if (result.statusText !== "") {
+        expect(result.statusText).toBe("Hidden");
+      }
+      // Pill className is set to "status" (no --ready modifier) when
+      // hidden. Skip the assertion when the pill isn't present.
+      if (result.pillClassName !== "") {
+        expect(result.pillClassName).toBe("status");
+      }
+    } finally {
+      await disposeBoot(handle);
+    }
+  });
 });
 
 // ===== page.evaluate helpers =====
