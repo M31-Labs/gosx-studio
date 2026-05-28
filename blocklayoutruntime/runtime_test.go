@@ -58,6 +58,10 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 		IslandGlobals.CommitReorder,
 		IslandGlobals.UpdateBlockLibraryState,
 		IslandGlobals.UpdateVisibilityState,
+		// v0.5.1 listener-binding methods (Open questions 1 + 2 in
+		// ~/.hyphae/spaces/m31labs-gosx/inbox/agents/2026-05-27-elm-bridgemount-restoration-v0-5-0.md).
+		IslandGlobals.BindLibrary,
+		IslandGlobals.BindVisibility,
 		FeatureFlagKey,
 	} {
 		if !strings.Contains(shim, fragment) {
@@ -277,24 +281,95 @@ func TestIslandRuntimeJSPublishesUpdateVisibilityStateGlobal(t *testing.T) {
 func TestBridgeShimAutoMountsOnDocumentReady(t *testing.T) {
 	// Pre-2026-05-27 the deleted studio-engines.js bundle's engine-mount
 	// factory invoked bindBlockLayoutList / bindBlockLayoutLibrary /
-	// bindBlockLayoutVisibility for the block-layout engine at boot. After
-	// deletion the only top-level method on the BlockLayoutRuntime contract
-	// that maps to a boot-time observable is updateBlockLibraryState — it
-	// refreshes the library button states (className / aria-pressed / label)
-	// against the current row visibility, matching the legacy
-	// updateBlockLayoutLibraryState(document) call at the tail of every
-	// boot-time bindBlockLayoutLibrary pass. The v0.5.0 auto-mount restores
-	// that observable. Per-row click-handler attachment is NOT restored here
-	// because the legacy bindBlockLayoutLibrary / bindBlockLayoutVisibility
-	// click-handler logic was not yet migrated to an island — that's a
-	// follow-up (future bindLibrary / bindVisibility island contracts).
+	// bindBlockLayoutVisibility for the block-layout engine at boot.
+	//
+	// v0.5.0 restored the observable that DID exist as an island global:
+	// updateBlockLibraryState — refreshes the library button states
+	// (className / aria-pressed / label) against the current row visibility.
+	// The two listener-binding helpers were deferred because their island
+	// migration hadn't shipped yet.
+	//
+	// v0.5.1 ships those island migrations (bindLibrary, bindVisibility)
+	// and the auto-mount now invokes all three so add-block button clicks
+	// and visibility checkbox changes actually work in production. See
+	// ~/.hyphae/spaces/m31labs-gosx/inbox/agents/2026-05-27-elm-bridgemount-restoration-v0-5-0.md
+	// (Open questions 1 + 2) for the bug this closes.
 	shim := string(BridgeShim())
 	for _, fragment := range []string{
 		"DOMContentLoaded",
+		"window.GoSXStudioBlockLayoutRuntime.bindLibrary",
+		"window.GoSXStudioBlockLayoutRuntime.bindVisibility",
 		"window.GoSXStudioBlockLayoutRuntime.updateBlockLibraryState",
 	} {
 		if !strings.Contains(shim, fragment) {
 			t.Fatalf("BridgeShim() missing auto-mount fragment %q:\n%s", fragment, shim)
+		}
+	}
+}
+
+func TestIslandRuntimeJSPublishesBindLibraryGlobal(t *testing.T) {
+	// v0.5.1 follow-on: bindLibrary(root) restores the deleted
+	// bindBlockLayoutLibrary helper (studio-engines.js:2022 in the legacy
+	// bundle deleted 2026-05-27). The island scopes a click delegate to
+	// the editor workbench form for [data-editor-add-block] buttons; on
+	// click, the row's visibility checkbox is flipped to checked (with
+	// input + change events so the visibility island fires), the row is
+	// selected, scrolled into view, focused, and the library buttons are
+	// refreshed.
+	//
+	// Idempotency: per-form marker
+	// data-gosx-studio-block-library-island-bound="true" (renamed from the
+	// legacy gosxStudioBlockLibraryBound to make the post-deletion
+	// ownership obvious). Compare to the deleted bindBlockLayoutLibrary
+	// pattern documented in the slice-4 deletion log "Idempotency" table.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.BindLibrary + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// DOM contracts the click handler queries against.
+		"data-editor-workbench",
+		"data-editor-add-block",
+		"data-editor-block-visible",
+		// Idempotency marker (camelCase dataset key form).
+		"gosxStudioBlockLibraryIslandBound",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() bindLibrary must preserve %q contract", contract)
+		}
+	}
+}
+
+func TestIslandRuntimeJSPublishesBindVisibilityGlobal(t *testing.T) {
+	// v0.5.1 follow-on: bindVisibility(root) restores the deleted
+	// bindBlockLayoutVisibility helper (studio-engines.js:2010 in the
+	// legacy bundle deleted 2026-05-27). For every
+	// [data-editor-block-visible] checkbox in root, attaches a change
+	// listener that calls updateVisibilityState (which toggles the row's
+	// hidden class, status text, pill class, and publishes the
+	// $preview.block.<key>.visible shared signal). Also fires
+	// updateVisibilityState(check) once at bind time to sync the
+	// storefront preview's initial state to the checkbox state.
+	//
+	// Idempotency: per-checkbox marker
+	// data-gosx-studio-block-visibility-island-bound="true" (renamed from
+	// the legacy gosxStudioBlockVisibilityBound to make the post-deletion
+	// ownership obvious). Compare to the deleted bindBlockLayoutVisibility
+	// pattern documented in the slice-4 deletion log "Idempotency" table.
+	body := string(IslandRuntimeJS())
+	want := "window." + IslandGlobals.BindVisibility + " "
+	if !strings.Contains(body, want) {
+		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	for _, contract := range []string{
+		// DOM contract the change handler queries against.
+		"data-editor-block-visible",
+		// Idempotency marker (camelCase dataset key form).
+		"gosxStudioBlockVisibilityIslandBound",
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() bindVisibility must preserve %q contract", contract)
 		}
 	}
 }
