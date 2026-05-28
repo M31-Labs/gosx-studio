@@ -239,5 +239,43 @@ const bridgeShimJS = `;(function () {
       typeof updateBlockLayoutVisibilityState === "function" ? updateBlockLayoutVisibilityState : legacy.updateVisibilityState
     )
   };
+  // Auto-mount on document ready. Mirrors the v0.4.1 fieldruntime fix: the
+  // deleted studio-engines.js bundle's engine-mount factory invoked
+  // bindBlockLayoutList / bindBlockLayoutLibrary / bindBlockLayoutVisibility
+  // for the block-layout engine at boot. Those three binders are NOT yet
+  // migrated to island globals (the legacy bundle is gone but the click-
+  // handler binding logic for data-editor-add-block / data-editor-block-
+  // visible was not yet re-implemented in an island). v0.5.0 restores the
+  // observable that DOES exist as an island global: updateBlockLibraryState
+  // refreshes the library button states (className / aria-pressed / label)
+  // against the current row visibility on initial load, matching the legacy
+  // updateBlockLayoutLibraryState(document) call at the tail of every
+  // boot-time bindBlockLayoutLibrary / bindBlockLayoutVisibility pass.
+  // Restoring the per-row click-handler attachment is a follow-up that needs
+  // its own island migration (a future blocklayoutruntime bindLibrary /
+  // bindVisibility contract); without that the buttons render in the
+  // correct visual state but clicks remain inert until the host wires them.
+  // updateVisibilityState is per-checkbox (not document-rooted) so it's NOT
+  // auto-called — calling it at boot without a checkbox argument would no-op
+  // and writing across all checkboxes individually would duplicate the
+  // library refresh that updateBlockLibraryState already issues. Idempotent:
+  // a per-document marker attribute guards against double-mount.
+  function autoMount() {
+    try {
+      var marker = "data-gosx-studio-blocklayout-runtime-auto-mounted";
+      if (document.documentElement && document.documentElement.getAttribute(marker) === "true") return;
+      if (document.documentElement) document.documentElement.setAttribute(marker, "true");
+      window.GoSXStudioBlockLayoutRuntime.updateBlockLibraryState(document);
+    } catch (e) {
+      // Auto-mount must never break the page; the host can always invoke
+      // window.GoSXStudioBlockLayoutRuntime.updateBlockLibraryState manually
+      // if it needs to recover.
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", autoMount);
+  } else {
+    autoMount();
+  }
 })();
 `

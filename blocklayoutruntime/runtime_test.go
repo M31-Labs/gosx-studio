@@ -274,6 +274,31 @@ func TestIslandRuntimeJSPublishesUpdateVisibilityStateGlobal(t *testing.T) {
 	}
 }
 
+func TestBridgeShimAutoMountsOnDocumentReady(t *testing.T) {
+	// Pre-2026-05-27 the deleted studio-engines.js bundle's engine-mount
+	// factory invoked bindBlockLayoutList / bindBlockLayoutLibrary /
+	// bindBlockLayoutVisibility for the block-layout engine at boot. After
+	// deletion the only top-level method on the BlockLayoutRuntime contract
+	// that maps to a boot-time observable is updateBlockLibraryState — it
+	// refreshes the library button states (className / aria-pressed / label)
+	// against the current row visibility, matching the legacy
+	// updateBlockLayoutLibraryState(document) call at the tail of every
+	// boot-time bindBlockLayoutLibrary pass. The v0.5.0 auto-mount restores
+	// that observable. Per-row click-handler attachment is NOT restored here
+	// because the legacy bindBlockLayoutLibrary / bindBlockLayoutVisibility
+	// click-handler logic was not yet migrated to an island — that's a
+	// follow-up (future bindLibrary / bindVisibility island contracts).
+	shim := string(BridgeShim())
+	for _, fragment := range []string{
+		"DOMContentLoaded",
+		"window.GoSXStudioBlockLayoutRuntime.updateBlockLibraryState",
+	} {
+		if !strings.Contains(shim, fragment) {
+			t.Fatalf("BridgeShim() missing auto-mount fragment %q:\n%s", fragment, shim)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
