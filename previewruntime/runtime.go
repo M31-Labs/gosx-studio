@@ -326,5 +326,36 @@ const bridgeShimJS = `;(function () {
       typeof legacy.cycleField === "function" ? legacy.cycleField : undefined
     )
   };
+  // Auto-mount on document ready. Mirrors the v0.4.1 fieldruntime fix: the
+  // deleted preview-runtime.js bundle's CanvasEngine factory called
+  // GoSXStudioPreviewRuntime.mount(document) on engine mount. When the
+  // bundle and the engine factory were both deleted, the per-slice
+  // BridgeShim correctly re-published window.GoSXStudioPreviewRuntime but
+  // the auto-mount call was lost — nothing invoked .mount(document) on page
+  // load anymore, so the preview epoch signal ($preview.mount.epoch) was
+  // never bumped at boot and the preview iframe's subscriber never wired
+  // its bindPreview pass on initial load. The other nine methods on the
+  // PreviewRuntime contract (setBlockVisibility, applyTextUpdate,
+  // applyTheme, applyStyleImpact, applyCSS, applyFonts, updateHeaderLogo,
+  // requestInlineEdit, cycleField) are host-driven writes, not boot
+  // bindings, so they're NOT auto-mounted. Idempotent: a per-document
+  // marker attribute guards against double-mount if a host also calls
+  // .mount explicitly during SSR hydration.
+  function autoMount() {
+    try {
+      var marker = "data-gosx-studio-preview-runtime-auto-mounted";
+      if (document.documentElement && document.documentElement.getAttribute(marker) === "true") return;
+      if (document.documentElement) document.documentElement.setAttribute(marker, "true");
+      window.GoSXStudioPreviewRuntime.mount(document.body || document);
+    } catch (e) {
+      // Auto-mount must never break the page; the host can always invoke
+      // window.GoSXStudioPreviewRuntime.mount manually if it needs to recover.
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", autoMount);
+  } else {
+    autoMount();
+  }
 })();
 `

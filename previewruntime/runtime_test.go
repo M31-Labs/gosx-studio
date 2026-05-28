@@ -370,6 +370,30 @@ func TestSubscriberRuntimeScriptPreservesLegacyDOMMutations(t *testing.T) {
 	}
 }
 
+func TestBridgeShimAutoMountsOnDocumentReady(t *testing.T) {
+	// Pre-2026-05-27 the deleted preview-runtime.js bundle was wired via the
+	// CanvasEngine factory in studio-engines.js, which called
+	// GoSXStudioPreviewRuntime.mount(document) on engine mount. With both
+	// bundles deleted the per-slice BridgeShim correctly re-published
+	// window.GoSXStudioPreviewRuntime but the auto-mount call was lost —
+	// nothing invoked .mount(document) on page load anymore, so the preview
+	// epoch signal ($preview.mount.epoch) was never bumped at boot and the
+	// preview iframe's subscriber never wired its bindPreview pass on
+	// initial load. The v0.4.1 fix landed this same contract for
+	// fieldruntime; v0.5.0 restores it across the remaining six islands.
+	// The other nine methods on the contract are host-driven writes, not
+	// boot bindings.
+	shim := string(BridgeShim())
+	for _, fragment := range []string{
+		"DOMContentLoaded",
+		"window.GoSXStudioPreviewRuntime.mount",
+	} {
+		if !strings.Contains(shim, fragment) {
+			t.Fatalf("BridgeShim() missing auto-mount fragment %q:\n%s", fragment, shim)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {
