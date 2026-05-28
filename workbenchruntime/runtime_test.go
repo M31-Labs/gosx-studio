@@ -558,6 +558,29 @@ func TestIslandRuntimeJSPublishesSetRailWidthGlobal(t *testing.T) {
 	}
 }
 
+func TestBridgeShimAutoMountsOnDocumentReady(t *testing.T) {
+	// Pre-2026-05-27 the deleted studio-engines.js bundle auto-mounted every
+	// runtime contract at DOMContentLoaded — for WorkbenchRuntime that meant
+	// two binds at boot: bindWorkbenchRailResizers and bindWorkbenchChrome.
+	// When the bundle was deleted the per-slice BridgeShim correctly re-
+	// published window.GoSXStudioWorkbenchRuntime but the two auto-mounts
+	// were lost — rail-resizer drag handles and toolbar chrome were never
+	// wired on initial load. The v0.4.1 fix landed this same contract for
+	// fieldruntime; v0.5.0 restores it across the remaining six islands. The
+	// other thirteen methods on the contract are host-driven writes (mode
+	// switches, viewport changes, zoom updates, etc.), not boot bindings.
+	shim := string(BridgeShim())
+	for _, fragment := range []string{
+		"DOMContentLoaded",
+		"window.GoSXStudioWorkbenchRuntime.bindRailResizers",
+		"window.GoSXStudioWorkbenchRuntime.bindChrome",
+	} {
+		if !strings.Contains(shim, fragment) {
+			t.Fatalf("BridgeShim() missing auto-mount fragment %q:\n%s", fragment, shim)
+		}
+	}
+}
+
 func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	bundle := string(Bundle())
 	if bundle == "" {

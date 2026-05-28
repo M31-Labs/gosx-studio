@@ -334,5 +334,36 @@ const bridgeShimJS = `;(function () {
       typeof setWorkbenchRailWidth === "function" ? setWorkbenchRailWidth : legacy.setRailWidth
     )
   };
+  // Auto-mount on document ready. Mirrors the v0.4.1 fieldruntime fix: the
+  // deleted studio-engines.js bundle ran a top-level init() at
+  // DOMContentLoaded that called bindWorkbenchRailResizers(document) and
+  // bindWorkbenchChrome(document). When the bundle was deleted the per-slice
+  // BridgeShim correctly re-published window.GoSXStudioWorkbenchRuntime but
+  // the two auto-mounts were lost — the rail-resizer drag handles and
+  // workbench chrome (toolbar mode/viewport buttons, command palette
+  // listener) were never wired on initial load. The remaining thirteen
+  // methods on the WorkbenchRuntime contract are host-driven writes (mode
+  // switches, viewport changes, zoom updates, layout save, etc.), not boot
+  // bindings, so they're NOT auto-mounted. Idempotent: a per-document marker
+  // attribute guards against double-mount if a host also calls .bind*
+  // explicitly during SSR hydration.
+  function autoMount() {
+    try {
+      var marker = "data-gosx-studio-workbench-runtime-auto-mounted";
+      if (document.documentElement && document.documentElement.getAttribute(marker) === "true") return;
+      if (document.documentElement) document.documentElement.setAttribute(marker, "true");
+      var root = document.body || document;
+      window.GoSXStudioWorkbenchRuntime.bindRailResizers(root);
+      window.GoSXStudioWorkbenchRuntime.bindChrome(root);
+    } catch (e) {
+      // Auto-mount must never break the page; the host can always invoke
+      // window.GoSXStudioWorkbenchRuntime.bind* manually if it needs to recover.
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", autoMount);
+  } else {
+    autoMount();
+  }
 })();
 `
