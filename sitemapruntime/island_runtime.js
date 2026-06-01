@@ -40,9 +40,26 @@
   var MIN_SCALE = 0.25;
   var MAX_SCALE = 3;
 
+  // ---- Node drag-to-reposition ----
+  // Movement (in screen px) a pointer must travel before a press on a node
+  // becomes a drag; below it the press stays a click (select). Snap grid is in
+  // pan-surface-LOCAL px (the units left/top are written in).
+  var DRAG_THRESHOLD = 4;
+  var NODE_SNAP_GRID = 20;
+
   function num(el, name, fallback) {
     var value = parseFloat(attr(el, name, ""));
     return isFinite(value) ? value : fallback;
+  }
+
+  function snapTo(value, grid) {
+    if (!grid) return value;
+    return Math.round(value / grid) * grid;
+  }
+
+  function styleNum(el, prop) {
+    var value = el && el.style ? parseFloat(el.style[prop]) : NaN;
+    return isFinite(value) ? value : null;
   }
 
   function clampScale(value) {
@@ -123,11 +140,63 @@
     if (event.button !== 0 && event.button !== 1) return;
     if (!closest(event.target, "[data-studio-site-map-canvas]")) return;
     var onEmpty = viewportDragAllowed(event.target);
+    // Plain left-press on a node = potential drag-to-reposition. Shift is
+    // reserved for marquee/multi-select, so it never starts a node drag.
+    if (event.button === 0 && !event.shiftKey && !onEmpty) {
+      var node = closest(event.target, "[data-studio-site-map-workspace-node]");
+      if (node) return startNodeDrag(root, node, event);
+    }
     // Shift + left-drag on empty canvas = marquee multi-select.
     if (event.button === 0 && event.shiftKey && onEmpty) return startMarquee(root, event);
     // Plain left-drag must start on empty canvas; middle-drag pans from anywhere.
     if (event.button === 0 && !onEmpty) return;
     startPan(root, event);
+  }
+
+  // Live-move a node on the pan surface. Screen-pixel deltas are converted to
+  // pan-surface-LOCAL units by dividing by the current scale, so a node tracks
+  // the pointer at any zoom. A press that never crosses DRAG_THRESHOLD stays a
+  // click (the click handler selects it) and emits no move event.
+  function startNodeDrag(root, node, event) {
+    var key = attr(node, "data-studio-site-map-workspace-node", "");
+    var startClientX = event.clientX;
+    var startClientY = event.clientY;
+    var startLeft = styleNum(node, "left");
+    if (startLeft == null) startLeft = node.offsetLeft || 0;
+    var startTop = styleNum(node, "top");
+    if (startTop == null) startTop = node.offsetTop || 0;
+    var dragging = false;
+    function move(ev) {
+      var dxScreen = ev.clientX - startClientX;
+      var dyScreen = ev.clientY - startClientY;
+      if (!dragging && Math.abs(dxScreen) < DRAG_THRESHOLD && Math.abs(dyScreen) < DRAG_THRESHOLD) return;
+      if (!dragging) {
+        dragging = true;
+        setAttr(root, "data-studio-site-map-node-dragging", "true");
+      }
+      var scale = state(root).scale || 1;
+      node.style.position = "absolute";
+      node.style.left = startLeft + dxScreen / scale + "px";
+      node.style.top = startTop + dyScreen / scale + "px";
+    }
+    function up() {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      if (!dragging) return; // sub-threshold press: leave it to click-to-select.
+      setAttr(root, "data-studio-site-map-node-dragging", "false");
+      var x = snapTo(styleNum(node, "left") || 0, NODE_SNAP_GRID);
+      var y = snapTo(styleNum(node, "top") || 0, NODE_SNAP_GRID);
+      node.style.left = x + "px";
+      node.style.top = y + "px";
+      setAttr(node, "data-studio-site-map-node-x", x);
+      setAttr(node, "data-studio-site-map-node-y", y);
+      root.dispatchEvent(new CustomEvent("gosxstudio:sitemap-node-moved", {
+        bubbles: true,
+        detail: { key: key, x: x, y: y },
+      }));
+    }
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
   }
 
   function startPan(root, event) {

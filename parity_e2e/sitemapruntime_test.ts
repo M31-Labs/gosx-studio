@@ -577,3 +577,159 @@ test.describe("@smoke GoSXStudioSiteMapRuntime keyboard activation respects focu
     expect(await page.evaluate(() => window.__activated)).toBe(false);
   });
 });
+
+// Two absolutely-positioned nodes on the pan surface. `alpha` carries a saved
+// position (left/top + node-x/node-y); the runtime live-moves it on drag and
+// snaps the released coordinates to the 20px grid.
+const nodeDragBoard = `
+  <section
+    data-studio-site-map-board="true"
+    tabindex="0"
+    data-studio-site-map-scale="1"
+    data-studio-site-map-pan-x="0"
+    data-studio-site-map-pan-y="0"
+    data-studio-site-map-selected-node=""
+    data-studio-site-map-selected-nodes=""
+    data-studio-site-map-filter="all"
+  >
+    <div data-studio-site-map-workspace="true" data-studio-site-map-panel-visible="true">
+      <div data-studio-site-map-canvas="true" style="width:600px;height:400px;position:relative;overflow:hidden;">
+        <div data-studio-site-map-pan-surface="true" style="position:relative;inset:0;">
+          <label data-studio-site-map-workspace-node="alpha" data-studio-site-map-group="site"
+                 data-studio-site-map-node-label="Alpha"
+                 data-studio-site-map-node-x="100" data-studio-site-map-node-y="100"
+                 style="position:absolute;left:100px;top:100px;width:80px;height:40px;">Alpha</label>
+          <label data-studio-site-map-workspace-node="beta" data-studio-site-map-group="site"
+                 data-studio-site-map-node-label="Beta"
+                 data-studio-site-map-node-x="400" data-studio-site-map-node-y="300"
+                 style="position:absolute;left:400px;top:300px;width:80px;height:40px;">Beta</label>
+        </div>
+      </div>
+    </div>
+  </section>
+`;
+
+function leftTopPx(style: string): { left: number; top: number } {
+  const left = /left:\s*([-\d.]+)px/.exec(style);
+  const top = /top:\s*([-\d.]+)px/.exec(style);
+  return {
+    left: left ? Number(left[1]) : NaN,
+    top: top ? Number(top[1]) : NaN,
+  };
+}
+
+test.describe("@smoke GoSXStudioSiteMapRuntime infinite-canvas node drag-to-reposition", () => {
+  test("dragging a node updates left/top live and snaps to the grid on release", async ({ page }) => {
+    await page.setContent(nodeDragBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    const board = page.locator("[data-studio-site-map-board='true']");
+    const alpha = page.locator("[data-studio-site-map-workspace-node='alpha']");
+    const box = await alpha.boundingBox();
+
+    // Grab the node center and drag by a non-grid-aligned screen delta.
+    const startX = box!.x + box!.width / 2;
+    const startY = box!.y + box!.height / 2;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    // +33,+27 crosses the 4px threshold and is not grid-aligned.
+    await page.mouse.move(startX + 33, startY + 27, { steps: 6 });
+
+    // During drag the board flags dragging and left/top track the pointer.
+    await expect(board).toHaveAttribute("data-studio-site-map-node-dragging", "true");
+    const live = leftTopPx((await alpha.getAttribute("style")) || "");
+    expect(live.left).toBeCloseTo(133, 0);
+    expect(live.top).toBeCloseTo(127, 0);
+
+    await page.mouse.up();
+
+    // On release: snap to the 20px grid (133->140, 127->120) and write coords.
+    await expect(board).toHaveAttribute("data-studio-site-map-node-dragging", "false");
+    await expect(alpha).toHaveAttribute("data-studio-site-map-node-x", "140");
+    await expect(alpha).toHaveAttribute("data-studio-site-map-node-y", "120");
+    const snapped = leftTopPx((await alpha.getAttribute("style")) || "");
+    expect(snapped.left).toBe(140);
+    expect(snapped.top).toBe(120);
+  });
+
+  test("releasing a drag dispatches gosxstudio:sitemap-node-moved with snapped coords", async ({ page }) => {
+    await page.setContent(nodeDragBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    await page.evaluate(() => {
+      window.__moved = null;
+      document.addEventListener("gosxstudio:sitemap-node-moved", (event) => {
+        const detail = (event as CustomEvent).detail;
+        window.__moved = { key: detail.key, x: detail.x, y: detail.y };
+      });
+    });
+
+    const alpha = page.locator("[data-studio-site-map-workspace-node='alpha']");
+    const box = await alpha.boundingBox();
+    const startX = box!.x + box!.width / 2;
+    const startY = box!.y + box!.height / 2;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 33, startY + 27, { steps: 6 });
+    await page.mouse.up();
+
+    const moved = await page.evaluate(() => window.__moved);
+    expect(moved).toEqual({ key: "alpha", x: 140, y: 120 });
+  });
+
+  test("a sub-threshold press selects the node and emits no move event", async ({ page }) => {
+    await page.setContent(nodeDragBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    await page.evaluate(() => {
+      window.__moveCount = 0;
+      document.addEventListener("gosxstudio:sitemap-node-moved", () => {
+        window.__moveCount += 1;
+      });
+    });
+
+    const board = page.locator("[data-studio-site-map-board='true']");
+    const alpha = page.locator("[data-studio-site-map-workspace-node='alpha']");
+    const box = await alpha.boundingBox();
+    const startX = box!.x + box!.width / 2;
+    const startY = box!.y + box!.height / 2;
+
+    // Press, nudge 2px (below the 4px threshold), release: this is a click.
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 2, startY + 1, { steps: 2 });
+    await page.mouse.up();
+
+    // No move emitted; the node stays put and becomes the primary selection.
+    expect(await page.evaluate(() => window.__moveCount)).toBe(0);
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-node", "alpha");
+    await expect(alpha).toHaveAttribute("data-studio-site-map-node-x", "100");
+    await expect(alpha).toHaveAttribute("data-studio-site-map-node-y", "100");
+  });
+
+  test("at scale 2 a screen delta maps to half the local delta", async ({ page }) => {
+    await page.setContent(nodeDragBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    await page.evaluate(() => {
+      const board = document.querySelector("[data-studio-site-map-board='true']");
+      window.GoSXStudioSiteMapRuntime.setState(board, { scale: 2 });
+    });
+
+    const alpha = page.locator("[data-studio-site-map-workspace-node='alpha']");
+    const box = await alpha.boundingBox();
+    const startX = box!.x + box!.width / 2;
+    const startY = box!.y + box!.height / 2;
+
+    // +80 screen px at scale 2 => +40 local px (100 -> 140), already grid-aligned.
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 80, startY, { steps: 6 });
+    const live = leftTopPx((await alpha.getAttribute("style")) || "");
+    expect(live.left).toBeCloseTo(140, 0);
+    await page.mouse.up();
+
+    await expect(alpha).toHaveAttribute("data-studio-site-map-node-x", "140");
+    await expect(alpha).toHaveAttribute("data-studio-site-map-node-y", "100");
+  });
+});
