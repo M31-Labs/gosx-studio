@@ -81,19 +81,18 @@ Current:
   define the first executable mutation boundary.
 - `AuthoringSurfaceView` now exposes stable mutation field names plus form
   payloads for composition intents and component controls.
+- Noni applies create-page, home add-component, and hero-headline mutations.
+- Pajaritos applies create-page, family-form add-component, hero-headline, and
+  flow step/submit label mutations.
 
 Missing:
 
-- Host implementations in Noni and Pajaritos for:
-  - applying a composition intent
-  - updating a control value
+- Host implementations in Noni and Pajaritos for the remaining operations:
   - reordering components
   - toggling component visibility
   - duplicating and deleting components
   - changing page metadata and routes
   - validating changes before persistence
-- Pajaritos and Noni now have first save-control implementations for the home
-  hero headline; the remaining operations are still pending.
 - Route-level examples showing how host apps register `AuthoringActionHandler`
   beside page modules.
 - Preview refresh wiring from successful mutation results into the canvas
@@ -495,8 +494,9 @@ These are the current places to mine for reusable Studio behavior.
    `AuthoringSurfaceView`.
 2. Done on 2026-06-01: add a Studio authoring mutation interface for applying
    composition intents and saving control values.
-3. Partly done on 2026-06-01: add server-action helpers for Studio authoring
-   mutations and wire minimal Pajaritos/Noni save-control implementations.
+3. Done on 2026-06-01: add server-action helpers for Studio authoring
+   mutations and wire Pajaritos/Noni composition/control persistence for the
+   first real content flows.
 4. Build a reusable `StudioShell.gsx` that consumes `ShellConfig` and
    `AuthoringSurfaceView`.
 5. Move workbench, command palette, and state runtime ownership out of
@@ -534,16 +534,27 @@ These are the current places to mine for reusable Studio behavior.
   carry the same mutation payload and DOM authoring metadata for placed
   components. Verified with `go test ./...` plus `gosx check app/page.gsx
   app/admin/editor/page.gsx` in `muddy-noni-commerce`.
+- 2026-06-01: Replaced Noni's duplicated site-map view assembly with the shared
+  `gosx-studio` site-map projection and verified the host shell exposes the
+  shared `siteMap` payload in Pajaritos.
+- 2026-06-01: Added host persistence for composition intents: Noni can create a
+  draft page and enable a home section, while Pajaritos can create draft pages
+  and enable a family request form on the home page.
+- 2026-06-01: Extended Pajaritos control persistence beyond site settings so
+  flow step labels and submit labels save through the same
+  `AuthoringActionHandler` mutation boundary.
 
 ## Next Execution Slice
 
-The next practical slice is parity and breadth:
+The next practical slice is interaction feedback and confidence:
 
-- Move Noni's duplicate site-map/control form payload logic behind
-  `AuthoringSurfaceView`.
-- Add Pajaritos support for one flow-label control so the same mutation API
-  crosses page content and flow resources.
-- Add a shared host-contract test pattern that both apps can use.
+- Wire successful authoring mutation results into the preview/canvas runtime so
+  create, add, and edit operations refresh and select the changed object without
+  a full operator context reset.
+- Add Noni and Pajaritos e2e smoke tests for create page, add component, and
+  edit control through the visible editor surface.
+- Add the first route/page metadata mutation for title/slug updates, including
+  conflict validation and clear field errors.
 
 ## Definition of Done
 
