@@ -106,3 +106,71 @@ func TestRenderSiteMapBoardUsesSharedRuntimeContracts(t *testing.T) {
 		t.Fatalf("shared site-map board must not inject visible platform copy:\n%s", html)
 	}
 }
+
+func TestRenderSiteMapBoardPanSurfaceIsPositionedAnchor(t *testing.T) {
+	view := AuthoringSiteMapView(NoCodeAuthoringSurface(SiteMap{
+		Pages: []Page{{
+			Key:      "home",
+			Label:    "Home",
+			Route:    "/",
+			Group:    PageGroupSite,
+			Editable: true,
+			Selected: true,
+		}},
+	}), SiteMapViewOptions{})
+
+	html := gosx.RenderHTML(RenderSiteMapBoard(view, SiteMapBoardOptions{}))
+
+	// The pan surface must be a positioned ancestor so absolutely-positioned
+	// nodes anchor to it (drag-to-reposition). Default nodes still flow in
+	// lanes, so this style addition must be layout-neutral.
+	if !strings.Contains(html, `data-studio-site-map-pan-surface="true" style="position:relative"`) {
+		t.Fatalf("pan surface must carry position:relative so nodes can anchor:\n%s", html)
+	}
+}
+
+func TestRenderSiteMapBoardWorkspaceNodeWithoutPositionStaysInLaneFlow(t *testing.T) {
+	// A node map WITHOUT x/y keys must render exactly as today: no absolute
+	// position, no node-x/node-y attrs. This keeps the default
+	// AuthoringSiteMapView (and the reference editors) visually unchanged.
+	node := map[string]any{
+		"key":   "page:home",
+		"label": "Home",
+		"class": "studio-site-map-workspace-node",
+	}
+	html := gosx.RenderHTML(gosx.Fragment(renderSiteMapBoardWorkspaceNode(node, siteMapBoardState{})...))
+
+	if strings.Contains(html, "data-studio-site-map-node-x") {
+		t.Fatalf("node without a saved position must not emit data-studio-site-map-node-x:\n%s", html)
+	}
+	if strings.Contains(html, "data-studio-site-map-node-y") {
+		t.Fatalf("node without a saved position must not emit data-studio-site-map-node-y:\n%s", html)
+	}
+	if strings.Contains(html, "position:absolute") {
+		t.Fatalf("node without a saved position must stay in lane flow (no absolute position):\n%s", html)
+	}
+}
+
+func TestRenderSiteMapBoardWorkspaceNodeWithPositionRendersAbsolute(t *testing.T) {
+	// A node map carrying numeric x/y keys must be rendered absolutely
+	// positioned on the pan surface, with the coordinate data attributes the
+	// runtime reads/writes during drag-to-reposition.
+	node := map[string]any{
+		"key":   "page:home",
+		"label": "Home",
+		"class": "studio-site-map-workspace-node",
+		"x":     120.0,
+		"y":     48.0,
+	}
+	html := gosx.RenderHTML(gosx.Fragment(renderSiteMapBoardWorkspaceNode(node, siteMapBoardState{})...))
+
+	for _, fragment := range []string{
+		`data-studio-site-map-node-x="120"`,
+		`data-studio-site-map-node-y="48"`,
+		`style="position:absolute;left:120px;top:48px"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("positioned node missing %q:\n%s", fragment, html)
+		}
+	}
+}

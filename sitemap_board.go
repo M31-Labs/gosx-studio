@@ -1,6 +1,8 @@
 package studio
 
 import (
+	"encoding/json"
+	"strconv"
 	"strings"
 
 	"m31labs.dev/gosx"
@@ -238,6 +240,11 @@ func renderSiteMapBoardWorkspace(siteMapView map[string]any, state siteMapBoardS
 				gosx.El("div", gosx.Attrs(
 					gosx.Attr("class", "studio-site-map-workspace__surface"),
 					gosx.Attr("data-studio-site-map-pan-surface", "true"),
+					// position:relative anchors absolutely-positioned nodes
+					// (drag-to-reposition) to the pan surface. Nodes without a
+					// saved position keep flowing in lanes, so this is
+					// layout-neutral for the default view.
+					gosx.Attr("style", "position:relative"),
 				),
 					renderSiteMapBoardCanvasPaths(siteMapView, state),
 					renderSiteMapBoardWorkspaceLayers(siteMapView, state),
@@ -328,6 +335,38 @@ func renderSiteMapBoardWorkspaceLayer(layer map[string]any, state siteMapBoardSt
 func renderSiteMapBoardWorkspaceNode(node map[string]any, state siteMapBoardState) []gosx.Node {
 	selected := state.selectedNodeKey != "" && state.selectedNodeKey == workbenchMapString(node, "key")
 	visible := siteMapBoardMatchesGroup(state.group, workbenchMapString(node, "group"))
+	labelAttrs := []any{
+		gosx.Attr("class", workbenchMapString(node, "class")),
+		gosx.Attr("for", workbenchMapString(node, "inputID")),
+		gosx.Attr("data-studio-site-map-workspace-node", workbenchMapString(node, "key")),
+		gosx.Attr("data-studio-site-map-node-kind", workbenchMapString(node, "kind")),
+		gosx.Attr("data-studio-site-map-node-kind-label", workbenchMapString(node, "kindLabel")),
+		gosx.Attr("data-studio-site-map-node-label", workbenchMapString(node, "label")),
+		gosx.Attr("data-studio-site-map-node-summary", workbenchMapString(node, "summary")),
+		gosx.Attr("data-studio-site-map-node-source-label", workbenchMapString(node, "sourceLabel")),
+		gosx.Attr("data-studio-site-map-node-binding-label", workbenchMapString(node, "bindingLabel")),
+		gosx.Attr("data-studio-site-map-node-status-label", workbenchMapString(node, "statusLabel")),
+		gosx.Attr("data-studio-site-map-node-component-label", workbenchMapString(node, "componentLabel")),
+		gosx.Attr("data-studio-site-map-group", workbenchMapString(node, "group")),
+		gosx.Attr("data-studio-site-map-page", workbenchMapString(node, "pageKey")),
+		gosx.Attr("data-studio-site-map-route", workbenchMapString(node, "route")),
+		gosx.Attr("data-studio-site-map-source", workbenchMapString(node, "source")),
+		gosx.Attr("data-studio-site-map-binding", workbenchMapString(node, "binding")),
+		gosx.Attr("data-studio-gosx-component", workbenchMapString(node, "gosxComponent")),
+		gosx.Attr("data-studio-site-map-node-selected", siteMapBoardBoolString(selected)),
+		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(visible)),
+	}
+	// A node carrying numeric x/y is free-placed on the pan surface (the runtime
+	// live-moves it on drag and snaps on release). Nodes WITHOUT a saved
+	// position render exactly as before (lane flow), keeping the default view
+	// and the reference editors visually unchanged.
+	if x, y, ok := siteMapBoardNodePosition(node); ok {
+		labelAttrs = append(labelAttrs,
+			gosx.Attr("data-studio-site-map-node-x", workspaceCoord(x)),
+			gosx.Attr("data-studio-site-map-node-y", workspaceCoord(y)),
+			gosx.Attr("style", "position:absolute;left:"+workspaceCoord(x)+"px;top:"+workspaceCoord(y)+"px"),
+		)
+	}
 	return []gosx.Node{
 		gosx.El("input", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-workspace-node__input"),
@@ -338,27 +377,7 @@ func renderSiteMapBoardWorkspaceNode(node map[string]any, state siteMapBoardStat
 			gosx.Attr("aria-label", workbenchMapString(node, "label")),
 			gosx.Attr("checked", selected),
 		)),
-		gosx.El("label", gosx.Attrs(
-			gosx.Attr("class", workbenchMapString(node, "class")),
-			gosx.Attr("for", workbenchMapString(node, "inputID")),
-			gosx.Attr("data-studio-site-map-workspace-node", workbenchMapString(node, "key")),
-			gosx.Attr("data-studio-site-map-node-kind", workbenchMapString(node, "kind")),
-			gosx.Attr("data-studio-site-map-node-kind-label", workbenchMapString(node, "kindLabel")),
-			gosx.Attr("data-studio-site-map-node-label", workbenchMapString(node, "label")),
-			gosx.Attr("data-studio-site-map-node-summary", workbenchMapString(node, "summary")),
-			gosx.Attr("data-studio-site-map-node-source-label", workbenchMapString(node, "sourceLabel")),
-			gosx.Attr("data-studio-site-map-node-binding-label", workbenchMapString(node, "bindingLabel")),
-			gosx.Attr("data-studio-site-map-node-status-label", workbenchMapString(node, "statusLabel")),
-			gosx.Attr("data-studio-site-map-node-component-label", workbenchMapString(node, "componentLabel")),
-			gosx.Attr("data-studio-site-map-group", workbenchMapString(node, "group")),
-			gosx.Attr("data-studio-site-map-page", workbenchMapString(node, "pageKey")),
-			gosx.Attr("data-studio-site-map-route", workbenchMapString(node, "route")),
-			gosx.Attr("data-studio-site-map-source", workbenchMapString(node, "source")),
-			gosx.Attr("data-studio-site-map-binding", workbenchMapString(node, "binding")),
-			gosx.Attr("data-studio-gosx-component", workbenchMapString(node, "gosxComponent")),
-			gosx.Attr("data-studio-site-map-node-selected", siteMapBoardBoolString(selected)),
-			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(visible)),
-		),
+		gosx.El("label", gosx.Attrs(labelAttrs...),
 			gosx.El("span", nil, gosx.Text(workbenchMapString(node, "kindLabel"))),
 			gosx.El("strong", nil, gosx.Text(workbenchMapString(node, "label"))),
 			gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchMapBool(node, "hasSummary")))), gosx.Text(workbenchMapString(node, "summary"))),
@@ -939,6 +958,40 @@ func siteMapBoardBoolString(value bool) string {
 		return "true"
 	}
 	return "false"
+}
+
+// siteMapBoardNodePosition reports a node's saved canvas position. It returns
+// ok=true only when BOTH x and y resolve to finite numbers; today most node
+// maps carry no coordinates (ok=false) and render in lane flow.
+func siteMapBoardNodePosition(node map[string]any) (x, y float64, ok bool) {
+	x, xok := siteMapBoardNodeCoord(node, "x")
+	y, yok := siteMapBoardNodeCoord(node, "y")
+	return x, y, xok && yok
+}
+
+func siteMapBoardNodeCoord(node map[string]any, key string) (float64, bool) {
+	if node == nil {
+		return 0, false
+	}
+	switch typed := node[key].(type) {
+	case float64:
+		return typed, true
+	case float32:
+		return float64(typed), true
+	case int:
+		return float64(typed), true
+	case int64:
+		return float64(typed), true
+	case json.Number:
+		if value, err := typed.Float64(); err == nil {
+			return value, true
+		}
+	case string:
+		if value, err := strconv.ParseFloat(strings.TrimSpace(typed), 64); err == nil {
+			return value, true
+		}
+	}
+	return 0, false
 }
 
 func siteMapBoardMatchesGroup(group, candidate string) bool {
