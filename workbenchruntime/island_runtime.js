@@ -200,7 +200,6 @@
   function normalizeWorkbenchMode(mode) {
     if (mode === "structure" || mode === "content") return "home";
     if (mode === "style") return "look";
-    if (mode === "preview") return "publish";
     if (mode === "manage" || mode === "flows") return "advanced";
     return mode || "home";
   }

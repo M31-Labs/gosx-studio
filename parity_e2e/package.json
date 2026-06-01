@@ -7,7 +7,8 @@
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
-    "test:reference-apps": "GOSX_STUDIO_REFERENCE_APP_E2E=1 playwright test reference_apps_authoring_test.ts",
+    "test:reference-apps": "GOSX_STUDIO_REFERENCE_APP_E2E=1 playwright test reference_apps_authoring_test.ts reference_apps_visual_a11y_test.ts",
+    "test:reference-apps:visual-a11y": "GOSX_STUDIO_REFERENCE_APP_E2E=1 playwright test reference_apps_visual_a11y_test.ts",
     "smoke": "playwright test --grep @smoke"
   },
   "devDependencies": {

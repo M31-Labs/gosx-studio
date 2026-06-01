@@ -103,13 +103,13 @@ jobs:
             exit 1
           fi
 
-      - name: Run reference app editor workflows
+      - name: Run reference app editor workflows and quality gates
         working-directory: gosx-studio/parity_e2e
         env:
           GOSX_STUDIO_REFERENCE_APP_E2E: '1'
           GOSX_STUDIO_MUDDY_REPO: ${{ github.workspace }}/muddy-noni-commerce
           GOSX_STUDIO_PAJARITOS_REPO: ${{ github.workspace }}/pajaritos-forest-school
-        run: npx playwright test reference_apps_authoring_test.ts
+        run: npm run test:reference-apps
 
       - name: Upload Playwright artifacts on failure
         if: failure()

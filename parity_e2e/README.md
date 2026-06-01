@@ -100,17 +100,22 @@ GOSX_STUDIO_PARITY_BASE_URL=http://localhost:8080 npm test
 
 ## Reference App Authoring E2E
 
-`reference_apps_authoring_test.ts` is an opt-in browser workflow for the two
-current reference apps. It boots Muddy/Noni and Pajaritos from sibling worktrees
-with temporary data directories, opens their real admin editors, verifies the
-visible authoring buttons receive pointer events, and submits create-page,
-add-section, duplicate-section, and save-field actions through the real GoSX
-action/CSRF flow. Muddy assertions include browser-reloaded duplicate and field
-state. Pajaritos assertions now verify native create-page, add-section,
-duplicate, and save-field payloads, 303 redirects, browser-visible success
-feedback, persisted page/section reflection, staging/production readiness
-copy, preview-refresh instrumentation, and a visible restore-point rollback
-after the editor reload.
+`reference_apps_authoring_test.ts` and
+`reference_apps_visual_a11y_test.ts` are opt-in browser workflows for the two
+current reference apps. They boot Muddy/Noni and Pajaritos from sibling
+worktrees with temporary data directories, open their real admin editors,
+verify visible authoring buttons receive pointer events, and submit
+create-page, add-section, duplicate-section, and save-field actions through
+the real GoSX action/CSRF flow. Muddy assertions include browser-reloaded
+duplicate and field state. Pajaritos assertions verify native create-page,
+add-section, duplicate, and save-field payloads, 303 redirects,
+browser-visible success feedback, persisted page/section reflection,
+staging/production readiness copy, preview-refresh instrumentation, and a
+visible restore-point rollback after the editor reload. The visual/a11y gate
+also checks the editor shell, site-map/canvas surface, publishing section,
+responsive preview iframe, keyboard focus, accessible names, reduced-motion
+behavior, sampled contrast, clipped command text, and desktop/mobile viewport
+fit.
 
 It now runs in default `gosx-studio` CI via
 `.github/workflows/reference-apps.yml`, which checks out the sibling repos in
@@ -126,7 +131,13 @@ Override sibling locations if needed:
 GOSX_STUDIO_REFERENCE_APP_E2E=1 \
 GOSX_STUDIO_MUDDY_REPO=~/work/muddy-noni-commerce \
 GOSX_STUDIO_PAJARITOS_REPO=~/work/pajaritos-forest-school \
-  npx playwright test reference_apps_authoring_test.ts
+  npx playwright test reference_apps_authoring_test.ts reference_apps_visual_a11y_test.ts
+```
+
+Run only the visual/accessibility gate with:
+
+```bash
+npm run test:reference-apps:visual-a11y
 ```
 
 ## File layout

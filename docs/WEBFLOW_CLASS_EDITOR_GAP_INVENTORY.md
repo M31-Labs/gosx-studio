@@ -462,16 +462,26 @@ Current:
 - `.github/workflows/reference-apps.yml` now promotes the Muddy/Noni and
   Pajaritos browser workflow into default `gosx-studio` CI by checking out the
   sibling app layout and running the reference-app e2e suite.
+- `parity_e2e/reference_apps_visual_a11y_test.ts` now adds the first
+  host-backed browser quality gate for both reference apps. It validates the
+  editor shell, visible site-map/canvas surface, publishing section,
+  responsive preview iframe, desktop/mobile viewport fit, accessible names,
+  keyboard focus, reduced-motion behavior, sampled contrast, clipped command
+  text, and pointer-safe authoring controls. This gate caught and fixed a
+  hidden Muddy preview mode, a preview-to-publish workbench runtime alias, a
+  Muddy toolbar pointer overlap, and a Pajaritos mobile toolbar overflow.
 - `docs/PUBLIC_READINESS.md` names the release posture concerns.
 
 Missing:
 
-- Broader visual, accessibility, and performance gates for the browser-driven
-  editor workflows after the default reference-app CI check.
-- Visual regression checks for the shell, canvas, inspector, site map, media,
-  flow designer, publish panel, and responsive preview.
-- Accessibility checks for keyboard navigation, focus, labels, reduced motion,
-  contrast, and screen reader structure.
+- Broader visual, accessibility, and performance gates for media, flow
+  designer, inspector, source binding, and plugin workflows beyond the first
+  reference-app browser gate.
+- Golden or diff-based visual regression baselines for the shell, canvas,
+  inspector, site map, media, flow designer, publish panel, and responsive
+  preview.
+- Deeper accessibility checks for complete keyboard navigation paths, focus
+  order, screen reader structure, and full WCAG contrast coverage.
 - Performance budgets for runtime payloads, preview latency, canvas overlays,
   and publish readiness checks.
 - API versioning and migration notes before public release.
@@ -592,6 +602,10 @@ These are the current places to mine for reusable Studio behavior.
     accessibility states, and responsive behavior.
 16. Done on 2026-06-01: render visible create-page/add-section apply controls
     from shared site-map composition intent payloads in Noni and Pajaritos.
+17. Done on 2026-06-01: add reference-app visual/accessibility gates for the
+    Studio shell, site-map/canvas surface, publishing section, responsive
+    preview, keyboard focus, accessible names, reduced motion, contrast, and
+    desktop/mobile viewport fit.
 
 ## Execution Log
 
@@ -711,15 +725,22 @@ These are the current places to mine for reusable Studio behavior.
   into `gosx-studio` default CI. Pajaritos now exposes staging/production
   environment readiness in the publishing section, and the browser e2e asserts
   publish readiness plus preview refresh after a client-side editor action.
+- 2026-06-01: Added a shared reference-app Playwright harness plus
+  `reference_apps_visual_a11y_test.ts`, and wired it into the default
+  reference-app CI workflow. The gate checks both reference app editors across
+  desktop and mobile for shell/canvas/publish/preview visibility, pointer-safe
+  controls, accessible names, keyboard focus, reduced motion, sampled contrast,
+  clipped command text, and viewport fit. It also drove fixes in Muddy's
+  visible Preview mode/runtime mapping/toolbar layout and Pajaritos' mobile
+  editor overflow.
 
 ## Next Execution Slice
 
-The next practical slice is full browser automation plus the next visible shell
+The next practical slice is performance budgeting plus the next visible shell
 extraction:
 
-- Add visual regression and accessibility gates for the Studio shell, canvas,
-  publishing section, and responsive preview across the reference-app browser
-  workflow.
+- Add runtime payload, preview-load latency, canvas overlay, and publishing
+  readiness budgets to the reference-app browser workflow.
 - Continue the shell extraction by moving the next visible wrapper/toolbar
   piece behind a Studio-owned render path that consumes `WorkbenchShellView`.
 - Extend `authoringruntime` host-backed smoke coverage to assert

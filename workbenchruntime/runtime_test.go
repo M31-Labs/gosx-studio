@@ -164,13 +164,17 @@ func TestIslandRuntimeJSPublishesSetModeGlobal(t *testing.T) {
 	// is-mode-active / hidden / aria-hidden on [data-studio-mode-panel]
 	// siblings, scrolls active panel into view when requested, updates
 	// [data-studio-mode-label] readouts, emits
-	// gosxstudio:workbench-mode-change. The mode alias mapping
-	// (structure/content → home, style → look, preview → publish,
-	// manage/flows → advanced) is preserved verbatim.
+	// gosxstudio:workbench-mode-change. The mode alias mapping keeps
+	// legacy structure/content → home, style → look, and manage/flows →
+	// advanced aliases while allowing preview to be its own visible editor
+	// mode.
 	body := string(IslandRuntimeJS())
 	want := "window." + IslandGlobals.SetMode + " "
 	if !strings.Contains(body, want) {
 		t.Fatalf("IslandRuntimeJS() missing global assignment %q", want)
+	}
+	if strings.Contains(body, `mode === "preview") return "publish"`) {
+		t.Fatalf("IslandRuntimeJS() setMode must keep preview as its own mode")
 	}
 	for _, contract := range []string{
 		// Form attribute written by setMode.
@@ -187,7 +191,6 @@ func TestIslandRuntimeJSPublishesSetModeGlobal(t *testing.T) {
 		`"structure"`,
 		`"content"`,
 		`"style"`,
-		`"preview"`,
 		`"manage"`,
 		`"flows"`,
 	} {
