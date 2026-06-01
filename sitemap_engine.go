@@ -4,13 +4,39 @@ import (
 	"strings"
 
 	"m31labs.dev/gosx"
+	"m31labs.dev/gosx/engine"
 )
+
+type SiteMapEngineRuntime interface {
+	Engine(engine.Config, gosx.Node) gosx.Node
+}
+
+type SiteMapEngineHostOptions struct {
+	Key          string
+	Name         string
+	MountID      string
+	Class        string
+	Capabilities []string
+	EngineSource string
+}
 
 type SiteMapEngineOptions struct {
 	Class        string
 	ModePanel    string
 	PanelKey     string
 	EngineSource string
+
+	EngineRuntime SiteMapEngineRuntime
+	EngineHost    SiteMapEngineHostOptions
+
+	Board           SiteMapBoardOptions
+	AuthoringPanels SiteMapAuthoringPanelsOptions
+	AuthoringForms  SiteMapAuthoringFormsOptions
+
+	HideEngineHost      bool
+	HideBoard           bool
+	HideAuthoringPanels bool
+	HideAuthoringForms  bool
 }
 
 type SiteMapEngineSegments struct {
@@ -18,6 +44,50 @@ type SiteMapEngineSegments struct {
 	Header       gosx.Node
 	SourceLegend gosx.Node
 	RootClose    gosx.Node
+}
+
+type SiteMapEngineRender struct {
+	Surface gosx.Node
+	Forms   gosx.Node
+}
+
+func SiteMapEngineHostFromMap(host map[string]any) SiteMapEngineHostOptions {
+	return SiteMapEngineHostOptions{
+		Key:          workbenchMapString(host, "key"),
+		Name:         workbenchMapString(host, "name"),
+		MountID:      workbenchMapString(host, "mountId"),
+		Class:        workbenchMapString(host, "class"),
+		Capabilities: siteMapEngineCapabilityStrings(host["capabilities"]),
+	}
+}
+
+func RenderSiteMapEngine(siteMapView map[string]any, options SiteMapEngineOptions) SiteMapEngineRender {
+	segments := RenderSiteMapEngineSegments(siteMapView, options)
+	surfaceNodes := []gosx.Node{
+		segments.RootOpen,
+		segments.Header,
+	}
+	if !options.HideAuthoringPanels {
+		surfaceNodes = append(surfaceNodes, RenderSiteMapAuthoringPanels(siteMapView, options.AuthoringPanels))
+	}
+	surfaceNodes = append(surfaceNodes, segments.SourceLegend)
+	if !options.HideEngineHost {
+		surfaceNodes = append(surfaceNodes, renderSiteMapEngineHost(options))
+	}
+	if !options.HideBoard {
+		surfaceNodes = append(surfaceNodes, RenderSiteMapBoard(siteMapView, options.Board))
+	}
+	surfaceNodes = append(surfaceNodes, segments.RootClose)
+
+	forms := gosx.Fragment()
+	if !options.HideAuthoringForms {
+		forms = RenderSiteMapAuthoringForms(siteMapView, options.AuthoringForms)
+	}
+
+	return SiteMapEngineRender{
+		Surface: gosx.Fragment(surfaceNodes...),
+		Forms:   forms,
+	}
 }
 
 func RenderSiteMapEngineSegments(siteMapView map[string]any, options SiteMapEngineOptions) SiteMapEngineSegments {
@@ -87,4 +157,127 @@ func renderSiteMapEngineOpenTag(tag string, attrs []any) gosx.Node {
 	suffix := "</" + tag + ">"
 	html = strings.TrimSuffix(html, suffix)
 	return gosx.RawHTML(html)
+}
+
+func renderSiteMapEngineHost(options SiteMapEngineOptions) gosx.Node {
+	host := normalizeSiteMapEngineHost(options.EngineHost, options.EngineSource)
+	mountAttrs := map[string]any{
+		"class":                               host.Class,
+		"data-gosx-studio-engine":             host.Key,
+		"data-studio-engine-role":             host.Key,
+		"data-studio-engine-source":           host.EngineSource,
+		"data-studio-site-map-engine-surface": "true",
+	}
+	capabilities := siteMapEngineCapabilities(host.Capabilities)
+	if options.EngineRuntime != nil {
+		return options.EngineRuntime.Engine(engine.Config{
+			Name:         host.Name,
+			Kind:         engine.KindSurface,
+			MountID:      host.MountID,
+			MountAttrs:   mountAttrs,
+			Capabilities: capabilities,
+		}, gosx.Node{})
+	}
+
+	attrs := []any{
+		gosx.Attr("id", host.MountID),
+		gosx.Attr("class", host.Class),
+		gosx.Attr("data-gosx-engine", host.Name),
+		gosx.Attr("data-gosx-engine-kind", string(engine.KindSurface)),
+		gosx.Attr("data-gosx-studio-engine", host.Key),
+		gosx.Attr("data-studio-engine-role", host.Key),
+		gosx.Attr("data-studio-engine-source", host.EngineSource),
+		gosx.Attr("data-studio-site-map-engine-surface", "true"),
+	}
+	if len(capabilities) > 0 {
+		attrs = append(attrs, gosx.Attr("data-gosx-engine-capabilities", strings.Join(siteMapEngineCapabilityNames(capabilities), " ")))
+	}
+	return gosx.El("div", gosx.Attrs(attrs...))
+}
+
+func normalizeSiteMapEngineHost(host SiteMapEngineHostOptions, engineSource string) SiteMapEngineHostOptions {
+	defaults := SiteMapEngineHostOptions{
+		Key:          "site-map",
+		Name:         SiteMapEngineName,
+		MountID:      "gosx-studio-site-map-engine",
+		Class:        "studio-site-map-engine-host",
+		Capabilities: []string{"canvas", "pointer", "keyboard", "text-input", "animation"},
+		EngineSource: "gosx",
+	}
+	return SiteMapEngineHostOptions{
+		Key:          FirstNonEmpty(host.Key, defaults.Key),
+		Name:         FirstNonEmpty(host.Name, defaults.Name),
+		MountID:      FirstNonEmpty(host.MountID, defaults.MountID),
+		Class:        FirstNonEmpty(host.Class, defaults.Class),
+		Capabilities: siteMapEngineHostCapabilities(host.Capabilities, defaults.Capabilities),
+		EngineSource: FirstNonEmpty(host.EngineSource, engineSource, defaults.EngineSource),
+	}
+}
+
+func siteMapEngineHostCapabilities(values []string, fallback []string) []string {
+	normalized := siteMapEngineCapabilityStrings(values)
+	if len(normalized) > 0 {
+		return normalized
+	}
+	return append([]string(nil), fallback...)
+}
+
+func siteMapEngineCapabilities(values []string) []engine.Capability {
+	names := siteMapEngineCapabilityStrings(values)
+	capabilities := make([]engine.Capability, 0, len(names))
+	for _, name := range names {
+		capabilities = append(capabilities, engine.Capability(name))
+	}
+	return capabilities
+}
+
+func siteMapEngineCapabilityNames(values []engine.Capability) []string {
+	names := make([]string, 0, len(values))
+	for _, value := range values {
+		if name := strings.TrimSpace(string(value)); name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+func siteMapEngineCapabilityStrings(value any) []string {
+	out := []string{}
+	seen := map[string]bool{}
+	appendField := func(field string) {
+		field = strings.TrimSpace(field)
+		if field == "" || seen[field] {
+			return
+		}
+		seen[field] = true
+		out = append(out, field)
+	}
+	appendFields := func(raw string) {
+		raw = strings.ReplaceAll(raw, ",", " ")
+		for _, field := range strings.Fields(raw) {
+			appendField(field)
+		}
+	}
+
+	switch typed := value.(type) {
+	case nil:
+		return nil
+	case string:
+		appendFields(typed)
+	case []string:
+		for _, item := range typed {
+			appendFields(item)
+		}
+	case []engine.Capability:
+		for _, item := range typed {
+			appendField(string(item))
+		}
+	case []any:
+		for _, item := range typed {
+			appendFields(FmtAny(item))
+		}
+	default:
+		appendFields(FmtAny(typed))
+	}
+	return out
 }

@@ -930,19 +930,21 @@ These are the current places to mine for reusable Studio behavior.
   current `SiteMapCanvasIsland`, and Pajaritos mounts the standalone runtime
   next to its server-composed shell.
 - 2026-06-01: Added `RenderSiteMapBoard` in `gosx-studio` and moved Muddy/Noni's
-  visible site-map board behind that shared renderer. Muddy now passes
-  `data.siteMapBoard` into the engine panel, the old app-local
+  visible site-map board behind that shared renderer. The old app-local
   `SiteMapCanvasIsland` markup is gone, and the board keeps the existing
   interaction/runtime data hooks without adding visible platform copy.
+- 2026-06-01: Added the host-facing `RenderSiteMapEngine` render path in
+  `gosx-studio`. It now composes site-map frame chrome, authoring panels,
+  engine host mount, shared board, and external managed forms into one
+  integration contract. Muddy/Noni now passes only `data.siteMapEngineSurface`
+  inside the workbench form and `data.siteMapAuthoringForms` outside it, so the
+  host route no longer manually assembles the site-map surface while preserving
+  valid form nesting and engine runtime registration.
 
 ## Next Execution Slice
 
-The next practical slice is consolidating the site-map engine surface:
+The next practical slice is broadening the shared site-map engine surface:
 
-- Wrap `RenderSiteMapEngineSegments`, `RenderSiteMapBoard`,
-  `RenderSiteMapAuthoringPanels`, and `RenderSiteMapAuthoringForms` behind a
-  single host-facing `SiteMapEngine` render path so app routes provide data and
-  slots instead of assembling the surface manually.
 - Decide the Pajaritos map path: adopt the shared board directly, or provide a
   host-styled board slot that still uses `AuthoringSiteMapView` plus
   `sitemapruntime`.
