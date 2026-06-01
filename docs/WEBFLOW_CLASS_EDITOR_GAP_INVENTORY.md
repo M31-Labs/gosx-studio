@@ -802,6 +802,13 @@ These are the current places to mine for reusable Studio behavior.
   and both reference apps mark editable-control authoring forms as managed
   POST forms while leaving create/add/duplicate flows on their native
   redirect-safe path.
+- 2026-06-01: Burned down the in-place field-save UX gap. Studio now owns
+  marked authoring form submits before the generic navigation layer, posts them
+  as JSON actions, keeps the active editor panel mounted, updates visible
+  save-detail chrome with the returned authoring message, records changed
+  object selection, and refreshes preview without a manual page reload.
+  The runtime also avoids treating the workbench form's save-state attribute as
+  display text, preventing field saves from deleting the editor shell.
 
 ## Next Execution Slice
 
@@ -809,9 +816,10 @@ The next practical slice is the next shell/render extraction:
 
 - Collapse the remaining `gosx-cms/studio` workbench wrapper duplication now
   that both reference apps consume Studio-owned frame semantics.
-- Continue turning the managed editable-control path into a richer in-place UX:
-  keep the active editor section/panel mounted after successful field saves and
-  surface the returned authoring message in visible save-detail chrome.
+- Extend the same in-place authoring result loop beyond fields to component
+  add/duplicate/reorder/visibility and page metadata operations, so more
+  Webflow-class edits update canvas, inspector, preview, and save chrome
+  without redirecting the editor.
 - Keep broadening visual/accessibility/performance checks as inspector, media,
   flow, and publish surfaces move behind reusable Studio-owned render paths.
 

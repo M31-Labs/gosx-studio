@@ -14,6 +14,9 @@
   var CHANGE_COMPONENT_ATTR = "data-gosx-studio-authoring-change-component";
   var CHANGE_BINDING_ATTR = "data-gosx-studio-authoring-change-binding";
   var SELECTED_COUNT_ATTR = "data-gosx-studio-authoring-selected-count";
+  var MANAGED_FORM_ATTR = "data-gosx-studio-authoring-managed";
+  var FORM_STATE_ATTR = "data-gosx-form-state";
+  var FORM_PENDING_ATTR = "data-gosx-pending";
 
   function toObject(value) {
     if (!value) return {};
@@ -295,7 +298,7 @@
         node.textContent = message;
       });
     }
-    queryAll("[data-gosx-studio-save-state]").forEach(function (node) {
+    queryAll("[data-gosx-studio-save-state='true']").forEach(function (node) {
       node.textContent = "Saved";
     });
   }
@@ -339,17 +342,191 @@
     return handlePayload(detail.result, detail);
   }
 
+  function formSubmitTarget(form, submitter) {
+    return String(
+      submitter && submitter.getAttribute && submitter.getAttribute("formtarget")
+      || form && form.getAttribute && form.getAttribute("target")
+      || ""
+    ).trim();
+  }
+
+  function formSubmissionMethod(form, submitter) {
+    return String(
+      submitter && submitter.getAttribute && submitter.getAttribute("formmethod")
+      || form && form.getAttribute && form.getAttribute("method")
+      || "post"
+    ).trim().toUpperCase();
+  }
+
+  function formSubmissionAction(form, submitter) {
+    return String(
+      submitter && submitter.getAttribute && submitter.getAttribute("formaction")
+      || form && form.getAttribute && form.getAttribute("action")
+      || window.location.href
+    );
+  }
+
+  function isSameOrigin(value) {
+    try {
+      return new URL(value, window.location.href).origin === window.location.origin;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function serializeForm(form, submitter) {
+    var formData = new FormData(form);
+    var submitterName = submitter && (submitter.name || (submitter.getAttribute && submitter.getAttribute("name")));
+    var submitterValue = submitter && (submitter.value || (submitter.getAttribute && submitter.getAttribute("value")) || "");
+    if (submitterName && !formData.has(submitterName)) {
+      formData.append(submitterName, submitterValue);
+    }
+    return formData;
+  }
+
+  function formCSRFToken(formData) {
+    if (!formData || typeof formData.get !== "function") return "";
+    var token = formData.get("csrf_token");
+    return token == null ? "" : String(token);
+  }
+
+  function captureFormState(form) {
+    if (!form || !form.getAttribute) return { pending: null, state: null };
+    return {
+      pending: form.getAttribute(FORM_PENDING_ATTR),
+      state: form.getAttribute(FORM_STATE_ATTR)
+    };
+  }
+
+  function setFormPending(form) {
+    if (!form || !form.setAttribute) return;
+    form.setAttribute(FORM_PENDING_ATTR, "true");
+    form.setAttribute(FORM_STATE_ATTR, "pending");
+  }
+
+  function restoreFormState(form, previous) {
+    if (!form) return;
+    previous = previous || { pending: null, state: null };
+    if (previous.pending == null) {
+      if (form.removeAttribute) form.removeAttribute(FORM_PENDING_ATTR);
+    } else if (form.setAttribute) {
+      form.setAttribute(FORM_PENDING_ATTR, previous.pending);
+    }
+    if (previous.state == null) {
+      if (form.setAttribute) form.setAttribute(FORM_STATE_ATTR, "idle");
+    } else if (form.setAttribute) {
+      form.setAttribute(FORM_STATE_ATTR, previous.state);
+    }
+  }
+
+  function setFormError(form) {
+    if (!form || !form.setAttribute) return;
+    form.setAttribute(FORM_STATE_ATTR, "error");
+    if (form.removeAttribute) form.removeAttribute(FORM_PENDING_ATTR);
+  }
+
+  function formNavigationURL(url, formData) {
+    var next = new URL(url.href);
+    var params = new URLSearchParams();
+    if (formData && typeof formData.forEach === "function") {
+      formData.forEach(function (value, key) {
+        params.append(String(key), value == null ? "" : String(value));
+      });
+    }
+    next.search = params.toString();
+    return next;
+  }
+
+  function parseJSONResponse(response) {
+    return response.json().catch(function () {
+      return null;
+    });
+  }
+
+  function submitAuthoringManagedForm(form, submitter) {
+    var method = formSubmissionMethod(form, submitter);
+    var action = formSubmissionAction(form, submitter) || window.location.href;
+    var url = new URL(action, window.location.href);
+    var formData = serializeForm(form, submitter);
+    var previous = captureFormState(form);
+    var csrfToken = formCSRFToken(formData);
+
+    setFormPending(form);
+
+    if (method === "GET") {
+      handlePayload({
+        ok: true,
+        data: {
+          message: "",
+          previewURL: formNavigationURL(url, formData).href,
+          refreshPreview: true
+        }
+      }, { action: url.href, method: method, ok: true });
+      restoreFormState(form, previous);
+      return;
+    }
+
+    fetch(url.href, {
+      method: method,
+      headers: {
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "X-CSRF-Token": csrfToken
+      },
+      body: formData,
+      redirect: "follow"
+    }).then(function (response) {
+      return parseJSONResponse(response).then(function (result) {
+        return { response: response, result: result };
+      });
+    }).then(function (payload) {
+      handlePayload(payload.result, {
+        action: url.href,
+        method: method,
+        ok: payload.response && payload.response.ok,
+        status: payload.response ? payload.response.status : 0
+      });
+      restoreFormState(form, previous);
+    }, function () {
+      setFormError(form);
+    });
+  }
+
+  function shouldHandleAuthoringForm(form, event) {
+    if (!form || !form.hasAttribute || !form.hasAttribute(MANAGED_FORM_ATTR)) return false;
+    if (event && event.defaultPrevented) return false;
+    var submitter = event && event.submitter ? event.submitter : null;
+    if (formSubmitTarget(form, submitter)) return false;
+    var method = formSubmissionMethod(form, submitter);
+    if (method !== "GET" && method !== "POST") return false;
+    return isSameOrigin(formSubmissionAction(form, submitter) || window.location.href);
+  }
+
+  function handleAuthoringFormSubmit(event) {
+    var form = event && event.target;
+    if (!shouldHandleAuthoringForm(form, event)) return;
+    event.preventDefault();
+    if (typeof event.stopImmediatePropagation === "function") {
+      event.stopImmediatePropagation();
+    } else if (typeof event.stopPropagation === "function") {
+      event.stopPropagation();
+    }
+    submitAuthoringManagedForm(form, event.submitter || null);
+  }
+
   window.GoSXStudioAuthoringRuntime = {
     handleEvent: handleManagedFormResult,
     handleResult: function (result, meta) {
       return handlePayload(result, meta || {});
     },
+    handleSubmit: handleAuthoringFormSubmit,
     refreshPreview: refreshPreview,
     selectChange: selectChange
   };
 
   if (window.__gosx_studio_authoring_runtime_bound !== "true") {
     window.__gosx_studio_authoring_runtime_bound = "true";
+    doc.addEventListener("submit", handleAuthoringFormSubmit, true);
     doc.addEventListener("gosx:form:result", handleManagedFormResult);
   }
 }());

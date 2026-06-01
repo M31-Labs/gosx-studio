@@ -74,7 +74,6 @@ test.describe("@reference-apps browser authoring workflows", () => {
         reloadAfter: false,
         expectedMessage: "Hero headline saved.",
       });
-      await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "networkidle" });
 
       await expectIntentButtonReceivesPointer(page, "add-component:home:hero");
       const addResponse = await clickIntent(page, "add-component:home:hero");

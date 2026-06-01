@@ -14,6 +14,7 @@ func TestIslandRuntimeJSOwnsAuthoringResultFeedback(t *testing.T) {
 		"GoSXStudioAuthoringRuntime",
 		"gosx:form:result",
 		"gosxstudio:authoring-result",
+		"data-gosx-studio-authoring-managed",
 		"data-gosx-studio-authoring-selected",
 		"data-gosx-studio-authoring-state",
 		"data-gosx-studio-preview-url",
