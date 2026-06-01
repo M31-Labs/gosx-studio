@@ -1001,6 +1001,14 @@ These are the current places to mine for reusable Studio behavior.
   the default view + reference editors are unchanged). 4 parity + 3 Go cases;
   merged to main as `94c6751`+`b51ec08`. **Host persistence is the open
   follow-up.**
+- 2026-06-01 (elm): Shipped the **studio-side node-position persistence
+  contract**. `SiteMapViewOptions.NodePositions map[string]SiteMapNodePosition`
+  (`{X,Y float64}`, keyed by workspace node key — the same key cedar's
+  `gosxstudio:sitemap-node-moved` emits) stamps `x`/`y` onto workspace node maps
+  in `AuthoringSiteMapView`, so `RenderSiteMapBoard` re-renders dragged nodes at
+  their saved spot. Round-trips 1:1 (pan-surface-LOCAL px). Default (no
+  positions) render unchanged. Go tests only; merged to main as `5c85591`.
+  **Host store + event-listener wiring remains** (apps own storage).
 
 ## Next Execution Slice
 
@@ -1009,12 +1017,12 @@ keyboard node navigation, and node drag-to-reposition (emits
 `gosxstudio:sitemap-node-moved`). A `:focus-visible` ring is a minor host-CSS
 follow-up. The next practical slices, in order, are:
 
-1. **Persist node positions (round-trip).** Studio-side: a `NodePositions`
-   contract on the site-map view so `RenderSiteMapBoard` re-renders dragged
-   nodes at their saved `x`/`y` (the renderer already supports this). Host-side:
-   Muddy/Noni + Pajaritos listen for `gosxstudio:sitemap-node-moved`, persist
-   `{key,x,y}` to a "Saved canvas positions" store, and feed positions back into
-   the view so a reload keeps the layout. (Drag + snap + event shipped 2026-06-01.)
+1. **Persist node positions — host wiring (round-trip completion).** Studio-side
+   contract shipped (`5c85591`: drag event + `NodePositions`). Remaining is
+   host-side: Muddy/Noni + Pajaritos listen for `gosxstudio:sitemap-node-moved`,
+   persist `{key,x,y}` per surface to a "Saved canvas positions" store, and feed
+   that map into `SiteMapViewOptions.NodePositions` on render so a reload keeps
+   the layout. App-coupled (each app's editor route + store).
 2. **Parallel track — Canvas2D engine (foundation shipped 2026-06-01, `0b23c8e`).**
    `RenderSiteMapCanvasEngine` (opt-in, default-off) mounts `gosx.CanvasBoard`
    for the page graph. Remaining: browser/WASM hydration e2e for the canvas
