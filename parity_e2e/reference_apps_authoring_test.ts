@@ -7,6 +7,7 @@ import {
   expectIntentButtonReceivesPointer,
   expectPajaritosPublishingReadiness,
   expectPanelButtonReceivesPointer,
+  reorderComponent,
   saveEditableControl,
   savePageMetadata,
   startMuddy,
@@ -51,6 +52,7 @@ test.describe("@reference-apps browser authoring workflows", () => {
       });
 
       await toggleComponentVisibility(page, { reloadAfter: false });
+      await reorderComponent(page, { reloadAfter: false });
     } finally {
       await server.stop();
     }
@@ -90,6 +92,7 @@ test.describe("@reference-apps browser authoring workflows", () => {
       });
 
       await toggleComponentVisibility(page, { reloadAfter: false });
+      await reorderComponent(page, { reloadAfter: false });
 
       await expectIntentButtonReceivesPointer(page, "add-component:home:hero");
       const addResponse = await clickIntent(page, "add-component:home:hero");

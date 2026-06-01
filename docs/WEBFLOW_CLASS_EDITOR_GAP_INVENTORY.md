@@ -106,6 +106,9 @@ Current:
 - `authoringruntime` now listens for successful GoSX action results, marks the
   changed editor object, updates workbench save feedback, and refreshes preview
   frames when the host mutation result requests it.
+- Managed authoring forms now keep editable-control, page metadata,
+  visibility, and reorder edits in the active editor instead of forcing a
+  full-page redirect for every persisted change.
 - `AuthoringSiteMapView` now exposes the first editable page metadata mutation
   payload, and Noni/Pajaritos persist page title/route updates with field-level
   validation through the same authoring action boundary.
@@ -451,9 +454,9 @@ Current:
   duplicate-component, and edit-control paths into their host persistence
   layers.
 - The Studio Playwright parity harness now clicks visible authoring controls for
-  create-page, add-component, duplicate-component, and edit-control workflows,
-  then verifies managed action feedback selects the changed surface, refreshes
-  the preview, and updates save-state UI.
+  create-page, add-component, duplicate-component, edit-control, page metadata,
+  visibility, and reorder workflows, then verifies managed action feedback
+  selects the changed surface, refreshes the preview, and updates save-state UI.
 - A local Pajaritos browser check now clicks the visible create-page control
   through a real admin editor page, posts through the GoSX authoring action with
   CSRF, follows the redirect, and verifies the new page appears. That check also
@@ -820,16 +823,23 @@ These are the current places to mine for reusable Studio behavior.
   select the affected component, update save-detail chrome, and flip the local
   panel from Hide to Show (or back) by rewriting the next
   `gosx_studio_visible` value after a successful result.
+- 2026-06-01: Extended in-place authoring to component reorder controls.
+  Managed reorder forms now keep the editor mounted, refresh preview, select
+  the affected component, update save-detail chrome, and rewrite the local
+  position output, next target field, and Move up/down button after a
+  successful result in both reference apps.
 
 ## Next Execution Slice
 
-The next practical slice is the next shell/render extraction:
+The next practical slice is the structural authoring refresh contract:
 
-- Collapse the remaining `gosx-cms/studio` workbench wrapper duplication now
-  that both reference apps consume Studio-owned frame semantics.
-- Extend the same in-place authoring result loop to reorder operations, then
-  graduate add/duplicate/delete once Studio has a fragment-refresh contract for
-  structural DOM changes.
+- Define a Studio fragment-refresh contract for structural add, duplicate, and
+  delete operations so those workflows can leave the redirect path without
+  stale site-map/canvas DOM.
+- Use that contract to graduate visible add/duplicate/delete controls to
+  managed in-place authoring in Muddy/Noni and Pajaritos.
+- Collapse the remaining `gosx-cms/studio` workbench wrapper duplication once
+  the structural refresh loop is stable.
 - Keep broadening visual/accessibility/performance checks as inspector, media,
   flow, and publish surfaces move behind reusable Studio-owned render paths.
 

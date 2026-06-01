@@ -374,6 +374,45 @@
     updatePanelInputs(panel, "gosx_studio_visible", visible ? "false" : "true");
   }
 
+  function firstPanelInputValue(panel, name) {
+    var inputs = queryAll("input[name=\"" + selectorValue(name) + "\"]", panel);
+    if (!inputs[0]) return "";
+    return String(inputs[0].value || inputs[0].getAttribute("value") || "");
+  }
+
+  function panelPosition(panel) {
+    var attr = String(panel && panel.getAttribute && panel.getAttribute("data-gosx-studio-authoring-position") || "").trim();
+    if (attr) {
+      var parsedAttr = parseInt(attr, 10);
+      if (!isNaN(parsedAttr)) return parsedAttr;
+    }
+    var output = queryAll("output", panel)[0];
+    var text = String(output && output.textContent || "").replace(/[^0-9-]/g, "");
+    var parsed = parseInt(text, 10);
+    return isNaN(parsed) ? -1 : parsed - 1;
+  }
+
+  function updateReorderPanel(data, panel) {
+    if (!panel || !panel.matches || !panel.matches("[data-gosx-studio-component-reorder], [data-studio-site-map-component-reorder]")) return;
+    var values = resultValues(data);
+    var submitted = String(values.gosx_studio_position || firstPanelInputValue(panel, "gosx_studio_position")).trim();
+    if (!submitted) return;
+    var target = parseInt(submitted, 10);
+    if (isNaN(target) || target < 0) return;
+    var previous = panelPosition(panel);
+    var nextTarget = target + 1;
+    var nextLabel = "Move down section";
+    if (previous < 0 || target > previous) {
+      nextTarget = Math.max(0, target - 1);
+      nextLabel = "Move up section";
+    }
+    panel.setAttribute("data-gosx-studio-authoring-position", String(target));
+    panel.setAttribute("data-gosx-studio-authoring-next-position", String(nextTarget));
+    setFirstText(panel, "output", "#" + String(target + 1));
+    setFirstText(panel, "button", nextLabel);
+    updatePanelInputs(panel, "gosx_studio_position", String(nextTarget));
+  }
+
   function markSourcePanel(data, change, panel) {
     if (!panel || !panel.setAttribute) return;
     panel.setAttribute(STATE_ATTR, "saved");
@@ -384,6 +423,7 @@
     setOptionalAttr(panel, CHANGE_COMPONENT_ATTR, change && change.component);
     setOptionalAttr(panel, CHANGE_BINDING_ATTR, change && change.binding);
     updateVisibilityPanel(data, panel);
+    updateReorderPanel(data, panel);
   }
 
   function formSubmitTarget(form, submitter) {
@@ -492,8 +532,10 @@
       "[data-gosx-studio-editable-control]",
       "[data-gosx-studio-page-metadata]",
       "[data-gosx-studio-component-visibility]",
+      "[data-gosx-studio-component-reorder]",
       "[data-studio-site-map-page-edit]",
-      "[data-studio-site-map-component-visibility]"
+      "[data-studio-site-map-component-visibility]",
+      "[data-studio-site-map-component-reorder]"
     ].join(", "));
   }
 

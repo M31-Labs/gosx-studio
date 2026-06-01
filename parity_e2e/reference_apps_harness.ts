@@ -281,6 +281,43 @@ export async function toggleComponentVisibility(page: Page, options?: ClickAutho
   expect(authoringParam(response, "gosx_studio_operation")).toBe("toggle-visibility");
 }
 
+export async function reorderComponent(page: Page, options?: ClickAuthoringOptions) {
+  const panelSelector = "[data-gosx-studio-component-reorder='true'], [data-studio-site-map-component-reorder='true']";
+  const buttonSelector = "[data-gosx-studio-component-reorder='true'] button, [data-studio-site-map-component-reorder='true'] button";
+  const panel = page.locator(panelSelector).first();
+  await expect(panel).toBeVisible();
+  const positionInput = panel.locator("input[name='gosx_studio_position']");
+  await expect(positionInput).toHaveCount(1);
+  const currentLabel = (await panel.locator("output").first().textContent())?.trim() ?? "";
+  const currentPosition = Number(currentLabel.replace(/[^0-9-]/g, "")) - 1;
+  const submittedPosition = Number(await positionInput.first().getAttribute("value"));
+  expect(Number.isFinite(submittedPosition), "reorder form should carry a numeric target position").toBeTruthy();
+  const expectedPosition = submittedPosition;
+  const expectedNextPosition = submittedPosition > currentPosition ? Math.max(0, submittedPosition - 1) : submittedPosition + 1;
+  const expectedButton = submittedPosition > currentPosition ? "Move up section" : "Move down section";
+  await expectButtonReceivesPointer(page, buttonSelector, "component reorder");
+  const authoringResultPromise = options?.reloadAfter === false ? waitForStudioAuthoringResult(page) : null;
+  const clickOptions = options?.reloadAfter === false ? { ...options, settleAfter: false } : options;
+  const response = await clickEditorActionButton(page, buttonSelector, "/__actions/authoring", clickOptions);
+  if (options?.reloadAfter === false) {
+    expect(response.status()).toBe(200);
+    const detail = await authoringResultPromise;
+    expect(detail, "real editor should emit component reorder authoring result detail").toBeTruthy();
+    expect(detail?.change?.kind).toBe("component");
+    expect(detail?.selectedCount ?? 0, "reorder save should select the changed component").toBeGreaterThan(0);
+    expect(detail?.previewCount ?? 0, "reorder save should refresh at least one preview frame").toBeGreaterThan(0);
+    await expect(panel).toHaveAttribute("data-gosx-studio-authoring-state", "saved");
+    await expect(panel).toHaveAttribute("data-gosx-studio-authoring-position", String(expectedPosition));
+    await expect(panel).toHaveAttribute("data-gosx-studio-authoring-next-position", String(expectedNextPosition));
+    await expect(panel.locator("input[name='gosx_studio_position']").first()).toHaveValue(String(expectedNextPosition));
+    await expect(page.locator(buttonSelector).first()).toHaveText(expectedButton);
+    await expect(page.locator("[data-gosx-studio-save-detail]").first()).toHaveText(detail?.result?.message ?? /./);
+    return;
+  }
+  expect(response.status()).toBe(303);
+  expect(authoringParam(response, "gosx_studio_operation")).toBe("reorder-component");
+}
+
 export function authoringParam(response: { request(): { postData(): string | null } }, key: string) {
   return new URLSearchParams(response.request().postData() ?? "").get(key);
 }
