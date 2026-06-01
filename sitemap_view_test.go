@@ -10,6 +10,7 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 		Group:         PageGroupSite,
 		GoSXComponent: "HomePage",
 		Status:        "Editable",
+		Editable:      true,
 		Selected:      true,
 		Components: []Component{{
 			Key:           "hero",
@@ -70,6 +71,14 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 	home := pages[0]
 	if home["href"] != "/admin/preview?path=/" || home["typeLabel"] != "Site page" || home["class"] != "studio-site-map-page is-selected" {
 		t.Fatalf("unexpected home page view: %#v", home)
+	}
+	if home["editable"] != true || view["hasMetadataPage"] != true {
+		t.Fatalf("expected editable page metadata projection: %#v", home)
+	}
+	metadataPage := view["metadataPage"].(map[string]any)
+	metadataForm := metadataPage["formValues"].(map[string]string)
+	if metadataPage["authoringOperation"] != "update-page" || metadataForm[AuthoringFieldPageKey] != "home" {
+		t.Fatalf("unexpected metadata page authoring payload: %#v", metadataPage)
 	}
 	hero := home["components"].([]map[string]any)[0]
 	if hero["selectionKey"] != "home.hero" || hero["sourceSummary"] != "Site-owned editable block" || hero["controlLabel"] != "1 field" {

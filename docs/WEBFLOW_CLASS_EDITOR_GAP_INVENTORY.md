@@ -87,6 +87,9 @@ Current:
 - `authoringruntime` now listens for successful GoSX action results, marks the
   changed editor object, updates workbench save feedback, and refreshes preview
   frames when the host mutation result requests it.
+- `AuthoringSiteMapView` now exposes the first editable page metadata mutation
+  payload, and Noni/Pajaritos persist page title/route updates with field-level
+  validation through the same authoring action boundary.
 
 Missing:
 
@@ -94,8 +97,8 @@ Missing:
   - reordering components
   - toggling component visibility
   - duplicating and deleting components
-  - changing page metadata and routes
-  - validating changes before persistence
+- Cross-operation validation beyond the current create-page, add-component,
+  save-control, and page metadata paths.
 - Route-level examples showing how host apps register `AuthoringActionHandler`
   beside page modules.
 
@@ -111,13 +114,16 @@ Current:
 - `SiteMap.CompositionWorkspace()` and `WorkspaceCanvas` can describe a graph.
 - Noni has app-local functions for page views and composition intents.
 - Pajaritos builds a simple site map but does not get a reusable graph editor.
+- The shared site-map projection can identify an editable page and provide a
+  ready-to-submit page metadata mutation payload.
 
 Missing:
 
 - A Studio-owned site-map engine that renders pages, routes, components,
   source bindings, readiness, and allowed operations.
 - Create-page and add-component flows from the composition library.
-- Route editing, page grouping, selection state, and conflict validation.
+- Full route editing across all editable pages, page grouping, selection state,
+  and conflict validation inside the visual graph.
 - Keyboard and pointer interactions suitable for a visual graph.
 
 Acceptance:
@@ -450,11 +456,11 @@ These are the current places to mine for reusable Studio behavior.
 
 - Introduce an `AuthoringAdapter` or equivalent mutation interface. Done in the
   first execution slice.
-- Implement apply-intent, save-control, reorder, visibility, route metadata,
-  duplicate, delete, and validation operations.
+- Implement apply-intent, save-control, and route metadata operations. Reorder,
+  visibility, duplicate, delete, and broader validation operations remain.
 - Add server-action helpers and focused tests.
 - Wire both Noni and Pajaritos to the same action contract. Pajaritos and Noni
-  now have minimal save-control slices.
+  now have create-page, add-component, save-control, and page metadata slices.
 
 ### Phase 2: Extract the Visible Shell
 
@@ -488,7 +494,7 @@ These are the current places to mine for reusable Studio behavior.
 - Add plugin registry and first-run project templates.
 - Prepare public docs and API stability guarantees.
 
-## Next Ten Tickets
+## Next Execution Queue
 
 1. Extract Noni site-map view and composition-intent logic into
    `gosx-studio`, replacing duplicate app-local view builders with
@@ -498,19 +504,21 @@ These are the current places to mine for reusable Studio behavior.
 3. Done on 2026-06-01: add server-action helpers for Studio authoring
    mutations and wire Pajaritos/Noni composition/control persistence for the
    first real content flows.
-4. Build a reusable `StudioShell.gsx` that consumes `ShellConfig` and
+4. Done on 2026-06-01: add first page title/route metadata mutation payloads
+   and host persistence in both reference apps.
+5. Build a reusable `StudioShell.gsx` that consumes `ShellConfig` and
    `AuthoringSurfaceView`.
-5. Move workbench, command palette, and state runtime ownership out of
+6. Move workbench, command palette, and state runtime ownership out of
    `gosx-cms/studio` when the dependent hosts are ready.
-6. Implement `SiteMapEngine.gsx` against the existing `CompositionWorkspace`
+7. Implement `SiteMapEngine.gsx` against the existing `CompositionWorkspace`
    and `WorkspaceCanvas` contracts.
-7. Implement `InspectorIsland.gsx` for the current `ControlKind` set with
+8. Implement `InspectorIsland.gsx` for the current `ControlKind` set with
    dirty/valid/saving states.
-8. Implement canvas selection and inline text editing through the Studio
+9. Implement canvas selection and inline text editing through the Studio
    preview/selection/field runtimes.
-9. Add Noni and Pajaritos e2e smoke tests for create page, add component,
+10. Add Noni and Pajaritos e2e smoke tests for create page, add component,
    edit control, responsive preview, staging publish readiness, and rollback.
-10. Write the visual-system spec for the Studio editor UI before the major
+11. Write the visual-system spec for the Studio editor UI before the major
     shell styling pass, including density, typography, color roles,
     accessibility states, and responsive behavior.
 
@@ -551,18 +559,25 @@ These are the current places to mine for reusable Studio behavior.
   into its generated workbench. Successful authoring actions can now refresh
   previews, mark the changed node/control, and publish a
   `gosxstudio:authoring-result` event.
+- 2026-06-01: Added shared page metadata mutation payloads to the site-map
+  projection and wired both reference apps to persist page title/route edits
+  through `AuthoringActionHandler`. Noni validates reserved storefront routes;
+  Pajaritos validates duplicate content-page routes. Both apps now expose
+  visible page detail controls without adding client copy that names GoSX
+  Studio.
 
 ## Next Execution Slice
 
-The next practical slice is route/page metadata editing and confidence:
+The next practical slice is e2e authoring confidence plus component operations:
 
-- Add the first route/page metadata mutation for title/slug updates, including
-  conflict validation and clear field errors.
 - Add Noni and Pajaritos e2e smoke tests for create page, add component, and
   edit control through the visible editor surface.
 - Use the new `gosxstudio:authoring-result` event in the smoke tests to assert
   changed-object selection and preview refresh instead of only checking stored
   data.
+- Add the first persisted component reorder/visibility operations so the
+  site-map and canvas can manipulate placed sections rather than only fields
+  and page metadata.
 
 ## Definition of Done
 

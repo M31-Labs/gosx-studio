@@ -57,6 +57,23 @@ func TestAuthoringMutationFromIntentBuildsActionPayload(t *testing.T) {
 	}
 }
 
+func TestAuthoringMutationForPageBuildsUpdatePayload(t *testing.T) {
+	mutation := AuthoringMutationForPage(Page{
+		Key:      "page_philosophy",
+		Label:    "Our Philosophy",
+		Route:    "/pages/philosophy",
+		Editable: true,
+	})
+	values := mutation.FormValues()
+
+	if mutation.Kind != AuthoringOperationUpdatePage || mutation.PageKey != "page_philosophy" {
+		t.Fatalf("unexpected page mutation: %#v", mutation)
+	}
+	if values[AuthoringFieldOperation] != "update-page" || values[AuthoringFieldPageLabel] != "Our Philosophy" || values[AuthoringFieldPageRoute] != "/pages/philosophy" {
+		t.Fatalf("unexpected page form values: %#v", values)
+	}
+}
+
 func TestAuthoringMutationFromFormNormalizesAndValidates(t *testing.T) {
 	mutation, validation := AuthoringMutationFromForm(map[string]string{
 		AuthoringFieldOperation:    " save-control ",

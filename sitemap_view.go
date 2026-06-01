@@ -44,6 +44,7 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 		defaultFocusKey = "all"
 	}
 	pages := authoringSiteMapPageViews(siteMap.Pages, options)
+	metadataPage := authoringSiteMapMetadataPageView(siteMap.Pages)
 	sources := authoringSiteMapSourceViews(siteMap)
 	blueprints := authoringSiteMapPageBlueprintViews(siteMap.Library.PageBlueprints, options)
 	palette := authoringSiteMapComponentTemplateViews(siteMap.Library.ComponentTemplates, options)
@@ -89,6 +90,8 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 		"defaultWorkspaceNodeComponentLabel": stringMapValue(selectedWorkspaceNode, "componentLabel"),
 		"pages":                              pages,
 		"hasPages":                           len(pages) > 0,
+		"metadataPage":                       metadataPage,
+		"hasMetadataPage":                    len(metadataPage) > 0,
 		"empty":                              "No editable pages are configured.",
 		"sources":                            sources,
 		"hasSources":                         len(sources) > 0,
@@ -129,6 +132,7 @@ func authoringSiteMapPageViews(pages []Page, options SiteMapViewOptions) []map[s
 			"statusLabel":         page.Status,
 			"gosxComponent":       page.GoSXComponent,
 			"goSXComponent":       page.GoSXComponent,
+			"editable":            page.Editable,
 			"componentCountLabel": countLabel(componentCount, "component", "components"),
 			"components":          authoringSiteMapComponentViews(page, page.Components),
 			"hasComponents":       componentCount > 0,
@@ -138,6 +142,30 @@ func authoringSiteMapPageViews(pages []Page, options SiteMapViewOptions) []map[s
 		})
 	}
 	return out
+}
+
+func authoringSiteMapMetadataPageView(pages []Page) map[string]any {
+	for _, page := range pages {
+		page = page.Normalize()
+		if !page.Editable {
+			continue
+		}
+		mutation := AuthoringMutationForPage(page)
+		return map[string]any{
+			"key":                page.Key,
+			"label":              page.Label,
+			"route":              page.Route,
+			"groupLabel":         page.GroupLabel(),
+			"statusLabel":        page.Status,
+			"authoringOperation": string(mutation.Kind),
+			"authoringPageKey":   mutation.PageKey,
+			"authoringPageLabel": mutation.PageLabel,
+			"authoringPageRoute": mutation.PageRoute,
+			"mutation":           AuthoringMutationView(mutation),
+			"formValues":         mutation.FormValues(),
+		}
+	}
+	return nil
 }
 
 func authoringSiteMapComponentViews(page Page, components []Component) []map[string]any {

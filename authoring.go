@@ -201,6 +201,7 @@ func authoringPageView(page Page) map[string]any {
 		"groupLabel":     page.GroupLabel(),
 		"goSXComponent":  page.GoSXComponent,
 		"status":         page.Status,
+		"editable":       page.Editable,
 		"selected":       page.Selected,
 		"componentCount": page.ComponentCount(),
 		"controlCount":   page.ControlCount(),

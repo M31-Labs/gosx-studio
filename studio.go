@@ -227,6 +227,7 @@ type Page struct {
 	Group         PageGroup
 	GoSXComponent string
 	Status        string
+	Editable      bool
 	Selected      bool
 	Components    []Component
 }

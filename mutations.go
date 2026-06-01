@@ -165,6 +165,16 @@ func AuthoringMutationForControl(page Page, component Component, control Control
 	}.Normalize()
 }
 
+func AuthoringMutationForPage(page Page) AuthoringMutation {
+	page = page.Normalize()
+	return AuthoringMutation{
+		Kind:      AuthoringOperationUpdatePage,
+		PageKey:   page.Key,
+		PageLabel: page.Label,
+		PageRoute: page.Route,
+	}.Normalize()
+}
+
 func AuthoringMutationFromForm(form map[string]string) (AuthoringMutation, AuthoringValidation) {
 	mutation := AuthoringMutation{
 		Kind:                 AuthoringOperationKind(formValue(form, AuthoringFieldOperation)),
