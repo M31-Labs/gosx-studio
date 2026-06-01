@@ -392,6 +392,41 @@ func (mutation AuthoringMutation) FormValues() map[string]string {
 	return values
 }
 
+func AuthoringMutationFormInputViews(mutation AuthoringMutation) []map[string]string {
+	values := mutation.FormValues()
+	fields := []string{
+		AuthoringFieldOperation,
+		AuthoringFieldIntentKey,
+		AuthoringFieldIntentKind,
+		AuthoringFieldPageKey,
+		AuthoringFieldPageLabel,
+		AuthoringFieldPageRoute,
+		AuthoringFieldPageBlueprintKey,
+		AuthoringFieldComponentKey,
+		AuthoringFieldComponentLabel,
+		AuthoringFieldComponentTemplateKey,
+		AuthoringFieldControlKey,
+		AuthoringFieldControlKind,
+		AuthoringFieldBinding,
+		AuthoringFieldTargetRegion,
+		AuthoringFieldValue,
+		AuthoringFieldPosition,
+		AuthoringFieldVisible,
+	}
+	out := make([]map[string]string, 0, len(values))
+	for _, field := range fields {
+		value, ok := values[field]
+		if !ok {
+			continue
+		}
+		out = append(out, map[string]string{
+			"name":  field,
+			"value": value,
+		})
+	}
+	return out
+}
+
 func AuthoringMutationView(mutation AuthoringMutation) map[string]any {
 	mutation = mutation.Normalize()
 	return map[string]any{
@@ -415,6 +450,7 @@ func AuthoringMutationView(mutation AuthoringMutation) map[string]any {
 		"visible":              mutation.Visible,
 		"hasVisible":           mutation.HasVisible,
 		"formValues":           mutation.FormValues(),
+		"formInputs":           AuthoringMutationFormInputViews(mutation),
 	}
 }
 

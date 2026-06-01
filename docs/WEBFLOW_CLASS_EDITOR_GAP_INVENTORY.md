@@ -86,6 +86,9 @@ Current:
   define the first executable mutation boundary.
 - `AuthoringSurfaceView` now exposes stable mutation field names plus form
   payloads for composition intents and component controls.
+- `AuthoringMutationView` and `AuthoringSiteMapView` now expose ordered
+  `formInputs`, so host renderers can build visible apply controls without
+  duplicating every hidden action field.
 - Noni applies create-page, home add-component, and hero-headline mutations.
 - Pajaritos applies create-page, family-form add-component, hero-headline, and
   flow step/submit label mutations.
@@ -661,6 +664,10 @@ These are the current places to mine for reusable Studio behavior.
   for the canvas stacking and pointer-events rules that keep transformed site
   map layers from blocking authoring controls while preserving canvas-node
   clicks.
+- 2026-06-01: Added ordered `formInputs` to Studio authoring mutation views and
+  site-map composition intents. Muddy and Pajaritos now render their visible
+  create-page/add-section hidden input payloads from the shared Studio
+  projection instead of app-local field lists.
 
 ## Next Execution Slice
 

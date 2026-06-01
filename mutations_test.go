@@ -55,6 +55,14 @@ func TestAuthoringMutationFromIntentBuildsActionPayload(t *testing.T) {
 	if view["kind"] != "apply-intent" || view["formValues"].(map[string]string)[AuthoringFieldTargetRegion] != "main" {
 		t.Fatalf("unexpected mutation view: %#v", view)
 	}
+	inputs := view["formInputs"].([]map[string]string)
+	if len(inputs) == 0 || inputs[0]["name"] != AuthoringFieldOperation || inputs[0]["value"] != "apply-intent" {
+		t.Fatalf("expected ordered operation form input: %#v", inputs)
+	}
+	if !authoringFormInputsContain(inputs, AuthoringFieldComponentTemplateKey, "gallery") ||
+		!authoringFormInputsContain(inputs, AuthoringFieldBinding, "media.gallery") {
+		t.Fatalf("expected intent form inputs to include component and binding values: %#v", inputs)
+	}
 }
 
 func TestAuthoringMutationForPageBuildsUpdatePayload(t *testing.T) {
@@ -288,4 +296,13 @@ func TestAuthoringActionHandlerReturnsValidationFailure(t *testing.T) {
 	if result.OK || result.FieldErrors[AuthoringFieldVisible] == "" {
 		t.Fatalf("unexpected validation result: %#v", result)
 	}
+}
+
+func authoringFormInputsContain(inputs []map[string]string, name, value string) bool {
+	for _, input := range inputs {
+		if input["name"] == name && input["value"] == value {
+			return true
+		}
+	}
+	return false
 }

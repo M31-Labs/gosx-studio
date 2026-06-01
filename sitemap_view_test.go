@@ -162,6 +162,13 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 	if addForm[AuthoringFieldOperation] != "apply-intent" || addForm[AuthoringFieldComponentTemplateKey] != "gallery" {
 		t.Fatalf("unexpected add intent form: %#v", addForm)
 	}
+	addInputs := add["formInputs"].([]map[string]string)
+	if len(addInputs) == 0 || addInputs[0]["name"] != AuthoringFieldOperation || addInputs[0]["value"] != "apply-intent" {
+		t.Fatalf("expected ordered add intent form inputs: %#v", addInputs)
+	}
+	if !authoringFormInputsContain(addInputs, AuthoringFieldComponentTemplateKey, "gallery") {
+		t.Fatalf("expected add intent template input: %#v", addInputs)
+	}
 	workspaceLayers := view["workspaceLayers"].([]map[string]any)
 	if len(workspaceLayers) == 0 || workspaceLayers[0]["hasPageComposition"] != true || workspaceLayers[0]["sectionCountLabel"] != "2 sections" {
 		t.Fatalf("unexpected workspace layer: %#v", workspaceLayers)

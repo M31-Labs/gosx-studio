@@ -594,6 +594,7 @@ func authoringSiteMapIntentView(intent CompositionIntent) map[string]any {
 		"authoringRegion":      mutation.TargetRegion,
 		"mutation":             AuthoringMutationView(mutation),
 		"formValues":           mutation.FormValues(),
+		"formInputs":           AuthoringMutationFormInputViews(mutation),
 	}
 }
 
