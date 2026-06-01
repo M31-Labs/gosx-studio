@@ -102,4 +102,31 @@ func TestRenderSiteMapAuthoringPanelsUsesSharedAuthoringContracts(t *testing.T) 
 	if strings.Contains(html, "GoSX Studio") {
 		t.Fatalf("shared authoring panels must not inject visible platform copy:\n%s", html)
 	}
+
+	formsHTML := gosx.RenderHTML(RenderSiteMapAuthoringForms(view, SiteMapAuthoringFormsOptions{
+		Action:    "/admin/editor/__actions/authoring",
+		CSRFToken: "csrf-token",
+	}))
+	for _, fragment := range []string{
+		`data-gosx-studio-authoring-forms-renderer="gosx-studio"`,
+		`data-studio-composition-intent-forms="true"`,
+		`id="studioSiteMapIntentForm-create-page-landing"`,
+		`action="/admin/editor/__actions/authoring"`,
+		`data-gosx-studio-authoring-managed="true"`,
+		`data-gosx-enhance="form"`,
+		`name="csrf_token" value="csrf-token"`,
+		`data-studio-site-map-operation-form="metadata"`,
+		`id="studioSiteMapEditableControlForm"`,
+		`data-studio-site-map-operation-form="reorder"`,
+		`data-studio-site-map-operation-form="duplicate"`,
+		`data-studio-site-map-operation-form="visibility"`,
+		`data-studio-site-map-operation-form="delete"`,
+	} {
+		if !strings.Contains(formsHTML, fragment) {
+			t.Fatalf("rendered site-map authoring forms missing %q:\n%s", fragment, formsHTML)
+		}
+	}
+	if strings.Contains(formsHTML, "GoSX Studio") {
+		t.Fatalf("shared authoring forms must not inject visible platform copy:\n%s", formsHTML)
+	}
 }
