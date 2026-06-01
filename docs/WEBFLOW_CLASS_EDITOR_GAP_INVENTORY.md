@@ -31,6 +31,7 @@ still split across `gosx-studio`, `gosx-cms/studio`, Muddy Noni, and Pajaritos.
 | --- | --- | --- |
 | Studio package boundary | `README.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md` | The docs already define Studio as the authoring layer beside CMS/Admin, not inside a host app. |
 | Host shell contract | `store.go:12`, `store.go:27` | Hosts can feed Studio panels, media, revisions, readiness, adapters, and a normalized shell. |
+| Reusable workbench shell projection | `workbench_shell_view.go` | Studio now owns the shared editor shell view payload for workbench chrome, preview-shell attrs, zoom levels, rail resizers, CSRF/action metadata, and host label overrides. |
 | Authoring projection | `authoring.go:9`, `authoring.go:21`, `authoring.go:47` | `AuthoringSurface` exposes pages, selected page, palette, intents, workspace graph, and canvas layout. |
 | Authoring mutation contract | `mutations.go` | Studio now has typed operation kinds, form field names, `AuthoringMutation`, `AuthoringAdapter`, validation/result envelopes, and a GoSX action handler for host-owned persistence. |
 | Typed page/component model | `studio.go:151`, `studio.go:156`, `studio.go:292` | Pages, components, controls, canvas blocks, blueprints, templates, and composition intents exist as contracts. |
@@ -53,6 +54,10 @@ Current:
   `FlowDesigner.gsx`, and `PublishPanel.gsx`.
 - Host apps still render most visible UI through Noni-specific functions or
   `gosx-cms/studio` helpers.
+- `WorkbenchShellView` now extracts the first shared shell projection into
+  `gosx-studio`, and both Noni and Pajaritos consume it for workbench metadata,
+  preview-shell attributes, zoom controls, rail resizers, and save/preview
+  labels.
 
 Missing:
 
@@ -485,8 +490,11 @@ These are the current places to mine for reusable Studio behavior.
 ### Phase 2: Extract the Visible Shell
 
 - Build `StudioShell.gsx`, `SiteNavigator.gsx`, `InspectorIsland.gsx`, and
-  `PublishPanel.gsx` in `gosx-studio`.
-- Replace app-local editor chrome with the shared shell.
+  `PublishPanel.gsx` in `gosx-studio`. The first reusable workbench shell view
+  payload is done; complete `.gsx` ownership remains.
+- Replace app-local editor chrome with the shared shell. Noni and Pajaritos now
+  share the Go-side workbench shell projection, but still render host-local
+  wrappers/panels.
 - Preserve app-specific panels as slots or adapter-fed views.
 
 ### Phase 3: Ship Core Engines
@@ -532,8 +540,9 @@ These are the current places to mine for reusable Studio behavior.
    persistence in both reference apps.
 7. Done on 2026-06-01: add component delete mutation payloads and host
    persistence in both reference apps.
-8. Build a reusable `StudioShell.gsx` that consumes `ShellConfig` and
-   `AuthoringSurfaceView`.
+8. In progress on 2026-06-01: build a reusable shell path that consumes
+   `ShellConfig` and `AuthoringSurfaceView`. The shared Go workbench shell
+   projection is done; the complete `StudioShell.gsx` surface remains.
 9. Done on 2026-06-01: add duplicate component operations with a dynamic
    component-instance model, host-backed persistence, and visible site-map
    controls.
@@ -614,18 +623,25 @@ These are the current places to mine for reusable Studio behavior.
   scoped form IDs, and explicit authoring payload fields; Muddy and Pajaritos
   render those controls without leaking platform copy, and Pajaritos now builds
   its panel site-map from `NoCodeAuthoringSurface`.
+- 2026-06-01: Added `WorkbenchShellView` and `CanvasPreviewShellView` in
+  `gosx-studio` as the first reusable shell extraction slice. Muddy now adapts
+  its editor workbench shell map through that shared projection instead of
+  constructing preview-shell attrs, zoom levels, and rail resizers locally.
+  Pajaritos now exposes `hostWorkbenchShell` from the same projection and uses
+  it for editor host metadata. Both apps keep visible client copy host-branded
+  while footer attribution remains limited to "Made with GoSX by M31 Labs."
 
 ## Next Execution Slice
 
-The next practical slice is reusable shell extraction plus persisted browser
-confidence:
+The next practical slice is persisted browser confidence plus the next visible
+shell extraction:
 
-- Build the first reusable `StudioShell.gsx`/view slice so Muddy and Pajaritos
-  stop carrying app-local editor chrome for the shared workbench shell.
 - Add Noni and Pajaritos persisted browser smoke tests for create page, add
   component, duplicate component, and edit control through the visible editor
   surface. The tests should run with real authenticated/CSRF-capable sessions
   or a local-only test bypass, not just inspect form payloads.
+- Continue the shell extraction by moving the next visible wrapper/toolbar
+  piece behind a Studio-owned render path that consumes `WorkbenchShellView`.
 - Extend `authoringruntime` host-backed smoke coverage to assert
   changed-object selection and preview refresh after those persisted actions.
 
