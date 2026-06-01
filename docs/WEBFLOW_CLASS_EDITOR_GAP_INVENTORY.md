@@ -667,9 +667,9 @@ These are the current places to mine for reusable Studio behavior.
   clicks.
 - 2026-06-01: Added ordered `formInputs` to Studio authoring mutation views,
   surface controls/intents, and site-map page/component/control operations.
-  Muddy and Pajaritos now render their visible create-page/add-section hidden
-  input payloads from the shared Studio projection instead of app-local field
-  lists.
+  Muddy and Pajaritos now render visible create-page/add-section, page
+  metadata, component reorder, duplicate, visibility, and delete hidden-input
+  payloads from the shared Studio projection instead of app-local field lists.
 
 ## Next Execution Slice
 
