@@ -454,8 +454,8 @@ Current:
   data, verifies visible authoring buttons receive pointer events, and submits
   create-page, add-section, duplicate-section, and save-field actions through
   the real admin editor action flow. Muddy verifies duplicate/save-field state
-  after reload; Pajaritos verifies the isolated native payloads and redirects
-  while draft-state reload reflection remains a host gap.
+  after reload; Pajaritos verifies native duplicate/save-field payloads,
+  redirects, and browser-visible authoring feedback after reload.
 - `docs/PUBLIC_READINESS.md` names the release posture concerns.
 
 Missing:
@@ -692,8 +692,8 @@ These are the current places to mine for reusable Studio behavior.
 - 2026-06-01: Broadened the reference-app browser e2e to click duplicate and
   save-field controls. Muddy now asserts duplicate and headline state after a
   browser reload; Pajaritos asserts pointer reachability, native
-  duplicate/save-control payloads, and 303 redirects while exposing the
-  remaining draft-state reload gap.
+  duplicate/save-control payloads, 303 redirects, and visible success feedback
+  through its host PRG notice path.
 
 ## Next Execution Slice
 
@@ -701,9 +701,9 @@ The next practical slice is full browser automation plus the next visible shell
 extraction:
 
 - Promote the opt-in Muddy/Pajaritos reference-app browser e2e into default CI
-  and make Pajaritos render draft-state edits after redirect/reload, then add
-  preview-refresh, staging publish readiness, and rollback workflows with
-  persisted browser-visible assertions.
+  and add broader Pajaritos draft-state assertions for create-page/add-section
+  reloads, preview-refresh, staging publish readiness, and rollback workflows
+  with persisted browser-visible assertions.
 - Continue the shell extraction by moving the next visible wrapper/toolbar
   piece behind a Studio-owned render path that consumes `WorkbenchShellView`.
 - Extend `authoringruntime` host-backed smoke coverage to assert

@@ -55,10 +55,11 @@ test.describe("@reference-apps browser authoring workflows", () => {
       expect(duplicateResponse.status()).toBe(303);
       expect(authoringParam(duplicateResponse, "gosx_studio_operation")).toBe("duplicate-component");
       expect(authoringParam(duplicateResponse, "gosx_studio_component_key")).toBe("hero");
-      await expect(page.locator("[data-gosx-studio-component-duplicate='true']")).toBeVisible();
+      await expect(page.locator("body")).toContainText("Hero copy 2 duplicated.");
 
       await saveEditableControl(page, "Small boots, big questions.", {
         reloadAfter: false,
+        expectedMessage: "Hero headline saved.",
       });
 
       await expectIntentButtonReceivesPointer(page, "add-component:home:hero");
@@ -84,12 +85,17 @@ async function clickAuthoringPanel(page: Page, panelSelector: string, options?: 
 }
 
 async function clickAuthoringButton(page: Page, buttonSelector: string, options?: ClickAuthoringOptions) {
+  const navigationPromise = page.waitForEvent("framenavigated", {
+    predicate: (frame) => frame === page.mainFrame(),
+    timeout: 3_000,
+  }).catch(() => null);
   const responsePromise = page.waitForResponse((response) =>
     response.url().includes("/__actions/authoring") &&
     response.request().method() === "POST",
   );
   await page.locator(buttonSelector).first().click();
   const response = await responsePromise;
+  await navigationPromise;
   await page.waitForLoadState("networkidle");
   if (options?.reloadAfter !== false) {
     await page.goto(page.url(), { waitUntil: "networkidle" });

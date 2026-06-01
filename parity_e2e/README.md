@@ -106,9 +106,8 @@ with temporary data directories, opens their real admin editors, verifies the
 visible authoring buttons receive pointer events, and submits create-page,
 add-section, duplicate-section, and save-field actions through the real GoSX
 action/CSRF flow. Muddy assertions include browser-reloaded duplicate and field
-state. Pajaritos assertions currently stop at isolated native payloads and
-redirects because its editor reload still renders the published baseline rather
-than the preview draft.
+state. Pajaritos assertions now verify native duplicate and save-field payloads,
+303 redirects, and browser-visible success feedback after the editor reload.
 
 It is not part of default parity CI yet because it depends on sibling app
 worktrees. Run it locally with:
