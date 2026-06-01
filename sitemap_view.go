@@ -50,6 +50,7 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 	metadataPage := authoringSiteMapMetadataPageView(siteMap.Pages)
 	reorderComponent := authoringSiteMapReorderComponentView(siteMap.Pages)
 	visibilityComponent := authoringSiteMapVisibilityComponentView(siteMap.Pages)
+	deleteComponent := authoringSiteMapDeleteComponentView(siteMap.Pages)
 	sources := authoringSiteMapSourceViews(siteMap)
 	blueprints := authoringSiteMapPageBlueprintViews(siteMap.Library.PageBlueprints, options)
 	palette := authoringSiteMapComponentTemplateViews(siteMap.Library.ComponentTemplates, options)
@@ -101,6 +102,8 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 		"hasReorderComponent":                len(reorderComponent) > 0,
 		"visibilityComponent":                visibilityComponent,
 		"hasVisibilityComponent":             len(visibilityComponent) > 0,
+		"deleteComponent":                    deleteComponent,
+		"hasDeleteComponent":                 len(deleteComponent) > 0,
 		"empty":                              "No editable pages are configured.",
 		"sources":                            sources,
 		"hasSources":                         len(sources) > 0,
@@ -208,6 +211,12 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 				visibilityActionLabel = "Hide"
 			}
 		}
+		deleteMutation := AuthoringMutation{}
+		deleteFormValues := map[string]string(nil)
+		if component.CanDelete {
+			deleteMutation = AuthoringMutationForComponentDelete(page, component)
+			deleteFormValues = deleteMutation.FormValues()
+		}
 		out = append(out, map[string]any{
 			"key":                          component.Key,
 			"selectionKey":                 component.SelectionKey(page.Key),
@@ -249,6 +258,13 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 			"visibilityAuthoringVisible":   visibilityMutation.Visible,
 			"visibilityMutation":           AuthoringMutationView(visibilityMutation),
 			"visibilityFormValues":         visibilityFormValues,
+			"canDelete":                    component.CanDelete,
+			"deleteActionLabel":            "Delete",
+			"deleteAuthoringOperation":     string(deleteMutation.Kind),
+			"deleteAuthoringPageKey":       deleteMutation.PageKey,
+			"deleteAuthoringComponent":     deleteMutation.ComponentKey,
+			"deleteMutation":               AuthoringMutationView(deleteMutation),
+			"deleteFormValues":             deleteFormValues,
 			"controls":                     authoringSiteMapControlViews(page, component, component.Controls),
 			"hasControls":                  component.ControlCount() > 0,
 			"controlLabel":                 countLabel(component.ControlCount(), "field", "fields"),
@@ -327,6 +343,37 @@ func authoringSiteMapVisibilityComponentView(pages []Page) map[string]any {
 				"authoringPageKey":   mutation.PageKey,
 				"authoringComponent": mutation.ComponentKey,
 				"authoringVisible":   mutation.Visible,
+				"mutation":           AuthoringMutationView(mutation),
+				"formValues":         mutation.FormValues(),
+			}
+		}
+	}
+	return nil
+}
+
+func authoringSiteMapDeleteComponentView(pages []Page) map[string]any {
+	for _, page := range pages {
+		page = page.Normalize()
+		for index, component := range page.Components {
+			component = component.Normalize()
+			component.Position = index
+			if !component.CanDelete {
+				continue
+			}
+			mutation := AuthoringMutationForComponentDelete(page, component)
+			return map[string]any{
+				"key":                component.Key,
+				"label":              component.Label,
+				"pageKey":            page.Key,
+				"pageLabel":          page.Label,
+				"binding":            component.Binding,
+				"statusLabel":        component.Status,
+				"position":           index,
+				"positionLabel":      strconv.Itoa(index + 1),
+				"actionLabel":        "Delete",
+				"authoringOperation": string(mutation.Kind),
+				"authoringPageKey":   mutation.PageKey,
+				"authoringComponent": mutation.ComponentKey,
 				"mutation":           AuthoringMutationView(mutation),
 				"formValues":         mutation.FormValues(),
 			}

@@ -120,6 +120,26 @@ func TestAuthoringMutationForComponentReorderBuildsPositionPayload(t *testing.T)
 	}
 }
 
+func TestAuthoringMutationForComponentDeleteBuildsComponentPayload(t *testing.T) {
+	mutation := AuthoringMutationForComponentDelete(Page{
+		Key:   "home",
+		Label: "Home",
+		Route: "/",
+	}, Component{
+		Key:     "gallery",
+		Label:   "Gallery",
+		Binding: "home.section.gallery",
+	})
+	values := mutation.FormValues()
+
+	if mutation.Kind != AuthoringOperationDeleteComponent || mutation.PageKey != "home" || mutation.ComponentKey != "gallery" {
+		t.Fatalf("unexpected delete mutation: %#v", mutation)
+	}
+	if values[AuthoringFieldOperation] != "delete-component" || values[AuthoringFieldBinding] != "home.section.gallery" {
+		t.Fatalf("unexpected delete form values: %#v", values)
+	}
+}
+
 func TestAuthoringMutationFromFormNormalizesAndValidates(t *testing.T) {
 	mutation, validation := AuthoringMutationFromForm(map[string]string{
 		AuthoringFieldOperation:    " save-control ",

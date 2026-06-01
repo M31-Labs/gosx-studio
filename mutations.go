@@ -207,6 +207,20 @@ func AuthoringMutationForComponentVisibility(page Page, component Component, vis
 	}.Normalize()
 }
 
+func AuthoringMutationForComponentDelete(page Page, component Component) AuthoringMutation {
+	page = page.Normalize()
+	component = component.Normalize()
+	return AuthoringMutation{
+		Kind:           AuthoringOperationDeleteComponent,
+		PageKey:        page.Key,
+		PageLabel:      page.Label,
+		PageRoute:      page.Route,
+		ComponentKey:   component.Key,
+		ComponentLabel: component.Label,
+		Binding:        component.Binding,
+	}.Normalize()
+}
+
 func AuthoringMutationFromForm(form map[string]string) (AuthoringMutation, AuthoringValidation) {
 	mutation := AuthoringMutation{
 		Kind:                 AuthoringOperationKind(formValue(form, AuthoringFieldOperation)),

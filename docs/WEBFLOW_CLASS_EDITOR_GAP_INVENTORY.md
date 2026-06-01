@@ -97,13 +97,17 @@ Current:
 - `AuthoringSiteMapView` now exposes component reorder payloads. Noni persists
   homepage section order through its settings store, and Pajaritos persists home
   section order through preview settings metadata.
+- `AuthoringSiteMapView` now exposes component delete payloads. Noni removes a
+  storefront section by disabling it in site settings, and Pajaritos removes a
+  home section from the configured order while keeping it restorable from the
+  component palette.
 
 Missing:
 
 - Host implementations in Noni and Pajaritos for the remaining operations:
-  - duplicating and deleting components
+  - duplicating components with dynamic component instances
 - Cross-operation validation beyond the current create-page, add-component,
-  save-control, page metadata, visibility, and reorder paths.
+  save-control, page metadata, visibility, reorder, and delete paths.
 - Route-level examples showing how host apps register `AuthoringActionHandler`
   beside page modules.
 
@@ -465,13 +469,13 @@ These are the current places to mine for reusable Studio behavior.
 
 - Introduce an `AuthoringAdapter` or equivalent mutation interface. Done in the
   first execution slice.
-- Implement apply-intent, save-control, route metadata, first visibility, and
-  first reorder operations. Duplicate, delete, and broader validation operations
+- Implement apply-intent, save-control, route metadata, first visibility,
+  reorder, and delete operations. Duplicate and broader validation operations
   remain.
 - Add server-action helpers and focused tests.
 - Wire both Noni and Pajaritos to the same action contract. Pajaritos and Noni
   now have create-page, add-component, save-control, page metadata, visibility,
-  and reorder slices.
+  reorder, and delete slices.
 
 ### Phase 2: Extract the Visible Shell
 
@@ -521,21 +525,23 @@ These are the current places to mine for reusable Studio behavior.
    host persistence in both reference apps.
 6. Done on 2026-06-01: add first component reorder mutation payloads and host
    persistence in both reference apps.
-7. Build a reusable `StudioShell.gsx` that consumes `ShellConfig` and
+7. Done on 2026-06-01: add component delete mutation payloads and host
+   persistence in both reference apps.
+8. Build a reusable `StudioShell.gsx` that consumes `ShellConfig` and
    `AuthoringSurfaceView`.
-8. Add duplicate/delete component operations with host-backed persistence and
-   visible canvas/site-map controls.
-9. Move workbench, command palette, and state runtime ownership out of
+9. Add duplicate component operations with a dynamic component-instance model,
+   host-backed persistence, and visible canvas/site-map controls.
+10. Move workbench, command palette, and state runtime ownership out of
    `gosx-cms/studio` when the dependent hosts are ready.
-10. Implement `SiteMapEngine.gsx` against the existing `CompositionWorkspace`
+11. Implement `SiteMapEngine.gsx` against the existing `CompositionWorkspace`
    and `WorkspaceCanvas` contracts.
-11. Implement `InspectorIsland.gsx` for the current `ControlKind` set with
+12. Implement `InspectorIsland.gsx` for the current `ControlKind` set with
    dirty/valid/saving states.
-12. Implement canvas selection and inline text editing through the Studio
+13. Implement canvas selection and inline text editing through the Studio
    preview/selection/field runtimes.
-13. Add Noni and Pajaritos e2e smoke tests for create page, add component,
+14. Add Noni and Pajaritos e2e smoke tests for create page, add component,
    edit control, responsive preview, staging publish readiness, and rollback.
-14. Write the visual-system spec for the Studio editor UI before the major
+15. Write the visual-system spec for the Studio editor UI before the major
     shell styling pass, including density, typography, color roles,
     accessibility states, and responsive behavior.
 

@@ -234,6 +234,7 @@ func authoringComponentView(page Page, component Component) map[string]any {
 		"canReorder":          component.CanReorder,
 		"visible":             component.Visible,
 		"canToggleVisibility": component.CanToggleVisibility,
+		"canDelete":           component.CanDelete,
 		"controlCount":        component.ControlCount(),
 		"controls":            authoringControlViews(page, component, component.Controls),
 	}

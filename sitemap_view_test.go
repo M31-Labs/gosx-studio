@@ -23,6 +23,7 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 			CanReorder:          true,
 			Visible:             true,
 			CanToggleVisibility: true,
+			CanDelete:           true,
 			Controls: []Control{{
 				Key:     "headline",
 				Label:   "Headline",
@@ -99,6 +100,9 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 	if hero["canToggleVisibility"] != true || hero["visibilityActionLabel"] != "Hide" {
 		t.Fatalf("expected hero visibility authoring projection: %#v", hero)
 	}
+	if hero["canDelete"] != true || hero["deleteAuthoringOperation"] != "delete-component" {
+		t.Fatalf("expected hero delete authoring projection: %#v", hero)
+	}
 	if hero["canReorder"] != true || hero["canMoveUp"] != false || hero["canMoveDown"] != true || hero["positionLabel"] != "1" {
 		t.Fatalf("expected hero reorder authoring projection: %#v", hero)
 	}
@@ -111,6 +115,11 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 	visibilityForm := visibilityPage["formValues"].(map[string]string)
 	if view["hasVisibilityComponent"] != true || visibilityPage["authoringOperation"] != "toggle-visibility" || visibilityForm[AuthoringFieldVisible] != "false" {
 		t.Fatalf("unexpected visibility component payload: %#v", visibilityPage)
+	}
+	deletePage := view["deleteComponent"].(map[string]any)
+	deleteForm := deletePage["formValues"].(map[string]string)
+	if view["hasDeleteComponent"] != true || deletePage["authoringOperation"] != "delete-component" || deleteForm[AuthoringFieldComponentKey] != "hero" {
+		t.Fatalf("unexpected delete component payload: %#v", deletePage)
 	}
 	headline := hero["controls"].([]map[string]any)[0]
 	if headline["authoringOperation"] != "save-control" || headline["authoringBinding"] != "pages.home.hero.headline" || headline["value"] != "Forest days" {

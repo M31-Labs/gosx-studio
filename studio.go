@@ -245,6 +245,7 @@ type Component struct {
 	CanReorder          bool
 	Visible             bool
 	CanToggleVisibility bool
+	CanDelete           bool
 	Controls            []Control
 }
 
