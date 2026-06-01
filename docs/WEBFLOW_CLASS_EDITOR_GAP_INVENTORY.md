@@ -17,6 +17,9 @@ The finished platform should let a non-technical site author:
 - Collaborate safely with presence, history, permissions, and audit trails.
 - Extend the editor through Studio plugins without copying app-specific editor
   code into every host.
+- Keep reference client sites host-branded in public and admin UI. Footer
+  attribution such as "Made with GoSX by M31 Labs" is acceptable, but visible
+  Muddy/Noni and Pajaritos copy should not name "GoSX Studio."
 
 The architectural constraint is important: Studio should expose a no-code graph
 over typed GoSX components, server actions, engines, islands, CMS resources, and
@@ -470,6 +473,13 @@ Current:
   text, and pointer-safe authoring controls. This gate caught and fixed a
   hidden Muddy preview mode, a preview-to-publish workbench runtime alias, a
   Muddy toolbar pointer overlap, and a Pajaritos mobile toolbar overflow.
+- `parity_e2e/reference_apps_performance_test.ts` now enforces the first
+  reference-app browser performance budgets for shell ready time, preview
+  iframe latency, publish readiness latency, runtime payload bytes, largest
+  runtime resource size, preview-frame count, canvas node/overlay counts,
+  layout sampling, and publish-readiness item count. The initial baseline
+  guards Muddy/Noni's current editor runtime payload, including the large dev
+  WASM runtime, and keeps Pajaritos on a much lighter runtime path.
 - `docs/PUBLIC_READINESS.md` names the release posture concerns.
 
 Missing:
@@ -482,8 +492,9 @@ Missing:
   preview.
 - Deeper accessibility checks for complete keyboard navigation paths, focus
   order, screen reader structure, and full WCAG contrast coverage.
-- Performance budgets for runtime payloads, preview latency, canvas overlays,
-  and publish readiness checks.
+- Production-build/TinyGo size budgets, third-host baselines, and deeper
+  performance coverage for media, inspector, flow designer, source binding,
+  plugins, and publish promotion beyond the first reference-app editor gate.
 - API versioning and migration notes before public release.
 
 Acceptance:
@@ -606,6 +617,8 @@ These are the current places to mine for reusable Studio behavior.
     Studio shell, site-map/canvas surface, publishing section, responsive
     preview, keyboard focus, accessible names, reduced motion, contrast, and
     desktop/mobile viewport fit.
+18. Done on 2026-06-01: add reference-app performance budgets for runtime
+    payload, preview latency, canvas overlay cost, and publish readiness.
 
 ## Execution Log
 
@@ -733,18 +746,25 @@ These are the current places to mine for reusable Studio behavior.
   clipped command text, and viewport fit. It also drove fixes in Muddy's
   visible Preview mode/runtime mapping/toolbar layout and Pajaritos' mobile
   editor overflow.
+- 2026-06-01: Added `reference_apps_performance_test.ts` and wired it into the
+  default reference-app browser workflow. The gate measures shell ready time,
+  preview iframe readiness, publish readiness, editor runtime payload bytes,
+  largest runtime resources, preview-frame count, canvas/site-map node count,
+  overlay count, layout sample time, and publish-readiness item count. The
+  first focused run established Muddy/Noni around a 5.6 MB dev editor runtime
+  payload with a 4.7 MB WASM resource, while Pajaritos stayed around a 38 KB
+  runtime payload.
 
 ## Next Execution Slice
 
-The next practical slice is performance budgeting plus the next visible shell
-extraction:
+The next practical slice is the next visible shell extraction:
 
-- Add runtime payload, preview-load latency, canvas overlay, and publishing
-  readiness budgets to the reference-app browser workflow.
 - Continue the shell extraction by moving the next visible wrapper/toolbar
   piece behind a Studio-owned render path that consumes `WorkbenchShellView`.
 - Extend `authoringruntime` host-backed smoke coverage to assert
   changed-object selection and preview refresh after those persisted actions.
+- Keep broadening visual/accessibility/performance checks as inspector, media,
+  flow, and publish surfaces move behind reusable Studio-owned render paths.
 
 ## Definition of Done
 

@@ -2,6 +2,7 @@ import { expect, test, type APIRequestContext, type Page } from "@playwright/tes
 import {
   expectButtonReceivesPointer,
   expectPajaritosPublishingReadiness,
+  revealModeIfPresent,
   startMuddy,
   startPajaritos,
   type ServerHandle,
@@ -326,22 +327,4 @@ async function expectSurfaceWithinViewport(page: Page, selector: string, label: 
     return null;
   }, selector);
   expect(issue, `${label} should fit the viewport`).toBeNull();
-}
-
-async function revealModeIfPresent(page: Page, mode: string | undefined) {
-  if (!mode) return;
-  await page.waitForFunction(() =>
-    document.documentElement.getAttribute("data-gosx-studio-workbench-runtime-auto-mounted") === "true" ||
-    "GoSXStudioWorkbenchRuntime" in window,
-  null, { timeout: 5_000 }).catch(() => null);
-  await page.evaluate((mode) => {
-    const form = document.querySelector("[data-studio-workbench]");
-    const runtime = (window as unknown as { GoSXStudioWorkbenchRuntime?: { setMode?: (form: Element | null, mode: string, scroll: boolean) => void } }).GoSXStudioWorkbenchRuntime;
-    runtime?.setMode?.(form, mode, false);
-  }, mode).catch(() => null);
-  const button = page.locator(`[data-studio-mode-control="${mode}"]`).first();
-  if (await button.count() === 0) return;
-  if (!await button.isVisible()) return;
-  await button.click();
-  await page.waitForTimeout(150);
 }

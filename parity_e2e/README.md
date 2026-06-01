@@ -100,9 +100,10 @@ GOSX_STUDIO_PARITY_BASE_URL=http://localhost:8080 npm test
 
 ## Reference App Authoring E2E
 
-`reference_apps_authoring_test.ts` and
-`reference_apps_visual_a11y_test.ts` are opt-in browser workflows for the two
-current reference apps. They boot Muddy/Noni and Pajaritos from sibling
+The `reference_apps_authoring_test.ts`,
+`reference_apps_visual_a11y_test.ts`, and
+`reference_apps_performance_test.ts` suites are opt-in browser workflows for
+the two current reference apps. They boot Muddy/Noni and Pajaritos from sibling
 worktrees with temporary data directories, open their real admin editors,
 verify visible authoring buttons receive pointer events, and submit
 create-page, add-section, duplicate-section, and save-field actions through
@@ -115,7 +116,10 @@ visible restore-point rollback after the editor reload. The visual/a11y gate
 also checks the editor shell, site-map/canvas surface, publishing section,
 responsive preview iframe, keyboard focus, accessible names, reduced-motion
 behavior, sampled contrast, clipped command text, and desktop/mobile viewport
-fit.
+fit. The performance gate records JSON metrics and enforces budgets for shell
+ready time, preview iframe latency, publish readiness latency, editor runtime
+payload bytes, largest runtime resource size, preview-frame count, canvas
+node/overlay counts, canvas layout sampling, and publish-readiness item count.
 
 It now runs in default `gosx-studio` CI via
 `.github/workflows/reference-apps.yml`, which checks out the sibling repos in
@@ -131,13 +135,19 @@ Override sibling locations if needed:
 GOSX_STUDIO_REFERENCE_APP_E2E=1 \
 GOSX_STUDIO_MUDDY_REPO=~/work/muddy-noni-commerce \
 GOSX_STUDIO_PAJARITOS_REPO=~/work/pajaritos-forest-school \
-  npx playwright test reference_apps_authoring_test.ts reference_apps_visual_a11y_test.ts
+  npx playwright test reference_apps_authoring_test.ts reference_apps_visual_a11y_test.ts reference_apps_performance_test.ts
 ```
 
 Run only the visual/accessibility gate with:
 
 ```bash
 npm run test:reference-apps:visual-a11y
+```
+
+Run only the performance budget gate with:
+
+```bash
+npm run test:reference-apps:performance
 ```
 
 ## File layout

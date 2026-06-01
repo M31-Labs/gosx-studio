@@ -100,6 +100,24 @@ export async function expectButtonReceivesPointer(page: Page, selector: string, 
   expect(hit, `expected ${label} button to receive pointer events`).toMatchObject({ ok: true });
 }
 
+export async function revealModeIfPresent(page: Page, mode: string | undefined) {
+  if (!mode) return;
+  await page.waitForFunction(() =>
+    document.documentElement.getAttribute("data-gosx-studio-workbench-runtime-auto-mounted") === "true" ||
+    "GoSXStudioWorkbenchRuntime" in window,
+  null, { timeout: 5_000 }).catch(() => null);
+  await page.evaluate((mode) => {
+    const form = document.querySelector("[data-studio-workbench]");
+    const runtime = (window as unknown as { GoSXStudioWorkbenchRuntime?: { setMode?: (form: Element | null, mode: string, scroll: boolean) => void } }).GoSXStudioWorkbenchRuntime;
+    runtime?.setMode?.(form, mode, false);
+  }, mode).catch(() => null);
+  const button = page.locator(`[data-studio-mode-control="${mode}"]`).first();
+  if (await button.count() === 0) return;
+  if (!await button.isVisible()) return;
+  await button.click();
+  await page.waitForTimeout(150);
+}
+
 export async function waitForStudioPreviewRefresh(page: Page, reason: string) {
   return page.evaluate((expectedReason) => new Promise<{ reason: string; route: string } | null>((resolve) => {
     let handler: EventListener;
