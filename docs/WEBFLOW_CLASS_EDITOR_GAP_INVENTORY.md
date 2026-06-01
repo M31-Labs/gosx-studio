@@ -84,6 +84,9 @@ Current:
 - Noni applies create-page, home add-component, and hero-headline mutations.
 - Pajaritos applies create-page, family-form add-component, hero-headline, and
   flow step/submit label mutations.
+- `authoringruntime` now listens for successful GoSX action results, marks the
+  changed editor object, updates workbench save feedback, and refreshes preview
+  frames when the host mutation result requests it.
 
 Missing:
 
@@ -95,8 +98,6 @@ Missing:
   - validating changes before persistence
 - Route-level examples showing how host apps register `AuthoringActionHandler`
   beside page modules.
-- Preview refresh wiring from successful mutation results into the canvas
-  runtime.
 
 Acceptance:
 
@@ -543,18 +544,25 @@ These are the current places to mine for reusable Studio behavior.
 - 2026-06-01: Extended Pajaritos control persistence beyond site settings so
   flow step labels and submit labels save through the same
   `AuthoringActionHandler` mutation boundary.
+- 2026-06-01: Added `authoringruntime`, bundled it into the Studio engine
+  runtime, and exposed `AuthoringRuntimeScript()` for hosts still using
+  `gosx-cms/studio` composition helpers. Muddy now proves the delegated engine
+  bundle contains the runtime, and Pajaritos injects the standalone runtime
+  into its generated workbench. Successful authoring actions can now refresh
+  previews, mark the changed node/control, and publish a
+  `gosxstudio:authoring-result` event.
 
 ## Next Execution Slice
 
-The next practical slice is interaction feedback and confidence:
+The next practical slice is route/page metadata editing and confidence:
 
-- Wire successful authoring mutation results into the preview/canvas runtime so
-  create, add, and edit operations refresh and select the changed object without
-  a full operator context reset.
-- Add Noni and Pajaritos e2e smoke tests for create page, add component, and
-  edit control through the visible editor surface.
 - Add the first route/page metadata mutation for title/slug updates, including
   conflict validation and clear field errors.
+- Add Noni and Pajaritos e2e smoke tests for create page, add component, and
+  edit control through the visible editor surface.
+- Use the new `gosxstudio:authoring-result` event in the smoke tests to assert
+  changed-object selection and preview refresh instead of only checking stored
+  data.
 
 ## Definition of Done
 

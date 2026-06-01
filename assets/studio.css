@@ -13,3 +13,13 @@ body:has(.editor-page),
   --size-studio-resizer: 0.85rem;
   --studio-stage-height: clamp(42rem, calc(100svh - 9rem), 84rem);
 }
+
+[data-gosx-studio-authoring-selected="true"] {
+  outline: 2px solid var(--color-accent, currentColor);
+  outline-offset: 3px;
+  scroll-margin: var(--space-md, 1rem);
+}
+
+[data-gosx-studio-authoring-state="saved"] [data-gosx-studio-save-state] {
+  color: var(--color-success, var(--color-accent, currentColor));
+}

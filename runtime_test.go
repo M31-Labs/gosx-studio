@@ -24,7 +24,7 @@ func TestStylesheetHandlerServesStudioChromeTokens(t *testing.T) {
 	if ct := rec.Header().Get("Content-Type"); !strings.Contains(ct, "text/css") {
 		t.Fatalf("stylesheet content type = %q", ct)
 	}
-	for _, check := range []string{"--size-studio-max", "--studio-stage-height", ".gosx-studio"} {
+	for _, check := range []string{"--size-studio-max", "--studio-stage-height", ".gosx-studio", "data-gosx-studio-authoring-selected"} {
 		if !strings.Contains(rec.Body.String(), check) {
 			t.Fatalf("stylesheet missing %q: %s", check, rec.Body.String())
 		}
@@ -211,6 +211,31 @@ func TestEngineRuntimeIncludesPreviewRuntimeIslandBundle(t *testing.T) {
 	}
 	if !strings.Contains(engines, "window.GoSXStudioPreviewRuntime =") {
 		t.Fatalf("engine runtime missing previewruntime shim assignment")
+	}
+}
+
+func TestEngineRuntimeIncludesAuthoringRuntimeBundle(t *testing.T) {
+	engines := string(EngineRuntimeScript())
+	for _, fragment := range []string{
+		"window.GoSXStudioAuthoringRuntime",
+		"gosx:form:result",
+		"gosxstudio:authoring-result",
+		"data-gosx-studio-authoring-selected",
+		"data-gosx-studio-preview-url",
+	} {
+		if !strings.Contains(engines, fragment) {
+			t.Fatalf("engine runtime missing authoringruntime fragment %q", fragment)
+		}
+	}
+}
+
+func TestAuthoringRuntimeScriptIsNonEmpty(t *testing.T) {
+	runtime := string(AuthoringRuntimeScript())
+	if runtime == "" {
+		t.Fatal("AuthoringRuntimeScript() must return non-empty bundle")
+	}
+	if !strings.Contains(runtime, "GoSXStudioAuthoringRuntime") {
+		t.Fatalf("AuthoringRuntimeScript() missing authoring runtime global")
 	}
 }
 

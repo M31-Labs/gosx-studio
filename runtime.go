@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"m31labs.dev/gosx-studio/authoringruntime"
 	"m31labs.dev/gosx-studio/blocklayoutruntime"
 	"m31labs.dev/gosx-studio/brandruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
@@ -35,6 +36,7 @@ func EngineRuntimeScript() []byte {
 		styleruntime.Bundle(),
 		workbenchruntime.Bundle(),
 		previewruntime.Bundle(),
+		authoringruntime.Bundle(),
 	}
 	total := 0
 	for _, slice := range slices {
@@ -78,6 +80,14 @@ func EngineRuntimeHandler() http.Handler {
 // gosx-studio/previewruntime/runtime.go for the contract.
 func PreviewSubscriberScript() []byte {
 	return previewruntime.PreviewSubscriberScript()
+}
+
+// AuthoringRuntimeScript returns the browser runtime that reacts to successful
+// Studio authoring action results. It is included in EngineRuntimeScript for
+// hosts that serve the Studio engine bundle, and is exposed separately for
+// hosts that still compose their editor chrome from gosx-cms/studio helpers.
+func AuthoringRuntimeScript() []byte {
+	return authoringruntime.Bundle()
 }
 
 // PreviewSubscriberHandler serves PreviewSubscriberScript() at
