@@ -48,7 +48,12 @@ test.describe("@reference-apps browser authoring workflows", () => {
       await expectIntentButtonReceivesPointer(page, "create-page:program-page");
       const createResponse = await clickIntent(page, "create-page:program-page");
       expect(createResponse.status()).toBe(303);
+      expect(authoringParam(createResponse, "gosx_studio_operation")).toBe("apply-intent");
+      expect(authoringParam(createResponse, "gosx_studio_intent_kind")).toBe("create-page");
       await expect(page.locator("[data-studio-composition-intent-forms='true']")).toBeAttached();
+      await expect(page.locator("[data-gosx-studio-page-list='true']")).toContainText("6 pages");
+      await expect(page.locator("[data-gosx-studio-page-list='true']")).toContainText("Program Page");
+      await expect(page.locator("body")).toContainText("Program Page created.");
 
       await expectPanelButtonReceivesPointer(page, "[data-gosx-studio-component-duplicate='true']");
       const duplicateResponse = await clickAuthoringPanel(page, "[data-gosx-studio-component-duplicate='true']", { reloadAfter: false });
@@ -65,7 +70,11 @@ test.describe("@reference-apps browser authoring workflows", () => {
       await expectIntentButtonReceivesPointer(page, "add-component:home:hero");
       const addResponse = await clickIntent(page, "add-component:home:hero");
       expect(addResponse.status()).toBe(303);
-      await expect(page.locator("[data-studio-site-map-component='hero']").first()).toBeAttached();
+      expect(authoringParam(addResponse, "gosx_studio_operation")).toBe("apply-intent");
+      expect(authoringParam(addResponse, "gosx_studio_intent_kind")).toBe("add-component");
+      expect(authoringParam(addResponse, "gosx_studio_component_template_key")).toBe("hero");
+      await expect(page.locator("body")).toContainText("Hero section added to Home.");
+      await expect(page.locator("[data-studio-site-map-component='hero__copy_3']").first()).toBeAttached();
     } finally {
       await server.stop();
     }

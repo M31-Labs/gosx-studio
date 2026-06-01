@@ -454,15 +454,16 @@ Current:
   data, verifies visible authoring buttons receive pointer events, and submits
   create-page, add-section, duplicate-section, and save-field actions through
   the real admin editor action flow. Muddy verifies duplicate/save-field state
-  after reload; Pajaritos verifies native duplicate/save-field payloads,
-  redirects, and browser-visible authoring feedback after reload.
+  after reload; Pajaritos verifies native create-page, add-section, duplicate,
+  and save-field payloads, redirects, browser-visible authoring feedback, and
+  persisted page/section reflection after reload.
 - `docs/PUBLIC_READINESS.md` names the release posture concerns.
 
 Missing:
 
 - Default-CI browser-driven editor workflows across both Noni and Pajaritos,
-  plus Pajaritos draft-state reload reflection, preview refresh, staging
-  publish readiness, and rollback.
+  plus Pajaritos preview-refresh instrumentation, staging publish readiness,
+  and rollback.
 - Visual regression checks for the shell, canvas, inspector, site map, media,
   flow designer, publish panel, and responsive preview.
 - Accessibility checks for keyboard navigation, focus, labels, reduced motion,
@@ -694,6 +695,10 @@ These are the current places to mine for reusable Studio behavior.
   browser reload; Pajaritos asserts pointer reachability, native
   duplicate/save-control payloads, 303 redirects, and visible success feedback
   through its host PRG notice path.
+- 2026-06-01: Wired Pajaritos persisted CMS pages into the Studio site-map
+  projection and added a visible page/section summary to the editor shell. The
+  reference-app browser e2e now verifies create-page and add-section payloads,
+  success notices, and reloaded page/section state for Pajaritos.
 
 ## Next Execution Slice
 
@@ -701,9 +706,8 @@ The next practical slice is full browser automation plus the next visible shell
 extraction:
 
 - Promote the opt-in Muddy/Pajaritos reference-app browser e2e into default CI
-  and add broader Pajaritos draft-state assertions for create-page/add-section
-  reloads, preview-refresh, staging publish readiness, and rollback workflows
-  with persisted browser-visible assertions.
+  and add Pajaritos preview-refresh instrumentation, staging publish readiness,
+  and rollback workflows with persisted browser-visible assertions.
 - Continue the shell extraction by moving the next visible wrapper/toolbar
   piece behind a Studio-owned render path that consumes `WorkbenchShellView`.
 - Extend `authoringruntime` host-backed smoke coverage to assert
