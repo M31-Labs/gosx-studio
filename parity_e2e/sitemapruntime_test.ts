@@ -287,3 +287,96 @@ test.describe("@smoke GoSXStudioSiteMapRuntime infinite-canvas pan and zoom", ()
     expect(Number(await board.getAttribute("data-studio-site-map-pan-y"))).toBeLessThan(0);
   });
 });
+
+const marqueeBoard = `
+  <section
+    data-studio-site-map-board="true"
+    tabindex="0"
+    data-studio-site-map-scale="1"
+    data-studio-site-map-pan-x="0"
+    data-studio-site-map-pan-y="0"
+    data-studio-site-map-selected-node=""
+    data-studio-site-map-selected-nodes=""
+    data-studio-site-map-filter="all"
+  >
+    <div data-studio-site-map-workspace="true" data-studio-site-map-panel-visible="true">
+      <div data-studio-site-map-canvas="true" style="width:600px;height:400px;position:relative;overflow:hidden;">
+        <div data-studio-site-map-pan-surface="true" style="position:absolute;inset:0;">
+          <label data-studio-site-map-workspace-node="alpha" data-studio-site-map-group="site"
+                 style="position:absolute;left:40px;top:40px;width:80px;height:40px;">Alpha</label>
+          <label data-studio-site-map-workspace-node="beta" data-studio-site-map-group="site"
+                 style="position:absolute;left:440px;top:320px;width:80px;height:40px;">Beta</label>
+        </div>
+      </div>
+    </div>
+  </section>
+`;
+
+test.describe("@smoke GoSXStudioSiteMapRuntime infinite-canvas marquee and multi-select", () => {
+  test("shift-drag rubber-band selects intersecting nodes only", async ({ page }) => {
+    await page.setContent(marqueeBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    const canvas = page.locator("[data-studio-site-map-canvas='true']");
+    const box = await canvas.boundingBox();
+    await page.keyboard.down("Shift");
+    await page.mouse.move(box.x + 16, box.y + 16);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 180, box.y + 140, { steps: 5 });
+    await page.mouse.up();
+    await page.keyboard.up("Shift");
+
+    const board = page.locator("[data-studio-site-map-board='true']");
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-nodes", "alpha");
+    await expect(page.locator("[data-studio-site-map-workspace-node='alpha']")).toHaveAttribute("data-studio-site-map-node-selected", "true");
+    await expect(page.locator("[data-studio-site-map-workspace-node='beta']")).toHaveAttribute("data-studio-site-map-node-selected", "false");
+  });
+
+  test("shift-click toggles a node in and out of the multi-selection", async ({ page }) => {
+    await page.setContent(marqueeBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    const board = page.locator("[data-studio-site-map-board='true']");
+    const beta = page.locator("[data-studio-site-map-workspace-node='beta']");
+
+    await page.locator("[data-studio-site-map-workspace-node='alpha']").click();
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-node", "alpha");
+
+    await beta.click({ modifiers: ["Shift"] });
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-nodes", "beta");
+    await expect(beta).toHaveAttribute("data-studio-site-map-node-selected", "true");
+
+    await beta.click({ modifiers: ["Shift"] });
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-nodes", "");
+    await expect(beta).toHaveAttribute("data-studio-site-map-node-selected", "false");
+  });
+
+  test("Escape clears the multi-selection", async ({ page }) => {
+    await page.setContent(marqueeBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    await page.evaluate(() => {
+      const board = document.querySelector("[data-studio-site-map-board='true']");
+      window.GoSXStudioSiteMapRuntime.setState(board, { selectedNodes: ["alpha", "beta"] });
+    });
+    const board = page.locator("[data-studio-site-map-board='true']");
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-nodes", "alpha,beta");
+
+    await board.focus();
+    await page.keyboard.press("Escape");
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-nodes", "");
+  });
+
+  test("multi-selection survives a sync triggered by another state change", async ({ page }) => {
+    await page.setContent(marqueeBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    await page.evaluate(() => {
+      const board = document.querySelector("[data-studio-site-map-board='true']");
+      window.GoSXStudioSiteMapRuntime.setState(board, { selectedNodes: ["alpha"] });
+      window.GoSXStudioSiteMapRuntime.setState(board, { filter: "site" });
+    });
+
+    await expect(page.locator("[data-studio-site-map-workspace-node='alpha']")).toHaveAttribute("data-studio-site-map-node-selected", "true");
+  });
+});

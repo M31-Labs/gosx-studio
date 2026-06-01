@@ -122,7 +122,15 @@
   function handlePointerDown(root, event) {
     if (event.button !== 0 && event.button !== 1) return;
     if (!closest(event.target, "[data-studio-site-map-canvas]")) return;
-    if (event.button === 0 && !viewportDragAllowed(event.target)) return;
+    var onEmpty = viewportDragAllowed(event.target);
+    // Shift + left-drag on empty canvas = marquee multi-select.
+    if (event.button === 0 && event.shiftKey && onEmpty) return startMarquee(root, event);
+    // Plain left-drag must start on empty canvas; middle-drag pans from anywhere.
+    if (event.button === 0 && !onEmpty) return;
+    startPan(root, event);
+  }
+
+  function startPan(root, event) {
     var origin = state(root);
     var startX = event.clientX;
     var startY = event.clientY;
@@ -142,6 +150,76 @@
     document.addEventListener("pointerup", up);
   }
 
+  function parseKeyList(value) {
+    return String(value || "").split(",").map(function (item) {
+      return item.trim();
+    }).filter(Boolean);
+  }
+
+  function marqueeRect(startX, startY, ev) {
+    return {
+      x: Math.min(startX, ev.clientX),
+      y: Math.min(startY, ev.clientY),
+      w: Math.abs(ev.clientX - startX),
+      h: Math.abs(ev.clientY - startY),
+    };
+  }
+
+  function rectsIntersect(box, nodeRect) {
+    return !(nodeRect.right < box.x || nodeRect.left > box.x + box.w || nodeRect.bottom < box.y || nodeRect.top > box.y + box.h);
+  }
+
+  function ensureMarqueeOverlay(canvas) {
+    var overlay = canvas.querySelector("[data-studio-site-map-marquee]");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.setAttribute("data-studio-site-map-marquee", "true");
+      overlay.className = "studio-site-map-marquee";
+      overlay.style.position = "absolute";
+      overlay.style.pointerEvents = "none";
+      overlay.style.display = "none";
+      canvas.appendChild(overlay);
+    }
+    return overlay;
+  }
+
+  function startMarquee(root, event) {
+    var canvas = canvasEl(root);
+    if (!canvas) return;
+    var overlay = ensureMarqueeOverlay(canvas);
+    var startX = event.clientX;
+    var startY = event.clientY;
+    var moved = false;
+    setAttr(root, "data-studio-site-map-marqueeing", "true");
+    function move(ev) {
+      var box = marqueeRect(startX, startY, ev);
+      if (box.w > 3 || box.h > 3) moved = true;
+      var canvasRect = canvas.getBoundingClientRect();
+      overlay.style.display = "block";
+      overlay.style.left = box.x - canvasRect.left + "px";
+      overlay.style.top = box.y - canvasRect.top + "px";
+      overlay.style.width = box.w + "px";
+      overlay.style.height = box.h + "px";
+    }
+    function up(ev) {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      overlay.style.display = "none";
+      setAttr(root, "data-studio-site-map-marqueeing", "false");
+      if (!moved) return;
+      var box = marqueeRect(startX, startY, ev);
+      var selected = [];
+      all(root, "[data-studio-site-map-workspace-node]").forEach(function (node) {
+        if (rectsIntersect(box, node.getBoundingClientRect())) {
+          selected.push(attr(node, "data-studio-site-map-workspace-node", ""));
+        }
+      });
+      setState(root, { selectedNodes: selected });
+    }
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+  }
+
   function handleKeydown(root, event) {
     var target = event.target;
     if (target && target.matches && target.matches("input, textarea, select")) return;
@@ -154,6 +232,11 @@
     } else if (event.key === "0") {
       event.preventDefault();
       zoomAction(root, "reset");
+    } else if (event.key === "Escape") {
+      if (state(root).selectedNodes.length) {
+        event.preventDefault();
+        setState(root, { selectedNodes: [] });
+      }
     }
   }
 
@@ -172,6 +255,7 @@
       scale: clampScale(num(root, "data-studio-site-map-scale", 1)),
       panX: num(root, "data-studio-site-map-pan-x", 0),
       panY: num(root, "data-studio-site-map-pan-y", 0),
+      selectedNodes: parseKeyList(attr(root, "data-studio-site-map-selected-nodes", "")),
     };
   }
 
@@ -189,6 +273,7 @@
     setAttr(root, "data-studio-site-map-scale", trimNum(clampScale(next.scale)));
     setAttr(root, "data-studio-site-map-pan-x", trimNum(next.panX));
     setAttr(root, "data-studio-site-map-pan-y", trimNum(next.panY));
+    setAttr(root, "data-studio-site-map-selected-nodes", (next.selectedNodes || []).join(","));
   }
 
   function syncPressed(root, selector, current) {
@@ -270,11 +355,15 @@
   }
 
   function syncSelection(root, next) {
+    var multi = next.selectedNodes || [];
+    function isSelected(key) {
+      return key === next.selectedNode || multi.indexOf(key) >= 0;
+    }
     all(root, "[data-studio-site-map-workspace-node]").forEach(function (node) {
-      setAttr(node, "data-studio-site-map-node-selected", attr(node, "data-studio-site-map-workspace-node", "") === next.selectedNode ? "true" : "false");
+      setAttr(node, "data-studio-site-map-node-selected", isSelected(attr(node, "data-studio-site-map-workspace-node", "")) ? "true" : "false");
     });
     all(root, "[data-studio-site-map-workspace-node-card]").forEach(function (card) {
-      setAttr(card, "data-studio-site-map-node-selected", attr(card, "data-studio-site-map-workspace-node-card", "") === next.selectedNode ? "true" : "false");
+      setAttr(card, "data-studio-site-map-node-selected", isSelected(attr(card, "data-studio-site-map-workspace-node-card", "")) ? "true" : "false");
     });
     all(root, "[data-studio-site-map-workspace-path], [data-studio-site-map-workspace-link]").forEach(function (link) {
       var selected = attr(link, "data-studio-site-map-link-from", "") === next.selectedNode || attr(link, "data-studio-site-map-link-to", "") === next.selectedNode;
@@ -400,7 +489,17 @@
     if (value) return setState(root, { palette: value });
 
     var node = closest(target, "[data-studio-site-map-workspace-node]");
-    if (node) return setState(root, { selectedNode: attr(node, "data-studio-site-map-workspace-node", "") });
+    if (node) {
+      var nodeKey = attr(node, "data-studio-site-map-workspace-node", "");
+      if (event.shiftKey) {
+        var selected = state(root).selectedNodes.slice();
+        var at = selected.indexOf(nodeKey);
+        if (at >= 0) selected.splice(at, 1);
+        else selected.push(nodeKey);
+        return setState(root, { selectedNodes: selected });
+      }
+      return setState(root, { selectedNode: nodeKey, selectedNodes: [] });
+    }
 
     var blueprint = closest(target, "[data-studio-site-map-blueprint]");
     if (blueprint) return setState(root, { selectedBlueprint: attr(blueprint, "data-studio-site-map-blueprint", "") });

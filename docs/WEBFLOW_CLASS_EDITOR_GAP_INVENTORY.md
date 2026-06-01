@@ -214,9 +214,10 @@ Missing:
   and conflict validation inside the visual graph.
 - Keyboard and pointer interactions suitable for a visual graph. **Partial
   (2026-06-01):** continuous infinite-canvas pan/zoom (wheel-to-cursor,
-  drag-to-pan, keyboard `+`/`-`/`0`, live zoom readout) shipped on the shared
-  board via `sitemapruntime` + `RenderSiteMapBoard`. Still missing: marquee
-  multi-select, keyboard node navigation, and node drag-to-reposition.
+  drag-to-pan, keyboard `+`/`-`/`0`, live zoom readout) and marquee
+  multi-select (shift-drag rubber-band, shift-click toggle, `Escape`-clear)
+  shipped on the shared board via `sitemapruntime` + `RenderSiteMapBoard`. Still
+  missing: keyboard node navigation and node drag-to-reposition.
 
 Acceptance:
 
@@ -957,16 +958,28 @@ These are the current places to mine for reusable Studio behavior.
   buttons, deterministic `setState` pan, wheel zoom, keyboard zoom, drag pan);
   board markup contract asserted in `sitemap_board_test.go`. Backward
   compatible — the legacy discrete `zoom` enum (fit/wide) is untouched.
+- 2026-06-01 (sequoia): Added marquee multi-select to the shared site-map
+  board. `sitemapruntime` now supports shift+left-drag rubber-band selection
+  (a dynamically created `[data-studio-site-map-marquee]` overlay; AABB
+  intersection against node rects), shift-click to toggle a node in/out of the
+  multi-selection, and `Escape` to clear it. A new `selectedNodes` state field
+  (`data-studio-site-map-selected-nodes`) is part of the state machine, so
+  `syncSelection` preserves multi-selection across unrelated state changes; a
+  node renders selected when it is the primary `selectedNode` OR in the
+  multi-set. Pan stays on plain left-drag (Step A) — marquee is additive on
+  shift. 4 new parity cases in `sitemapruntime_test.ts` (rubber-band,
+  shift-toggle, Escape, survives-sync); runtime-only, no renderer change.
 
 ## Next Execution Slice
 
 The infinite-canvas viewport (pan/zoom/keyboard) shipped on the shared board.
 The next practical slices, in order, are:
 
-1. **Marquee multi-select + keyboard node navigation** on the shared board:
-   rubber-band selection over nodes, shift-click toggle, arrow-key spatial
-   selection movement, `Enter`/`Escape`, and a visible focus ring — with
-   `sitemapruntime_test.ts` parity coverage.
+1. **Keyboard node navigation + focus ring** on the shared board: arrow-key
+   spatial selection movement between nodes, `Enter` to open the inspector, and
+   a visible `:focus-visible` ring — with `sitemapruntime_test.ts` parity
+   coverage. (Marquee multi-select, shift-click toggle, and `Escape`-clear
+   shipped 2026-06-01.)
 2. **Node drag-to-reposition with persisted canvas positions**: free placement
    on the pan surface emitting `gosxstudio:sitemap-node-moved {key,x,y}`, host
    persistence into the "Saved canvas positions" (`layout-graph`) store, and
