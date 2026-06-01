@@ -76,6 +76,7 @@ test.describe("@reference-apps browser authoring workflows", () => {
       expect(authoringParam(addResponse, "gosx_studio_component_template_key")).toBe("hero");
       await expect(page.locator("body")).toContainText("Hero section added to Home.");
       await expect(page.locator("[data-studio-site-map-component='hero__copy_3']").first()).toBeAttached();
+      await expectPajaritosPublishingReadiness(page);
 
       const restoreButtonSelector = "[data-pajaritos-restore-index='1'] button";
       await expectPanelButtonReceivesPointer(page, "[data-pajaritos-restore-index='1']");
@@ -83,6 +84,7 @@ test.describe("@reference-apps browser authoring workflows", () => {
       const restoreRevisionID = await restoreButton.getAttribute("value");
       expect(await restoreButton.getAttribute("name")).toBe("revisionId");
       expect(restoreRevisionID).toBeTruthy();
+      const previewRefreshPromise = waitForStudioPreviewRefresh(page, "action");
       const restoreResponse = await clickEditorActionButton(page, restoreButtonSelector, "/__actions/restoreRevision", {
         noWaitAfter: true,
         reloadAfter: false,
@@ -90,6 +92,8 @@ test.describe("@reference-apps browser authoring workflows", () => {
       });
       expect(restoreResponse.status()).toBe(303);
       expect(restoreResponse.headers()["location"]).toContain("Restore+point+applied.");
+      await expect(previewRefreshPromise).resolves.toMatchObject({ reason: "action" });
+      await expect(page.locator("[data-studio-preview-frame]").first()).toHaveAttribute("src", /_gosx_preview_reason=action/);
       await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "networkidle" });
       await expect(page.locator("[data-studio-site-map-component='hero__copy_2']").first()).toBeAttached();
       await expect(page.locator("[data-studio-site-map-component='hero__copy_3']")).toHaveCount(0);
@@ -146,6 +150,21 @@ async function expectPanelButtonReceivesPointer(page: Page, panelSelector: strin
   await expectButtonReceivesPointer(page, `${panelSelector} button`, panelSelector);
 }
 
+async function expectPajaritosPublishingReadiness(page: Page) {
+  const publishing = page.locator("#publishing");
+  await expect(publishing).toContainText("Publishing checklist");
+  await expect(publishing).toContainText("4/5 clear");
+  await expect(publishing).toContainText("Director approval");
+  await expect(publishing).toContainText("Publish timing");
+  await expect(publishing).toContainText("Family forms");
+  await expect(publishing.locator("[data-pajaritos-environments='true']")).toContainText("Publishing environments");
+  await expect(publishing.locator("[data-pajaritos-environment='staging']")).toContainText("https://pajaritos.m31labs.dev");
+  await expect(publishing.locator("[data-pajaritos-environment='staging']")).toHaveAttribute("data-pajaritos-environment-state", "ready");
+  await expect(publishing.locator("[data-pajaritos-environment='production']")).toContainText("TBD");
+  await expect(publishing.locator("[data-pajaritos-environment='production']")).toHaveAttribute("data-pajaritos-environment-state", "tbd");
+  await expectPanelButtonReceivesPointer(page, ".studio-publish-controls");
+}
+
 async function expectButtonReceivesPointer(page: Page, selector: string, label: string) {
   const button = page.locator(selector).first();
   await expect(button).toBeVisible();
@@ -168,6 +187,27 @@ async function expectButtonReceivesPointer(page: Page, selector: string, label: 
   }, selector);
 
   expect(hit, `expected ${label} button to receive pointer events`).toMatchObject({ ok: true });
+}
+
+async function waitForStudioPreviewRefresh(page: Page, reason: string) {
+  return page.evaluate((expectedReason) => new Promise<{ reason: string; route: string } | null>((resolve) => {
+    let handler: EventListener;
+    const timeout = window.setTimeout(() => {
+      document.removeEventListener("gosxstudio:preview-refresh", handler);
+      resolve(null);
+    }, 5_000);
+    handler = (event: Event) => {
+      const detail = ((event as CustomEvent).detail ?? {}) as { reason?: string; route?: string };
+      if (expectedReason && detail.reason !== expectedReason) return;
+      window.clearTimeout(timeout);
+      document.removeEventListener("gosxstudio:preview-refresh", handler);
+      resolve({
+        reason: detail.reason ?? "",
+        route: detail.route ?? "",
+      });
+    };
+    document.addEventListener("gosxstudio:preview-refresh", handler);
+  }), reason);
 }
 
 async function saveEditableControl(page: Page, value: string, options?: ClickAuthoringOptions & { expectedMessage?: string }) {

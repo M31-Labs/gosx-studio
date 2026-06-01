@@ -1,0 +1,123 @@
+name: reference app editor e2e
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: reference-app-editor-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  reference-apps:
+    name: Muddy/Noni + Pajaritos editor workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout gosx-studio
+        uses: actions/checkout@v4
+        with:
+          path: gosx-studio
+
+      - name: Checkout gosx
+        uses: actions/checkout@v4
+        with:
+          repository: odvcencio/gosx
+          token: ${{ secrets.CI_GITHUB_TOKEN || github.token }}
+          path: gosx
+
+      - name: Checkout gosx-admin
+        uses: actions/checkout@v4
+        with:
+          repository: odvcencio/gosx-admin
+          token: ${{ secrets.CI_GITHUB_TOKEN || github.token }}
+          path: gosx-admin
+
+      - name: Checkout gosx-cms
+        uses: actions/checkout@v4
+        with:
+          repository: odvcencio/gosx-cms
+          token: ${{ secrets.CI_GITHUB_TOKEN || github.token }}
+          path: gosx-cms
+
+      - name: Checkout Muddy/Noni
+        uses: actions/checkout@v4
+        with:
+          repository: odvcencio/muddy-noni-commerce
+          token: ${{ secrets.CI_GITHUB_TOKEN || github.token }}
+          path: muddy-noni-commerce
+
+      - name: Checkout Pajaritos
+        uses: actions/checkout@v4
+        with:
+          repository: odvcencio/pajaritos-forest-school
+          token: ${{ secrets.CI_GITHUB_TOKEN || github.token }}
+          path: pajaritos-forest-school
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: gosx-studio/go.mod
+          cache-dependency-path: |
+            gosx-studio/go.sum
+            gosx/go.sum
+            gosx-admin/go.sum
+            gosx-cms/go.sum
+            muddy-noni-commerce/go.sum
+            pajaritos-forest-school/go.sum
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: gosx-studio/parity_e2e/package-lock.json
+
+      - name: Install parity harness dependencies
+        working-directory: gosx-studio/parity_e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Type-check parity harness
+        working-directory: gosx-studio/parity_e2e
+        run: npx tsc --noEmit
+
+      - name: Unit-test gosx-studio
+        working-directory: gosx-studio
+        run: go test ./...
+
+      - name: Guard client copy against internal platform wording
+        run: |
+          if grep -RInEi --exclude='*_test.go' 'gosx studio|go sx studio' \
+            muddy-noni-commerce/app muddy-noni-commerce/internal muddy-noni-commerce/public \
+            pajaritos-forest-school/app pajaritos-forest-school/internal pajaritos-forest-school/public; then
+            echo "Client-facing copy must not mention GoSX Studio."
+            exit 1
+          fi
+
+      - name: Run reference app editor workflows
+        working-directory: gosx-studio/parity_e2e
+        env:
+          GOSX_STUDIO_REFERENCE_APP_E2E: '1'
+          GOSX_STUDIO_MUDDY_REPO: ${{ github.workspace }}/muddy-noni-commerce
+          GOSX_STUDIO_PAJARITOS_REPO: ${{ github.workspace }}/pajaritos-forest-school
+        run: npx playwright test reference_apps_authoring_test.ts
+
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reference-app-editor-e2e-artifacts
+          path: |
+            gosx-studio/parity_e2e/playwright-report/
+            gosx-studio/parity_e2e/test-results/
+          if-no-files-found: ignore
+          retention-days: 7

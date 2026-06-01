@@ -456,15 +456,18 @@ Current:
   the real admin editor action flow. Muddy verifies duplicate/save-field state
   after reload; Pajaritos verifies native create-page, add-section, duplicate,
   and save-field payloads, redirects, browser-visible authoring feedback, and
-  persisted page/section reflection plus a visible restore-point rollback
-  after reload.
+  persisted page/section reflection, staging/production readiness, preview
+  refresh after client-side editor actions, and a visible restore-point
+  rollback after reload.
+- `.github/workflows/reference-apps.yml` now promotes the Muddy/Noni and
+  Pajaritos browser workflow into default `gosx-studio` CI by checking out the
+  sibling app layout and running the reference-app e2e suite.
 - `docs/PUBLIC_READINESS.md` names the release posture concerns.
 
 Missing:
 
-- Default-CI browser-driven editor workflows across both Noni and Pajaritos,
-  plus Pajaritos preview-refresh instrumentation and broader staging publish
-  readiness.
+- Broader visual, accessibility, and performance gates for the browser-driven
+  editor workflows after the default reference-app CI check.
 - Visual regression checks for the shell, canvas, inspector, site map, media,
   flow designer, publish panel, and responsive preview.
 - Accessibility checks for keyboard navigation, focus, labels, reduced motion,
@@ -704,15 +707,19 @@ These are the current places to mine for reusable Studio behavior.
   plus a `restoreRevision` editor action for site settings rollback. The
   reference-app browser e2e now clicks the visible rollback control after
   authoring changes and verifies the restored section state after reload.
+- 2026-06-01: Promoted the Muddy/Noni plus Pajaritos reference-app browser e2e
+  into `gosx-studio` default CI. Pajaritos now exposes staging/production
+  environment readiness in the publishing section, and the browser e2e asserts
+  publish readiness plus preview refresh after a client-side editor action.
 
 ## Next Execution Slice
 
 The next practical slice is full browser automation plus the next visible shell
 extraction:
 
-- Promote the Muddy/Pajaritos reference-app browser e2e script into default CI
-  and add Pajaritos preview-refresh instrumentation plus broader staging
-  publish readiness assertions.
+- Add visual regression and accessibility gates for the Studio shell, canvas,
+  publishing section, and responsive preview across the reference-app browser
+  workflow.
 - Continue the shell extraction by moving the next visible wrapper/toolbar
   piece behind a Studio-owned render path that consumes `WorkbenchShellView`.
 - Extend `authoringruntime` host-backed smoke coverage to assert
