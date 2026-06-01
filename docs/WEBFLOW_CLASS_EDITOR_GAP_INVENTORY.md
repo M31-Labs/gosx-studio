@@ -809,6 +809,12 @@ These are the current places to mine for reusable Studio behavior.
   object selection, and refreshes preview without a manual page reload.
   The runtime also avoids treating the workbench form's save-state attribute as
   display text, preventing field saves from deleting the editor shell.
+- 2026-06-01: Extended the in-place authoring path to page metadata edits in
+  both reference apps. Muddy/Noni and Pajaritos now mark page metadata forms as
+  Studio-managed authoring forms, and the reference-app browser workflow edits
+  title and route fields without leaving the active editor, while asserting
+  page-level authoring results, selected-page feedback, save-detail chrome, and
+  preview refresh.
 
 ## Next Execution Slice
 
@@ -816,10 +822,9 @@ The next practical slice is the next shell/render extraction:
 
 - Collapse the remaining `gosx-cms/studio` workbench wrapper duplication now
   that both reference apps consume Studio-owned frame semantics.
-- Extend the same in-place authoring result loop beyond fields to component
-  add/duplicate/reorder/visibility and page metadata operations, so more
-  Webflow-class edits update canvas, inspector, preview, and save chrome
-  without redirecting the editor.
+- Extend the same in-place authoring result loop to component visibility and
+  reorder operations, then graduate add/duplicate/delete once Studio has a
+  fragment-refresh contract for structural DOM changes.
 - Keep broadening visual/accessibility/performance checks as inspector, media,
   flow, and publish surfaces move behind reusable Studio-owned render paths.
 

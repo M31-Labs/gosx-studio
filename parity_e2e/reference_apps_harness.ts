@@ -210,6 +210,44 @@ export async function saveEditableControl(page: Page, value: string, options?: C
   await expect(page.locator("[data-gosx-studio-editable-control='true'] input[name='gosx_studio_value']").first()).toHaveValue(value);
 }
 
+export async function savePageMetadata(page: Page, title: string, route: string, options?: ClickAuthoringOptions & { expectedMessage?: string }) {
+  const panelSelector = "[data-gosx-studio-page-metadata='true'], [data-studio-site-map-page-edit='true']";
+  const buttonSelector = "[data-gosx-studio-page-metadata='true'] button, [data-studio-site-map-page-edit='true'] button";
+  const panel = page.locator(panelSelector).first();
+  await expect(panel).toBeVisible();
+  const titleInput = panel.locator("input[name='gosx_studio_page_label']");
+  const routeInput = panel.locator("input[name='gosx_studio_page_route']");
+  await expect(titleInput).toBeVisible();
+  await expect(routeInput).toBeVisible();
+  await titleInput.fill(title);
+  await routeInput.fill(route);
+  await expectButtonReceivesPointer(page, buttonSelector, "page metadata");
+  const authoringResultPromise = options?.reloadAfter === false ? waitForStudioAuthoringResult(page) : null;
+  const clickOptions = options?.reloadAfter === false ? { ...options, settleAfter: false } : options;
+  const response = await clickEditorActionButton(page, buttonSelector, "/__actions/authoring", clickOptions);
+  if (options?.reloadAfter === false) {
+    expect(response.status()).toBe(200);
+    const detail = await authoringResultPromise;
+    expect(detail, "real editor should emit page metadata authoring result detail").toBeTruthy();
+    expect(detail?.result?.message).toBe(options.expectedMessage);
+    expect(detail?.change?.kind).toBe("page");
+    expect(detail?.selectedCount ?? 0, "page metadata save should select the changed page").toBeGreaterThan(0);
+    expect(detail?.previewCount ?? 0, "page metadata save should refresh at least one preview frame").toBeGreaterThan(0);
+    const workbench = page.locator("[data-gosx-studio-workbench], [data-studio-workbench]").first();
+    await expect(workbench).toHaveAttribute("data-gosx-studio-authoring-change-kind", "page");
+    await expect(workbench).toHaveAttribute("data-gosx-studio-authoring-selected-count", /^[1-9]/);
+    await expect(page.locator("[data-gosx-studio-save-detail]").first()).toHaveText(options.expectedMessage ?? /./);
+    await expect(panel).toBeVisible();
+    await expect(titleInput).toHaveValue(title);
+    await expect(routeInput).toHaveValue(route);
+    return;
+  }
+  expect(response.status()).toBe(303);
+  expect(authoringParam(response, "gosx_studio_operation")).toBe("update-page");
+  expect(authoringParam(response, "gosx_studio_page_label")).toBe(title);
+  expect(authoringParam(response, "gosx_studio_page_route")).toBe(route);
+}
+
 export function authoringParam(response: { request(): { postData(): string | null } }, key: string) {
   return new URLSearchParams(response.request().postData() ?? "").get(key);
 }

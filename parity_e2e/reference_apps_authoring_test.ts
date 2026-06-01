@@ -8,6 +8,7 @@ import {
   expectPajaritosPublishingReadiness,
   expectPanelButtonReceivesPointer,
   saveEditableControl,
+  savePageMetadata,
   startMuddy,
   startPajaritos,
   waitForStudioPreviewRefresh,
@@ -22,6 +23,11 @@ test.describe("@reference-apps browser authoring workflows", () => {
     try {
       await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "networkidle" });
       await expect(page.locator("[data-studio-composition-intent-forms='true']")).toBeAttached();
+
+      await savePageMetadata(page, "Studio Test Notes", "/pages/studio-test-notes", {
+        reloadAfter: false,
+        expectedMessage: "Studio Test Notes saved.",
+      });
 
       await expectIntentButtonReceivesPointer(page, "create-page:landing");
       const createResponse = await clickIntent(page, "create-page:landing");
@@ -52,6 +58,11 @@ test.describe("@reference-apps browser authoring workflows", () => {
     try {
       await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "networkidle" });
       await expect(page.locator("[data-studio-composition-intent-forms='true']")).toBeAttached();
+
+      await savePageMetadata(page, "Forest Notes", "/pages/forest-notes", {
+        reloadAfter: false,
+        expectedMessage: "Forest Notes saved.",
+      });
 
       await expectIntentButtonReceivesPointer(page, "create-page:program-page");
       const createResponse = await clickIntent(page, "create-page:program-page");
