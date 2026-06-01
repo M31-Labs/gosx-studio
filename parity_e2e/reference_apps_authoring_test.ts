@@ -27,6 +27,13 @@ test.describe("@reference-apps browser authoring workflows", () => {
       const addResponse = await clickIntent(page, "add-component:home:contact-flow");
       expect(addResponse.status()).toBe(303);
       await expect(page.locator("[data-studio-composition-intent-forms='true']")).toBeAttached();
+
+      await expectPanelButtonReceivesPointer(page, "[data-studio-site-map-component-duplicate='true']");
+      const duplicateResponse = await clickAuthoringPanel(page, "[data-studio-site-map-component-duplicate='true']");
+      expect(duplicateResponse.status()).toBe(303);
+      await expect(page.locator("body")).toContainText("Hero copy 2");
+
+      await saveEditableControl(page, "Surface-tested clay rituals");
     } finally {
       await server.stop();
     }
@@ -43,6 +50,17 @@ test.describe("@reference-apps browser authoring workflows", () => {
       expect(createResponse.status()).toBe(303);
       await expect(page.locator("[data-studio-composition-intent-forms='true']")).toBeAttached();
 
+      await expectPanelButtonReceivesPointer(page, "[data-gosx-studio-component-duplicate='true']");
+      const duplicateResponse = await clickAuthoringPanel(page, "[data-gosx-studio-component-duplicate='true']", { reloadAfter: false });
+      expect(duplicateResponse.status()).toBe(303);
+      expect(authoringParam(duplicateResponse, "gosx_studio_operation")).toBe("duplicate-component");
+      expect(authoringParam(duplicateResponse, "gosx_studio_component_key")).toBe("hero");
+      await expect(page.locator("[data-gosx-studio-component-duplicate='true']")).toBeVisible();
+
+      await saveEditableControl(page, "Small boots, big questions.", {
+        reloadAfter: false,
+      });
+
       await expectIntentButtonReceivesPointer(page, "add-component:home:hero");
       const addResponse = await clickIntent(page, "add-component:home:hero");
       expect(addResponse.status()).toBe(303);
@@ -54,18 +72,40 @@ test.describe("@reference-apps browser authoring workflows", () => {
 });
 
 async function clickIntent(page: Page, intentKey: string) {
+  return clickAuthoringButton(page, `[data-studio-composition-intent="${intentKey}"] button`);
+}
+
+type ClickAuthoringOptions = {
+  reloadAfter?: boolean;
+};
+
+async function clickAuthoringPanel(page: Page, panelSelector: string, options?: ClickAuthoringOptions) {
+  return clickAuthoringButton(page, `${panelSelector} button`, options);
+}
+
+async function clickAuthoringButton(page: Page, buttonSelector: string, options?: ClickAuthoringOptions) {
   const responsePromise = page.waitForResponse((response) =>
     response.url().includes("/__actions/authoring") &&
     response.request().method() === "POST",
   );
-  await page.locator(`[data-studio-composition-intent="${intentKey}"] button`).first().click();
+  await page.locator(buttonSelector).first().click();
   const response = await responsePromise;
   await page.waitForLoadState("networkidle");
+  if (options?.reloadAfter !== false) {
+    await page.goto(page.url(), { waitUntil: "networkidle" });
+  }
   return response;
 }
 
 async function expectIntentButtonReceivesPointer(page: Page, intentKey: string) {
-  const selector = `[data-studio-composition-intent="${intentKey}"] button`;
+  await expectButtonReceivesPointer(page, `[data-studio-composition-intent="${intentKey}"] button`, intentKey);
+}
+
+async function expectPanelButtonReceivesPointer(page: Page, panelSelector: string) {
+  await expectButtonReceivesPointer(page, `${panelSelector} button`, panelSelector);
+}
+
+async function expectButtonReceivesPointer(page: Page, selector: string, label: string) {
   const button = page.locator(selector).first();
   await expect(button).toBeVisible();
   await button.scrollIntoViewIfNeeded();
@@ -86,7 +126,32 @@ async function expectIntentButtonReceivesPointer(page: Page, intentKey: string) 
     };
   }, selector);
 
-  expect(hit, `expected ${intentKey} button to receive pointer events`).toMatchObject({ ok: true });
+  expect(hit, `expected ${label} button to receive pointer events`).toMatchObject({ ok: true });
+}
+
+async function saveEditableControl(page: Page, value: string, options?: ClickAuthoringOptions & { expectedMessage?: string }) {
+  const panel = page.locator("[data-gosx-studio-editable-control='true']").first();
+  await expect(panel).toBeVisible();
+  const input = panel.locator("input[name='gosx_studio_value']");
+  await expect(input).toBeVisible();
+  await input.fill(value);
+  await expectPanelButtonReceivesPointer(page, "[data-gosx-studio-editable-control='true']");
+  const response = await clickAuthoringPanel(page, "[data-gosx-studio-editable-control='true']", options);
+  expect(response.status()).toBe(303);
+  expect(authoringParam(response, "gosx_studio_operation")).toBe("save-control");
+  expect(authoringParam(response, "gosx_studio_value")).toBe(value);
+  if (options?.reloadAfter === false) {
+    if (options.expectedMessage) {
+      await expect(page.locator("body")).toContainText(options.expectedMessage);
+    }
+    await expect(page.locator("[data-gosx-studio-editable-control='true']")).toBeVisible();
+    return;
+  }
+  await expect(page.locator("[data-gosx-studio-editable-control='true'] input[name='gosx_studio_value']").first()).toHaveValue(value);
+}
+
+function authoringParam(response: { request(): { postData(): string | null } }, key: string) {
+  return new URLSearchParams(response.request().postData() ?? "").get(key);
 }
 
 async function startMuddy(request: APIRequestContext): Promise<ServerHandle> {

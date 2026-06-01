@@ -103,8 +103,12 @@ GOSX_STUDIO_PARITY_BASE_URL=http://localhost:8080 npm test
 `reference_apps_authoring_test.ts` is an opt-in browser workflow for the two
 current reference apps. It boots Muddy/Noni and Pajaritos from sibling worktrees
 with temporary data directories, opens their real admin editors, verifies the
-visible authoring buttons receive pointer events, and submits create-page plus
-add-section actions through the real GoSX action/CSRF flow.
+visible authoring buttons receive pointer events, and submits create-page,
+add-section, duplicate-section, and save-field actions through the real GoSX
+action/CSRF flow. Muddy assertions include browser-reloaded duplicate and field
+state. Pajaritos assertions currently stop at isolated native payloads and
+redirects because its editor reload still renders the published baseline rather
+than the preview draft.
 
 It is not part of default parity CI yet because it depends on sibling app
 worktrees. Run it locally with:

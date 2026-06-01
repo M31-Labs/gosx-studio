@@ -52,6 +52,7 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 	duplicateComponent := authoringSiteMapDuplicateComponentView(siteMap.Pages)
 	visibilityComponent := authoringSiteMapVisibilityComponentView(siteMap.Pages)
 	deleteComponent := authoringSiteMapDeleteComponentView(siteMap.Pages)
+	editableControl := authoringSiteMapEditableControlView(siteMap.Pages)
 	sources := authoringSiteMapSourceViews(siteMap)
 	blueprints := authoringSiteMapPageBlueprintViews(siteMap.Library.PageBlueprints, options)
 	palette := authoringSiteMapComponentTemplateViews(siteMap.Library.ComponentTemplates, options)
@@ -107,6 +108,8 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 		"hasVisibilityComponent":             len(visibilityComponent) > 0,
 		"deleteComponent":                    deleteComponent,
 		"hasDeleteComponent":                 len(deleteComponent) > 0,
+		"editableControl":                    editableControl,
+		"hasEditableControl":                 len(editableControl) > 0,
 		"empty":                              "No editable pages are configured.",
 		"sources":                            sources,
 		"hasSources":                         len(sources) > 0,
@@ -450,6 +453,46 @@ func authoringSiteMapDeleteComponentView(pages []Page) map[string]any {
 				"mutation":           AuthoringMutationView(mutation),
 				"formValues":         mutation.FormValues(),
 				"formInputs":         AuthoringMutationFormInputViews(mutation),
+			}
+		}
+	}
+	return nil
+}
+
+func authoringSiteMapEditableControlView(pages []Page) map[string]any {
+	for _, page := range pages {
+		page = page.Normalize()
+		for _, component := range page.Components {
+			component = component.Normalize()
+			if !component.Editable {
+				continue
+			}
+			for _, control := range component.Controls {
+				control = control.Normalize()
+				if control.Key == "" || control.Label == "" {
+					continue
+				}
+				mutation := AuthoringMutationForControl(page, component, control)
+				view := authoringSiteMapControlView(control)
+				view["pageKey"] = page.Key
+				view["pageLabel"] = page.Label
+				view["pageRoute"] = page.Route
+				view["componentKey"] = component.Key
+				view["componentLabel"] = component.Label
+				view["componentBinding"] = component.Binding
+				view["selectionKey"] = component.SelectionKey(page.Key)
+				view["inputName"] = AuthoringFieldValue
+				view["actionLabel"] = "Save field"
+				view["authoringOperation"] = string(mutation.Kind)
+				view["authoringPageKey"] = mutation.PageKey
+				view["authoringComponent"] = mutation.ComponentKey
+				view["authoringControl"] = mutation.ControlKey
+				view["authoringBinding"] = mutation.Binding
+				view["authoringControlKind"] = string(mutation.ControlKind)
+				view["mutation"] = AuthoringMutationView(mutation)
+				view["formValues"] = mutation.FormValues()
+				view["formInputs"] = AuthoringMutationFormInputViews(mutation)
+				return view
 			}
 		}
 	}

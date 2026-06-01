@@ -167,6 +167,18 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 	if !authoringFormInputsContain(controlInputs, AuthoringFieldBinding, "pages.home.hero.headline") {
 		t.Fatalf("expected control form inputs: %#v", controlInputs)
 	}
+	editableControl := view["editableControl"].(map[string]any)
+	editableControlForm := editableControl["formValues"].(map[string]string)
+	if view["hasEditableControl"] != true || editableControl["key"] != "headline" || editableControl["componentKey"] != "hero" || editableControl["inputName"] != AuthoringFieldValue {
+		t.Fatalf("unexpected editable control projection: %#v", editableControl)
+	}
+	if editableControl["actionLabel"] != "Save field" || editableControlForm[AuthoringFieldBinding] != "pages.home.hero.headline" || editableControlForm[AuthoringFieldValue] != "Forest days" {
+		t.Fatalf("unexpected editable control form payload: %#v", editableControl)
+	}
+	editableControlInputs := editableControl["formInputs"].([]map[string]string)
+	if !authoringFormInputsContain(editableControlInputs, AuthoringFieldControlKey, "headline") {
+		t.Fatalf("expected editable control form inputs: %#v", editableControlInputs)
+	}
 	blueprints := view["blueprints"].([]map[string]any)
 	if blueprints[0]["inputName"] != "studioPageBlueprintIntent" || blueprints[0]["inputID"] != "studioSiteMapBlueprint-landing" {
 		t.Fatalf("unexpected blueprint payload: %#v", blueprints[0])

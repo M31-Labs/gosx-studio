@@ -452,14 +452,17 @@ Current:
 - `parity_e2e/reference_apps_authoring_test.ts` now provides an opt-in
   browser harness that boots sibling Muddy/Noni and Pajaritos apps with temp
   data, verifies visible authoring buttons receive pointer events, and submits
-  create-page/add-section actions through the real admin editor action flow.
+  create-page, add-section, duplicate-section, and save-field actions through
+  the real admin editor action flow. Muddy verifies duplicate/save-field state
+  after reload; Pajaritos verifies the isolated native payloads and redirects
+  while draft-state reload reflection remains a host gap.
 - `docs/PUBLIC_READINESS.md` names the release posture concerns.
 
 Missing:
 
 - Default-CI browser-driven editor workflows across both Noni and Pajaritos,
-  plus deeper persisted browser assertions for duplicate, edit-control,
-  preview refresh, staging publish readiness, and rollback.
+  plus Pajaritos draft-state reload reflection, preview refresh, staging
+  publish readiness, and rollback.
 - Visual regression checks for the shell, canvas, inspector, site map, media,
   flow designer, publish panel, and responsive preview.
 - Accessibility checks for keyboard navigation, focus, labels, reduced motion,
@@ -680,6 +683,17 @@ These are the current places to mine for reusable Studio behavior.
   and Pajaritos apps with temp data directories, checks that visible
   create-page/add-section buttons are not blocked by overlays, and verifies the
   real authoring POST/redirect path in both admin editors.
+- 2026-06-01: Added a top-level `editableControl` projection to
+  `AuthoringSiteMapView` and wired Muddy/Pajaritos visible save-field panels to
+  the same ordered `formInputs` contract. Both apps now isolate metadata,
+  editable-field, reorder, duplicate, visibility, and delete panels behind
+  scoped external forms so the main save form no longer leaks competing hidden
+  operations into authoring submissions.
+- 2026-06-01: Broadened the reference-app browser e2e to click duplicate and
+  save-field controls. Muddy now asserts duplicate and headline state after a
+  browser reload; Pajaritos asserts pointer reachability, native
+  duplicate/save-control payloads, and 303 redirects while exposing the
+  remaining draft-state reload gap.
 
 ## Next Execution Slice
 
@@ -687,9 +701,9 @@ The next practical slice is full browser automation plus the next visible shell
 extraction:
 
 - Promote the opt-in Muddy/Pajaritos reference-app browser e2e into default CI
-  and broaden it from create/add POST/redirect checks to duplicate,
-  edit-control, preview-refresh, staging publish readiness, and rollback
-  workflows with persisted browser-visible assertions.
+  and make Pajaritos render draft-state edits after redirect/reload, then add
+  preview-refresh, staging publish readiness, and rollback workflows with
+  persisted browser-visible assertions.
 - Continue the shell extraction by moving the next visible wrapper/toolbar
   piece behind a Studio-owned render path that consumes `WorkbenchShellView`.
 - Extend `authoringruntime` host-backed smoke coverage to assert
