@@ -436,6 +436,10 @@ Current:
   submits the actual visible authoring payloads for create-page, add-component,
   duplicate-component, and edit-control paths into their host persistence
   layers.
+- The Studio Playwright parity harness now clicks visible authoring controls for
+  create-page, add-component, duplicate-component, and edit-control workflows,
+  then verifies managed action feedback selects the changed surface, refreshes
+  the preview, and updates save-state UI.
 - `docs/PUBLIC_READINESS.md` names the release posture concerns.
 
 Missing:
@@ -640,14 +644,22 @@ These are the current places to mine for reusable Studio behavior.
   edit-control payloads exposed to the editor surface, submit them through the
   host mutation paths, and assert that pages, home sections, duplicated
   sections, and text controls actually persist.
+- 2026-06-01: Added a browser-click authoring surface smoke in
+  `parity_e2e/authoring_surface_workflows_test.ts`. The test clicks visible
+  create-page, add-section, duplicate-section, and save-headline controls,
+  drives scoped/external forms, simulates GoSX managed action results, and
+  verifies authoring runtime selection, preview refresh, save feedback, and
+  persisted workflow state.
 
 ## Next Execution Slice
 
 The next practical slice is full browser automation plus the next visible shell
 extraction:
 
-- Turn the persisted editor-surface smoke tests into browser-driven flows that
-  run with real authenticated/CSRF-capable sessions or a local-only test bypass.
+- Turn the persisted editor-surface smoke tests into browser-driven reference
+  app flows that run with real authenticated/CSRF-capable sessions or a
+  local-only test bypass. The shared runtime-level browser-click coverage is
+  now in place.
 - Continue the shell extraction by moving the next visible wrapper/toolbar
   piece behind a Studio-owned render path that consumes `WorkbenchShellView`.
 - Extend `authoringruntime` host-backed smoke coverage to assert
