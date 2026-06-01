@@ -969,6 +969,17 @@ These are the current places to mine for reusable Studio behavior.
   multi-set. Pan stays on plain left-drag (Step A) — marquee is additive on
   shift. 4 new parity cases in `sitemapruntime_test.ts` (rubber-band,
   shift-toggle, Escape, survives-sync); runtime-only, no renderer change.
+- 2026-06-01 (fir): Shipped the opt-in **Canvas2D site-map engine foundation**
+  (Hybrid parallel track). New `RenderSiteMapCanvasEngine(view,
+  SiteMapCanvasOptions{Enabled:...})` in `sitemap_canvas.go` renders the same
+  `AuthoringSiteMapView` page graph onto the merged Phase-2 `gosx.CanvasBoard`
+  (surface kind `canvas2d`): workspace nodes → `rect` + `label` board nodes laid
+  out deterministically by layer-column / node-row (the view exposes no numeric
+  coords), `workspaceLinks` → `line` connectors between node centers, group-keyed
+  fill colors, pick events wired to `handleSiteMapPick`. **Default OFF** — emits
+  an inert hidden hook unless `Enabled:true`; the `RenderSiteMapBoard` DOM path
+  is untouched. Go coverage in `sitemap_canvas_test.go`; full gosx-studio suite
+  green. Merged to main as `0b23c8e`.
 
 ## Next Execution Slice
 
@@ -984,11 +995,13 @@ The next practical slices, in order, are:
    on the pan surface emitting `gosxstudio:sitemap-node-moved {key,x,y}`, host
    persistence into the "Saved canvas positions" (`layout-graph`) store, and
    snap-to-grid.
-3. **Parallel track — `SiteMapEngine.gsx` on `<CanvasBoard>`** (Canvas2D): mount
-   the merged Phase-2 primitive (`gosx.CanvasBoard`, `OrthoCamera2D`, surface
-   kind `canvas2d`) as a feature-flagged true-infinite rendering surface for the
-   page graph; add e2e before flipping the flag. (CanvasBoard ships
-   render/pan/zoom/pick but **not** grid/marquee/drag — those wire on top.)
+3. **Parallel track — Canvas2D engine (foundation shipped 2026-06-01, `0b23c8e`).**
+   `RenderSiteMapCanvasEngine` (opt-in, default-off) mounts `gosx.CanvasBoard`
+   for the page graph. Remaining: browser/WASM hydration e2e for the canvas
+   surface; grid/marquee/drag wiring on it (the primitive ships
+   render/pan/zoom/pick only); deterministic positions persisted instead of
+   structural grid; and a host opt-in + flag flip once at parity with the DOM
+   board.
 4. Decide the Pajaritos map path: adopt the shared board directly, or provide a
    host-styled board slot that still uses `AuthoringSiteMapView` plus
    `sitemapruntime`.
