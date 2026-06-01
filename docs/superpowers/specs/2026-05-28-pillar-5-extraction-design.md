@@ -34,6 +34,87 @@ For reference, Noni imports `cmsstudio` 403 times across its codebase; pajaritos
 4. **`gosx-studio` package layout is flat**, with one carve-out: the 7 existing `*runtime/` sub-packages stay separate (their boundaries are JS-bundle composition concerns, not Go organization concerns).
 5. **End state**: Noni's editor route drops from ~7,000 lines to ~500. Pajaritos's editor route stays at its current ~340 lines (proving Pillar 5 didn't leak Noni-shape into Studio). `gosx-cms/studio/` package ceases to exist. `gosx-studio` is the complete reusable editor.
 
+## Visual System
+
+The Studio editor UI uses the same Paper & Ink operational-tool territory proven
+in Muddy: warm paper canvas, restrained ink text, terracotta action color,
+compact controls, and visible structure for page maps, inspectors, canvas
+rails, and publish review. It should feel like a dense authoring tool, not a
+marketing page.
+
+- Display font: Fraunces, 700, for compact panel headings and editor section
+  titles.
+- Body font: Space Grotesk, 400/600/700, for tool labels, field labels, body
+  copy, and buttons.
+- Mono font: JetBrains Mono, 500, for status chips, counters, runtime labels,
+  and technical metadata.
+- Type scale: compact minor-third scale, mapped to `--text-xs`, `--text-sm`,
+  `--text-md`, `--text-lg`, `--text-xl`, `--text-2xl`, `--text-3xl`, and
+  `--text-4xl`. Use the smaller steps inside panels, rails, cards, toolbars,
+  and form controls.
+- Dominant color: `--color-canvas` `#f6f0e8`.
+- Secondary colors: `--color-canvas-soft` `#fdfaf6` and `--color-panel` for
+  editor panels, boards, and control surfaces.
+- Accent color: `--color-accent` `#b86a4a`; stronger action state
+  `--color-accent-strong` `#965036`.
+- Support colors: moss, sun, stone, success, and danger for readiness,
+  lifecycle, and validation states.
+- Text hierarchy: `--color-ink` primary, `--color-ink-soft` secondary,
+  `--color-muted` muted. Against `--color-canvas`, all three meet WCAG AA for
+  normal text; primary and secondary meet AAA in the current Muddy palette.
+- Motion: Subtle. Use `--duration-fast` 180ms for hover/focus, `--duration-base`
+  260ms for panel state, `--duration-slow` 520ms for drawer/workspace changes,
+  `--ease-out` `cubic-bezier(0.16, 1, 0.3, 1)`, and `--ease-spring`
+  `cubic-bezier(0.34, 1.56, 0.64, 1)`.
+- Spacing: 8px-rooted responsive scale from `--space-xs` through
+  `--space-3xl`. Tool surfaces should prefer `--space-xs` through
+  `--space-md`; page-level bands can use `--space-lg` and above.
+
+```css
+:root {
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "Space Grotesk", "Avenir Next", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --text-xs: clamp(0.75rem, 0.72rem + 0.12vw, 0.82rem);
+  --text-sm: clamp(0.88rem, 0.84rem + 0.18vw, 0.98rem);
+  --text-md: clamp(1rem, 0.96rem + 0.2vw, 1.12rem);
+  --text-lg: clamp(1.25rem, 1.16rem + 0.42vw, 1.5rem);
+  --text-xl: clamp(1.56rem, 1.39rem + 0.8vw, 2rem);
+  --text-2xl: clamp(1.95rem, 1.68rem + 1.2vw, 2.7rem);
+  --text-3xl: clamp(2.44rem, 1.98rem + 2vw, 3.6rem);
+  --text-4xl: clamp(3.05rem, 2.35rem + 3vw, 4.8rem);
+  --color-canvas: #f6f0e8;
+  --color-canvas-soft: #fdfaf6;
+  --color-panel: #fffaf2;
+  --color-ink: #2a241e;
+  --color-ink-soft: #4c4036;
+  --color-muted: #76685c;
+  --color-line: rgba(42, 36, 30, 0.16);
+  --color-line-strong: rgba(42, 36, 30, 0.28);
+  --color-accent: #b86a4a;
+  --color-accent-strong: #965036;
+  --color-moss: #2f5143;
+  --color-sun: #e5b36a;
+  --color-stone: #cbb39a;
+  --color-success: #2f6d4f;
+  --color-danger: #9f3d2f;
+  --space-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.9rem);
+  --space-sm: clamp(1rem, 0.92rem + 0.35vw, 1.2rem);
+  --space-md: clamp(1.5rem, 1.32rem + 0.8vw, 2rem);
+  --space-lg: clamp(2rem, 1.7rem + 1.3vw, 2.8rem);
+  --space-xl: clamp(3rem, 2.45rem + 2.4vw, 4.4rem);
+  --space-2xl: clamp(4rem, 3.15rem + 3.8vw, 6.2rem);
+  --space-3xl: clamp(6rem, 4.7rem + 5.8vw, 9.5rem);
+  --radius-card: 8px;
+  --radius-pill: 999px;
+  --duration-fast: 180ms;
+  --duration-base: 260ms;
+  --duration-slow: 520ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+```
+
 ## Scope
 
 ### Moves into `gosx-studio`

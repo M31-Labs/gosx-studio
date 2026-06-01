@@ -563,6 +563,8 @@ func authoringSiteMapIntentView(intent CompositionIntent) map[string]any {
 		"summary":              intent.Summary,
 		"kind":                 string(kind),
 		"kindLabel":            authoringCompositionIntentKindLabel(kind),
+		"actionLabel":          authoringCompositionIntentActionLabel(kind),
+		"formID":               "studioSiteMapIntentForm-" + workspaceToken(intent.Key),
 		"class":                "studio-site-map-intent studio-site-map-intent--" + string(kind),
 		"targetPageKey":        intent.TargetPageKey,
 		"targetLabel":          firstNonEmpty(intent.TargetPageLabel, intent.PageBlueprintLabel, intent.TargetRoute, "New page"),
@@ -579,6 +581,17 @@ func authoringSiteMapIntentView(intent CompositionIntent) map[string]any {
 		"stepCountLabel":       countLabel(intent.StepCount(), "step", "steps"),
 		"steps":                authoringSiteMapStepViews(intent.Steps),
 		"hasSteps":             intent.StepCount() > 0,
+		"authoringOperation":   string(mutation.Kind),
+		"authoringIntentKey":   mutation.IntentKey,
+		"authoringIntentKind":  string(mutation.IntentKind),
+		"authoringPageKey":     mutation.PageKey,
+		"authoringPageLabel":   mutation.PageLabel,
+		"authoringPageRoute":   mutation.PageRoute,
+		"authoringBlueprint":   mutation.PageBlueprintKey,
+		"authoringTemplate":    mutation.ComponentTemplateKey,
+		"authoringComponent":   mutation.ComponentLabel,
+		"authoringBinding":     mutation.Binding,
+		"authoringRegion":      mutation.TargetRegion,
 		"mutation":             AuthoringMutationView(mutation),
 		"formValues":           mutation.FormValues(),
 	}
@@ -934,6 +947,17 @@ func authoringCompositionIntentKindLabel(kind CompositionIntentKind) string {
 		return "Page draft"
 	default:
 		return "Block draft"
+	}
+}
+
+func authoringCompositionIntentActionLabel(kind CompositionIntentKind) string {
+	switch kind {
+	case CompositionIntentCreatePage:
+		return "Create page"
+	case CompositionIntentAddComponent:
+		return "Add section"
+	default:
+		return "Apply draft"
 	}
 }
 

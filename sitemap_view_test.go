@@ -152,8 +152,11 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 		t.Fatalf("expected create/add intents, got %#v", intents)
 	}
 	add := intents[1]
-	if add["kindLabel"] != "Block draft" || add["targetPageKey"] != "home" || add["componentTemplateKey"] != "gallery" {
+	if add["kindLabel"] != "Block draft" || add["actionLabel"] != "Add section" || add["formID"] != "studioSiteMapIntentForm-add-component-home-gallery" || add["targetPageKey"] != "home" || add["componentTemplateKey"] != "gallery" {
 		t.Fatalf("unexpected add-component intent: %#v", add)
+	}
+	if add["authoringOperation"] != "apply-intent" || add["authoringIntentKind"] != "add-component" || add["authoringTemplate"] != "gallery" {
+		t.Fatalf("unexpected add-component authoring payload: %#v", add)
 	}
 	addForm := add["formValues"].(map[string]string)
 	if addForm[AuthoringFieldOperation] != "apply-intent" || addForm[AuthoringFieldComponentTemplateKey] != "gallery" {

@@ -127,12 +127,15 @@ Current:
 - Pajaritos builds a simple site map but does not get a reusable graph editor.
 - The shared site-map projection can identify an editable page and provide a
   ready-to-submit page metadata mutation payload.
+- The shared site-map projection now exposes scoped apply-intent payloads for
+  create-page and add-component drafts. Noni and Pajaritos render visible
+  "Create page" / "Add section" controls from those payloads, and Pajaritos now
+  derives its editor panel site-map from `NoCodeAuthoringSurface`.
 
 Missing:
 
 - A Studio-owned site-map engine that renders pages, routes, components,
   source bindings, readiness, and allowed operations.
-- Create-page and add-component flows from the composition library.
 - Full route editing across all editable pages, page grouping, selection state,
   and conflict validation inside the visual graph.
 - Keyboard and pointer interactions suitable for a visual graph.
@@ -541,12 +544,14 @@ These are the current places to mine for reusable Studio behavior.
 12. Implement `InspectorIsland.gsx` for the current `ControlKind` set with
    dirty/valid/saving states.
 13. Implement canvas selection and inline text editing through the Studio
-   preview/selection/field runtimes.
+    preview/selection/field runtimes.
 14. Add Noni and Pajaritos e2e smoke tests for create page, add component,
-   edit control, responsive preview, staging publish readiness, and rollback.
+    edit control, responsive preview, staging publish readiness, and rollback.
 15. Write the visual-system spec for the Studio editor UI before the major
     shell styling pass, including density, typography, color roles,
     accessibility states, and responsive behavior.
+16. Done on 2026-06-01: render visible create-page/add-section apply controls
+    from shared site-map composition intent payloads in Noni and Pajaritos.
 
 ## Execution Log
 
@@ -604,19 +609,25 @@ These are the current places to mine for reusable Studio behavior.
   instance keys such as `hero__copy_2` while preserving the template key for
   rendering and settings saves; Pajaritos stores repeatable ordered home
   section instances in metadata.
+- 2026-06-01: Added visible create-page/add-section apply controls for
+  composition intents. `AuthoringSiteMapView` now exposes action labels,
+  scoped form IDs, and explicit authoring payload fields; Muddy and Pajaritos
+  render those controls without leaking platform copy, and Pajaritos now builds
+  its panel site-map from `NoCodeAuthoringSurface`.
 
 ## Next Execution Slice
 
-The next practical slice is e2e authoring confidence plus reusable shell
-extraction:
+The next practical slice is reusable shell extraction plus persisted browser
+confidence:
 
-- Add Noni and Pajaritos e2e smoke tests for create page, add component,
-  duplicate component, and edit control through the visible editor surface.
-- Extend the new `authoringruntime` browser smoke into host-backed smoke tests
-  that assert changed-object selection and preview refresh instead of only
-  checking stored data.
-- Build the first reusable `StudioShell.gsx` slice so Muddy and Pajaritos stop
-  carrying app-local editor chrome for the shared workbench shell.
+- Build the first reusable `StudioShell.gsx`/view slice so Muddy and Pajaritos
+  stop carrying app-local editor chrome for the shared workbench shell.
+- Add Noni and Pajaritos persisted browser smoke tests for create page, add
+  component, duplicate component, and edit control through the visible editor
+  surface. The tests should run with real authenticated/CSRF-capable sessions
+  or a local-only test bypass, not just inspect form payloads.
+- Extend `authoringruntime` host-backed smoke coverage to assert
+  changed-object selection and preview refresh after those persisted actions.
 
 ## Definition of Done
 
