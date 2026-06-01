@@ -248,6 +248,39 @@ export async function savePageMetadata(page: Page, title: string, route: string,
   expect(authoringParam(response, "gosx_studio_page_route")).toBe(route);
 }
 
+export async function toggleComponentVisibility(page: Page, options?: ClickAuthoringOptions) {
+  const panelSelector = "[data-gosx-studio-component-visibility='true'], [data-studio-site-map-component-visibility='true']";
+  const buttonSelector = "[data-gosx-studio-component-visibility='true'] button, [data-studio-site-map-component-visibility='true'] button";
+  const panel = page.locator(panelSelector).first();
+  await expect(panel).toBeVisible();
+  const visibleInput = panel.locator("input[name='gosx_studio_visible']");
+  await expect(visibleInput).toHaveCount(1);
+  const submittedVisible = (await visibleInput.first().getAttribute("value")) === "true";
+  const expectedNextVisible = submittedVisible ? "false" : "true";
+  const expectedButton = submittedVisible ? "Hide section" : "Show section";
+  const expectedState = submittedVisible ? "visible" : "hidden";
+  await expectButtonReceivesPointer(page, buttonSelector, "component visibility");
+  const authoringResultPromise = options?.reloadAfter === false ? waitForStudioAuthoringResult(page) : null;
+  const clickOptions = options?.reloadAfter === false ? { ...options, settleAfter: false } : options;
+  const response = await clickEditorActionButton(page, buttonSelector, "/__actions/authoring", clickOptions);
+  if (options?.reloadAfter === false) {
+    expect(response.status()).toBe(200);
+    const detail = await authoringResultPromise;
+    expect(detail, "real editor should emit component visibility authoring result detail").toBeTruthy();
+    expect(detail?.change?.kind).toBe("component");
+    expect(detail?.selectedCount ?? 0, "visibility save should select the changed component").toBeGreaterThan(0);
+    expect(detail?.previewCount ?? 0, "visibility save should refresh at least one preview frame").toBeGreaterThan(0);
+    await expect(panel).toHaveAttribute("data-gosx-studio-authoring-state", "saved");
+    await expect(panel).toHaveAttribute("data-gosx-studio-authoring-visibility", expectedState);
+    await expect(panel.locator("input[name='gosx_studio_visible']").first()).toHaveValue(expectedNextVisible);
+    await expect(page.locator(buttonSelector).first()).toHaveText(expectedButton);
+    await expect(page.locator("[data-gosx-studio-save-detail]").first()).toHaveText(detail?.result?.message ?? /./);
+    return;
+  }
+  expect(response.status()).toBe(303);
+  expect(authoringParam(response, "gosx_studio_operation")).toBe("toggle-visibility");
+}
+
 export function authoringParam(response: { request(): { postData(): string | null } }, key: string) {
   return new URLSearchParams(response.request().postData() ?? "").get(key);
 }

@@ -11,6 +11,7 @@ import {
   savePageMetadata,
   startMuddy,
   startPajaritos,
+  toggleComponentVisibility,
   waitForStudioPreviewRefresh,
 } from "./reference_apps_harness";
 
@@ -48,6 +49,8 @@ test.describe("@reference-apps browser authoring workflows", () => {
         reloadAfter: false,
         expectedMessage: "Hero headline saved.",
       });
+
+      await toggleComponentVisibility(page, { reloadAfter: false });
     } finally {
       await server.stop();
     }
@@ -85,6 +88,8 @@ test.describe("@reference-apps browser authoring workflows", () => {
         reloadAfter: false,
         expectedMessage: "Hero headline saved.",
       });
+
+      await toggleComponentVisibility(page, { reloadAfter: false });
 
       await expectIntentButtonReceivesPointer(page, "add-component:home:hero");
       const addResponse = await clickIntent(page, "add-component:home:hero");

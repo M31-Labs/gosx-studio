@@ -328,6 +328,7 @@
     var selectedCount = selectChange(change);
     var previewCount = refreshPreview(data);
     markWorkbench(data, change, selectedCount);
+    markSourcePanel(data, change, meta.sourcePanel);
     emitResult(data, meta, change, selectedCount, previewCount);
     return {
       result: data,
@@ -340,6 +341,49 @@
   function handleManagedFormResult(event) {
     var detail = event && event.detail || {};
     return handlePayload(detail.result, detail);
+  }
+
+  function resultValues(data) {
+    return toObject(data && data.values);
+  }
+
+  function setFirstText(root, selector, value) {
+    value = String(value || "").trim();
+    if (!root || !value) return;
+    var nodes = queryAll(selector, root);
+    if (nodes[0]) nodes[0].textContent = value;
+  }
+
+  function updatePanelInputs(root, name, value) {
+    if (!root || !name) return;
+    queryAll("input[name=\"" + selectorValue(name) + "\"]", root).forEach(function (input) {
+      input.setAttribute("value", value);
+      input.value = value;
+    });
+  }
+
+  function updateVisibilityPanel(data, panel) {
+    if (!panel || !panel.matches || !panel.matches("[data-gosx-studio-component-visibility], [data-studio-site-map-component-visibility]")) return;
+    var values = resultValues(data);
+    var submitted = String(values.gosx_studio_visible || "").trim().toLowerCase();
+    if (submitted !== "true" && submitted !== "false") return;
+    var visible = submitted === "true";
+    panel.setAttribute("data-gosx-studio-authoring-visibility", visible ? "visible" : "hidden");
+    setFirstText(panel, "output", visible ? "Visible" : "Hidden");
+    setFirstText(panel, "button", visible ? "Hide section" : "Show section");
+    updatePanelInputs(panel, "gosx_studio_visible", visible ? "false" : "true");
+  }
+
+  function markSourcePanel(data, change, panel) {
+    if (!panel || !panel.setAttribute) return;
+    panel.setAttribute(STATE_ATTR, "saved");
+    setOptionalAttr(panel, MESSAGE_ATTR, data && data.message);
+    setOptionalAttr(panel, CHANGE_KEY_ATTR, change && change.key);
+    setOptionalAttr(panel, CHANGE_KIND_ATTR, change && change.kind);
+    setOptionalAttr(panel, CHANGE_PAGE_ATTR, change && change.pageKey);
+    setOptionalAttr(panel, CHANGE_COMPONENT_ATTR, change && change.component);
+    setOptionalAttr(panel, CHANGE_BINDING_ATTR, change && change.binding);
+    updateVisibilityPanel(data, panel);
   }
 
   function formSubmitTarget(form, submitter) {
@@ -443,6 +487,16 @@
     });
   }
 
+  function sourcePanelForSubmitter(submitter) {
+    return closest(submitter, [
+      "[data-gosx-studio-editable-control]",
+      "[data-gosx-studio-page-metadata]",
+      "[data-gosx-studio-component-visibility]",
+      "[data-studio-site-map-page-edit]",
+      "[data-studio-site-map-component-visibility]"
+    ].join(", "));
+  }
+
   function submitAuthoringManagedForm(form, submitter) {
     var method = formSubmissionMethod(form, submitter);
     var action = formSubmissionAction(form, submitter) || window.location.href;
@@ -450,6 +504,7 @@
     var formData = serializeForm(form, submitter);
     var previous = captureFormState(form);
     var csrfToken = formCSRFToken(formData);
+    var sourcePanel = sourcePanelForSubmitter(submitter);
 
     setFormPending(form);
 
@@ -461,7 +516,7 @@
           previewURL: formNavigationURL(url, formData).href,
           refreshPreview: true
         }
-      }, { action: url.href, method: method, ok: true });
+      }, { action: url.href, method: method, ok: true, sourcePanel: sourcePanel });
       restoreFormState(form, previous);
       return;
     }
@@ -484,7 +539,8 @@
         action: url.href,
         method: method,
         ok: payload.response && payload.response.ok,
-        status: payload.response ? payload.response.status : 0
+        status: payload.response ? payload.response.status : 0,
+        sourcePanel: sourcePanel
       });
       restoreFormState(form, previous);
     }, function () {

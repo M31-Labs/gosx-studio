@@ -815,6 +815,11 @@ These are the current places to mine for reusable Studio behavior.
   title and route fields without leaving the active editor, while asserting
   page-level authoring results, selected-page feedback, save-detail chrome, and
   preview refresh.
+- 2026-06-01: Extended in-place authoring to component visibility controls.
+  Managed visibility forms now keep the editor mounted, refresh preview,
+  select the affected component, update save-detail chrome, and flip the local
+  panel from Hide to Show (or back) by rewriting the next
+  `gosx_studio_visible` value after a successful result.
 
 ## Next Execution Slice
 
@@ -822,9 +827,9 @@ The next practical slice is the next shell/render extraction:
 
 - Collapse the remaining `gosx-cms/studio` workbench wrapper duplication now
   that both reference apps consume Studio-owned frame semantics.
-- Extend the same in-place authoring result loop to component visibility and
-  reorder operations, then graduate add/duplicate/delete once Studio has a
-  fragment-refresh contract for structural DOM changes.
+- Extend the same in-place authoring result loop to reorder operations, then
+  graduate add/duplicate/delete once Studio has a fragment-refresh contract for
+  structural DOM changes.
 - Keep broadening visual/accessibility/performance checks as inspector, media,
   flow, and publish surfaces move behind reusable Studio-owned render paths.
 
