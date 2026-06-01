@@ -178,6 +178,7 @@ func authoringSiteMapMetadataPageView(pages []Page) map[string]any {
 			"authoringPageRoute": mutation.PageRoute,
 			"mutation":           AuthoringMutationView(mutation),
 			"formValues":         mutation.FormValues(),
+			"formInputs":         AuthoringMutationFormInputViews(mutation),
 		}
 	}
 	return nil
@@ -193,22 +194,28 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 		moveDownMutation := AuthoringMutation{}
 		moveUpFormValues := map[string]string(nil)
 		moveDownFormValues := map[string]string(nil)
+		moveUpFormInputs := []map[string]string(nil)
+		moveDownFormInputs := []map[string]string(nil)
 		canMoveUp := component.CanReorder && index > 0
 		canMoveDown := component.CanReorder && index < len(components)-1
 		if canMoveUp {
 			moveUpMutation = AuthoringMutationForComponentReorder(page, component, index-1)
 			moveUpFormValues = moveUpMutation.FormValues()
+			moveUpFormInputs = AuthoringMutationFormInputViews(moveUpMutation)
 		}
 		if canMoveDown {
 			moveDownMutation = AuthoringMutationForComponentReorder(page, component, index+1)
 			moveDownFormValues = moveDownMutation.FormValues()
+			moveDownFormInputs = AuthoringMutationFormInputViews(moveDownMutation)
 		}
 		visibilityMutation := AuthoringMutation{}
 		visibilityFormValues := map[string]string(nil)
+		visibilityFormInputs := []map[string]string(nil)
 		visibilityActionLabel := ""
 		if component.CanToggleVisibility {
 			visibilityMutation = AuthoringMutationForComponentVisibility(page, component, !component.Visible)
 			visibilityFormValues = visibilityMutation.FormValues()
+			visibilityFormInputs = AuthoringMutationFormInputViews(visibilityMutation)
 			visibilityActionLabel = "Show"
 			if component.Visible {
 				visibilityActionLabel = "Hide"
@@ -216,15 +223,19 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 		}
 		deleteMutation := AuthoringMutation{}
 		deleteFormValues := map[string]string(nil)
+		deleteFormInputs := []map[string]string(nil)
 		if component.CanDelete {
 			deleteMutation = AuthoringMutationForComponentDelete(page, component)
 			deleteFormValues = deleteMutation.FormValues()
+			deleteFormInputs = AuthoringMutationFormInputViews(deleteMutation)
 		}
 		duplicateMutation := AuthoringMutation{}
 		duplicateFormValues := map[string]string(nil)
+		duplicateFormInputs := []map[string]string(nil)
 		if component.CanDuplicate {
 			duplicateMutation = AuthoringMutationForComponentDuplicate(page, component, index+1)
 			duplicateFormValues = duplicateMutation.FormValues()
+			duplicateFormInputs = AuthoringMutationFormInputViews(duplicateMutation)
 		}
 		out = append(out, map[string]any{
 			"key":                          component.Key,
@@ -254,12 +265,14 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 			"moveUpAuthoringPosition":      moveUpMutation.Position,
 			"moveUpMutation":               AuthoringMutationView(moveUpMutation),
 			"moveUpFormValues":             moveUpFormValues,
+			"moveUpFormInputs":             moveUpFormInputs,
 			"moveDownAuthoringOperation":   string(moveDownMutation.Kind),
 			"moveDownAuthoringPageKey":     moveDownMutation.PageKey,
 			"moveDownAuthoringComponent":   moveDownMutation.ComponentKey,
 			"moveDownAuthoringPosition":    moveDownMutation.Position,
 			"moveDownMutation":             AuthoringMutationView(moveDownMutation),
 			"moveDownFormValues":           moveDownFormValues,
+			"moveDownFormInputs":           moveDownFormInputs,
 			"visible":                      component.Visible,
 			"canToggleVisibility":          component.CanToggleVisibility,
 			"visibilityActionLabel":        visibilityActionLabel,
@@ -269,6 +282,7 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 			"visibilityAuthoringVisible":   visibilityMutation.Visible,
 			"visibilityMutation":           AuthoringMutationView(visibilityMutation),
 			"visibilityFormValues":         visibilityFormValues,
+			"visibilityFormInputs":         visibilityFormInputs,
 			"canDelete":                    component.CanDelete,
 			"deleteActionLabel":            "Delete",
 			"deleteAuthoringOperation":     string(deleteMutation.Kind),
@@ -276,6 +290,7 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 			"deleteAuthoringComponent":     deleteMutation.ComponentKey,
 			"deleteMutation":               AuthoringMutationView(deleteMutation),
 			"deleteFormValues":             deleteFormValues,
+			"deleteFormInputs":             deleteFormInputs,
 			"duplicateActionLabel":         "Duplicate",
 			"duplicateAuthoringOperation":  string(duplicateMutation.Kind),
 			"duplicateAuthoringPageKey":    duplicateMutation.PageKey,
@@ -284,6 +299,7 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 			"duplicateAuthoringPosition":   duplicateMutation.Position,
 			"duplicateMutation":            AuthoringMutationView(duplicateMutation),
 			"duplicateFormValues":          duplicateFormValues,
+			"duplicateFormInputs":          duplicateFormInputs,
 			"controls":                     authoringSiteMapControlViews(page, component, component.Controls),
 			"hasControls":                  component.ControlCount() > 0,
 			"controlLabel":                 countLabel(component.ControlCount(), "field", "fields"),
@@ -329,6 +345,7 @@ func authoringSiteMapReorderComponentView(pages []Page) map[string]any {
 				"authoringPosition":   mutation.Position,
 				"mutation":            AuthoringMutationView(mutation),
 				"formValues":          mutation.FormValues(),
+				"formInputs":          AuthoringMutationFormInputViews(mutation),
 			}
 		}
 	}
@@ -364,6 +381,7 @@ func authoringSiteMapDuplicateComponentView(pages []Page) map[string]any {
 				"authoringPosition":  mutation.Position,
 				"mutation":           AuthoringMutationView(mutation),
 				"formValues":         mutation.FormValues(),
+				"formInputs":         AuthoringMutationFormInputViews(mutation),
 			}
 		}
 	}
@@ -399,6 +417,7 @@ func authoringSiteMapVisibilityComponentView(pages []Page) map[string]any {
 				"authoringVisible":   mutation.Visible,
 				"mutation":           AuthoringMutationView(mutation),
 				"formValues":         mutation.FormValues(),
+				"formInputs":         AuthoringMutationFormInputViews(mutation),
 			}
 		}
 	}
@@ -430,6 +449,7 @@ func authoringSiteMapDeleteComponentView(pages []Page) map[string]any {
 				"authoringComponent": mutation.ComponentKey,
 				"mutation":           AuthoringMutationView(mutation),
 				"formValues":         mutation.FormValues(),
+				"formInputs":         AuthoringMutationFormInputViews(mutation),
 			}
 		}
 	}
@@ -454,6 +474,7 @@ func authoringSiteMapControlViews(page Page, component Component, controls []Con
 		view["authoringControlKind"] = string(mutation.ControlKind)
 		view["mutation"] = AuthoringMutationView(mutation)
 		view["formValues"] = mutation.FormValues()
+		view["formInputs"] = AuthoringMutationFormInputViews(mutation)
 		out = append(out, view)
 	}
 	return out

@@ -95,6 +95,10 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 	if metadataPage["authoringOperation"] != "update-page" || metadataForm[AuthoringFieldPageKey] != "home" {
 		t.Fatalf("unexpected metadata page authoring payload: %#v", metadataPage)
 	}
+	metadataInputs := metadataPage["formInputs"].([]map[string]string)
+	if len(metadataInputs) == 0 || metadataInputs[0]["name"] != AuthoringFieldOperation || metadataInputs[0]["value"] != "update-page" {
+		t.Fatalf("expected ordered metadata form inputs: %#v", metadataInputs)
+	}
 	hero := home["components"].([]map[string]any)[0]
 	if hero["selectionKey"] != "home.hero" || hero["sourceSummary"] != "Site-owned editable block" || hero["controlLabel"] != "1 field" {
 		t.Fatalf("unexpected hero view: %#v", hero)
@@ -111,25 +115,45 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 	if hero["canReorder"] != true || hero["canMoveUp"] != false || hero["canMoveDown"] != true || hero["positionLabel"] != "1" {
 		t.Fatalf("expected hero reorder authoring projection: %#v", hero)
 	}
+	moveDownInputs := hero["moveDownFormInputs"].([]map[string]string)
+	if !authoringFormInputsContain(moveDownInputs, AuthoringFieldPosition, "1") {
+		t.Fatalf("expected move-down form inputs: %#v", moveDownInputs)
+	}
 	reorderPage := view["reorderComponent"].(map[string]any)
 	reorderForm := reorderPage["formValues"].(map[string]string)
 	if view["hasReorderComponent"] != true || reorderPage["authoringOperation"] != "reorder-component" || reorderForm[AuthoringFieldPosition] != "1" {
 		t.Fatalf("unexpected reorder component payload: %#v", reorderPage)
+	}
+	reorderInputs := reorderPage["formInputs"].([]map[string]string)
+	if !authoringFormInputsContain(reorderInputs, AuthoringFieldPosition, "1") {
+		t.Fatalf("expected reorder component form inputs: %#v", reorderInputs)
 	}
 	visibilityPage := view["visibilityComponent"].(map[string]any)
 	visibilityForm := visibilityPage["formValues"].(map[string]string)
 	if view["hasVisibilityComponent"] != true || visibilityPage["authoringOperation"] != "toggle-visibility" || visibilityForm[AuthoringFieldVisible] != "false" {
 		t.Fatalf("unexpected visibility component payload: %#v", visibilityPage)
 	}
+	visibilityInputs := visibilityPage["formInputs"].([]map[string]string)
+	if !authoringFormInputsContain(visibilityInputs, AuthoringFieldVisible, "false") {
+		t.Fatalf("expected visibility component form inputs: %#v", visibilityInputs)
+	}
 	deletePage := view["deleteComponent"].(map[string]any)
 	deleteForm := deletePage["formValues"].(map[string]string)
 	if view["hasDeleteComponent"] != true || deletePage["authoringOperation"] != "delete-component" || deleteForm[AuthoringFieldComponentKey] != "hero" {
 		t.Fatalf("unexpected delete component payload: %#v", deletePage)
 	}
+	deleteInputs := deletePage["formInputs"].([]map[string]string)
+	if !authoringFormInputsContain(deleteInputs, AuthoringFieldComponentKey, "hero") {
+		t.Fatalf("expected delete component form inputs: %#v", deleteInputs)
+	}
 	duplicatePage := view["duplicateComponent"].(map[string]any)
 	duplicateForm := duplicatePage["formValues"].(map[string]string)
 	if view["hasDuplicateComponent"] != true || duplicatePage["authoringOperation"] != "duplicate-component" || duplicateForm[AuthoringFieldComponentTemplateKey] != "hero" || duplicateForm[AuthoringFieldPosition] != "1" {
 		t.Fatalf("unexpected duplicate component payload: %#v", duplicatePage)
+	}
+	duplicateInputs := duplicatePage["formInputs"].([]map[string]string)
+	if !authoringFormInputsContain(duplicateInputs, AuthoringFieldComponentTemplateKey, "hero") {
+		t.Fatalf("expected duplicate component form inputs: %#v", duplicateInputs)
 	}
 	headline := hero["controls"].([]map[string]any)[0]
 	if headline["authoringOperation"] != "save-control" || headline["authoringBinding"] != "pages.home.hero.headline" || headline["value"] != "Forest days" {
@@ -138,6 +162,10 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 	form := headline["formValues"].(map[string]string)
 	if form[AuthoringFieldOperation] != "save-control" || form[AuthoringFieldPageKey] != "home" || form[AuthoringFieldComponentKey] != "hero" {
 		t.Fatalf("unexpected control form payload: %#v", form)
+	}
+	controlInputs := headline["formInputs"].([]map[string]string)
+	if !authoringFormInputsContain(controlInputs, AuthoringFieldBinding, "pages.home.hero.headline") {
+		t.Fatalf("expected control form inputs: %#v", controlInputs)
 	}
 	blueprints := view["blueprints"].([]map[string]any)
 	if blueprints[0]["inputName"] != "studioPageBlueprintIntent" || blueprints[0]["inputID"] != "studioSiteMapBlueprint-landing" {

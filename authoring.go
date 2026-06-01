@@ -268,6 +268,7 @@ func authoringControlViews(page Page, component Component, controls []Control) [
 			mutation := AuthoringMutationForControl(page, component, control)
 			view["mutation"] = AuthoringMutationView(mutation)
 			view["formValues"] = mutation.FormValues()
+			view["formInputs"] = AuthoringMutationFormInputViews(mutation)
 		}
 		out = append(out, view)
 	}
@@ -363,6 +364,7 @@ func authoringIntentViews(intents []CompositionIntent) []map[string]any {
 			"steps":                authoringStepViews(intent.Steps),
 			"mutation":             AuthoringMutationView(mutation),
 			"formValues":           mutation.FormValues(),
+			"formInputs":           AuthoringMutationFormInputViews(mutation),
 		})
 	}
 	return out

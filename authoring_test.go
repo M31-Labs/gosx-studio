@@ -131,6 +131,10 @@ func TestAuthoringSurfaceViewProjectsNoCodePlatformModel(t *testing.T) {
 	if controlForm[AuthoringFieldOperation] != "save-control" || controlForm[AuthoringFieldControlKey] != "submit-label" || controlForm[AuthoringFieldComponentKey] != "form" {
 		t.Fatalf("control mutation form = %#v", controlForm)
 	}
+	controlInputs := controls[0]["formInputs"].([]map[string]string)
+	if !authoringFormInputsContain(controlInputs, AuthoringFieldControlKey, "submit-label") {
+		t.Fatalf("control mutation inputs = %#v", controlInputs)
+	}
 	library := view["library"].(map[string]any)
 	if library["templateCount"] != 1 {
 		t.Fatalf("library view = %#v", library)
@@ -146,6 +150,10 @@ func TestAuthoringSurfaceViewProjectsNoCodePlatformModel(t *testing.T) {
 	intentForm := intents[0]["formValues"].(map[string]string)
 	if intentForm[AuthoringFieldOperation] != "apply-intent" || intentForm[AuthoringFieldComponentTemplateKey] != "faq" || intentForm[AuthoringFieldPageKey] != "contact" {
 		t.Fatalf("intent mutation form = %#v", intentForm)
+	}
+	intentInputs := intents[0]["formInputs"].([]map[string]string)
+	if !authoringFormInputsContain(intentInputs, AuthoringFieldComponentTemplateKey, "faq") {
+		t.Fatalf("intent mutation inputs = %#v", intentInputs)
 	}
 	workspace := view["workspace"].(map[string]any)
 	if workspace["nodeCount"] != 3 || workspace["linkCount"] != 2 {
