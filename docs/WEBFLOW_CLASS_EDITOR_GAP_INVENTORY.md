@@ -789,14 +789,18 @@ These are the current places to mine for reusable Studio behavior.
   only client-specific panel slots and action forms in `.gsx`; shared shell
   semantics and native form/autosave/CSRF/state attributes come from
   `gosx-studio`.
+- 2026-06-01: Flipped Pajaritos' server-composed editor workbench onto
+  `RenderWorkbenchFrame` while preserving its CMS sections, family-form editor,
+  lifecycle controls, environment readiness, restore points, and inline runtime
+  nodes. Both reference apps now consume Studio-owned frame semantics for their
+  primary editor shells.
 
 ## Next Execution Slice
 
 The next practical slice is the next shell/render extraction:
 
-- Use the same `RenderWorkbenchFrame` path in Pajaritos so both reference apps
-  consume Studio-owned shell structure, then collapse the remaining
-  `gosx-cms/studio` workbench wrapper duplication.
+- Collapse the remaining `gosx-cms/studio` workbench wrapper duplication now
+  that both reference apps consume Studio-owned frame semantics.
 - Extend `authoringruntime` host-backed smoke coverage to assert
   changed-object selection and preview refresh after those persisted actions.
 - Keep broadening visual/accessibility/performance checks as inspector, media,
