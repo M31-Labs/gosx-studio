@@ -300,6 +300,13 @@
     return key === "ArrowUp" || key === "ArrowDown" || key === "ArrowLeft" || key === "ArrowRight";
   }
 
+  // True when focus is on an interactive control (button/link/editable). Node
+  // navigation and activate apply to the board/canvas surface only — they must
+  // never hijack a focused control's native keyboard activation (Enter/Space).
+  function isInteractiveControl(target) {
+    return !!closest(target, "button, a, [role='button'], [contenteditable=''], [contenteditable='true']");
+  }
+
   function handleKeydown(root, event) {
     var target = event.target;
     if (target && target.matches && target.matches("input, textarea, select")) return;
@@ -313,9 +320,11 @@
       event.preventDefault();
       zoomAction(root, "reset");
     } else if (isArrowKey(event.key)) {
+      if (isInteractiveControl(target)) return;
       event.preventDefault();
       navigateNodes(root, event.key);
     } else if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+      if (isInteractiveControl(target)) return;
       var selected = state(root).selectedNode;
       if (!selected) return;
       event.preventDefault();

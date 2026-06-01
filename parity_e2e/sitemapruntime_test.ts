@@ -534,3 +534,46 @@ test.describe("@smoke GoSXStudioSiteMapRuntime infinite-canvas keyboard navigati
     expect(key).toBe("down");
   });
 });
+
+test.describe("@smoke GoSXStudioSiteMapRuntime keyboard activation respects focused controls", () => {
+  test("Enter on a focused control activates it natively, not site-map-activate", async ({ page }) => {
+    await page.setContent(`
+      <section
+        data-studio-site-map-board="true"
+        tabindex="0"
+        data-studio-site-map-detail="map"
+        data-studio-site-map-palette="all"
+        data-studio-site-map-selected-node="alpha"
+      >
+        <button type="button" data-studio-site-map-detail-target="build" aria-pressed="false">Add</button>
+        <div data-studio-site-map-workspace="true" data-studio-site-map-panel-visible="true">
+          <div data-studio-site-map-canvas="true" style="position:relative;width:400px;height:300px;">
+            <div data-studio-site-map-pan-surface="true">
+              <label data-studio-site-map-workspace-node="alpha" data-studio-site-map-group="site" data-studio-site-map-node-label="Alpha">Alpha</label>
+            </div>
+          </div>
+        </div>
+        <div data-studio-site-map-builder="true" data-studio-site-map-panel-visible="false"></div>
+      </section>
+    `);
+    await page.addScriptTag({ content: runtimeJS });
+
+    await page.evaluate(() => {
+      window.__activated = false;
+      document.addEventListener("gosxstudio:site-map-activate", () => { window.__activated = true; });
+    });
+
+    const board = page.locator("[data-studio-site-map-board='true']");
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-node", "alpha");
+
+    // A node is selected, but focus is on the Add (build) control. The runtime
+    // must NOT hijack Enter on a focused interactive control: the button's
+    // native activation (click -> detail=build) must win and no site-map
+    // activate event should fire. (Regression: b597deb blocked the click.)
+    await page.locator("[data-studio-site-map-detail-target='build']").focus();
+    await page.keyboard.press("Enter");
+
+    await expect(board).toHaveAttribute("data-studio-site-map-detail", "build");
+    expect(await page.evaluate(() => window.__activated)).toBe(false);
+  });
+});
