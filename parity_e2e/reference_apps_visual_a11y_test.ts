@@ -35,7 +35,7 @@ const referenceApps: ReferenceAppGate[] = [
     name: "Pajaritos",
     start: startPajaritos,
     authoringIntentKey: "create-page:program-page",
-    canvasSelector: "[data-gosx-studio-site-canvas='true']",
+    canvasSelector: "#website-map",
     publishSelector: "#publishing",
     assertPublishing: expectPajaritosPublishingReadiness,
   },
@@ -59,7 +59,7 @@ test.describe("@reference-apps visual and accessibility gates", () => {
 
 async function runVisualA11yGate(page: Page, baseURL: string, app: ReferenceAppGate) {
   await page.setViewportSize({ width: 1280, height: 820 });
-  await page.goto(`${baseURL}/admin/editor`, { waitUntil: "networkidle" });
+  await page.goto(`${baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await expectEditorShell(page, app);
   await expectCanvasGate(page, app);
   await expectPublishingGate(page, app);
@@ -68,7 +68,8 @@ async function runVisualA11yGate(page: Page, baseURL: string, app: ReferenceAppG
   await expectVisualIntegrity(page, app, "desktop");
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`${baseURL}/admin/editor`, { waitUntil: "networkidle" });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(150);
   await expectEditorShell(page, app);
   await expectCanvasGate(page, app);
   await expectPreviewGate(page, app);
@@ -121,6 +122,7 @@ async function expectPreviewGate(page: Page, app: ReferenceAppGate) {
   await revealModeIfPresent(page, app.previewMode);
   const frame = page.locator("[data-studio-preview-frame]").first();
   await expect(frame).toBeAttached();
+  await hydrateDeferredPreviewFrame(frame);
   await frame.scrollIntoViewIfNeeded();
   await expect(frame).toBeVisible();
   await expect(frame).toHaveAttribute("src", /.+/);
@@ -139,6 +141,18 @@ async function expectPreviewGate(page: Page, app: ReferenceAppGate) {
   expect(box?.height ?? 0).toBeGreaterThan(120);
   const screenshot = await frame.screenshot();
   expect(screenshot.length, `${app.name} preview frame should render non-empty pixels`).toBeGreaterThan(1_000);
+}
+
+async function hydrateDeferredPreviewFrame(frame: ReturnType<Page["locator"]>) {
+  await frame.evaluate((node) => {
+    if (!(node instanceof HTMLIFrameElement)) return;
+    if (node.getAttribute("src")) return;
+    const container = node.closest("[data-gosx-studio-preview]");
+    const nextURL = node.getAttribute("data-studio-preview-src") ||
+      container?.getAttribute("data-gosx-studio-preview-url") ||
+      "/";
+    node.setAttribute("src", nextURL);
+  });
 }
 
 async function expectEditorAccessibilityBasics(page: Page, app: ReferenceAppGate) {

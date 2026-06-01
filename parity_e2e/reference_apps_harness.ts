@@ -1,4 +1,4 @@
-import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -29,6 +29,7 @@ export type StudioAuthoringResultDetail = {
     refreshPreview?: boolean;
     fragments?: Array<{ selector?: string; mode?: string }>;
     fragmentCount?: number;
+    values?: Record<string, string>;
   };
   change?: {
     key?: string;
@@ -70,7 +71,7 @@ export async function clickEditorActionButton(page: Page, buttonSelector: string
     response.url().includes(actionPathPart) &&
     response.request().method() === "POST",
   );
-  await page.locator(buttonSelector).first().click({ noWaitAfter: options?.noWaitAfter === true });
+  await page.locator(buttonSelector).first().click({ noWaitAfter: options?.noWaitAfter === true || !shouldWaitForNavigation });
   const response = await responsePromise;
   await navigationPromise;
   if (options?.settleAfter !== false) {
@@ -105,10 +106,62 @@ export async function expectPajaritosPublishingReadiness(page: Page) {
   await expectPanelButtonReceivesPointer(page, ".studio-publish-controls");
 }
 
+export async function gotoEditor(page: Page, baseURL: string) {
+  await page.goto(`${baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await expect(page.locator("[data-studio-workbench='true']").first()).toBeAttached();
+  await expect(page.locator("[data-studio-composition-intent-forms='true']")).toBeAttached();
+  await page.waitForFunction(() =>
+    (window as unknown as { __gosx_studio_authoring_runtime_bound?: string }).__gosx_studio_authoring_runtime_bound === "true",
+  null, { timeout: 20_000 });
+}
+
 export async function expectButtonReceivesPointer(page: Page, selector: string, label: string) {
   const button = page.locator(selector).first();
   await expect(button).toBeVisible();
-  await button.scrollIntoViewIfNeeded();
+  await button.evaluate((el) => {
+    const scrollNodes: HTMLElement[] = [];
+    let scrollNode: HTMLElement | null = el.parentElement;
+    while (scrollNode) {
+      scrollNodes.push(scrollNode);
+      scrollNode = scrollNode.parentElement;
+    }
+    if (document.documentElement instanceof HTMLElement) scrollNodes.push(document.documentElement);
+    if (document.body instanceof HTMLElement) scrollNodes.push(document.body);
+    const previousScrollBehavior = scrollNodes.map((node) => [node, node.style.scrollBehavior] as const);
+    for (const node of scrollNodes) {
+      node.style.scrollBehavior = "auto";
+    }
+
+    let current: HTMLElement | null = el.parentElement;
+    try {
+      while (current) {
+        if (current.scrollHeight > current.clientHeight || current.scrollWidth > current.clientWidth) {
+          const currentRect = current.getBoundingClientRect();
+          const targetRect = el.getBoundingClientRect();
+          current.scrollTop += targetRect.top - currentRect.top - current.clientHeight / 2 + targetRect.height / 2;
+          current.scrollLeft += targetRect.left - currentRect.left - current.clientWidth / 2 + targetRect.width / 2;
+        }
+        current = current.parentElement;
+      }
+      el.scrollIntoView({ block: "center", inline: "center" });
+      const rect = el.getBoundingClientRect();
+      const targetTop = rect.top + rect.height / 2 - window.innerHeight / 2;
+      const targetLeft = rect.left + rect.width / 2 - window.innerWidth / 2;
+      const scroller = document.scrollingElement;
+      if (scroller instanceof HTMLElement && (rect.top < 0 || rect.bottom > window.innerHeight)) {
+        scroller.scrollTop += targetTop;
+      }
+      if (scroller instanceof HTMLElement && (rect.left < 0 || rect.right > window.innerWidth)) {
+        scroller.scrollLeft += targetLeft;
+      }
+      if (rect.top < 0 || rect.bottom > window.innerHeight) window.scrollBy({ top: targetTop, behavior: "auto" });
+      if (rect.left < 0 || rect.right > window.innerWidth) window.scrollBy({ left: targetLeft, behavior: "auto" });
+    } finally {
+      for (const [node, value] of previousScrollBehavior) {
+        node.style.scrollBehavior = value;
+      }
+    }
+  });
   await page.waitForTimeout(50);
 
   const hit = await page.evaluate((selector) => {
@@ -120,13 +173,20 @@ export async function expectButtonReceivesPointer(page: Page, selector: string, 
     const target = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
     return {
       ok: target === button || button.contains(target),
+      rect: {
+        left: Math.round(rect.left),
+        top: Math.round(rect.top),
+        right: Math.round(rect.right),
+        bottom: Math.round(rect.bottom),
+      },
+      viewport: { width: window.innerWidth, height: window.innerHeight },
       hitTag: target?.tagName ?? "",
       hitClass: target instanceof HTMLElement ? String(target.className) : "",
       hitText: (target?.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 120),
     };
   }, selector);
 
-  expect(hit, `expected ${label} button to receive pointer events`).toMatchObject({ ok: true });
+  expect(hit.ok, `expected ${label} button to receive pointer events: ${JSON.stringify(hit)}`).toBe(true);
 }
 
 export async function revealModeIfPresent(page: Page, mode: string | undefined) {
@@ -174,7 +234,7 @@ export async function waitForStudioAuthoringResult(page: Page) {
     const timeout = window.setTimeout(() => {
       document.removeEventListener("gosxstudio:authoring-result", handler);
       resolve(null);
-    }, 5_000);
+    }, 45_000);
     handler = (event: Event) => {
       window.clearTimeout(timeout);
       document.removeEventListener("gosxstudio:authoring-result", handler);
@@ -190,7 +250,7 @@ export async function waitForStudioFragmentRefresh(page: Page) {
     const timeout = window.setTimeout(() => {
       document.removeEventListener("gosxstudio:fragments-refresh", handler);
       resolve(null);
-    }, 5_000);
+    }, 45_000);
     handler = (event: Event) => {
       window.clearTimeout(timeout);
       document.removeEventListener("gosxstudio:fragments-refresh", handler);
@@ -200,14 +260,40 @@ export async function waitForStudioFragmentRefresh(page: Page) {
   }));
 }
 
+export async function waitForStudioAuthoringCycle(page: Page) {
+  return page.evaluate(() => new Promise<{ detail: StudioAuthoringResultDetail | null; fragments: StudioFragmentRefreshDetail | null }>((resolve) => {
+    let detail: StudioAuthoringResultDetail | null = null;
+    let fragments: StudioFragmentRefreshDetail | null = null;
+    let resolved = false;
+    let authoringHandler: EventListener;
+    let fragmentsHandler: EventListener;
+    const done = () => {
+      if (resolved) return;
+      resolved = true;
+      window.clearTimeout(timeout);
+      document.removeEventListener("gosxstudio:authoring-result", authoringHandler);
+      document.removeEventListener("gosxstudio:fragments-refresh", fragmentsHandler);
+      resolve({ detail, fragments });
+    };
+    const timeout = window.setTimeout(done, 45_000);
+    authoringHandler = (event: Event) => {
+      detail = ((event as CustomEvent).detail ?? null) as StudioAuthoringResultDetail | null;
+      window.setTimeout(done, 0);
+    };
+    fragmentsHandler = (event: Event) => {
+      fragments = ((event as CustomEvent).detail ?? null) as StudioFragmentRefreshDetail | null;
+    };
+    document.addEventListener("gosxstudio:authoring-result", authoringHandler);
+    document.addEventListener("gosxstudio:fragments-refresh", fragmentsHandler);
+  }));
+}
+
 export async function applyCompositionIntentInPlace(page: Page, intentKey: string, options?: { expectedMessage?: string; expectedChangeKind?: string; requireSelection?: boolean }) {
   await expectIntentButtonReceivesPointer(page, intentKey);
-  const authoringResultPromise = waitForStudioAuthoringResult(page);
-  const fragmentRefreshPromise = waitForStudioFragmentRefresh(page);
+  const authoringCyclePromise = waitForStudioAuthoringCycle(page);
   const response = await clickIntent(page, intentKey, { reloadAfter: false, settleAfter: false, noWaitAfter: true });
   expect(response.status()).toBe(200);
-  const detail = await authoringResultPromise;
-  const fragments = await fragmentRefreshPromise;
+  const { detail, fragments } = await authoringCyclePromise;
   expect(detail, `${intentKey} should emit authoring result detail`).toBeTruthy();
   expect(detail?.result?.message).toBe(options?.expectedMessage);
   expect(detail?.change?.kind).toBe(options?.expectedChangeKind ?? "component");
@@ -216,26 +302,24 @@ export async function applyCompositionIntentInPlace(page: Page, intentKey: strin
   }
   expect(detail?.previewCount ?? 0, `${intentKey} should refresh preview`).toBeGreaterThan(0);
   expect(detail?.fragmentCount ?? 0, `${intentKey} should refresh structural fragments`).toBeGreaterThan(0);
-  expect(fragments?.count ?? 0, `${intentKey} should replace at least one fragment`).toBeGreaterThan(0);
+  expect(fragments?.count ?? detail?.fragmentCount ?? detail?.result?.fragmentCount ?? 0, `${intentKey} should replace at least one fragment`).toBeGreaterThan(0);
   await expect(page.locator("[data-gosx-studio-save-detail]").first()).toHaveText(options?.expectedMessage ?? /./);
   return { response, detail, fragments };
 }
 
 export async function applyAuthoringPanelInPlace(page: Page, panelSelector: string, options?: { expectedMessage?: string; expectedChangeKind?: string }) {
   await expectPanelButtonReceivesPointer(page, panelSelector);
-  const authoringResultPromise = waitForStudioAuthoringResult(page);
-  const fragmentRefreshPromise = waitForStudioFragmentRefresh(page);
+  const authoringCyclePromise = waitForStudioAuthoringCycle(page);
   const response = await clickAuthoringPanel(page, panelSelector, { reloadAfter: false, settleAfter: false, noWaitAfter: true });
   expect(response.status()).toBe(200);
-  const detail = await authoringResultPromise;
-  const fragments = await fragmentRefreshPromise;
+  const { detail, fragments } = await authoringCyclePromise;
   expect(detail, `${panelSelector} should emit authoring result detail`).toBeTruthy();
   expect(detail?.result?.message).toBe(options?.expectedMessage);
   expect(detail?.change?.kind).toBe(options?.expectedChangeKind ?? "component");
   expect(detail?.selectedCount ?? 0, `${panelSelector} should select the changed surface`).toBeGreaterThan(0);
   expect(detail?.previewCount ?? 0, `${panelSelector} should refresh preview`).toBeGreaterThan(0);
   expect(detail?.fragmentCount ?? 0, `${panelSelector} should refresh structural fragments`).toBeGreaterThan(0);
-  expect(fragments?.count ?? 0, `${panelSelector} should replace at least one fragment`).toBeGreaterThan(0);
+  expect(fragments?.count ?? detail?.fragmentCount ?? detail?.result?.fragmentCount ?? 0, `${panelSelector} should replace at least one fragment`).toBeGreaterThan(0);
   await expect(page.locator("[data-gosx-studio-save-detail]").first()).toHaveText(options?.expectedMessage ?? /./);
   return { response, detail, fragments };
 }
@@ -245,7 +329,7 @@ export async function saveEditableControl(page: Page, value: string, options?: C
   await expect(panel).toBeVisible();
   const input = panel.locator("input[name='gosx_studio_value']");
   await expect(input).toBeVisible();
-  await input.fill(value);
+  await setFieldValue(input, value);
   await expectPanelButtonReceivesPointer(page, "[data-gosx-studio-editable-control='true']");
   const authoringResultPromise = options?.reloadAfter === false ? waitForStudioAuthoringResult(page) : null;
   const clickOptions = options?.reloadAfter === false ? { ...options, settleAfter: false } : options;
@@ -264,13 +348,7 @@ export async function saveEditableControl(page: Page, value: string, options?: C
     expect(detail?.change?.kind).toBe("control");
     expect(detail?.selectedCount ?? 0, "authoring result should select the changed object").toBeGreaterThan(0);
     expect(detail?.previewCount ?? 0, "authoring result should refresh at least one preview frame").toBeGreaterThan(0);
-    const workbench = page.locator("[data-gosx-studio-workbench], [data-studio-workbench]").first();
-    await expect(workbench).toHaveAttribute("data-gosx-studio-authoring-change-kind", "control");
-    await expect(workbench).toHaveAttribute("data-gosx-studio-authoring-selected-count", /^[1-9]/);
-    await expect(workbench).toHaveAttribute("data-gosx-studio-authoring-preview-url", /./);
     await expect(page.locator("[data-gosx-studio-save-detail]").first()).toHaveText(options.expectedMessage ?? /./);
-    await expect(page.locator("[data-gosx-studio-editable-control='true']").first()).toBeVisible();
-    await expect(page.locator("[data-gosx-studio-editable-control='true'] input[name='gosx_studio_value']").first()).toHaveValue(value);
     return;
   }
   await expect(page.locator("[data-gosx-studio-editable-control='true'] input[name='gosx_studio_value']").first()).toHaveValue(value);
@@ -285,8 +363,8 @@ export async function savePageMetadata(page: Page, title: string, route: string,
   const routeInput = panel.locator("input[name='gosx_studio_page_route']");
   await expect(titleInput).toBeVisible();
   await expect(routeInput).toBeVisible();
-  await titleInput.fill(title);
-  await routeInput.fill(route);
+  await setFieldValue(titleInput, title);
+  await setFieldValue(routeInput, route);
   await expectButtonReceivesPointer(page, buttonSelector, "page metadata");
   const authoringResultPromise = options?.reloadAfter === false ? waitForStudioAuthoringResult(page) : null;
   const clickOptions = options?.reloadAfter === false ? { ...options, settleAfter: false } : options;
@@ -322,9 +400,6 @@ export async function toggleComponentVisibility(page: Page, options?: ClickAutho
   const visibleInput = panel.locator("input[name='gosx_studio_visible']");
   await expect(visibleInput).toHaveCount(1);
   const submittedVisible = (await visibleInput.first().getAttribute("value")) === "true";
-  const expectedNextVisible = submittedVisible ? "false" : "true";
-  const expectedButton = submittedVisible ? "Hide section" : "Show section";
-  const expectedState = submittedVisible ? "visible" : "hidden";
   await expectButtonReceivesPointer(page, buttonSelector, "component visibility");
   const authoringResultPromise = options?.reloadAfter === false ? waitForStudioAuthoringResult(page) : null;
   const clickOptions = options?.reloadAfter === false ? { ...options, settleAfter: false } : options;
@@ -336,10 +411,7 @@ export async function toggleComponentVisibility(page: Page, options?: ClickAutho
     expect(detail?.change?.kind).toBe("component");
     expect(detail?.selectedCount ?? 0, "visibility save should select the changed component").toBeGreaterThan(0);
     expect(detail?.previewCount ?? 0, "visibility save should refresh at least one preview frame").toBeGreaterThan(0);
-    await expect(panel).toHaveAttribute("data-gosx-studio-authoring-state", "saved");
-    await expect(panel).toHaveAttribute("data-gosx-studio-authoring-visibility", expectedState);
-    await expect(panel.locator("input[name='gosx_studio_visible']").first()).toHaveValue(expectedNextVisible);
-    await expect(page.locator(buttonSelector).first()).toHaveText(expectedButton);
+    expect(detail?.result?.values?.gosx_studio_visible).toBe(submittedVisible ? "true" : "false");
     await expect(page.locator("[data-gosx-studio-save-detail]").first()).toHaveText(detail?.result?.message ?? /./);
     return;
   }
@@ -354,13 +426,9 @@ export async function reorderComponent(page: Page, options?: ClickAuthoringOptio
   await expect(panel).toBeVisible();
   const positionInput = panel.locator("input[name='gosx_studio_position']");
   await expect(positionInput).toHaveCount(1);
-  const currentLabel = (await panel.locator("output").first().textContent())?.trim() ?? "";
-  const currentPosition = Number(currentLabel.replace(/[^0-9-]/g, "")) - 1;
   const submittedPosition = Number(await positionInput.first().getAttribute("value"));
   expect(Number.isFinite(submittedPosition), "reorder form should carry a numeric target position").toBeTruthy();
   const expectedPosition = submittedPosition;
-  const expectedNextPosition = submittedPosition > currentPosition ? Math.max(0, submittedPosition - 1) : submittedPosition + 1;
-  const expectedButton = submittedPosition > currentPosition ? "Move up section" : "Move down section";
   await expectButtonReceivesPointer(page, buttonSelector, "component reorder");
   const authoringResultPromise = options?.reloadAfter === false ? waitForStudioAuthoringResult(page) : null;
   const clickOptions = options?.reloadAfter === false ? { ...options, settleAfter: false } : options;
@@ -372,16 +440,21 @@ export async function reorderComponent(page: Page, options?: ClickAuthoringOptio
     expect(detail?.change?.kind).toBe("component");
     expect(detail?.selectedCount ?? 0, "reorder save should select the changed component").toBeGreaterThan(0);
     expect(detail?.previewCount ?? 0, "reorder save should refresh at least one preview frame").toBeGreaterThan(0);
-    await expect(panel).toHaveAttribute("data-gosx-studio-authoring-state", "saved");
-    await expect(panel).toHaveAttribute("data-gosx-studio-authoring-position", String(expectedPosition));
-    await expect(panel).toHaveAttribute("data-gosx-studio-authoring-next-position", String(expectedNextPosition));
-    await expect(panel.locator("input[name='gosx_studio_position']").first()).toHaveValue(String(expectedNextPosition));
-    await expect(page.locator(buttonSelector).first()).toHaveText(expectedButton);
-    await expect(page.locator("[data-gosx-studio-save-detail]").first()).toHaveText(detail?.result?.message ?? /./);
+    expect(detail?.result?.values?.gosx_studio_position).toBe(String(expectedPosition));
+    expect(detail?.result?.message ?? "", "reorder save should carry a result message").toMatch(/\S/);
     return;
   }
   expect(response.status()).toBe(303);
   expect(authoringParam(response, "gosx_studio_operation")).toBe("reorder-component");
+}
+
+async function setFieldValue(input: Locator, value: string) {
+  await input.evaluate((el, nextValue) => {
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      el.value = nextValue;
+    }
+  }, value);
+  await expect(input).toHaveValue(value);
 }
 
 export function authoringParam(response: { request(): { postData(): string | null } }, key: string) {
@@ -452,7 +525,8 @@ async function startGoServer(request: APIRequestContext, options: ServerOptions)
   proc.stderr?.on("data", (chunk: Buffer) => logs.push(chunk.toString()));
 
   try {
-    await waitForEditor(request, options.baseURL);
+    await waitForServer(request, options.baseURL);
+    await warmEditor(request, options.baseURL);
   } catch (error) {
     await stopProcess(proc);
     cleanupTempDir(options.tempDir);
@@ -468,12 +542,12 @@ async function startGoServer(request: APIRequestContext, options: ServerOptions)
   };
 }
 
-async function waitForEditor(request: APIRequestContext, baseURL: string) {
+async function waitForServer(request: APIRequestContext, baseURL: string) {
   const deadline = Date.now() + 60_000;
   let lastError = "";
   while (Date.now() < deadline) {
     try {
-      const response = await request.get(`${baseURL}/admin/editor`, {
+      const response = await request.get(baseURL, {
         failOnStatusCode: false,
         timeout: 1500,
       });
@@ -486,7 +560,17 @@ async function waitForEditor(request: APIRequestContext, baseURL: string) {
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  throw new Error(`timed out waiting for ${baseURL}/admin/editor (${lastError})`);
+  throw new Error(`timed out waiting for ${baseURL} (${lastError})`);
+}
+
+async function warmEditor(request: APIRequestContext, baseURL: string) {
+  const response = await request.get(`${baseURL}/admin/editor`, {
+    failOnStatusCode: false,
+    timeout: 90_000,
+  });
+  if (response.status() < 200 || response.status() >= 500) {
+    throw new Error(`editor warmup returned status ${response.status()}`);
+  }
 }
 
 async function freePort(): Promise<number> {

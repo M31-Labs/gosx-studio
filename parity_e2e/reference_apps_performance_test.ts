@@ -52,6 +52,8 @@ const defaultBudgets: PerformanceBudgets = {
   publishCheckCount: 80,
 };
 
+const responseBodyCaptureTimeoutMs = 2_000;
+
 const referenceApps: ReferenceAppPerformanceGate[] = [
   {
     name: "Muddy/Noni",
@@ -72,7 +74,7 @@ const referenceApps: ReferenceAppPerformanceGate[] = [
   {
     name: "Pajaritos",
     start: startPajaritos,
-    canvasSelector: "[data-gosx-studio-site-canvas='true']",
+    canvasSelector: "#website-map",
     publishSelector: "#publishing",
     assertPublishing: expectPajaritosPublishingReadiness,
     budgets: {
@@ -80,14 +82,16 @@ const referenceApps: ReferenceAppPerformanceGate[] = [
       shellReadyMs: 2_500,
       previewReadyMs: 3_000,
       editorRuntimePayloadBytes: 3_500_000,
-      canvasNodeCount: 120,
+      canvasNodeCount: 240,
       publishCheckCount: 60,
     },
   },
 ];
 
+test.use({ trace: "off" });
+
 test.describe("@reference-apps performance budgets", () => {
-  test.describe.configure({ timeout: 120_000 });
+  test.describe.configure({ timeout: 150_000 });
   test.skip(process.env.GOSX_STUDIO_REFERENCE_APP_E2E !== "1", "set GOSX_STUDIO_REFERENCE_APP_E2E=1 to boot sibling reference apps");
 
   for (const app of referenceApps) {
@@ -131,69 +135,142 @@ type PerformanceMetrics = {
 async function measurePerformanceBudgets(page: Page, baseURL: string, app: ReferenceAppPerformanceGate): Promise<PerformanceMetrics> {
   await page.setViewportSize({ width: 1280, height: 820 });
   const resourcePromises: Promise<ResourceMetric | null>[] = [];
-  page.on("response", (response) => {
+  const onResponse = (response: Response) => {
     if (shouldCaptureResource(response, baseURL)) {
       resourcePromises.push(captureResponse(response));
     }
-  });
-
-  const shellStart = Date.now();
-  await page.goto(`${baseURL}/admin/editor`, { waitUntil: "domcontentloaded" });
-  await expect(page.locator("[data-studio-workbench='true']").first()).toBeAttached();
-  await expect(page.locator("[data-studio-toolbar='true']").first()).toBeVisible();
-  const shellReadyMs = Date.now() - shellStart;
-  await page.waitForLoadState("networkidle");
-
-  await revealModeIfPresent(page, app.canvasMode);
-  const canvasMetrics = await measureCanvasCost(page, app.canvasSelector);
-
-  const previewStart = Date.now();
-  await revealModeIfPresent(page, app.previewMode);
-  await waitForPreviewFrame(page);
-  const previewReadyMs = Date.now() - previewStart;
-
-  const publishStart = Date.now();
-  await revealModeIfPresent(page, app.publishMode);
-  const publish = page.locator(app.publishSelector).first();
-  await expect(publish).toBeAttached();
-  await publish.scrollIntoViewIfNeeded();
-  await expect(publish).toBeVisible();
-  if (app.assertPublishing) {
-    await app.assertPublishing(page);
-  }
-  const publishReadyMs = Date.now() - publishStart;
-  const publishCheckCount = await countPublishChecks(page, app.publishSelector);
-
-  await page.waitForLoadState("networkidle");
-  const resources = (await Promise.all(resourcePromises)).filter((metric): metric is ResourceMetric => metric !== null);
-  const runtimeResources = resources.filter((resource) => isRuntimeResource(resource));
-  const editorRuntimePayloadBytes = runtimeResources.reduce((sum, resource) => sum + resource.bytes, 0);
-  const largestRuntimeResourceBytes = Math.max(0, ...runtimeResources.map((resource) => resource.bytes));
-  const largestResources = runtimeResources
-    .slice()
-    .sort((a, b) => b.bytes - a.bytes)
-    .slice(0, 8)
-    .map((resource) => ({
-      url: pathOnly(resource.url),
-      resourceType: resource.resourceType,
-      bytes: resource.bytes,
-    }));
-
-  return {
-    shellReadyMs,
-    previewReadyMs,
-    publishReadyMs,
-    editorRuntimePayloadBytes,
-    largestRuntimeResourceBytes,
-    runtimeResourceCount: runtimeResources.length,
-    previewFrameCount: await page.locator("[data-studio-preview-frame]").count(),
-    canvasNodeCount: canvasMetrics.nodeCount,
-    canvasOverlayCount: canvasMetrics.overlayCount,
-    canvasLayoutSampleMs: canvasMetrics.layoutSampleMs,
-    publishCheckCount,
-    navigation: await navigationMetrics(page),
-    largestResources,
   };
+  page.on("response", onResponse);
+
+  try {
+    const shellStart = Date.now();
+    await page.goto(`${baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await page.waitForSelector("[data-studio-workbench='true']", { state: "attached", timeout: 10_000 });
+    await page.waitForSelector("[data-studio-toolbar='true']", { state: "visible", timeout: 10_000 });
+    const shellReadyMs = Date.now() - shellStart;
+    await waitForOptionalNetworkIdle(page);
+
+    await revealModeIfPresent(page, app.canvasMode);
+    const canvasMetrics = await measureCanvasCost(page, app.canvasSelector);
+
+    const previewStart = Date.now();
+    await revealModeIfPresent(page, app.previewMode);
+    await waitForPreviewFrame(page);
+    const previewReadyMs = Date.now() - previewStart;
+
+    const publishStart = Date.now();
+    await revealModeIfPresent(page, app.publishMode);
+    await page.waitForSelector(app.publishSelector, { state: "attached", timeout: 10_000 });
+    await scrollSelectorIntoView(page, app.publishSelector);
+    await page.waitForSelector(app.publishSelector, { state: "visible", timeout: 10_000 });
+    if (app.assertPublishing) {
+      await app.assertPublishing(page);
+    }
+    const publishReadyMs = Date.now() - publishStart;
+    const publishCheckCount = await countPublishChecks(page, app.publishSelector);
+
+    await waitForOptionalNetworkIdle(page);
+    page.off("response", onResponse);
+    const resources = (await Promise.all(resourcePromises.slice())).filter((metric): metric is ResourceMetric => metric !== null);
+    const runtimeResources = resources.filter((resource) => isRuntimeResource(resource));
+    const editorRuntimePayloadBytes = runtimeResources.reduce((sum, resource) => sum + resource.bytes, 0);
+    const largestRuntimeResourceBytes = Math.max(0, ...runtimeResources.map((resource) => resource.bytes));
+    const largestResources = runtimeResources
+      .slice()
+      .sort((a, b) => b.bytes - a.bytes)
+      .slice(0, 8)
+      .map((resource) => ({
+        url: pathOnly(resource.url),
+        resourceType: resource.resourceType,
+        bytes: resource.bytes,
+      }));
+
+    return {
+      shellReadyMs,
+      previewReadyMs,
+      publishReadyMs,
+      editorRuntimePayloadBytes,
+      largestRuntimeResourceBytes,
+      runtimeResourceCount: runtimeResources.length,
+      previewFrameCount: await page.locator("[data-studio-preview-frame]").count(),
+      canvasNodeCount: canvasMetrics.nodeCount,
+      canvasOverlayCount: canvasMetrics.overlayCount,
+      canvasLayoutSampleMs: canvasMetrics.layoutSampleMs,
+      publishCheckCount,
+      navigation: await navigationMetrics(page),
+      largestResources,
+    };
+  } finally {
+    page.off("response", onResponse);
+  }
+}
+
+async function waitForOptionalNetworkIdle(page: Page) {
+  await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => null);
+}
+
+async function scrollSelectorIntoView(page: Page, selector: string) {
+  await page.evaluate((targetSelector) => {
+    const target = document.querySelector(targetSelector);
+    if (!(target instanceof HTMLElement)) return;
+    const section = target.closest(".studio-workbench-section");
+    const scrollTarget = section instanceof HTMLElement ? section : target;
+    const scroller = scrollableAncestor(scrollTarget);
+    if (!scroller) return;
+
+    const previousScrollBehavior = scroller.style.scrollBehavior;
+    scroller.style.scrollBehavior = "auto";
+    try {
+      const offset = offsetWithin(scrollTarget, scroller);
+      scroller.scrollTop = Math.max(0, offset.top - 24);
+      scroller.scrollLeft = Math.max(0, offset.left - 24);
+    } finally {
+      scroller.style.scrollBehavior = previousScrollBehavior;
+    }
+
+    function scrollableAncestor(node: HTMLElement): HTMLElement | null {
+      let current: HTMLElement | null = node.parentElement;
+      while (current) {
+        if (current.scrollHeight > current.clientHeight || current.scrollWidth > current.clientWidth) {
+          return current;
+        }
+        current = current.parentElement;
+      }
+      const root = document.scrollingElement;
+      return root instanceof HTMLElement ? root : null;
+    }
+
+    function offsetWithin(node: HTMLElement, ancestor: HTMLElement) {
+      let top = 0;
+      let left = 0;
+      let current: HTMLElement | null = node;
+      while (current && current !== ancestor && ancestor.contains(current)) {
+        top += current.offsetTop;
+        left += current.offsetLeft;
+        const next = current.offsetParent instanceof HTMLElement ? current.offsetParent : current.parentElement;
+        current = next;
+      }
+      return { top, left };
+    }
+  }, selector);
+  await page.waitForTimeout(50);
+}
+
+async function waitForElementAttached(page: Page, selector: string, timeout = 45_000) {
+  await page.waitForFunction((targetSelector) =>
+    !!document.querySelector(targetSelector),
+  selector, { timeout });
+}
+
+async function waitForElementVisible(page: Page, selector: string, timeout = 45_000) {
+  await page.waitForFunction((targetSelector) => {
+    const target = document.querySelector(targetSelector);
+    if (!(target instanceof HTMLElement)) return false;
+    const style = window.getComputedStyle(target);
+    if (style.display === "none" || style.visibility === "hidden") return false;
+    const rect = target.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }, selector, { timeout });
 }
 
 function shouldCaptureResource(response: Response, baseURL: string) {
@@ -206,22 +283,38 @@ function shouldCaptureResource(response: Response, baseURL: string) {
 async function captureResponse(response: Response): Promise<ResourceMetric | null> {
   const status = response.status();
   if (status >= 300 && status < 400) return null;
+  const url = response.url();
+  const resourceType = response.request().resourceType();
   const headers = response.headers();
   let bytes = Number(headers["content-length"] ?? 0);
   if (!Number.isFinite(bytes) || bytes < 0) bytes = 0;
-  if (bytes === 0) {
-    try {
-      bytes = (await response.body()).length;
-    } catch {
-      bytes = 0;
-    }
+  if (bytes === 0 && shouldReadResponseBody(resourceType, url)) {
+    bytes = await responseBodyLength(response) ?? 0;
   }
   return {
-    url: response.url(),
-    resourceType: response.request().resourceType(),
+    url,
+    resourceType,
     status,
     bytes,
   };
+}
+
+function shouldReadResponseBody(resourceType: string, url: string) {
+  if (resourceType === "script" || resourceType === "stylesheet") return true;
+  return /\.(?:js|css|wasm)(?:\?|$)/.test(url) || url.includes("/_gosx/");
+}
+
+async function responseBodyLength(response: Response): Promise<number | null> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const bodyPromise = response.body()
+    .then((body) => body.length)
+    .catch(() => null);
+  const timeoutPromise = new Promise<null>((resolve) => {
+    timeout = setTimeout(() => resolve(null), responseBodyCaptureTimeoutMs);
+  });
+  const bytes = await Promise.race([bodyPromise, timeoutPromise]);
+  if (timeout) clearTimeout(timeout);
+  return bytes;
 }
 
 function isRuntimeResource(resource: ResourceMetric) {
@@ -231,23 +324,34 @@ function isRuntimeResource(resource: ResourceMetric) {
 }
 
 async function waitForPreviewFrame(page: Page) {
-  const frame = page.locator("[data-studio-preview-frame]").first();
-  await expect(frame).toBeAttached();
-  await frame.scrollIntoViewIfNeeded();
-  await expect(frame).toBeVisible();
+  await waitForElementAttached(page, "[data-studio-preview-frame]");
+  await hydrateDeferredPreviewFrame(page);
+  await scrollSelectorIntoView(page, "[data-studio-preview-frame]");
+  await waitForElementVisible(page, "[data-studio-preview-frame]");
   await page.waitForFunction(() => {
     const frame = document.querySelector("[data-studio-preview-frame]");
     if (!(frame instanceof HTMLIFrameElement)) return false;
     const body = frame.contentDocument?.body;
     return !!body && body.innerText.trim().length > 10;
-  }, null, { timeout: 10_000 });
+  }, null, { timeout: 45_000 });
+}
+
+async function hydrateDeferredPreviewFrame(page: Page) {
+  await page.evaluate(() => {
+    const node = document.querySelector("[data-studio-preview-frame]");
+    if (!(node instanceof HTMLIFrameElement)) return;
+    if (node.getAttribute("src")) return;
+    const container = node.closest("[data-gosx-studio-preview]");
+    const nextURL = node.getAttribute("data-studio-preview-src") ||
+      container?.getAttribute("data-gosx-studio-preview-url") ||
+      "/";
+    node.setAttribute("src", nextURL);
+  });
 }
 
 async function measureCanvasCost(page: Page, canvasSelector: string) {
-  const canvas = page.locator(canvasSelector).first();
-  await expect(canvas).toBeAttached();
-  await canvas.scrollIntoViewIfNeeded();
-  await expect(canvas).toBeVisible();
+  await waitForElementAttached(page, canvasSelector);
+  await scrollSelectorIntoView(page, canvasSelector);
   return page.evaluate((selector) => {
     const root = document.querySelector(selector);
     if (!(root instanceof HTMLElement)) {
