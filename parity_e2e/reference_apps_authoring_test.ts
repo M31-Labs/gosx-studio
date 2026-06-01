@@ -10,6 +10,7 @@ const muddyRepo = process.env.GOSX_STUDIO_MUDDY_REPO ?? path.join(workRoot, "mud
 const pajaritosRepo = process.env.GOSX_STUDIO_PAJARITOS_REPO ?? path.join(workRoot, "pajaritos-forest-school");
 
 test.describe("@reference-apps browser authoring workflows", () => {
+  test.describe.configure({ timeout: 90_000 });
   test.skip(process.env.GOSX_STUDIO_REFERENCE_APP_E2E !== "1", "set GOSX_STUDIO_REFERENCE_APP_E2E=1 to boot sibling reference apps");
 
   test("Muddy/Noni visible authoring controls submit through the real admin editor", async ({ page, request }) => {
@@ -75,6 +76,23 @@ test.describe("@reference-apps browser authoring workflows", () => {
       expect(authoringParam(addResponse, "gosx_studio_component_template_key")).toBe("hero");
       await expect(page.locator("body")).toContainText("Hero section added to Home.");
       await expect(page.locator("[data-studio-site-map-component='hero__copy_3']").first()).toBeAttached();
+
+      const restoreButtonSelector = "[data-pajaritos-restore-index='1'] button";
+      await expectPanelButtonReceivesPointer(page, "[data-pajaritos-restore-index='1']");
+      const restoreButton = page.locator(restoreButtonSelector).first();
+      const restoreRevisionID = await restoreButton.getAttribute("value");
+      expect(await restoreButton.getAttribute("name")).toBe("revisionId");
+      expect(restoreRevisionID).toBeTruthy();
+      const restoreResponse = await clickEditorActionButton(page, restoreButtonSelector, "/__actions/restoreRevision", {
+        noWaitAfter: true,
+        reloadAfter: false,
+        settleAfter: false,
+      });
+      expect(restoreResponse.status()).toBe(303);
+      expect(restoreResponse.headers()["location"]).toContain("Restore+point+applied.");
+      await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "networkidle" });
+      await expect(page.locator("[data-studio-site-map-component='hero__copy_2']").first()).toBeAttached();
+      await expect(page.locator("[data-studio-site-map-component='hero__copy_3']")).toHaveCount(0);
     } finally {
       await server.stop();
     }
@@ -86,7 +104,9 @@ async function clickIntent(page: Page, intentKey: string) {
 }
 
 type ClickAuthoringOptions = {
+  noWaitAfter?: boolean;
   reloadAfter?: boolean;
+  settleAfter?: boolean;
 };
 
 async function clickAuthoringPanel(page: Page, panelSelector: string, options?: ClickAuthoringOptions) {
@@ -94,18 +114,24 @@ async function clickAuthoringPanel(page: Page, panelSelector: string, options?: 
 }
 
 async function clickAuthoringButton(page: Page, buttonSelector: string, options?: ClickAuthoringOptions) {
+  return clickEditorActionButton(page, buttonSelector, "/__actions/authoring", options);
+}
+
+async function clickEditorActionButton(page: Page, buttonSelector: string, actionPathPart: string, options?: ClickAuthoringOptions) {
   const navigationPromise = page.waitForEvent("framenavigated", {
     predicate: (frame) => frame === page.mainFrame(),
     timeout: 3_000,
   }).catch(() => null);
   const responsePromise = page.waitForResponse((response) =>
-    response.url().includes("/__actions/authoring") &&
+    response.url().includes(actionPathPart) &&
     response.request().method() === "POST",
   );
-  await page.locator(buttonSelector).first().click();
+  await page.locator(buttonSelector).first().click({ noWaitAfter: options?.noWaitAfter === true });
   const response = await responsePromise;
   await navigationPromise;
-  await page.waitForLoadState("networkidle");
+  if (options?.settleAfter !== false) {
+    await page.waitForLoadState("networkidle");
+  }
   if (options?.reloadAfter !== false) {
     await page.goto(page.url(), { waitUntil: "networkidle" });
   }

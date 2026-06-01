@@ -456,14 +456,15 @@ Current:
   the real admin editor action flow. Muddy verifies duplicate/save-field state
   after reload; Pajaritos verifies native create-page, add-section, duplicate,
   and save-field payloads, redirects, browser-visible authoring feedback, and
-  persisted page/section reflection after reload.
+  persisted page/section reflection plus a visible restore-point rollback
+  after reload.
 - `docs/PUBLIC_READINESS.md` names the release posture concerns.
 
 Missing:
 
 - Default-CI browser-driven editor workflows across both Noni and Pajaritos,
-  plus Pajaritos preview-refresh instrumentation, staging publish readiness,
-  and rollback.
+  plus Pajaritos preview-refresh instrumentation and broader staging publish
+  readiness.
 - Visual regression checks for the shell, canvas, inspector, site map, media,
   flow designer, publish panel, and responsive preview.
 - Accessibility checks for keyboard navigation, focus, labels, reduced motion,
@@ -699,15 +700,19 @@ These are the current places to mine for reusable Studio behavior.
   projection and added a visible page/section summary to the editor shell. The
   reference-app browser e2e now verifies create-page and add-section payloads,
   success notices, and reloaded page/section state for Pajaritos.
+- 2026-06-01: Added a Pajaritos restore-point panel in the publishing section
+  plus a `restoreRevision` editor action for site settings rollback. The
+  reference-app browser e2e now clicks the visible rollback control after
+  authoring changes and verifies the restored section state after reload.
 
 ## Next Execution Slice
 
 The next practical slice is full browser automation plus the next visible shell
 extraction:
 
-- Promote the opt-in Muddy/Pajaritos reference-app browser e2e into default CI
-  and add Pajaritos preview-refresh instrumentation, staging publish readiness,
-  and rollback workflows with persisted browser-visible assertions.
+- Promote the Muddy/Pajaritos reference-app browser e2e script into default CI
+  and add Pajaritos preview-refresh instrumentation plus broader staging
+  publish readiness assertions.
 - Continue the shell extraction by moving the next visible wrapper/toolbar
   piece behind a Studio-owned render path that consumes `WorkbenchShellView`.
 - Extend `authoringruntime` host-backed smoke coverage to assert

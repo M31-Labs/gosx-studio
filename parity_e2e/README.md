@@ -108,14 +108,14 @@ add-section, duplicate-section, and save-field actions through the real GoSX
 action/CSRF flow. Muddy assertions include browser-reloaded duplicate and field
 state. Pajaritos assertions now verify native create-page, add-section,
 duplicate, and save-field payloads, 303 redirects, browser-visible success
-feedback, and persisted page/section reflection after the editor reload.
+feedback, persisted page/section reflection, and a visible restore-point
+rollback after the editor reload.
 
 It is not part of default parity CI yet because it depends on sibling app
 worktrees. Run it locally with:
 
 ```bash
-GOSX_STUDIO_REFERENCE_APP_E2E=1 \
-  npx playwright test reference_apps_authoring_test.ts
+npm run test:reference-apps
 ```
 
 Override sibling locations if needed:
