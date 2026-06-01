@@ -159,3 +159,131 @@ test.describe("@smoke GoSXStudioSiteMapRuntime interactions", () => {
     await expect(page.locator("[data-studio-site-map-builder='true']")).toHaveAttribute("data-studio-site-map-panel-visible", "true");
   });
 });
+
+const panZoomBoard = `
+  <section
+    data-studio-site-map-board="true"
+    tabindex="0"
+    data-studio-site-map-scale="1"
+    data-studio-site-map-pan-x="0"
+    data-studio-site-map-pan-y="0"
+  >
+    <div class="studio-site-map-board__view" role="group">
+      <button type="button" data-studio-site-map-zoom-action="out">-</button>
+      <button type="button" data-studio-site-map-zoom-action="reset">Reset</button>
+      <button type="button" data-studio-site-map-zoom-action="in">+</button>
+      <output data-studio-site-map-zoom-readout>100%</output>
+    </div>
+    <div data-studio-site-map-workspace="true" data-studio-site-map-panel-visible="true">
+      <div data-studio-site-map-canvas="true" style="width:600px;height:400px;position:relative;overflow:hidden;">
+        <div data-studio-site-map-pan-surface="true">
+          <label
+            data-studio-site-map-workspace-node="home"
+            data-studio-site-map-group="site"
+            data-studio-site-map-node-label="Home"
+          >Home</label>
+        </div>
+      </div>
+    </div>
+  </section>
+`;
+
+test.describe("@smoke GoSXStudioSiteMapRuntime infinite-canvas pan and zoom", () => {
+  test("applies the initial viewport transform on bind", async ({ page }) => {
+    await page.setContent(panZoomBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    const surface = page.locator("[data-studio-site-map-pan-surface='true']");
+    await expect(surface).toHaveAttribute("style", /scale\(1\)/);
+    await expect(page.locator("[data-studio-site-map-zoom-readout]")).toHaveText("100%");
+  });
+
+  test("zoom action buttons scale about the viewport center", async ({ page }) => {
+    await page.setContent(panZoomBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    const board = page.locator("[data-studio-site-map-board='true']");
+    const surface = page.locator("[data-studio-site-map-pan-surface='true']");
+    const readout = page.locator("[data-studio-site-map-zoom-readout]");
+
+    await page.locator("[data-studio-site-map-zoom-action='in']").click();
+    await expect(board).toHaveAttribute("data-studio-site-map-scale", "1.25");
+    await expect(readout).toHaveText("125%");
+    await expect(surface).toHaveAttribute("style", /scale\(1\.25\)/);
+
+    await page.locator("[data-studio-site-map-zoom-action='out']").click();
+    await expect(board).toHaveAttribute("data-studio-site-map-scale", "1");
+
+    await page.locator("[data-studio-site-map-zoom-action='out']").click();
+    await expect(board).toHaveAttribute("data-studio-site-map-scale", "0.8");
+    await expect(readout).toHaveText("80%");
+
+    await page.locator("[data-studio-site-map-zoom-action='reset']").click();
+    await expect(board).toHaveAttribute("data-studio-site-map-scale", "1");
+    await expect(board).toHaveAttribute("data-studio-site-map-pan-x", "0");
+    await expect(board).toHaveAttribute("data-studio-site-map-pan-y", "0");
+    await expect(readout).toHaveText("100%");
+  });
+
+  test("setState applies a pan translation deterministically", async ({ page }) => {
+    await page.setContent(panZoomBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    await page.evaluate(() => {
+      const board = document.querySelector("[data-studio-site-map-board='true']");
+      window.GoSXStudioSiteMapRuntime.setState(board, { panX: 48, panY: 24, scale: 1.5 });
+    });
+
+    const board = page.locator("[data-studio-site-map-board='true']");
+    const surface = page.locator("[data-studio-site-map-pan-surface='true']");
+    await expect(board).toHaveAttribute("data-studio-site-map-pan-x", "48");
+    await expect(board).toHaveAttribute("data-studio-site-map-pan-y", "24");
+    await expect(surface).toHaveAttribute("style", /translate\(48px, 24px\) scale\(1\.5\)/);
+  });
+
+  test("wheel over the canvas zooms toward the pointer", async ({ page }) => {
+    await page.setContent(panZoomBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    const canvas = page.locator("[data-studio-site-map-canvas='true']");
+    const box = await canvas.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(0, -100);
+
+    const scale = await page.locator("[data-studio-site-map-board='true']").getAttribute("data-studio-site-map-scale");
+    expect(Number(scale)).toBeGreaterThan(1);
+  });
+
+  test("keyboard +/-/0 zooms in, out, and resets", async ({ page }) => {
+    await page.setContent(panZoomBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    const board = page.locator("[data-studio-site-map-board='true']");
+    await board.focus();
+
+    await page.keyboard.press("=");
+    await expect(board).toHaveAttribute("data-studio-site-map-scale", "1.25");
+
+    await page.keyboard.press("0");
+    await expect(board).toHaveAttribute("data-studio-site-map-scale", "1");
+  });
+
+  test("dragging the canvas background pans the surface", async ({ page }) => {
+    await page.setContent(panZoomBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    const canvas = page.locator("[data-studio-site-map-canvas='true']");
+    const box = await canvas.boundingBox();
+    // Start in the empty bottom-right of the canvas, away from the node.
+    const startX = box.x + box.width - 24;
+    const startY = box.y + box.height - 24;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX - 60, startY - 40, { steps: 4 });
+    await page.mouse.up();
+
+    const board = page.locator("[data-studio-site-map-board='true']");
+    expect(Number(await board.getAttribute("data-studio-site-map-pan-x"))).toBeLessThan(0);
+    expect(Number(await board.getAttribute("data-studio-site-map-pan-y"))).toBeLessThan(0);
+  });
+});

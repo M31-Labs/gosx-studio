@@ -34,6 +34,129 @@
     return target && target.closest ? target.closest(selector) : null;
   }
 
+  // ---- Infinite-canvas viewport (continuous pan + zoom) ----
+  var ZOOM_STEP = 1.25;
+  var WHEEL_STEP = 1.1;
+  var MIN_SCALE = 0.25;
+  var MAX_SCALE = 3;
+
+  function num(el, name, fallback) {
+    var value = parseFloat(attr(el, name, ""));
+    return isFinite(value) ? value : fallback;
+  }
+
+  function clampScale(value) {
+    if (!isFinite(value)) return 1;
+    return Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
+  }
+
+  function trimNum(value) {
+    return String(Math.round(value * 10000) / 10000);
+  }
+
+  function canvasEl(root) {
+    return root.querySelector("[data-studio-site-map-canvas]");
+  }
+
+  function canvasPoint(root, clientX, clientY) {
+    var canvas = canvasEl(root);
+    if (!canvas || !canvas.getBoundingClientRect) return { x: 0, y: 0 };
+    var rect = canvas.getBoundingClientRect();
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }
+
+  function canvasCenter(root) {
+    var canvas = canvasEl(root);
+    if (!canvas || !canvas.getBoundingClientRect) return { x: 0, y: 0 };
+    var rect = canvas.getBoundingClientRect();
+    return { x: rect.width / 2, y: rect.height / 2 };
+  }
+
+  function viewportTransform(next) {
+    return "translate(" + trimNum(next.panX) + "px, " + trimNum(next.panY) + "px) scale(" + trimNum(clampScale(next.scale)) + ")";
+  }
+
+  function applyViewport(root, next) {
+    all(root, "[data-studio-site-map-pan-surface]").forEach(function (surface) {
+      surface.style.transformOrigin = "0 0";
+      surface.style.transform = viewportTransform(next);
+    });
+    writeText(root, "[data-studio-site-map-zoom-readout]", Math.round(clampScale(next.scale) * 100) + "%");
+  }
+
+  // Zoom keeps the world point under `point` (canvas-local px) fixed.
+  function zoomAbout(root, newScale, point) {
+    var current = state(root);
+    var scale = clampScale(newScale);
+    var worldX = (point.x - current.panX) / current.scale;
+    var worldY = (point.y - current.panY) / current.scale;
+    return setState(root, {
+      scale: scale,
+      panX: point.x - worldX * scale,
+      panY: point.y - worldY * scale,
+    });
+  }
+
+  function zoomAction(root, action) {
+    if (action === "reset" || action === "fit") {
+      return setState(root, { scale: 1, panX: 0, panY: 0 });
+    }
+    var current = state(root);
+    var factor = action === "in" ? ZOOM_STEP : action === "out" ? 1 / ZOOM_STEP : 1;
+    return zoomAbout(root, current.scale * factor, canvasCenter(root));
+  }
+
+  function handleWheel(root, event) {
+    if (!closest(event.target, "[data-studio-site-map-canvas]")) return;
+    if (event.cancelable) event.preventDefault();
+    var current = state(root);
+    var factor = event.deltaY < 0 ? WHEEL_STEP : 1 / WHEEL_STEP;
+    zoomAbout(root, current.scale * factor, canvasPoint(root, event.clientX, event.clientY));
+  }
+
+  // Left-drag pans only from empty canvas; middle-drag pans from anywhere.
+  function viewportDragAllowed(target) {
+    return !closest(target, "button, a, input, textarea, select, label, [data-studio-site-map-workspace-node], [data-studio-site-map-workspace-node-card]");
+  }
+
+  function handlePointerDown(root, event) {
+    if (event.button !== 0 && event.button !== 1) return;
+    if (!closest(event.target, "[data-studio-site-map-canvas]")) return;
+    if (event.button === 0 && !viewportDragAllowed(event.target)) return;
+    var origin = state(root);
+    var startX = event.clientX;
+    var startY = event.clientY;
+    setAttr(root, "data-studio-site-map-panning", "true");
+    function move(ev) {
+      setState(root, {
+        panX: origin.panX + (ev.clientX - startX),
+        panY: origin.panY + (ev.clientY - startY),
+      });
+    }
+    function up() {
+      setAttr(root, "data-studio-site-map-panning", "false");
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+    }
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+  }
+
+  function handleKeydown(root, event) {
+    var target = event.target;
+    if (target && target.matches && target.matches("input, textarea, select")) return;
+    if (event.key === "+" || event.key === "=") {
+      event.preventDefault();
+      zoomAction(root, "in");
+    } else if (event.key === "-" || event.key === "_") {
+      event.preventDefault();
+      zoomAction(root, "out");
+    } else if (event.key === "0") {
+      event.preventDefault();
+      zoomAction(root, "reset");
+    }
+  }
+
   function state(root) {
     return {
       filter: attr(root, "data-studio-site-map-filter", "all"),
@@ -46,6 +169,9 @@
       selectedNode: attr(root, "data-studio-site-map-selected-node", ""),
       selectedBlueprint: attr(root, "data-studio-site-map-selected-blueprint", ""),
       selectedTemplate: attr(root, "data-studio-site-map-selected-template", ""),
+      scale: clampScale(num(root, "data-studio-site-map-scale", 1)),
+      panX: num(root, "data-studio-site-map-pan-x", 0),
+      panY: num(root, "data-studio-site-map-pan-y", 0),
     };
   }
 
@@ -60,6 +186,9 @@
     setAttr(root, "data-studio-site-map-selected-node", next.selectedNode);
     setAttr(root, "data-studio-site-map-selected-blueprint", next.selectedBlueprint);
     setAttr(root, "data-studio-site-map-selected-template", next.selectedTemplate);
+    setAttr(root, "data-studio-site-map-scale", trimNum(clampScale(next.scale)));
+    setAttr(root, "data-studio-site-map-pan-x", trimNum(next.panX));
+    setAttr(root, "data-studio-site-map-pan-y", trimNum(next.panY));
   }
 
   function syncPressed(root, selector, current) {
@@ -217,6 +346,7 @@
     syncPalette(root, next);
     syncSelection(root, next);
     syncIntentActive(root, next);
+    applyViewport(root, next);
     return next;
   }
 
@@ -256,6 +386,9 @@
 
     value = controlValue(target, "data-studio-site-map-zoom-control");
     if (value) return setState(root, { zoom: value });
+
+    value = controlValue(target, "data-studio-site-map-zoom-action");
+    if (value) return zoomAction(root, value);
 
     value = controlValue(target, "data-studio-site-map-density-control");
     if (value) return setState(root, { density: value });
@@ -303,6 +436,15 @@
     });
     root.addEventListener("change", function (event) {
       handleChange(root, event);
+    });
+    root.addEventListener("wheel", function (event) {
+      handleWheel(root, event);
+    }, { passive: false });
+    root.addEventListener("pointerdown", function (event) {
+      handlePointerDown(root, event);
+    });
+    root.addEventListener("keydown", function (event) {
+      handleKeydown(root, event);
     });
     sync(root);
     return root;

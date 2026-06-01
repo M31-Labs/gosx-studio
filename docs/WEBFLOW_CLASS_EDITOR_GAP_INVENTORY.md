@@ -212,7 +212,11 @@ Missing:
   slot on top of the same Studio contracts.
 - Full route editing across all editable pages, page grouping, selection state,
   and conflict validation inside the visual graph.
-- Keyboard and pointer interactions suitable for a visual graph.
+- Keyboard and pointer interactions suitable for a visual graph. **Partial
+  (2026-06-01):** continuous infinite-canvas pan/zoom (wheel-to-cursor,
+  drag-to-pan, keyboard `+`/`-`/`0`, live zoom readout) shipped on the shared
+  board via `sitemapruntime` + `RenderSiteMapBoard`. Still missing: marquee
+  multi-select, keyboard node navigation, and node drag-to-reposition.
 
 Acceptance:
 
@@ -940,18 +944,43 @@ These are the current places to mine for reusable Studio behavior.
   inside the workbench form and `data.siteMapAuthoringForms` outside it, so the
   host route no longer manually assembles the site-map surface while preserving
   valid form nesting and engine runtime registration.
+- 2026-06-01 (sequoia): Added a continuous infinite-canvas viewport ("Figma
+  feel") to the shared site-map board. `sitemapruntime` now drives
+  wheel-to-cursor zoom, drag-to-pan, keyboard `+`/`-`/`0` zoom, and
+  `setState({scale,panX,panY})` against a new
+  `[data-studio-site-map-pan-surface]` transform layer, with a live
+  `[data-studio-site-map-zoom-readout]`. `RenderSiteMapBoard` emits the pan
+  surface (wrapping SVG paths + node layers, leaving the selection card as a
+  fixed overlay), a focusable/`aria-label`led canvas region, and zoom
+  in/out/reset action controls. Parity coverage added in
+  `parity_e2e/sitemapruntime_test.ts` (6 cases: initial transform, zoom
+  buttons, deterministic `setState` pan, wheel zoom, keyboard zoom, drag pan);
+  board markup contract asserted in `sitemap_board_test.go`. Backward
+  compatible — the legacy discrete `zoom` enum (fit/wide) is untouched.
 
 ## Next Execution Slice
 
-The next practical slice is broadening the shared site-map engine surface:
+The infinite-canvas viewport (pan/zoom/keyboard) shipped on the shared board.
+The next practical slices, in order, are:
 
-- Decide the Pajaritos map path: adopt the shared board directly, or provide a
-  host-styled board slot that still uses `AuthoringSiteMapView` plus
-  `sitemapruntime`.
-- Add keyboard affordances and browser assertions for the shared board's
-  toolbar, selected-node actions, palette filtering, and focus/detail modes.
-- Keep broadening visual/accessibility/performance checks as inspector, media,
-  flow, and publish surfaces move behind reusable Studio-owned render paths.
+1. **Marquee multi-select + keyboard node navigation** on the shared board:
+   rubber-band selection over nodes, shift-click toggle, arrow-key spatial
+   selection movement, `Enter`/`Escape`, and a visible focus ring — with
+   `sitemapruntime_test.ts` parity coverage.
+2. **Node drag-to-reposition with persisted canvas positions**: free placement
+   on the pan surface emitting `gosxstudio:sitemap-node-moved {key,x,y}`, host
+   persistence into the "Saved canvas positions" (`layout-graph`) store, and
+   snap-to-grid.
+3. **Parallel track — `SiteMapEngine.gsx` on `<CanvasBoard>`** (Canvas2D): mount
+   the merged Phase-2 primitive (`gosx.CanvasBoard`, `OrthoCamera2D`, surface
+   kind `canvas2d`) as a feature-flagged true-infinite rendering surface for the
+   page graph; add e2e before flipping the flag. (CanvasBoard ships
+   render/pan/zoom/pick but **not** grid/marquee/drag — those wire on top.)
+4. Decide the Pajaritos map path: adopt the shared board directly, or provide a
+   host-styled board slot that still uses `AuthoringSiteMapView` plus
+   `sitemapruntime`.
+5. Keep broadening visual/accessibility/performance checks as inspector, media,
+   flow, and publish surfaces move behind reusable Studio-owned render paths.
 
 ## Definition of Done
 

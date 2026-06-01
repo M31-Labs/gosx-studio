@@ -86,6 +86,9 @@ func RenderSiteMapBoard(siteMapView map[string]any, options SiteMapBoardOptions)
 		gosx.Attr("data-studio-site-map-zoom", state.zoom),
 		gosx.Attr("data-studio-site-map-density", state.density),
 		gosx.Attr("data-studio-site-map-grid", state.grid),
+		gosx.Attr("data-studio-site-map-scale", "1"),
+		gosx.Attr("data-studio-site-map-pan-x", "0"),
+		gosx.Attr("data-studio-site-map-pan-y", "0"),
 		gosx.Attr("data-studio-site-map-selected-node", state.selectedNodeKey),
 		gosx.Attr("data-studio-site-map-selected-blueprint", state.selectedBlueprintKey),
 		gosx.Attr("data-studio-site-map-selected-template", state.selectedTemplateKey),
@@ -131,6 +134,14 @@ func renderSiteMapBoardToolbar(siteMapView map[string]any, state siteMapBoardSta
 		}),
 		renderSiteMapBoardChoiceGroup("studio-site-map-board__focus", "group", "Page focus", "data-studio-site-map-focus-control", state.focus, append([]siteMapBoardChoice{{Label: "All pages", Key: "all"}}, siteMapBoardPageChoices(siteMapView)...)),
 		renderSiteMapBoardChoiceGroup("studio-site-map-board__view", "group", "Board view", "", "", nil,
+			renderSiteMapBoardActionControl("Zoom out", "data-studio-site-map-zoom-action", "out"),
+			gosx.El("output", gosx.Attrs(
+				gosx.Attr("class", "studio-site-map-board__zoom-readout"),
+				gosx.Attr("data-studio-site-map-zoom-readout", "true"),
+				gosx.Attr("aria-label", "Zoom level"),
+			), gosx.Text("100%")),
+			renderSiteMapBoardActionControl("Zoom in", "data-studio-site-map-zoom-action", "in"),
+			renderSiteMapBoardActionControl("Reset view", "data-studio-site-map-zoom-action", "reset"),
 			renderSiteMapBoardControl("Fit", "data-studio-site-map-zoom-control", "fit", state.zoom),
 			renderSiteMapBoardControl("Wide", "data-studio-site-map-zoom-control", "wide", state.zoom),
 			renderSiteMapBoardControl("Dense", "data-studio-site-map-density-control", "dense", state.density),
@@ -183,6 +194,16 @@ func renderSiteMapBoardControl(label, attrName, key, current string) gosx.Node {
 	return gosx.El("button", gosx.Attrs(attrs...), gosx.Text(label))
 }
 
+// renderSiteMapBoardActionControl renders a momentary action button (no pressed
+// state) such as the continuous zoom in/out/reset controls driven by the
+// site-map runtime's infinite-canvas viewport.
+func renderSiteMapBoardActionControl(label, attrName, key string) gosx.Node {
+	return gosx.El("button", gosx.Attrs(
+		gosx.Attr("type", "button"),
+		gosx.Attr(attrName, key),
+	), gosx.Text(label))
+}
+
 func renderSiteMapBoardWorkspace(siteMapView map[string]any, state siteMapBoardState) gosx.Node {
 	return gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", "studio-site-map-workspace"),
@@ -210,9 +231,17 @@ func renderSiteMapBoardWorkspace(siteMapView map[string]any, state siteMapBoardS
 			gosx.El("div", gosx.Attrs(
 				gosx.Attr("class", "studio-site-map-workspace__canvas"),
 				gosx.Attr("data-studio-site-map-canvas", "true"),
+				gosx.Attr("tabindex", "0"),
+				gosx.Attr("role", "group"),
+				gosx.Attr("aria-label", "Site map canvas. Drag to pan, scroll to zoom, press plus or minus to zoom and zero to reset."),
 			),
-				renderSiteMapBoardCanvasPaths(siteMapView, state),
-				renderSiteMapBoardWorkspaceLayers(siteMapView, state),
+				gosx.El("div", gosx.Attrs(
+					gosx.Attr("class", "studio-site-map-workspace__surface"),
+					gosx.Attr("data-studio-site-map-pan-surface", "true"),
+				),
+					renderSiteMapBoardCanvasPaths(siteMapView, state),
+					renderSiteMapBoardWorkspaceLayers(siteMapView, state),
+				),
 				renderSiteMapBoardSelectionCard(siteMapView, state),
 			),
 			renderSiteMapBoardWorkspaceRail(siteMapView, state),
