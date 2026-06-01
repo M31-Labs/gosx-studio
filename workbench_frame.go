@@ -48,6 +48,28 @@ type WorkbenchRailResizerOptions struct {
 	Default string
 }
 
+type WorkbenchFrameSegments struct {
+	RootOpen         gosx.Node
+	FormOpen         gosx.Node
+	CSRFInput        gosx.Node
+	StageOpen        gosx.Node
+	LeftRailOpen     gosx.Node
+	LeftRailClose    gosx.Node
+	LeftResizer      gosx.Node
+	MainOpen         gosx.Node
+	CanvasShellOpen  gosx.Node
+	BoardOpen        gosx.Node
+	BoardClose       gosx.Node
+	CanvasShellClose gosx.Node
+	MainClose        gosx.Node
+	RightResizer     gosx.Node
+	RightRailOpen    gosx.Node
+	RightRailClose   gosx.Node
+	StageClose       gosx.Node
+	FormClose        gosx.Node
+	RootClose        gosx.Node
+}
+
 func RenderWorkbenchFrame(view map[string]any, options WorkbenchFrameOptions) gosx.Node {
 	formChildren := make([]gosx.Node, 0, 5+len(options.AfterForm))
 	if !options.DisableCSRF {
@@ -67,6 +89,30 @@ func RenderWorkbenchFrame(view map[string]any, options WorkbenchFrameOptions) go
 	return gosx.El("div", gosx.Attrs(workbenchFrameRootAttrs(view, options)...),
 		gosx.El("form", gosx.Attrs(workbenchFrameFormAttrs(view, options)...), gosx.Fragment(formChildren...)),
 	)
+}
+
+func RenderWorkbenchFrameSegments(view map[string]any, options WorkbenchFrameOptions) WorkbenchFrameSegments {
+	return WorkbenchFrameSegments{
+		RootOpen:         renderWorkbenchFrameOpenTag("div", workbenchFrameRootAttrs(view, options)),
+		FormOpen:         renderWorkbenchFrameOpenTag("form", workbenchFrameFormAttrs(view, options)),
+		CSRFInput:        renderWorkbenchFrameCSRF(view, options),
+		StageOpen:        renderWorkbenchFrameOpenTag("div", workbenchFrameStageAttrs(options)),
+		LeftRailOpen:     renderWorkbenchFrameOpenTag("aside", workbenchFrameRailAttrs(FirstNonEmpty(options.LeftRailClass, "studio-left-rail"), "left")),
+		LeftRailClose:    gosx.RawHTML("</aside>"),
+		LeftResizer:      RenderWorkbenchRailResizer(view, "left", WorkbenchRailResizerOptions{}),
+		MainOpen:         renderWorkbenchFrameOpenTag("section", workbenchFrameMainAttrs(view, options)),
+		CanvasShellOpen:  renderWorkbenchFrameOpenTag("div", workbenchFrameCanvasShellAttrs(view, options)),
+		BoardOpen:        renderWorkbenchFrameOpenTag("div", workbenchFrameBoardAttrs(options)),
+		BoardClose:       gosx.RawHTML("</div>"),
+		CanvasShellClose: gosx.RawHTML("</div>"),
+		MainClose:        gosx.RawHTML("</section>"),
+		RightResizer:     RenderWorkbenchRailResizer(view, "right", WorkbenchRailResizerOptions{}),
+		RightRailOpen:    renderWorkbenchFrameOpenTag("aside", workbenchFrameRailAttrs(FirstNonEmpty(options.RightRailClass, "editor-sidebar"), "right")),
+		RightRailClose:   gosx.RawHTML("</aside>"),
+		StageClose:       gosx.RawHTML("</div>"),
+		FormClose:        gosx.RawHTML("</form>"),
+		RootClose:        gosx.RawHTML("</div>"),
+	}
 }
 
 func RenderWorkbenchRailResizer(view map[string]any, side string, options WorkbenchRailResizerOptions) gosx.Node {
@@ -103,19 +149,11 @@ func renderWorkbenchFrameStage(view map[string]any, options WorkbenchFrameOption
 	}
 	children = append(children, renderWorkbenchFrameRail("aside", FirstNonEmpty(options.RightRailClass, "editor-sidebar"), "right", options.RightRail))
 
-	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.StageClass, "editor-stage")),
-		gosx.Attr("data-studio-layout", "true"),
-		gosx.Attr("data-gosx-studio-stage-renderer", "gosx-studio"),
-	), gosx.Fragment(children...))
+	return gosx.El("div", gosx.Attrs(workbenchFrameStageAttrs(options)...), gosx.Fragment(children...))
 }
 
 func renderWorkbenchFrameRail(tag, className, side string, nodes []gosx.Node) gosx.Node {
-	return gosx.El(tag, gosx.Attrs(
-		gosx.Attr("class", className),
-		gosx.Attr("data-studio-sidebar", side),
-		gosx.Attr("data-gosx-studio-rail-renderer", "gosx-studio"),
-	), gosx.Fragment(nodes...))
+	return gosx.El(tag, gosx.Attrs(workbenchFrameRailAttrs(className, side)...), gosx.Fragment(nodes...))
 }
 
 func renderWorkbenchFrameMain(view map[string]any, options WorkbenchFrameOptions) gosx.Node {
@@ -123,34 +161,18 @@ func renderWorkbenchFrameMain(view map[string]any, options WorkbenchFrameOptions
 	if len(children) == 0 {
 		children = []gosx.Node{renderWorkbenchFrameCanvasShell(view, options)}
 	}
-	return gosx.El("section", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.MainClass, "editor-canvas")),
-		gosx.Attr("aria-label", FirstNonEmpty(workbenchViewString(view, "canvasAriaLabel"), workbenchViewString(view, "routeLabel"), "Studio canvas")),
-		gosx.Attr("data-panel-key", FirstNonEmpty(workbenchViewString(view, "canvasPanelKey"), NormalizeKey(workbenchViewString(view, "routeLabel")), "canvas")),
-		gosx.Attr("data-gosx-studio-main-renderer", "gosx-studio"),
-	), gosx.Fragment(children...))
+	return gosx.El("section", gosx.Attrs(workbenchFrameMainAttrs(view, options)...), gosx.Fragment(children...))
 }
 
 func renderWorkbenchFrameCanvasShell(view map[string]any, options WorkbenchFrameOptions) gosx.Node {
 	children := []gosx.Node{}
 	if len(options.CanvasBar) > 0 {
-		children = append(children, gosx.El("div", gosx.Attrs(
-			gosx.Attr("class", FirstNonEmpty(options.CanvasBarClass, "studio-canvas-bar")),
-			gosx.Attr("data-gosx-studio-canvas-bar-renderer", "gosx-studio"),
-		), gosx.Fragment(options.CanvasBar...)))
+		children = append(children, options.CanvasBar...)
 	}
-	children = append(children, gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.BoardClass, "studio-canvas-board")),
-		gosx.Attr("data-gosx-studio-board-renderer", "gosx-studio"),
-	), gosx.Fragment(options.Board...)))
+	children = append(children, gosx.El("div", gosx.Attrs(workbenchFrameBoardAttrs(options)...), gosx.Fragment(options.Board...)))
 	children = append(children, options.CanvasStatus...)
 
-	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.CanvasShellClass, "studio-canvas-shell")),
-		gosx.Attr("data-studio-canvas", "true"),
-		gosx.Attr("data-studio-canvas-zoom", FirstNonEmpty(workbenchViewString(view, "zoom"), "fit")),
-		gosx.Attr("data-gosx-studio-canvas-shell-renderer", "gosx-studio"),
-	), gosx.Fragment(children...))
+	return gosx.El("div", gosx.Attrs(workbenchFrameCanvasShellAttrs(view, options)...), gosx.Fragment(children...))
 }
 
 func renderWorkbenchFrameCSRF(view map[string]any, options WorkbenchFrameOptions) gosx.Node {
@@ -223,6 +245,54 @@ func workbenchFrameFormAttrs(view map[string]any, options WorkbenchFrameOptions)
 		attrs = append(attrs, gosx.Attr("data-studio-style-valid", styleSystemValid))
 	}
 	return appendWorkbenchFrameAttrs(attrs, options.FormAttrs)
+}
+
+func workbenchFrameStageAttrs(options WorkbenchFrameOptions) []any {
+	return []any{
+		gosx.Attr("class", FirstNonEmpty(options.StageClass, "editor-stage")),
+		gosx.Attr("data-studio-layout", "true"),
+		gosx.Attr("data-gosx-studio-stage-renderer", "gosx-studio"),
+	}
+}
+
+func workbenchFrameRailAttrs(className, side string) []any {
+	return []any{
+		gosx.Attr("class", className),
+		gosx.Attr("data-studio-sidebar", side),
+		gosx.Attr("data-gosx-studio-rail-renderer", "gosx-studio"),
+	}
+}
+
+func workbenchFrameMainAttrs(view map[string]any, options WorkbenchFrameOptions) []any {
+	return []any{
+		gosx.Attr("class", FirstNonEmpty(options.MainClass, "editor-canvas")),
+		gosx.Attr("aria-label", FirstNonEmpty(workbenchViewString(view, "canvasAriaLabel"), workbenchViewString(view, "routeLabel"), "Studio canvas")),
+		gosx.Attr("data-panel-key", FirstNonEmpty(workbenchViewString(view, "canvasPanelKey"), NormalizeKey(workbenchViewString(view, "routeLabel")), "canvas")),
+		gosx.Attr("data-gosx-studio-main-renderer", "gosx-studio"),
+	}
+}
+
+func workbenchFrameCanvasShellAttrs(view map[string]any, options WorkbenchFrameOptions) []any {
+	return []any{
+		gosx.Attr("class", FirstNonEmpty(options.CanvasShellClass, "studio-canvas-shell")),
+		gosx.Attr("data-studio-canvas", "true"),
+		gosx.Attr("data-studio-canvas-zoom", FirstNonEmpty(workbenchViewString(view, "zoom"), "fit")),
+		gosx.Attr("data-gosx-studio-canvas-shell-renderer", "gosx-studio"),
+	}
+}
+
+func workbenchFrameBoardAttrs(options WorkbenchFrameOptions) []any {
+	return []any{
+		gosx.Attr("class", FirstNonEmpty(options.BoardClass, "studio-canvas-board")),
+		gosx.Attr("data-gosx-studio-board-renderer", "gosx-studio"),
+	}
+}
+
+func renderWorkbenchFrameOpenTag(tag string, attrs []any) gosx.Node {
+	html := gosx.RenderHTML(gosx.El(tag, gosx.Attrs(attrs...)))
+	closeTag := "</" + tag + ">"
+	html = strings.TrimSuffix(html, closeTag)
+	return gosx.RawHTML(html)
 }
 
 func workbenchFrameResizerView(view map[string]any, side string) map[string]any {

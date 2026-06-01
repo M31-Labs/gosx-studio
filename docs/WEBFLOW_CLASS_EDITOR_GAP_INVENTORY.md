@@ -783,14 +783,20 @@ These are the current places to mine for reusable Studio behavior.
   passthrough, and host slots without injecting product copy. Muddy/Noni now
   consumes the Studio-owned rail resizer and removed its local `.gsx` resizer
   component while keeping the existing route-owned panel markup intact.
+- 2026-06-01: Flipped Muddy/Noni's editor shell onto
+  `RenderWorkbenchFrameSegments` for the outer root, form, stage, rails, rail
+  resizers, main canvas section, canvas shell, and board. The route now keeps
+  only client-specific panel slots and action forms in `.gsx`; shared shell
+  semantics and native form/autosave/CSRF/state attributes come from
+  `gosx-studio`.
 
 ## Next Execution Slice
 
 The next practical slice is the next shell/render extraction:
 
-- Flip Muddy/Noni's remaining outer form, stage, canvas shell, and rail
-  wrappers to `RenderWorkbenchFrame` slots, then use the same frame path in
-  Pajaritos so both reference apps consume Studio-owned shell structure.
+- Use the same `RenderWorkbenchFrame` path in Pajaritos so both reference apps
+  consume Studio-owned shell structure, then collapse the remaining
+  `gosx-cms/studio` workbench wrapper duplication.
 - Extend `authoringruntime` host-backed smoke coverage to assert
   changed-object selection and preview refresh after those persisted actions.
 - Keep broadening visual/accessibility/performance checks as inspector, media,

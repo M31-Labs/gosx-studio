@@ -138,3 +138,58 @@ func TestRenderWorkbenchRailResizerUsesShellViewDefaultsAndOverrides(t *testing.
 		}
 	}
 }
+
+func TestRenderWorkbenchFrameSegmentsExposeRenderableShellPieces(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{
+		Title:      "Client website",
+		SaveAction: "/save",
+		Canvas:     CanvasSurface{RouteLabel: "Home"},
+	}, WorkbenchShellViewOptions{
+		CSRFToken: "csrf-token",
+	})
+	segments := RenderWorkbenchFrameSegments(view, WorkbenchFrameOptions{
+		AuthoringURL:   "/authoring",
+		ResizableRails: true,
+	})
+	html := strings.Join([]string{
+		gosx.RenderHTML(segments.RootOpen),
+		gosx.RenderHTML(segments.FormOpen),
+		gosx.RenderHTML(segments.CSRFInput),
+		gosx.RenderHTML(segments.StageOpen),
+		gosx.RenderHTML(segments.LeftRailOpen),
+		gosx.RenderHTML(segments.LeftRailClose),
+		gosx.RenderHTML(segments.LeftResizer),
+		gosx.RenderHTML(segments.MainOpen),
+		gosx.RenderHTML(segments.CanvasShellOpen),
+		gosx.RenderHTML(segments.BoardOpen),
+		gosx.RenderHTML(segments.BoardClose),
+		gosx.RenderHTML(segments.CanvasShellClose),
+		gosx.RenderHTML(segments.MainClose),
+		gosx.RenderHTML(segments.RightResizer),
+		gosx.RenderHTML(segments.RightRailOpen),
+		gosx.RenderHTML(segments.RightRailClose),
+		gosx.RenderHTML(segments.StageClose),
+		gosx.RenderHTML(segments.FormClose),
+		gosx.RenderHTML(segments.RootClose),
+	}, "")
+
+	for _, want := range []string{
+		`<div class="gosx-studio-workbench"`,
+		`data-gosx-studio-frame-renderer="gosx-studio"`,
+		`<form class="gosx-studio-workbench__form gosx-studio"`,
+		`data-gosx-studio-authoring-url="/authoring"`,
+		`name="csrf_token"`,
+		`<div class="editor-stage"`,
+		`<aside class="studio-left-rail"`,
+		`data-gosx-studio-rail-resizer-renderer="gosx-studio"`,
+		`<section class="editor-canvas"`,
+		`<div class="studio-canvas-shell"`,
+		`<div class="studio-canvas-board"`,
+		`<aside class="editor-sidebar"`,
+		`</form></div>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in frame segments html: %s", want, html)
+		}
+	}
+}
