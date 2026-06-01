@@ -45,6 +45,7 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 	}
 	pages := authoringSiteMapPageViews(siteMap.Pages, options)
 	metadataPage := authoringSiteMapMetadataPageView(siteMap.Pages)
+	visibilityComponent := authoringSiteMapVisibilityComponentView(siteMap.Pages)
 	sources := authoringSiteMapSourceViews(siteMap)
 	blueprints := authoringSiteMapPageBlueprintViews(siteMap.Library.PageBlueprints, options)
 	palette := authoringSiteMapComponentTemplateViews(siteMap.Library.ComponentTemplates, options)
@@ -92,6 +93,8 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 		"hasPages":                           len(pages) > 0,
 		"metadataPage":                       metadataPage,
 		"hasMetadataPage":                    len(metadataPage) > 0,
+		"visibilityComponent":                visibilityComponent,
+		"hasVisibilityComponent":             len(visibilityComponent) > 0,
 		"empty":                              "No editable pages are configured.",
 		"sources":                            sources,
 		"hasSources":                         len(sources) > 0,
@@ -173,25 +176,80 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 	page = page.Normalize()
 	for _, component := range components {
 		component = component.Normalize()
+		visibilityMutation := AuthoringMutation{}
+		visibilityFormValues := map[string]string(nil)
+		visibilityActionLabel := ""
+		if component.CanToggleVisibility {
+			visibilityMutation = AuthoringMutationForComponentVisibility(page, component, !component.Visible)
+			visibilityFormValues = visibilityMutation.FormValues()
+			visibilityActionLabel = "Show"
+			if component.Visible {
+				visibilityActionLabel = "Hide"
+			}
+		}
 		out = append(out, map[string]any{
-			"key":           component.Key,
-			"selectionKey":  component.SelectionKey(page.Key),
-			"label":         component.Label,
-			"summary":       firstNonEmpty(component.Summary, authoringComponentDefaultSummary(component)),
-			"gosxComponent": component.GoSXComponent,
-			"goSXComponent": component.GoSXComponent,
-			"source":        string(component.NormalizedSource()),
-			"sourceLabel":   ComponentSourceLabel(component.Source),
-			"sourceSummary": authoringComponentSourceSummary(component),
-			"binding":       component.Binding,
-			"statusLabel":   component.Status,
-			"editable":      component.Editable,
-			"controls":      authoringSiteMapControlViews(page, component, component.Controls),
-			"hasControls":   component.ControlCount() > 0,
-			"controlLabel":  countLabel(component.ControlCount(), "field", "fields"),
+			"key":                          component.Key,
+			"selectionKey":                 component.SelectionKey(page.Key),
+			"label":                        component.Label,
+			"summary":                      firstNonEmpty(component.Summary, authoringComponentDefaultSummary(component)),
+			"gosxComponent":                component.GoSXComponent,
+			"goSXComponent":                component.GoSXComponent,
+			"source":                       string(component.NormalizedSource()),
+			"sourceLabel":                  ComponentSourceLabel(component.Source),
+			"sourceSummary":                authoringComponentSourceSummary(component),
+			"binding":                      component.Binding,
+			"statusLabel":                  component.Status,
+			"editable":                     component.Editable,
+			"visible":                      component.Visible,
+			"canToggleVisibility":          component.CanToggleVisibility,
+			"visibilityActionLabel":        visibilityActionLabel,
+			"visibilityAuthoringOperation": string(visibilityMutation.Kind),
+			"visibilityAuthoringPageKey":   visibilityMutation.PageKey,
+			"visibilityAuthoringComponent": visibilityMutation.ComponentKey,
+			"visibilityAuthoringVisible":   visibilityMutation.Visible,
+			"visibilityMutation":           AuthoringMutationView(visibilityMutation),
+			"visibilityFormValues":         visibilityFormValues,
+			"controls":                     authoringSiteMapControlViews(page, component, component.Controls),
+			"hasControls":                  component.ControlCount() > 0,
+			"controlLabel":                 countLabel(component.ControlCount(), "field", "fields"),
 		})
 	}
 	return out
+}
+
+func authoringSiteMapVisibilityComponentView(pages []Page) map[string]any {
+	for _, page := range pages {
+		page = page.Normalize()
+		for _, component := range page.Components {
+			component = component.Normalize()
+			if !component.CanToggleVisibility {
+				continue
+			}
+			mutation := AuthoringMutationForComponentVisibility(page, component, !component.Visible)
+			actionLabel := "Show"
+			if component.Visible {
+				actionLabel = "Hide"
+			}
+			return map[string]any{
+				"key":                component.Key,
+				"label":              component.Label,
+				"pageKey":            page.Key,
+				"pageLabel":          page.Label,
+				"binding":            component.Binding,
+				"statusLabel":        component.Status,
+				"visible":            component.Visible,
+				"nextVisible":        mutation.Visible,
+				"actionLabel":        actionLabel,
+				"authoringOperation": string(mutation.Kind),
+				"authoringPageKey":   mutation.PageKey,
+				"authoringComponent": mutation.ComponentKey,
+				"authoringVisible":   mutation.Visible,
+				"mutation":           AuthoringMutationView(mutation),
+				"formValues":         mutation.FormValues(),
+			}
+		}
+	}
+	return nil
 }
 
 func authoringSiteMapControlViews(page Page, component Component, controls []Control) []map[string]any {

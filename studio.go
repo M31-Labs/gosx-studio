@@ -233,15 +233,17 @@ type Page struct {
 }
 
 type Component struct {
-	Key           string
-	Label         string
-	Summary       string
-	GoSXComponent string
-	Source        ComponentSource
-	Binding       string
-	Status        string
-	Editable      bool
-	Controls      []Control
+	Key                 string
+	Label               string
+	Summary             string
+	GoSXComponent       string
+	Source              ComponentSource
+	Binding             string
+	Status              string
+	Editable            bool
+	Visible             bool
+	CanToggleVisibility bool
+	Controls            []Control
 }
 
 type Control struct {

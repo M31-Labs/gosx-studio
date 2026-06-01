@@ -90,15 +90,18 @@ Current:
 - `AuthoringSiteMapView` now exposes the first editable page metadata mutation
   payload, and Noni/Pajaritos persist page title/route updates with field-level
   validation through the same authoring action boundary.
+- `AuthoringSiteMapView` now exposes the first editable component visibility
+  mutation payload. Noni persists homepage section visibility, and Pajaritos
+  persists the home family-request form visibility through the same action
+  contract.
 
 Missing:
 
 - Host implementations in Noni and Pajaritos for the remaining operations:
   - reordering components
-  - toggling component visibility
   - duplicating and deleting components
 - Cross-operation validation beyond the current create-page, add-component,
-  save-control, and page metadata paths.
+  save-control, page metadata, and first visibility paths.
 - Route-level examples showing how host apps register `AuthoringActionHandler`
   beside page modules.
 
@@ -456,8 +459,9 @@ These are the current places to mine for reusable Studio behavior.
 
 - Introduce an `AuthoringAdapter` or equivalent mutation interface. Done in the
   first execution slice.
-- Implement apply-intent, save-control, and route metadata operations. Reorder,
-  visibility, duplicate, delete, and broader validation operations remain.
+- Implement apply-intent, save-control, route metadata, and first visibility
+  operations. Reorder, duplicate, delete, and broader validation operations
+  remain.
 - Add server-action helpers and focused tests.
 - Wire both Noni and Pajaritos to the same action contract. Pajaritos and Noni
   now have create-page, add-component, save-control, and page metadata slices.
@@ -506,19 +510,21 @@ These are the current places to mine for reusable Studio behavior.
    first real content flows.
 4. Done on 2026-06-01: add first page title/route metadata mutation payloads
    and host persistence in both reference apps.
-5. Build a reusable `StudioShell.gsx` that consumes `ShellConfig` and
+5. Done on 2026-06-01: add first component visibility mutation payloads and
+   host persistence in both reference apps.
+6. Build a reusable `StudioShell.gsx` that consumes `ShellConfig` and
    `AuthoringSurfaceView`.
-6. Move workbench, command palette, and state runtime ownership out of
+7. Move workbench, command palette, and state runtime ownership out of
    `gosx-cms/studio` when the dependent hosts are ready.
-7. Implement `SiteMapEngine.gsx` against the existing `CompositionWorkspace`
+8. Implement `SiteMapEngine.gsx` against the existing `CompositionWorkspace`
    and `WorkspaceCanvas` contracts.
-8. Implement `InspectorIsland.gsx` for the current `ControlKind` set with
+9. Implement `InspectorIsland.gsx` for the current `ControlKind` set with
    dirty/valid/saving states.
-9. Implement canvas selection and inline text editing through the Studio
+10. Implement canvas selection and inline text editing through the Studio
    preview/selection/field runtimes.
-10. Add Noni and Pajaritos e2e smoke tests for create page, add component,
+11. Add Noni and Pajaritos e2e smoke tests for create page, add component,
    edit control, responsive preview, staging publish readiness, and rollback.
-11. Write the visual-system spec for the Studio editor UI before the major
+12. Write the visual-system spec for the Studio editor UI before the major
     shell styling pass, including density, typography, color roles,
     accessibility states, and responsive behavior.
 
@@ -565,6 +571,10 @@ These are the current places to mine for reusable Studio behavior.
   Pajaritos validates duplicate content-page routes. Both apps now expose
   visible page detail controls without adding client copy that names GoSX
   Studio.
+- 2026-06-01: Added shared component visibility mutation payloads and wired the
+  first persisted visibility operation in both reference apps. Noni can show or
+  hide homepage sections, while Pajaritos can show or hide the home family
+  request form, with both returning preview-refresh authoring changes.
 
 ## Next Execution Slice
 
@@ -575,8 +585,8 @@ The next practical slice is e2e authoring confidence plus component operations:
 - Use the new `gosxstudio:authoring-result` event in the smoke tests to assert
   changed-object selection and preview refresh instead of only checking stored
   data.
-- Add the first persisted component reorder/visibility operations so the
-  site-map and canvas can manipulate placed sections rather than only fields
+- Add the first persisted component reorder operation so the site-map and
+  canvas can change placed section order rather than only fields, visibility,
   and page metadata.
 
 ## Definition of Done

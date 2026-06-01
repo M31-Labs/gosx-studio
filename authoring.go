@@ -220,18 +220,20 @@ func authoringComponentViews(page Page, components []Component) []map[string]any
 func authoringComponentView(page Page, component Component) map[string]any {
 	component = component.Normalize()
 	return map[string]any{
-		"key":           component.Key,
-		"label":         component.Label,
-		"summary":       component.Summary,
-		"hasSummary":    component.Summary != "",
-		"goSXComponent": component.GoSXComponent,
-		"source":        string(component.NormalizedSource()),
-		"sourceLabel":   ComponentSourceLabel(component.Source),
-		"binding":       component.Binding,
-		"status":        component.Status,
-		"editable":      component.Editable,
-		"controlCount":  component.ControlCount(),
-		"controls":      authoringControlViews(page, component, component.Controls),
+		"key":                 component.Key,
+		"label":               component.Label,
+		"summary":             component.Summary,
+		"hasSummary":          component.Summary != "",
+		"goSXComponent":       component.GoSXComponent,
+		"source":              string(component.NormalizedSource()),
+		"sourceLabel":         ComponentSourceLabel(component.Source),
+		"binding":             component.Binding,
+		"status":              component.Status,
+		"editable":            component.Editable,
+		"visible":             component.Visible,
+		"canToggleVisibility": component.CanToggleVisibility,
+		"controlCount":        component.ControlCount(),
+		"controls":            authoringControlViews(page, component, component.Controls),
 	}
 }
 

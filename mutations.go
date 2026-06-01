@@ -175,6 +175,22 @@ func AuthoringMutationForPage(page Page) AuthoringMutation {
 	}.Normalize()
 }
 
+func AuthoringMutationForComponentVisibility(page Page, component Component, visible bool) AuthoringMutation {
+	page = page.Normalize()
+	component = component.Normalize()
+	return AuthoringMutation{
+		Kind:           AuthoringOperationToggleVisibility,
+		PageKey:        page.Key,
+		PageLabel:      page.Label,
+		PageRoute:      page.Route,
+		ComponentKey:   component.Key,
+		ComponentLabel: component.Label,
+		Binding:        component.Binding,
+		Visible:        visible,
+		HasVisible:     true,
+	}.Normalize()
+}
+
 func AuthoringMutationFromForm(form map[string]string) (AuthoringMutation, AuthoringValidation) {
 	mutation := AuthoringMutation{
 		Kind:                 AuthoringOperationKind(formValue(form, AuthoringFieldOperation)),

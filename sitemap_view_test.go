@@ -13,13 +13,15 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 		Editable:      true,
 		Selected:      true,
 		Components: []Component{{
-			Key:           "hero",
-			Label:         "Hero",
-			GoSXComponent: "HomeHero",
-			Source:        ComponentSourceHost,
-			Binding:       "pages.home.hero",
-			Status:        "Visible",
-			Editable:      true,
+			Key:                 "hero",
+			Label:               "Hero",
+			GoSXComponent:       "HomeHero",
+			Source:              ComponentSourceHost,
+			Binding:             "pages.home.hero",
+			Status:              "Visible",
+			Editable:            true,
+			Visible:             true,
+			CanToggleVisibility: true,
 			Controls: []Control{{
 				Key:     "headline",
 				Label:   "Headline",
@@ -83,6 +85,14 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 	hero := home["components"].([]map[string]any)[0]
 	if hero["selectionKey"] != "home.hero" || hero["sourceSummary"] != "Site-owned editable block" || hero["controlLabel"] != "1 field" {
 		t.Fatalf("unexpected hero view: %#v", hero)
+	}
+	if hero["canToggleVisibility"] != true || hero["visibilityActionLabel"] != "Hide" {
+		t.Fatalf("expected hero visibility authoring projection: %#v", hero)
+	}
+	visibilityPage := view["visibilityComponent"].(map[string]any)
+	visibilityForm := visibilityPage["formValues"].(map[string]string)
+	if view["hasVisibilityComponent"] != true || visibilityPage["authoringOperation"] != "toggle-visibility" || visibilityForm[AuthoringFieldVisible] != "false" {
+		t.Fatalf("unexpected visibility component payload: %#v", visibilityPage)
 	}
 	headline := hero["controls"].([]map[string]any)[0]
 	if headline["authoringOperation"] != "save-control" || headline["authoringBinding"] != "pages.home.hero.headline" || headline["value"] != "Forest days" {

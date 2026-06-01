@@ -74,6 +74,29 @@ func TestAuthoringMutationForPageBuildsUpdatePayload(t *testing.T) {
 	}
 }
 
+func TestAuthoringMutationForComponentVisibilityBuildsTogglePayload(t *testing.T) {
+	mutation := AuthoringMutationForComponentVisibility(Page{
+		Key:   "home",
+		Label: "Home",
+		Route: "/",
+	}, Component{
+		Key:     "contact",
+		Label:   "Contact band",
+		Binding: "home.section.contact",
+	}, true)
+	values := mutation.FormValues()
+
+	if mutation.Kind != AuthoringOperationToggleVisibility || mutation.PageKey != "home" || mutation.ComponentKey != "contact" {
+		t.Fatalf("unexpected visibility mutation: %#v", mutation)
+	}
+	if !mutation.HasVisible || !mutation.Visible {
+		t.Fatalf("expected explicit visible target: %#v", mutation)
+	}
+	if values[AuthoringFieldOperation] != "toggle-visibility" || values[AuthoringFieldVisible] != "true" || values[AuthoringFieldBinding] != "home.section.contact" {
+		t.Fatalf("unexpected visibility form values: %#v", values)
+	}
+}
+
 func TestAuthoringMutationFromFormNormalizesAndValidates(t *testing.T) {
 	mutation, validation := AuthoringMutationFromForm(map[string]string{
 		AuthoringFieldOperation:    " save-control ",
