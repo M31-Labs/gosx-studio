@@ -794,6 +794,14 @@ These are the current places to mine for reusable Studio behavior.
   lifecycle controls, environment readiness, restore points, and inline runtime
   nodes. Both reference apps now consume Studio-owned frame semantics for their
   primary editor shells.
+- 2026-06-01: Tightened the host-backed reference-app authoring smoke test so
+  real Muddy/Noni and Pajaritos field edits run through GoSX managed form
+  feedback, emit `gosxstudio:authoring-result`, record changed-object selection
+  on the workbench, and refresh preview state without relying on visible
+  "GoSX Studio" copy. Muddy admin now loads the GoSX navigation/form runtime,
+  and both reference apps mark editable-control authoring forms as managed
+  POST forms while leaving create/add/duplicate flows on their native
+  redirect-safe path.
 
 ## Next Execution Slice
 
@@ -801,8 +809,9 @@ The next practical slice is the next shell/render extraction:
 
 - Collapse the remaining `gosx-cms/studio` workbench wrapper duplication now
   that both reference apps consume Studio-owned frame semantics.
-- Extend `authoringruntime` host-backed smoke coverage to assert
-  changed-object selection and preview refresh after those persisted actions.
+- Continue turning the managed editable-control path into a richer in-place UX:
+  keep the active editor section/panel mounted after successful field saves and
+  surface the returned authoring message in visible save-detail chrome.
 - Keep broadening visual/accessibility/performance checks as inspector, media,
   flow, and publish surfaces move behind reusable Studio-owned render paths.
 

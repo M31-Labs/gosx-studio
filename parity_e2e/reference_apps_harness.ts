@@ -20,6 +20,25 @@ export type ServerHandle = {
   stop: () => Promise<void>;
 };
 
+export type StudioAuthoringResultDetail = {
+  action?: string;
+  method?: string;
+  result?: {
+    message?: string;
+    previewURL?: string;
+    refreshPreview?: boolean;
+  };
+  change?: {
+    key?: string;
+    kind?: string;
+    pageKey?: string;
+    component?: string;
+    binding?: string;
+  };
+  selectedCount?: number;
+  previewCount?: number;
+};
+
 export async function clickIntent(page: Page, intentKey: string) {
   return clickAuthoringButton(page, `[data-studio-composition-intent="${intentKey}"] button`);
 }
@@ -139,6 +158,22 @@ export async function waitForStudioPreviewRefresh(page: Page, reason: string) {
   }), reason);
 }
 
+export async function waitForStudioAuthoringResult(page: Page) {
+  return page.evaluate(() => new Promise<StudioAuthoringResultDetail | null>((resolve) => {
+    let handler: EventListener;
+    const timeout = window.setTimeout(() => {
+      document.removeEventListener("gosxstudio:authoring-result", handler);
+      resolve(null);
+    }, 5_000);
+    handler = (event: Event) => {
+      window.clearTimeout(timeout);
+      document.removeEventListener("gosxstudio:authoring-result", handler);
+      resolve(((event as CustomEvent).detail ?? null) as StudioAuthoringResultDetail | null);
+    };
+    document.addEventListener("gosxstudio:authoring-result", handler);
+  }));
+}
+
 export async function saveEditableControl(page: Page, value: string, options?: ClickAuthoringOptions & { expectedMessage?: string }) {
   const panel = page.locator("[data-gosx-studio-editable-control='true']").first();
   await expect(panel).toBeVisible();
@@ -146,15 +181,26 @@ export async function saveEditableControl(page: Page, value: string, options?: C
   await expect(input).toBeVisible();
   await input.fill(value);
   await expectPanelButtonReceivesPointer(page, "[data-gosx-studio-editable-control='true']");
+  const authoringResultPromise = options?.reloadAfter === false ? waitForStudioAuthoringResult(page) : null;
   const response = await clickAuthoringPanel(page, "[data-gosx-studio-editable-control='true']", options);
-  expect(response.status()).toBe(303);
-  expect(authoringParam(response, "gosx_studio_operation")).toBe("save-control");
-  expect(authoringParam(response, "gosx_studio_value")).toBe(value);
   if (options?.reloadAfter === false) {
-    if (options.expectedMessage) {
-      await expect(page.locator("body")).toContainText(options.expectedMessage);
-    }
-    await expect(page.locator("[data-gosx-studio-editable-control='true']")).toBeVisible();
+    expect([200, 303]).toContain(response.status());
+  } else {
+    expect(response.status()).toBe(303);
+    expect(authoringParam(response, "gosx_studio_operation")).toBe("save-control");
+    expect(authoringParam(response, "gosx_studio_value")).toBe(value);
+  }
+  if (options?.reloadAfter === false) {
+    const detail = await authoringResultPromise;
+    expect(detail, "real editor should emit host-backed authoring result detail").toBeTruthy();
+    expect(detail?.result?.message).toBe(options.expectedMessage);
+    expect(detail?.change?.kind).toBe("control");
+    expect(detail?.selectedCount ?? 0, "authoring result should select the changed object").toBeGreaterThan(0);
+    expect(detail?.previewCount ?? 0, "authoring result should refresh at least one preview frame").toBeGreaterThan(0);
+    const workbench = page.locator("[data-gosx-studio-workbench], [data-studio-workbench]").first();
+    await expect(workbench).toHaveAttribute("data-gosx-studio-authoring-change-kind", "control");
+    await expect(workbench).toHaveAttribute("data-gosx-studio-authoring-selected-count", /^[1-9]/);
+    await expect(workbench).toHaveAttribute("data-gosx-studio-authoring-preview-url", /./);
     return;
   }
   await expect(page.locator("[data-gosx-studio-editable-control='true'] input[name='gosx_studio_value']").first()).toHaveValue(value);

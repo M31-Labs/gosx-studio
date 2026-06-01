@@ -38,7 +38,10 @@ test.describe("@reference-apps browser authoring workflows", () => {
       expect(duplicateResponse.status()).toBe(303);
       await expect(page.locator("body")).toContainText("Hero copy 2");
 
-      await saveEditableControl(page, "Surface-tested clay rituals");
+      await saveEditableControl(page, "Surface-tested clay rituals", {
+        reloadAfter: false,
+        expectedMessage: "Hero headline saved.",
+      });
     } finally {
       await server.stop();
     }
@@ -71,6 +74,7 @@ test.describe("@reference-apps browser authoring workflows", () => {
         reloadAfter: false,
         expectedMessage: "Hero headline saved.",
       });
+      await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "networkidle" });
 
       await expectIntentButtonReceivesPointer(page, "add-component:home:hero");
       const addResponse = await clickIntent(page, "add-component:home:hero");
