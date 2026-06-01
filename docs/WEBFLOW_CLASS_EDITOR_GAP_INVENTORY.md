@@ -35,6 +35,7 @@ still split across `gosx-studio`, `gosx-cms/studio`, Muddy Noni, and Pajaritos.
 | Studio package boundary | `README.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md` | The docs already define Studio as the authoring layer beside CMS/Admin, not inside a host app. |
 | Host shell contract | `store.go:12`, `store.go:27` | Hosts can feed Studio panels, media, revisions, readiness, adapters, and a normalized shell. |
 | Reusable workbench shell projection | `workbench_shell_view.go` | Studio now owns the shared editor shell view payload for workbench chrome, preview-shell attrs, zoom levels, rail resizers, CSRF/action metadata, and host label overrides. |
+| Reusable workbench toolbar renderer | `workbench_toolbar.go` | Studio now renders the first shared shell chrome from `WorkbenchShellView`: toolbar title, summary, save status, history controls, preview link, and save button. |
 | Authoring projection | `authoring.go:9`, `authoring.go:21`, `authoring.go:47` | `AuthoringSurface` exposes pages, selected page, palette, intents, workspace graph, and canvas layout. |
 | Authoring mutation contract | `mutations.go` | Studio now has typed operation kinds, form field names, `AuthoringMutation`, `AuthoringAdapter`, validation/result envelopes, and a GoSX action handler for host-owned persistence. |
 | Typed page/component model | `studio.go:151`, `studio.go:156`, `studio.go:292` | Pages, components, controls, canvas blocks, blueprints, templates, and composition intents exist as contracts. |
@@ -61,6 +62,9 @@ Current:
   `gosx-studio`, and both Noni and Pajaritos consume it for workbench metadata,
   preview-shell attributes, zoom controls, rail resizers, and save/preview
   labels.
+- `RenderWorkbenchToolbar` now gives Go-rendered hosts a Studio-owned toolbar
+  path that consumes `WorkbenchShellView`. Pajaritos uses it for the visible
+  editor toolbar while preserving host-branded copy and existing CSS hooks.
 
 Missing:
 
@@ -594,7 +598,8 @@ These are the current places to mine for reusable Studio behavior.
    persistence in both reference apps.
 8. In progress on 2026-06-01: build a reusable shell path that consumes
    `ShellConfig` and `AuthoringSurfaceView`. The shared Go workbench shell
-   projection is done; the complete `StudioShell.gsx` surface remains.
+   projection and first Studio-owned toolbar renderer are done; the complete
+   `StudioShell.gsx` surface remains.
 9. Done on 2026-06-01: add duplicate component operations with a dynamic
    component-instance model, host-backed persistence, and visible site-map
    controls.
@@ -754,13 +759,20 @@ These are the current places to mine for reusable Studio behavior.
   first focused run established Muddy/Noni around a 5.6 MB dev editor runtime
   payload with a 4.7 MB WASM resource, while Pajaritos stayed around a 38 KB
   runtime payload.
+- 2026-06-01: Added `RenderWorkbenchToolbar`,
+  `RenderWorkbenchSaveStatus`, and `RenderWorkbenchHistoryControls` in
+  `gosx-studio` as the next visible shell extraction. Pajaritos now renders its
+  top editor toolbar from the Studio-owned `WorkbenchShellView` path, including
+  host-branded title, summary, save state, history controls, preview link, and
+  save action without reintroducing "GoSX Studio" client copy.
 
 ## Next Execution Slice
 
-The next practical slice is the next visible shell extraction:
+The next practical slice is the next shell/render extraction:
 
-- Continue the shell extraction by moving the next visible wrapper/toolbar
-  piece behind a Studio-owned render path that consumes `WorkbenchShellView`.
+- Move the Muddy/Noni top toolbar or the shared command-palette node onto the
+  Studio-owned render path so both reference apps use the same shell chrome
+  contract for visible editor actions.
 - Extend `authoringruntime` host-backed smoke coverage to assert
   changed-object selection and preview refresh after those persisted actions.
 - Keep broadening visual/accessibility/performance checks as inspector, media,
