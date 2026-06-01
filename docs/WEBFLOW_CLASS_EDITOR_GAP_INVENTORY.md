@@ -991,18 +991,30 @@ These are the current places to mine for reusable Studio behavior.
   (button/link/contenteditable). Added an `isInteractiveControl` guard + a parity
   regression test. (Caught by the reference-app e2e: a focused "Add" button +
   `Enter` was being `preventDefault`ed, blocking native activation.)
+- 2026-06-01 (cedar): Shipped **node drag-to-reposition** on the shared board.
+  Plain left-drag on a node (4px threshold; shift stays marquee, empty-canvas
+  drag stays pan) live-moves it on the pan surface with scale-correct deltas
+  (`screenΔ / scale`), snaps to a 20px grid on release, writes
+  `data-studio-site-map-node-x`/`-y`, and dispatches
+  `gosxstudio:sitemap-node-moved {key,x,y}`. `RenderSiteMapBoard` renders nodes
+  absolutely when the view carries numeric `x`/`y` (layout-neutral otherwise, so
+  the default view + reference editors are unchanged). 4 parity + 3 Go cases;
+  merged to main as `94c6751`+`b51ec08`. **Host persistence is the open
+  follow-up.**
 
 ## Next Execution Slice
 
-Shipped on the shared board: infinite-canvas pan/zoom, marquee multi-select, and
-keyboard node navigation (arrows + `Enter`/`Space` activate, regression-fixed to
-respect focused controls). A `:focus-visible` ring is a minor host-CSS
+Shipped on the shared board: infinite-canvas pan/zoom, marquee multi-select,
+keyboard node navigation, and node drag-to-reposition (emits
+`gosxstudio:sitemap-node-moved`). A `:focus-visible` ring is a minor host-CSS
 follow-up. The next practical slices, in order, are:
 
-1. **Node drag-to-reposition with persisted canvas positions**: free placement
-   on the pan surface emitting `gosxstudio:sitemap-node-moved {key,x,y}`, host
-   persistence into the "Saved canvas positions" (`layout-graph`) store, and
-   snap-to-grid.
+1. **Persist node positions (round-trip).** Studio-side: a `NodePositions`
+   contract on the site-map view so `RenderSiteMapBoard` re-renders dragged
+   nodes at their saved `x`/`y` (the renderer already supports this). Host-side:
+   Muddy/Noni + Pajaritos listen for `gosxstudio:sitemap-node-moved`, persist
+   `{key,x,y}` to a "Saved canvas positions" store, and feed positions back into
+   the view so a reload keeps the layout. (Drag + snap + event shipped 2026-06-01.)
 2. **Parallel track — Canvas2D engine (foundation shipped 2026-06-01, `0b23c8e`).**
    `RenderSiteMapCanvasEngine` (opt-in, default-off) mounts `gosx.CanvasBoard`
    for the page graph. Remaining: browser/WASM hydration e2e for the canvas
