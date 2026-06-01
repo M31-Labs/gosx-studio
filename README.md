@@ -30,6 +30,8 @@ The first public contracts are intentionally small:
 - `Control` and `ControlOption` describe the editor-facing fields each component exposes: text, media, choices, links, color, source bindings, flows, and Scene3D/model controls.
 - `CompositionLibrary`, `PageBlueprint`, and `ComponentTemplate` describe the editor-facing building blocks that a site-map engine can expose as page starters and a component palette.
 - `CompositionIntent` and `CompositionStep` describe draft no-code operations such as creating a page from a blueprint or adding a component template to the selected route.
+- `AuthoringSurface` and `NoCodeAuthoringSurface` assemble the site map, selected page, palette, draft intents, workspace graph, and canvas layout into the host-facing no-code platform model exposed by `HostShell`.
+- `AuthoringMutation`, `AuthoringAdapter`, and `AuthoringActionHandler` describe the typed server-action boundary for applying no-code edits while host apps retain persistence, validation, preview refresh, and publish ownership.
 - `ResourceAdapter` and `ResourceBinding` describe host-owned media, pages, products, orders, contacts, settings, revisions, lifecycle, and flow resources without importing host internals.
 - `Engine` declares heavy interaction surfaces and the capabilities a host app can mount.
 - `RuntimeContract`, `RuntimeMethod`, and `RuntimePayloadField` declare the browser runtime APIs that engines expose, including the preview, workbench, brand, style, and block-layout globals used by canvas editing.
@@ -45,3 +47,5 @@ gosx-cms + gosx-admin + gosx-studio
 ```
 
 That combined product should not live inside Noni's site. Noni's site should remain a high-signal reference implementation and proving ground.
+
+See `docs/WEBFLOW_CLASS_EDITOR_GAP_INVENTORY.md` for the detailed gap inventory and work plan toward a Webflow-class no-code editor.

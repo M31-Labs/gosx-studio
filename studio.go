@@ -2190,6 +2190,17 @@ func (control Control) NormalizedKind() ControlKind {
 	return normalizeControlKind(control.Kind)
 }
 
+func (control Control) Normalize() Control {
+	control.Key = strings.TrimSpace(control.Key)
+	control.Label = strings.TrimSpace(control.Label)
+	control.Kind = normalizeControlKind(control.Kind)
+	control.Binding = strings.TrimSpace(control.Binding)
+	control.Value = strings.TrimSpace(control.Value)
+	control.Help = strings.TrimSpace(control.Help)
+	control.Options = normalizeControlOptions(control.Options)
+	return control
+}
+
 func (control Control) KindLabel() string {
 	return ControlKindLabel(control.Kind)
 }
