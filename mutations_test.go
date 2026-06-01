@@ -222,7 +222,12 @@ func TestAuthoringActionHandlerInvokesAdapter(t *testing.T) {
 	adapter := &stubAuthoringAdapter{result: AuthoringMutationResult{
 		Message:        "Updated hero.",
 		PreviewURL:     "/?gosx-preview=1",
+		FragmentURL:    "/admin/editor",
 		RefreshPreview: true,
+		Fragments: AuthoringRefreshFragments(
+			"[data-studio-composition-intent-forms='true']",
+			"[data-studio-site-map-panel='true']",
+		),
 		Changes: []AuthoringChange{{
 			Key:       "hero-headline",
 			Label:     "Hero headline",
@@ -266,6 +271,14 @@ func TestAuthoringActionHandlerInvokesAdapter(t *testing.T) {
 	}
 	if data["previewURL"] != "/?gosx-preview=1" || data["refreshPreview"] != true || data["changeCount"].(float64) != 1 {
 		t.Fatalf("unexpected result data: %#v", data)
+	}
+	if data["fragmentURL"] != "/admin/editor" || data["fragmentCount"].(float64) != 2 {
+		t.Fatalf("unexpected fragment result data: %#v", data)
+	}
+	fragments := data["fragments"].([]any)
+	firstFragment := fragments[0].(map[string]any)
+	if firstFragment["selector"] != "[data-studio-composition-intent-forms='true']" || firstFragment["mode"] != "replace" {
+		t.Fatalf("unexpected fragment view: %#v", fragments)
 	}
 }
 

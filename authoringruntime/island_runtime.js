@@ -255,6 +255,36 @@
     }
   }
 
+  function remountEditorRuntimes(root) {
+    root = root || doc;
+    remountPreviewRuntime();
+    var workbench = window.GoSXStudioWorkbenchRuntime || {};
+    [
+      ["bindRailResizers", root],
+      ["bindChrome", root]
+    ].forEach(function (call) {
+      if (typeof workbench[call[0]] === "function") {
+        try { workbench[call[0]](call[1]); } catch (e) {}
+      }
+    });
+    var block = window.GoSXStudioBlockLayoutRuntime || {};
+    [
+      ["bindLibrary", root],
+      ["bindVisibility", root],
+      ["bindList", root],
+      ["bindHandleDrag", root],
+      ["updateBlockLibraryState", root]
+    ].forEach(function (call) {
+      if (typeof block[call[0]] === "function") {
+        try { block[call[0]](call[1]); } catch (e) {}
+      }
+    });
+    var selection = window.GoSXStudioSelectionRuntime || {};
+    if (typeof selection.bind === "function") {
+      try { selection.bind(root); } catch (e) {}
+    }
+  }
+
   function refreshPreview(data) {
     if (!data || (!data.refreshPreview && !data.previewURL)) return 0;
     var frames = previewFrames();
@@ -279,6 +309,112 @@
     return frames.length;
   }
 
+  function writeSaveFeedback(message) {
+    message = String(message || "").trim();
+    if (message) {
+      queryAll("[data-gosx-studio-save-detail]").forEach(function (node) {
+        node.textContent = message;
+      });
+    }
+    queryAll("[data-gosx-studio-save-state='true']").forEach(function (node) {
+      node.textContent = "Saved";
+    });
+  }
+
+  function fragmentSpecs(data) {
+    var raw = data && (data.fragments || data.refreshFragments || data.fragmentSelectors || data.refreshFragmentSelectors);
+    if (!Array.isArray(raw)) return [];
+    var specs = [];
+    raw.forEach(function (item) {
+      var spec = typeof item === "string" ? { selector: item } : toObject(item);
+      var selector = String(spec.selector || spec.target || "").trim();
+      if (!selector) return;
+      var mode = String(spec.mode || "replace").trim();
+      if (mode !== "inner") mode = "replace";
+      specs.push({
+        key: String(spec.key || selector).trim(),
+        selector: selector,
+        mode: mode
+      });
+    });
+    return specs;
+  }
+
+  function fragmentRefreshURL(data) {
+    var target = String(data && (data.fragmentURL || data.refreshURL) || "").trim();
+    if (!target) target = window.location.href;
+    try {
+      return new URL(target, window.location.href).href;
+    } catch (e) {
+      return window.location.href;
+    }
+  }
+
+  function replaceFragment(current, fresh, mode) {
+    if (!current || !fresh) return false;
+    if (mode === "inner") {
+      current.innerHTML = fresh.innerHTML;
+      return true;
+    }
+    current.replaceWith(fresh.cloneNode(true));
+    return true;
+  }
+
+  function applyFragmentDocument(sourceDoc, specs) {
+    var count = 0;
+    specs.forEach(function (spec) {
+      var current = queryAll(spec.selector, doc);
+      var fresh = queryAll(spec.selector, sourceDoc);
+      var limit = Math.min(current.length, fresh.length);
+      for (var index = 0; index < limit; index += 1) {
+        if (replaceFragment(current[index], fresh[index], spec.mode)) count += 1;
+      }
+    });
+    if (count > 0) remountEditorRuntimes(doc);
+    return count;
+  }
+
+  function emitFragmentRefresh(data, specs, url, count) {
+    if (typeof window.CustomEvent !== "function" || typeof doc.dispatchEvent !== "function") return;
+    doc.dispatchEvent(new CustomEvent("gosxstudio:fragments-refresh", {
+      detail: {
+        url: url,
+        count: count,
+        selectors: specs.map(function (spec) { return spec.selector; }),
+        result: data
+      }
+    }));
+  }
+
+  function refreshFragments(data) {
+    var specs = fragmentSpecs(data);
+    if (!specs.length) return Promise.resolve(0);
+    var url = fragmentRefreshURL(data);
+    return fetch(url, {
+      method: "GET",
+      credentials: "same-origin",
+      headers: {
+        Accept: "text/html",
+        "X-Requested-With": "XMLHttpRequest"
+      }
+    }).then(function (response) {
+      if (!response || !response.ok) return "";
+      return response.text();
+    }).then(function (html) {
+      if (!html) {
+        emitFragmentRefresh(data, specs, url, 0);
+        return 0;
+      }
+      var parsed = new DOMParser().parseFromString(html, "text/html");
+      var count = applyFragmentDocument(parsed, specs);
+      emitFragmentRefresh(data, specs, url, count);
+      return count;
+    }, function () {
+      emitFragmentRefresh(data, specs, url, 0);
+      return 0;
+    });
+  }
+
   function markWorkbench(data, change, selectedCount) {
     var message = String(data.message || "").trim();
     roots().forEach(function (root) {
@@ -293,17 +429,14 @@
       setOptionalAttr(root, CHANGE_COMPONENT_ATTR, change.component);
       setOptionalAttr(root, CHANGE_BINDING_ATTR, change.binding);
     });
-    if (message) {
-      queryAll("[data-gosx-studio-save-detail]").forEach(function (node) {
-        node.textContent = message;
-      });
+    writeSaveFeedback(message);
+    if (typeof window.setTimeout === "function") {
+      window.setTimeout(function () { writeSaveFeedback(message); }, 0);
+      window.setTimeout(function () { writeSaveFeedback(message); }, 100);
     }
-    queryAll("[data-gosx-studio-save-state='true']").forEach(function (node) {
-      node.textContent = "Saved";
-    });
   }
 
-  function emitResult(data, meta, change, selectedCount, previewCount) {
+  function emitResult(data, meta, change, selectedCount, previewCount, fragmentCount) {
     if (typeof window.CustomEvent !== "function" || typeof doc.dispatchEvent !== "function") return;
     doc.dispatchEvent(new CustomEvent("gosxstudio:authoring-result", {
       detail: {
@@ -312,7 +445,8 @@
         result: data,
         change: change,
         selectedCount: selectedCount,
-        previewCount: previewCount
+        previewCount: previewCount,
+        fragmentCount: fragmentCount || 0
       }
     }));
   }
@@ -325,17 +459,25 @@
     var data = dataFromResult(result, meta);
     if (!data) return null;
     var change = firstChange(data);
-    var selectedCount = selectChange(change);
     var previewCount = refreshPreview(data);
-    markWorkbench(data, change, selectedCount);
-    markSourcePanel(data, change, meta.sourcePanel);
-    emitResult(data, meta, change, selectedCount, previewCount);
-    return {
-      result: data,
-      change: change,
-      selectedCount: selectedCount,
-      previewCount: previewCount
+    var finish = function (fragmentCount) {
+      var selectedCount = selectChange(change);
+      markWorkbench(data, change, selectedCount);
+      markSourcePanel(data, change, meta.sourcePanel);
+      emitResult(data, meta, change, selectedCount, previewCount, fragmentCount);
+      return {
+        result: data,
+        change: change,
+        selectedCount: selectedCount,
+        previewCount: previewCount,
+        fragmentCount: fragmentCount || 0
+      };
     };
+    var specs = fragmentSpecs(data);
+    if (specs.length) {
+      return refreshFragments(data).then(finish);
+    }
+    return finish(0);
   }
 
   function handleManagedFormResult(event) {
@@ -533,9 +675,14 @@
       "[data-gosx-studio-page-metadata]",
       "[data-gosx-studio-component-visibility]",
       "[data-gosx-studio-component-reorder]",
+      "[data-gosx-studio-component-duplicate]",
+      "[data-gosx-studio-component-delete]",
+      "[data-studio-composition-intent-apply]",
       "[data-studio-site-map-page-edit]",
       "[data-studio-site-map-component-visibility]",
-      "[data-studio-site-map-component-reorder]"
+      "[data-studio-site-map-component-reorder]",
+      "[data-studio-site-map-component-duplicate]",
+      "[data-studio-site-map-component-delete]"
     ].join(", "));
   }
 

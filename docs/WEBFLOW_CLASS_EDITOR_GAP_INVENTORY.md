@@ -109,6 +109,10 @@ Current:
 - Managed authoring forms now keep editable-control, page metadata,
   visibility, and reorder edits in the active editor instead of forcing a
   full-page redirect for every persisted change.
+- Structural authoring results can now request targeted editor fragment
+  refreshes. The browser runtime fetches the current editor document, replaces
+  host-declared fragments, remounts editor runtimes, and then selects the
+  changed page/component before emitting authoring result feedback.
 - `AuthoringSiteMapView` now exposes the first editable page metadata mutation
   payload, and Noni/Pajaritos persist page title/route updates with field-level
   validation through the same authoring action boundary.
@@ -631,6 +635,10 @@ These are the current places to mine for reusable Studio behavior.
     desktop/mobile viewport fit.
 18. Done on 2026-06-01: add reference-app performance budgets for runtime
     payload, preview latency, canvas overlay cost, and publish readiness.
+19. Done on 2026-06-01: add the structural authoring fragment-refresh contract
+    and graduate create-page, add-section, duplicate-section, and
+    delete-section capable forms to managed in-place authoring in both
+    reference apps.
 
 ## Execution Log
 
@@ -828,18 +836,24 @@ These are the current places to mine for reusable Studio behavior.
   the affected component, update save-detail chrome, and rewrite the local
   position output, next target field, and Move up/down button after a
   successful result in both reference apps.
+- 2026-06-01: Added the structural authoring fragment-refresh contract and
+  graduated create-page, add-section, duplicate-section, and delete-section
+  capable forms to managed in-place authoring. Studio action results now carry
+  refresh fragment selectors; the authoring runtime fetches the editor
+  document, replaces those fragments, remounts runtimes, refreshes preview, and
+  preserves visible save feedback. Muddy/Noni and Pajaritos both use the
+  contract for structural authoring controls without adding client-visible
+  platform copy.
 
 ## Next Execution Slice
 
-The next practical slice is the structural authoring refresh contract:
+The next practical slice is the next shell/render extraction:
 
-- Define a Studio fragment-refresh contract for structural add, duplicate, and
-  delete operations so those workflows can leave the redirect path without
-  stale site-map/canvas DOM.
-- Use that contract to graduate visible add/duplicate/delete controls to
-  managed in-place authoring in Muddy/Noni and Pajaritos.
 - Collapse the remaining `gosx-cms/studio` workbench wrapper duplication once
   the structural refresh loop is stable.
+- Pull the site-map authoring control panels behind a Studio-owned renderer so
+  host routes stop duplicating metadata/edit/reorder/duplicate/visibility/delete
+  markup.
 - Keep broadening visual/accessibility/performance checks as inspector, media,
   flow, and publish surfaces move behind reusable Studio-owned render paths.
 

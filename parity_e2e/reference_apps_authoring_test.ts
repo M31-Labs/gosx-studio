@@ -1,10 +1,9 @@
 import { expect, test } from "@playwright/test";
 import {
   authoringParam,
-  clickAuthoringPanel,
+  applyAuthoringPanelInPlace,
+  applyCompositionIntentInPlace,
   clickEditorActionButton,
-  clickIntent,
-  expectIntentButtonReceivesPointer,
   expectPajaritosPublishingReadiness,
   expectPanelButtonReceivesPointer,
   reorderComponent,
@@ -31,19 +30,21 @@ test.describe("@reference-apps browser authoring workflows", () => {
         expectedMessage: "Studio Test Notes saved.",
       });
 
-      await expectIntentButtonReceivesPointer(page, "create-page:landing");
-      const createResponse = await clickIntent(page, "create-page:landing");
-      expect(createResponse.status()).toBe(303);
+      await applyCompositionIntentInPlace(page, "create-page:landing", {
+        expectedMessage: "Landing created.",
+        expectedChangeKind: "page",
+        requireSelection: false,
+      });
       await expect(page.locator("body")).toContainText("6 pages");
 
-      await expectIntentButtonReceivesPointer(page, "add-component:home:contact-flow");
-      const addResponse = await clickIntent(page, "add-component:home:contact-flow");
-      expect(addResponse.status()).toBe(303);
+      await applyCompositionIntentInPlace(page, "add-component:home:contact-flow", {
+        expectedMessage: "Contact form added to Home.",
+      });
       await expect(page.locator("[data-studio-composition-intent-forms='true']")).toBeAttached();
 
-      await expectPanelButtonReceivesPointer(page, "[data-studio-site-map-component-duplicate='true']");
-      const duplicateResponse = await clickAuthoringPanel(page, "[data-studio-site-map-component-duplicate='true']");
-      expect(duplicateResponse.status()).toBe(303);
+      await applyAuthoringPanelInPlace(page, "[data-studio-site-map-component-duplicate='true']", {
+        expectedMessage: "Hero copy 2 duplicated.",
+      });
       await expect(page.locator("body")).toContainText("Hero copy 2");
 
       await saveEditableControl(page, "Surface-tested clay rituals", {
@@ -69,22 +70,21 @@ test.describe("@reference-apps browser authoring workflows", () => {
         expectedMessage: "Forest Notes saved.",
       });
 
-      await expectIntentButtonReceivesPointer(page, "create-page:program-page");
-      const createResponse = await clickIntent(page, "create-page:program-page");
-      expect(createResponse.status()).toBe(303);
-      expect(authoringParam(createResponse, "gosx_studio_operation")).toBe("apply-intent");
-      expect(authoringParam(createResponse, "gosx_studio_intent_kind")).toBe("create-page");
+      const createResult = await applyCompositionIntentInPlace(page, "create-page:program-page", {
+        expectedMessage: "Program Page created.",
+        expectedChangeKind: "page",
+      });
+      expect(authoringParam(createResult.response, "gosx_studio_operation")).toBe("apply-intent");
+      expect(authoringParam(createResult.response, "gosx_studio_intent_kind")).toBe("create-page");
       await expect(page.locator("[data-studio-composition-intent-forms='true']")).toBeAttached();
       await expect(page.locator("[data-gosx-studio-page-list='true']")).toContainText("6 pages");
       await expect(page.locator("[data-gosx-studio-page-list='true']")).toContainText("Program Page");
-      await expect(page.locator("body")).toContainText("Program Page created.");
 
-      await expectPanelButtonReceivesPointer(page, "[data-gosx-studio-component-duplicate='true']");
-      const duplicateResponse = await clickAuthoringPanel(page, "[data-gosx-studio-component-duplicate='true']", { reloadAfter: false });
-      expect(duplicateResponse.status()).toBe(303);
-      expect(authoringParam(duplicateResponse, "gosx_studio_operation")).toBe("duplicate-component");
-      expect(authoringParam(duplicateResponse, "gosx_studio_component_key")).toBe("hero");
-      await expect(page.locator("body")).toContainText("Hero copy 2 duplicated.");
+      const duplicateResult = await applyAuthoringPanelInPlace(page, "[data-gosx-studio-component-duplicate='true']", {
+        expectedMessage: "Hero copy 2 duplicated.",
+      });
+      expect(authoringParam(duplicateResult.response, "gosx_studio_operation")).toBe("duplicate-component");
+      expect(authoringParam(duplicateResult.response, "gosx_studio_component_key")).toBe("hero");
 
       await saveEditableControl(page, "Small boots, big questions.", {
         reloadAfter: false,
@@ -94,13 +94,12 @@ test.describe("@reference-apps browser authoring workflows", () => {
       await toggleComponentVisibility(page, { reloadAfter: false });
       await reorderComponent(page, { reloadAfter: false });
 
-      await expectIntentButtonReceivesPointer(page, "add-component:home:hero");
-      const addResponse = await clickIntent(page, "add-component:home:hero");
-      expect(addResponse.status()).toBe(303);
-      expect(authoringParam(addResponse, "gosx_studio_operation")).toBe("apply-intent");
-      expect(authoringParam(addResponse, "gosx_studio_intent_kind")).toBe("add-component");
-      expect(authoringParam(addResponse, "gosx_studio_component_template_key")).toBe("hero");
-      await expect(page.locator("body")).toContainText("Hero section added to Home.");
+      const addResult = await applyCompositionIntentInPlace(page, "add-component:home:hero", {
+        expectedMessage: "Hero section added to Home.",
+      });
+      expect(authoringParam(addResult.response, "gosx_studio_operation")).toBe("apply-intent");
+      expect(authoringParam(addResult.response, "gosx_studio_intent_kind")).toBe("add-component");
+      expect(authoringParam(addResult.response, "gosx_studio_component_template_key")).toBe("hero");
       await expect(page.locator("[data-studio-site-map-component='hero__copy_3']").first()).toBeAttached();
       await expectPajaritosPublishingReadiness(page);
 

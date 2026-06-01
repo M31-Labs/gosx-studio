@@ -81,11 +81,13 @@ type AuthoringMutationResult struct {
 	Message        string
 	RedirectURL    string
 	PreviewURL     string
+	FragmentURL    string
 	DraftID        string
 	RefreshPreview bool
 	FieldErrors    map[string]string
 	Values         map[string]string
 	Changes        []AuthoringChange
+	Fragments      []AuthoringRefreshFragment
 }
 
 type AuthoringChange struct {
@@ -96,6 +98,12 @@ type AuthoringChange struct {
 	PageKey   string
 	Component string
 	Binding   string
+}
+
+type AuthoringRefreshFragment struct {
+	Key      string
+	Selector string
+	Mode     string
 }
 
 func AuthoringActionHandler(adapter AuthoringAdapter) action.Handler {
@@ -476,6 +484,33 @@ func AuthoringFieldNamesView() map[string]string {
 	}
 }
 
+func AuthoringRefreshFragments(selectors ...string) []AuthoringRefreshFragment {
+	fragments := make([]AuthoringRefreshFragment, 0, len(selectors))
+	for _, selector := range selectors {
+		fragment := AuthoringRefreshFragment{Selector: selector}.Normalize()
+		if fragment.Selector == "" {
+			continue
+		}
+		fragments = append(fragments, fragment)
+	}
+	return fragments
+}
+
+func (fragment AuthoringRefreshFragment) Normalize() AuthoringRefreshFragment {
+	fragment.Key = strings.TrimSpace(fragment.Key)
+	fragment.Selector = strings.TrimSpace(fragment.Selector)
+	fragment.Mode = strings.TrimSpace(fragment.Mode)
+	switch fragment.Mode {
+	case "", "replace":
+		fragment.Mode = "replace"
+	case "inner":
+		fragment.Mode = "inner"
+	default:
+		fragment.Mode = "replace"
+	}
+	return fragment
+}
+
 func (validation AuthoringValidation) OK() bool {
 	return len(validation.FieldErrors) == 0
 }
@@ -509,10 +544,12 @@ func (result AuthoringMutationResult) Normalize() AuthoringMutationResult {
 	result.Message = strings.TrimSpace(result.Message)
 	result.RedirectURL = strings.TrimSpace(result.RedirectURL)
 	result.PreviewURL = strings.TrimSpace(result.PreviewURL)
+	result.FragmentURL = strings.TrimSpace(result.FragmentURL)
 	result.DraftID = strings.TrimSpace(result.DraftID)
 	result.FieldErrors = cloneStringMap(result.FieldErrors)
 	result.Values = cloneStringMap(result.Values)
 	result.Changes = normalizeAuthoringChanges(result.Changes)
+	result.Fragments = normalizeAuthoringRefreshFragments(result.Fragments)
 	return result
 }
 
@@ -526,13 +563,41 @@ func AuthoringMutationResultView(result AuthoringMutationResult) map[string]any 
 		"message":        result.Message,
 		"redirectURL":    result.RedirectURL,
 		"previewURL":     result.PreviewURL,
+		"fragmentURL":    result.FragmentURL,
 		"draftID":        result.DraftID,
 		"refreshPreview": result.RefreshPreview,
 		"fieldErrors":    cloneStringMap(result.FieldErrors),
 		"values":         cloneStringMap(result.Values),
 		"changes":        authoringChangeViews(result.Changes),
 		"changeCount":    len(result.Changes),
+		"fragments":      authoringRefreshFragmentViews(result.Fragments),
+		"fragmentCount":  len(result.Fragments),
 	}
+}
+
+func normalizeAuthoringRefreshFragments(fragments []AuthoringRefreshFragment) []AuthoringRefreshFragment {
+	out := make([]AuthoringRefreshFragment, 0, len(fragments))
+	for _, fragment := range fragments {
+		fragment = fragment.Normalize()
+		if fragment.Selector == "" {
+			continue
+		}
+		out = append(out, fragment)
+	}
+	return out
+}
+
+func authoringRefreshFragmentViews(fragments []AuthoringRefreshFragment) []map[string]string {
+	fragments = normalizeAuthoringRefreshFragments(fragments)
+	out := make([]map[string]string, 0, len(fragments))
+	for _, fragment := range fragments {
+		out = append(out, map[string]string{
+			"key":      fragment.Key,
+			"selector": fragment.Selector,
+			"mode":     fragment.Mode,
+		})
+	}
+	return out
 }
 
 func normalizeAuthoringOperationKind(kind AuthoringOperationKind) AuthoringOperationKind {

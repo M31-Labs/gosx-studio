@@ -207,4 +207,80 @@ test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
     expect(detail.selectedCount ?? 0).toBeGreaterThan(0);
     expect(detail.previewCount ?? 0).toBeGreaterThan(0);
   });
+
+  test("refreshes structural fragments before emitting authoring result", async ({ page }) => {
+    await page.route("http://127.0.0.1:4173/editor", async (route) => {
+      await route.fulfill({
+        contentType: "text/html",
+        body: `
+          <main class="editor-workbench" data-gosx-studio-workbench="true">
+            <section data-gosx-studio-fragment="site-map">
+              <article data-studio-site-map-component="hero__copy_2">Hero copy 2</article>
+            </section>
+          </main>
+        `,
+      });
+    });
+    await page.setContent(`
+      <main class="editor-workbench" data-gosx-studio-workbench="true">
+        <span data-gosx-studio-save-detail="true">Unsaved</span>
+        <section data-gosx-studio-fragment="site-map">
+          <article data-studio-site-map-component="hero">Hero</article>
+        </section>
+      </main>
+    `);
+    await page.addScriptTag({ content: runtimeJS });
+
+    const snapshot = await page.evaluate(async () => {
+      const details: unknown[] = [];
+      document.addEventListener("gosxstudio:fragments-refresh", (event) => {
+        details.push({ fragments: (event as CustomEvent).detail });
+      });
+      document.addEventListener("gosxstudio:authoring-result", (event) => {
+        details.push({ authoring: (event as CustomEvent).detail });
+      });
+
+      const runtime = (window as unknown as {
+        GoSXStudioAuthoringRuntime: {
+          handleResult: (result: unknown, meta: unknown) => Promise<unknown>;
+        };
+      }).GoSXStudioAuthoringRuntime;
+
+      await runtime.handleResult({
+        ok: true,
+        message: "Hero copy 2 duplicated.",
+        data: {
+          message: "Hero copy 2 duplicated.",
+          fragmentURL: "http://127.0.0.1:4173/editor",
+          fragments: [{ selector: "[data-gosx-studio-fragment='site-map']" }],
+          changes: [{
+            key: "home-section-hero__copy_2",
+            label: "Hero copy 2",
+            kind: "component",
+            pageKey: "home",
+            component: "hero__copy_2",
+            binding: "home.section.hero__copy_2",
+          }],
+        },
+      }, {
+        action: "/admin/editor/__actions/authoring",
+        method: "POST",
+      });
+
+      const root = document.querySelector("[data-gosx-studio-fragment='site-map']") as HTMLElement;
+      const copied = document.querySelector("[data-studio-site-map-component='hero__copy_2']") as HTMLElement;
+      return {
+        html: root.innerHTML,
+        selected: copied?.getAttribute("data-gosx-studio-authoring-selected") ?? "",
+        saveDetail: document.querySelector("[data-gosx-studio-save-detail]")?.textContent?.trim() ?? "",
+        details,
+      };
+    });
+
+    expect(snapshot.html).toContain("Hero copy 2");
+    expect(snapshot.selected).toBe("true");
+    expect(snapshot.saveDetail).toBe("Hero copy 2 duplicated.");
+    expect(JSON.stringify(snapshot.details)).toContain("fragments");
+    expect(JSON.stringify(snapshot.details)).toContain("\"fragmentCount\":1");
+  });
 });

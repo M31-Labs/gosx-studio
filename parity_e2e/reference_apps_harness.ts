@@ -27,6 +27,8 @@ export type StudioAuthoringResultDetail = {
     message?: string;
     previewURL?: string;
     refreshPreview?: boolean;
+    fragments?: Array<{ selector?: string; mode?: string }>;
+    fragmentCount?: number;
   };
   change?: {
     key?: string;
@@ -37,10 +39,17 @@ export type StudioAuthoringResultDetail = {
   };
   selectedCount?: number;
   previewCount?: number;
+  fragmentCount?: number;
 };
 
-export async function clickIntent(page: Page, intentKey: string) {
-  return clickAuthoringButton(page, `[data-studio-composition-intent="${intentKey}"] button`);
+export type StudioFragmentRefreshDetail = {
+  url?: string;
+  count?: number;
+  selectors?: string[];
+};
+
+export async function clickIntent(page: Page, intentKey: string, options?: ClickAuthoringOptions) {
+  return clickAuthoringButton(page, `[data-studio-composition-intent="${intentKey}"] button`, options);
 }
 
 export async function clickAuthoringPanel(page: Page, panelSelector: string, options?: ClickAuthoringOptions) {
@@ -52,10 +61,11 @@ export async function clickAuthoringButton(page: Page, buttonSelector: string, o
 }
 
 export async function clickEditorActionButton(page: Page, buttonSelector: string, actionPathPart: string, options?: ClickAuthoringOptions) {
-  const navigationPromise = page.waitForEvent("framenavigated", {
+  const shouldWaitForNavigation = options?.reloadAfter !== false;
+  const navigationPromise = shouldWaitForNavigation ? page.waitForEvent("framenavigated", {
     predicate: (frame) => frame === page.mainFrame(),
     timeout: 3_000,
-  }).catch(() => null);
+  }).catch(() => null) : Promise.resolve(null);
   const responsePromise = page.waitForResponse((response) =>
     response.url().includes(actionPathPart) &&
     response.request().method() === "POST",
@@ -172,6 +182,62 @@ export async function waitForStudioAuthoringResult(page: Page) {
     };
     document.addEventListener("gosxstudio:authoring-result", handler);
   }));
+}
+
+export async function waitForStudioFragmentRefresh(page: Page) {
+  return page.evaluate(() => new Promise<StudioFragmentRefreshDetail | null>((resolve) => {
+    let handler: EventListener;
+    const timeout = window.setTimeout(() => {
+      document.removeEventListener("gosxstudio:fragments-refresh", handler);
+      resolve(null);
+    }, 5_000);
+    handler = (event: Event) => {
+      window.clearTimeout(timeout);
+      document.removeEventListener("gosxstudio:fragments-refresh", handler);
+      resolve(((event as CustomEvent).detail ?? null) as StudioFragmentRefreshDetail | null);
+    };
+    document.addEventListener("gosxstudio:fragments-refresh", handler);
+  }));
+}
+
+export async function applyCompositionIntentInPlace(page: Page, intentKey: string, options?: { expectedMessage?: string; expectedChangeKind?: string; requireSelection?: boolean }) {
+  await expectIntentButtonReceivesPointer(page, intentKey);
+  const authoringResultPromise = waitForStudioAuthoringResult(page);
+  const fragmentRefreshPromise = waitForStudioFragmentRefresh(page);
+  const response = await clickIntent(page, intentKey, { reloadAfter: false, settleAfter: false, noWaitAfter: true });
+  expect(response.status()).toBe(200);
+  const detail = await authoringResultPromise;
+  const fragments = await fragmentRefreshPromise;
+  expect(detail, `${intentKey} should emit authoring result detail`).toBeTruthy();
+  expect(detail?.result?.message).toBe(options?.expectedMessage);
+  expect(detail?.change?.kind).toBe(options?.expectedChangeKind ?? "component");
+  if (options?.requireSelection !== false) {
+    expect(detail?.selectedCount ?? 0, `${intentKey} should select the changed surface`).toBeGreaterThan(0);
+  }
+  expect(detail?.previewCount ?? 0, `${intentKey} should refresh preview`).toBeGreaterThan(0);
+  expect(detail?.fragmentCount ?? 0, `${intentKey} should refresh structural fragments`).toBeGreaterThan(0);
+  expect(fragments?.count ?? 0, `${intentKey} should replace at least one fragment`).toBeGreaterThan(0);
+  await expect(page.locator("[data-gosx-studio-save-detail]").first()).toHaveText(options?.expectedMessage ?? /./);
+  return { response, detail, fragments };
+}
+
+export async function applyAuthoringPanelInPlace(page: Page, panelSelector: string, options?: { expectedMessage?: string; expectedChangeKind?: string }) {
+  await expectPanelButtonReceivesPointer(page, panelSelector);
+  const authoringResultPromise = waitForStudioAuthoringResult(page);
+  const fragmentRefreshPromise = waitForStudioFragmentRefresh(page);
+  const response = await clickAuthoringPanel(page, panelSelector, { reloadAfter: false, settleAfter: false, noWaitAfter: true });
+  expect(response.status()).toBe(200);
+  const detail = await authoringResultPromise;
+  const fragments = await fragmentRefreshPromise;
+  expect(detail, `${panelSelector} should emit authoring result detail`).toBeTruthy();
+  expect(detail?.result?.message).toBe(options?.expectedMessage);
+  expect(detail?.change?.kind).toBe(options?.expectedChangeKind ?? "component");
+  expect(detail?.selectedCount ?? 0, `${panelSelector} should select the changed surface`).toBeGreaterThan(0);
+  expect(detail?.previewCount ?? 0, `${panelSelector} should refresh preview`).toBeGreaterThan(0);
+  expect(detail?.fragmentCount ?? 0, `${panelSelector} should refresh structural fragments`).toBeGreaterThan(0);
+  expect(fragments?.count ?? 0, `${panelSelector} should replace at least one fragment`).toBeGreaterThan(0);
+  await expect(page.locator("[data-gosx-studio-save-detail]").first()).toHaveText(options?.expectedMessage ?? /./);
+  return { response, detail, fragments };
 }
 
 export async function saveEditableControl(page: Page, value: string, options?: ClickAuthoringOptions & { expectedMessage?: string }) {
@@ -319,7 +385,12 @@ export async function reorderComponent(page: Page, options?: ClickAuthoringOptio
 }
 
 export function authoringParam(response: { request(): { postData(): string | null } }, key: string) {
-  return new URLSearchParams(response.request().postData() ?? "").get(key);
+  const body = response.request().postData() ?? "";
+  const encoded = new URLSearchParams(body).get(key);
+  if (encoded !== null) return encoded;
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(`name="${escaped}"\\s*\\r?\\n\\r?\\n([^\\r\\n]*)`).exec(body);
+  return match?.[1] ?? null;
 }
 
 export async function startMuddy(request: APIRequestContext): Promise<ServerHandle> {
