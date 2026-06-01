@@ -449,12 +449,17 @@ Current:
   CSRF, follows the redirect, and verifies the new page appears. That check also
   caught and fixed a transformed canvas overlay that was intercepting authoring
   controls.
+- `parity_e2e/reference_apps_authoring_test.ts` now provides an opt-in
+  browser harness that boots sibling Muddy/Noni and Pajaritos apps with temp
+  data, verifies visible authoring buttons receive pointer events, and submits
+  create-page/add-section actions through the real admin editor action flow.
 - `docs/PUBLIC_READINESS.md` names the release posture concerns.
 
 Missing:
 
-- Full browser-driven editor workflows across both Noni and Pajaritos, including
-  authenticated/CSRF-capable sessions that click the visible controls.
+- Default-CI browser-driven editor workflows across both Noni and Pajaritos,
+  plus deeper persisted browser assertions for duplicate, edit-control,
+  preview refresh, staging publish readiness, and rollback.
 - Visual regression checks for the shell, canvas, inspector, site map, media,
   flow designer, publish panel, and responsive preview.
 - Accessibility checks for keyboard navigation, focus, labels, reduced motion,
@@ -670,17 +675,21 @@ These are the current places to mine for reusable Studio behavior.
   Muddy and Pajaritos now render visible create-page/add-section, page
   metadata, component reorder, duplicate, visibility, and delete hidden-input
   payloads from the shared Studio projection instead of app-local field lists.
+- 2026-06-01: Added opt-in reference-app browser e2e coverage in
+  `parity_e2e/reference_apps_authoring_test.ts`. It boots sibling Muddy/Noni
+  and Pajaritos apps with temp data directories, checks that visible
+  create-page/add-section buttons are not blocked by overlays, and verifies the
+  real authoring POST/redirect path in both admin editors.
 
 ## Next Execution Slice
 
 The next practical slice is full browser automation plus the next visible shell
 extraction:
 
-- Turn the persisted editor-surface smoke tests into browser-driven reference
-  app flows that run with real authenticated/CSRF-capable sessions or a
-  local-only test bypass. The shared runtime-level browser-click coverage is
-  now in place, and the first Pajaritos create-page browser click has been
-  verified against a real local app server.
+- Promote the opt-in Muddy/Pajaritos reference-app browser e2e into default CI
+  and broaden it from create/add POST/redirect checks to duplicate,
+  edit-control, preview-refresh, staging publish readiness, and rollback
+  workflows with persisted browser-visible assertions.
 - Continue the shell extraction by moving the next visible wrapper/toolbar
   piece behind a Studio-owned render path that consumes `WorkbenchShellView`.
 - Extend `authoringruntime` host-backed smoke coverage to assert

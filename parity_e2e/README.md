@@ -98,6 +98,31 @@ Override the base URL when running against a different host:
 GOSX_STUDIO_PARITY_BASE_URL=http://localhost:8080 npm test
 ```
 
+## Reference App Authoring E2E
+
+`reference_apps_authoring_test.ts` is an opt-in browser workflow for the two
+current reference apps. It boots Muddy/Noni and Pajaritos from sibling worktrees
+with temporary data directories, opens their real admin editors, verifies the
+visible authoring buttons receive pointer events, and submits create-page plus
+add-section actions through the real GoSX action/CSRF flow.
+
+It is not part of default parity CI yet because it depends on sibling app
+worktrees. Run it locally with:
+
+```bash
+GOSX_STUDIO_REFERENCE_APP_E2E=1 \
+  npx playwright test reference_apps_authoring_test.ts
+```
+
+Override sibling locations if needed:
+
+```bash
+GOSX_STUDIO_REFERENCE_APP_E2E=1 \
+GOSX_STUDIO_MUDDY_REPO=~/work/muddy-noni-commerce \
+GOSX_STUDIO_PAJARITOS_REPO=~/work/pajaritos-forest-school \
+  npx playwright test reference_apps_authoring_test.ts
+```
+
 ## File layout
 
 | File | Purpose |
