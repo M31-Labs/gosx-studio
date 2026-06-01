@@ -980,32 +980,40 @@ These are the current places to mine for reusable Studio behavior.
   an inert hidden hook unless `Enabled:true`; the `RenderSiteMapBoard` DOM path
   is untouched. Go coverage in `sitemap_canvas_test.go`; full gosx-studio suite
   green. Merged to main as `0b23c8e`.
+- 2026-06-01 (birch): Shipped **keyboard node navigation** on the shared board.
+  Arrow keys move the primary `selectedNode` to the spatially-nearest visible
+  node (cost = primary-axis distance + 2× perpendicular, half-plane filtered;
+  first arrow with no selection picks topmost-leftmost). `Enter`/`Space`
+  dispatch `gosxstudio:site-map-activate {key}` for hosts to open the inspector.
+  6 parity cases; merged to main as `b597deb`.
+- 2026-06-01 (sequoia): Hotfix `f3847c8` — keyboard handler must not hijack
+  `Enter`/`Space`/arrows when focus is on an interactive control
+  (button/link/contenteditable). Added an `isInteractiveControl` guard + a parity
+  regression test. (Caught by the reference-app e2e: a focused "Add" button +
+  `Enter` was being `preventDefault`ed, blocking native activation.)
 
 ## Next Execution Slice
 
-The infinite-canvas viewport (pan/zoom/keyboard) shipped on the shared board.
-The next practical slices, in order, are:
+Shipped on the shared board: infinite-canvas pan/zoom, marquee multi-select, and
+keyboard node navigation (arrows + `Enter`/`Space` activate, regression-fixed to
+respect focused controls). A `:focus-visible` ring is a minor host-CSS
+follow-up. The next practical slices, in order, are:
 
-1. **Keyboard node navigation + focus ring** on the shared board: arrow-key
-   spatial selection movement between nodes, `Enter` to open the inspector, and
-   a visible `:focus-visible` ring — with `sitemapruntime_test.ts` parity
-   coverage. (Marquee multi-select, shift-click toggle, and `Escape`-clear
-   shipped 2026-06-01.)
-2. **Node drag-to-reposition with persisted canvas positions**: free placement
+1. **Node drag-to-reposition with persisted canvas positions**: free placement
    on the pan surface emitting `gosxstudio:sitemap-node-moved {key,x,y}`, host
    persistence into the "Saved canvas positions" (`layout-graph`) store, and
    snap-to-grid.
-3. **Parallel track — Canvas2D engine (foundation shipped 2026-06-01, `0b23c8e`).**
+2. **Parallel track — Canvas2D engine (foundation shipped 2026-06-01, `0b23c8e`).**
    `RenderSiteMapCanvasEngine` (opt-in, default-off) mounts `gosx.CanvasBoard`
    for the page graph. Remaining: browser/WASM hydration e2e for the canvas
    surface; grid/marquee/drag wiring on it (the primitive ships
    render/pan/zoom/pick only); deterministic positions persisted instead of
    structural grid; and a host opt-in + flag flip once at parity with the DOM
    board.
-4. Decide the Pajaritos map path: adopt the shared board directly, or provide a
+3. Decide the Pajaritos map path: adopt the shared board directly, or provide a
    host-styled board slot that still uses `AuthoringSiteMapView` plus
    `sitemapruntime`.
-5. Keep broadening visual/accessibility/performance checks as inspector, media,
+4. Keep broadening visual/accessibility/performance checks as inspector, media,
    flow, and publish surfaces move behind reusable Studio-owned render paths.
 
 ## Definition of Done
