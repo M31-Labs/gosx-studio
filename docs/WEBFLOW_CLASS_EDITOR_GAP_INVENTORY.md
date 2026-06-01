@@ -432,11 +432,16 @@ Current:
   result feedback loop without requiring a host server: changed-object
   selection, canvas selection sync, preview refresh, save-state feedback, and
   `gosxstudio:authoring-result` dispatch.
+- Noni and Pajaritos now have persisted editor-surface smoke coverage that
+  submits the actual visible authoring payloads for create-page, add-component,
+  duplicate-component, and edit-control paths into their host persistence
+  layers.
 - `docs/PUBLIC_READINESS.md` names the release posture concerns.
 
 Missing:
 
-- End-to-end editor workflows across both Noni and Pajaritos.
+- Full browser-driven editor workflows across both Noni and Pajaritos, including
+  authenticated/CSRF-capable sessions that click the visible controls.
 - Visual regression checks for the shell, canvas, inspector, site map, media,
   flow designer, publish panel, and responsive preview.
 - Accessibility checks for keyboard navigation, focus, labels, reduced motion,
@@ -630,16 +635,19 @@ These are the current places to mine for reusable Studio behavior.
   Pajaritos now exposes `hostWorkbenchShell` from the same projection and uses
   it for editor host metadata. Both apps keep visible client copy host-branded
   while footer attribution remains limited to "Made with GoSX by M31 Labs."
+- 2026-06-01: Added persisted editor-surface smoke tests in both reference apps.
+  The tests pull the create-page, add-component, duplicate-component, and
+  edit-control payloads exposed to the editor surface, submit them through the
+  host mutation paths, and assert that pages, home sections, duplicated
+  sections, and text controls actually persist.
 
 ## Next Execution Slice
 
-The next practical slice is persisted browser confidence plus the next visible
-shell extraction:
+The next practical slice is full browser automation plus the next visible shell
+extraction:
 
-- Add Noni and Pajaritos persisted browser smoke tests for create page, add
-  component, duplicate component, and edit control through the visible editor
-  surface. The tests should run with real authenticated/CSRF-capable sessions
-  or a local-only test bypass, not just inspect form payloads.
+- Turn the persisted editor-surface smoke tests into browser-driven flows that
+  run with real authenticated/CSRF-capable sessions or a local-only test bypass.
 - Continue the shell extraction by moving the next visible wrapper/toolbar
   piece behind a Studio-owned render path that consumes `WorkbenchShellView`.
 - Extend `authoringruntime` host-backed smoke coverage to assert
