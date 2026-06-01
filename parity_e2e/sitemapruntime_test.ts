@@ -380,3 +380,157 @@ test.describe("@smoke GoSXStudioSiteMapRuntime infinite-canvas marquee and multi
     await expect(page.locator("[data-studio-site-map-workspace-node='alpha']")).toHaveAttribute("data-studio-site-map-node-selected", "true");
   });
 });
+
+// A plus/cross layout so spatial navigation is unambiguous. `center` sits in
+// the middle; `up`/`down`/`left`/`right` are aligned on its axes. `up` has the
+// smallest top (then smallest left), so it is the topmost-leftmost node.
+const keyboardNavBoard = `
+  <section
+    data-studio-site-map-board="true"
+    tabindex="0"
+    data-studio-site-map-scale="1"
+    data-studio-site-map-pan-x="0"
+    data-studio-site-map-pan-y="0"
+    data-studio-site-map-selected-node=""
+    data-studio-site-map-selected-nodes=""
+    data-studio-site-map-filter="all"
+  >
+    <div data-studio-site-map-workspace="true" data-studio-site-map-panel-visible="true">
+      <div data-studio-site-map-canvas="true" style="width:600px;height:400px;position:relative;overflow:hidden;">
+        <div data-studio-site-map-pan-surface="true" style="position:absolute;inset:0;">
+          <label data-studio-site-map-workspace-node="center" data-studio-site-map-group="site"
+                 data-studio-site-map-node-label="Center"
+                 style="position:absolute;left:280px;top:180px;width:80px;height:40px;">Center</label>
+          <label data-studio-site-map-workspace-node="right" data-studio-site-map-group="site"
+                 data-studio-site-map-node-label="Right"
+                 style="position:absolute;left:440px;top:180px;width:80px;height:40px;">Right</label>
+          <label data-studio-site-map-workspace-node="up" data-studio-site-map-group="site"
+                 data-studio-site-map-node-label="Up"
+                 style="position:absolute;left:280px;top:40px;width:80px;height:40px;">Up</label>
+          <label data-studio-site-map-workspace-node="down" data-studio-site-map-group="site"
+                 data-studio-site-map-node-label="Down"
+                 style="position:absolute;left:280px;top:320px;width:80px;height:40px;">Down</label>
+          <label data-studio-site-map-workspace-node="left" data-studio-site-map-group="site"
+                 data-studio-site-map-node-label="Left"
+                 style="position:absolute;left:120px;top:180px;width:80px;height:40px;">Left</label>
+        </div>
+      </div>
+    </div>
+  </section>
+`;
+
+test.describe("@smoke GoSXStudioSiteMapRuntime infinite-canvas keyboard navigation", () => {
+  test("ArrowRight moves the primary selection to the node on the right only", async ({ page }) => {
+    await page.setContent(keyboardNavBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    const board = page.locator("[data-studio-site-map-board='true']");
+    await page.evaluate(() => {
+      const root = document.querySelector("[data-studio-site-map-board='true']");
+      window.GoSXStudioSiteMapRuntime.setState(root, { selectedNode: "left" });
+    });
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-node", "left");
+
+    await board.focus();
+    await page.keyboard.press("ArrowRight");
+    // Nearest node strictly to the right of `left` is `center` (not `up`/`down`).
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-node", "center");
+
+    await page.keyboard.press("ArrowRight");
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-node", "right");
+  });
+
+  test("ArrowDown and ArrowUp move the primary selection vertically", async ({ page }) => {
+    await page.setContent(keyboardNavBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    const board = page.locator("[data-studio-site-map-board='true']");
+    await page.evaluate(() => {
+      const root = document.querySelector("[data-studio-site-map-board='true']");
+      window.GoSXStudioSiteMapRuntime.setState(root, { selectedNode: "center" });
+    });
+
+    await board.focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-node", "down");
+
+    await page.keyboard.press("ArrowUp");
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-node", "center");
+
+    await page.keyboard.press("ArrowUp");
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-node", "up");
+  });
+
+  test("an arrow key with nothing selected picks the topmost-leftmost node", async ({ page }) => {
+    await page.setContent(keyboardNavBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    const board = page.locator("[data-studio-site-map-board='true']");
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-node", "");
+
+    await board.focus();
+    await page.keyboard.press("ArrowDown");
+    // `up` has the smallest top, so it is the first (topmost-leftmost) node.
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-node", "up");
+  });
+
+  test("arrow navigation skips nodes hidden by a filter", async ({ page }) => {
+    await page.setContent(keyboardNavBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    const board = page.locator("[data-studio-site-map-board='true']");
+    await page.evaluate(() => {
+      const root = document.querySelector("[data-studio-site-map-board='true']");
+      window.GoSXStudioSiteMapRuntime.setState(root, { selectedNode: "left" });
+      // Hide `center` directly; arrow nav must skip invisible nodes.
+      root
+        .querySelector("[data-studio-site-map-workspace-node='center']")
+        .setAttribute("data-studio-site-map-visible", "false");
+    });
+
+    await board.focus();
+    await page.keyboard.press("ArrowRight");
+    // `center` is hidden, so the nearest visible node to the right is `right`.
+    await expect(board).toHaveAttribute("data-studio-site-map-selected-node", "right");
+  });
+
+  test("Enter dispatches gosxstudio:site-map-activate with the selected key", async ({ page }) => {
+    await page.setContent(keyboardNavBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    const board = page.locator("[data-studio-site-map-board='true']");
+    await page.evaluate(() => {
+      const root = document.querySelector("[data-studio-site-map-board='true']");
+      window.__activatedKey = null;
+      root.addEventListener("gosxstudio:site-map-activate", (event) => {
+        window.__activatedKey = event.detail && event.detail.key;
+      });
+      window.GoSXStudioSiteMapRuntime.setState(root, { selectedNode: "right" });
+    });
+
+    await board.focus();
+    await page.keyboard.press("Enter");
+    const key = await page.evaluate(() => window.__activatedKey);
+    expect(key).toBe("right");
+  });
+
+  test("Space also dispatches gosxstudio:site-map-activate", async ({ page }) => {
+    await page.setContent(keyboardNavBoard);
+    await page.addScriptTag({ content: runtimeJS });
+
+    const board = page.locator("[data-studio-site-map-board='true']");
+    await page.evaluate(() => {
+      const root = document.querySelector("[data-studio-site-map-board='true']");
+      window.__activatedKey = null;
+      root.addEventListener("gosxstudio:site-map-activate", (event) => {
+        window.__activatedKey = event.detail && event.detail.key;
+      });
+      window.GoSXStudioSiteMapRuntime.setState(root, { selectedNode: "down" });
+    });
+
+    await board.focus();
+    await page.keyboard.press("Space");
+    const key = await page.evaluate(() => window.__activatedKey);
+    expect(key).toBe("down");
+  });
+});

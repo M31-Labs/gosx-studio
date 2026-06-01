@@ -220,6 +220,86 @@
     document.addEventListener("pointerup", up);
   }
 
+  // ---- Keyboard node navigation (spatial arrows + activate) ----
+  function nodeCenter(node) {
+    var rect = node.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  }
+
+  function visibleNodes(root) {
+    return all(root, "[data-studio-site-map-workspace-node]").filter(function (node) {
+      return attr(node, "data-studio-site-map-visible", "true") !== "false";
+    });
+  }
+
+  // Topmost-leftmost visible node (smallest top, then smallest left).
+  function firstNodeKey(root) {
+    var best = null;
+    var bestCenter = null;
+    visibleNodes(root).forEach(function (node) {
+      var c = nodeCenter(node);
+      if (!best || c.y < bestCenter.y - 0.5 || (Math.abs(c.y - bestCenter.y) <= 0.5 && c.x < bestCenter.x)) {
+        best = node;
+        bestCenter = c;
+      }
+    });
+    return best ? attr(best, "data-studio-site-map-workspace-node", "") : "";
+  }
+
+  // Nearest visible node strictly in `dir` from the current node. Cost is the
+  // primary-axis distance plus a 2x perpendicular-axis penalty, so we prefer
+  // the node most directly in the pressed direction.
+  function nearestNodeKey(root, fromKey, dir) {
+    var fromNode = nodeByKey(root, fromKey);
+    if (!fromNode) return "";
+    var origin = nodeCenter(fromNode);
+    var best = null;
+    var bestCost = Infinity;
+    visibleNodes(root).forEach(function (node) {
+      var key = attr(node, "data-studio-site-map-workspace-node", "");
+      if (key === fromKey) return;
+      var c = nodeCenter(node);
+      var dx = c.x - origin.x;
+      var dy = c.y - origin.y;
+      var primary;
+      var perpendicular;
+      if (dir === "ArrowLeft") {
+        if (dx >= 0) return;
+        primary = -dx;
+        perpendicular = Math.abs(dy);
+      } else if (dir === "ArrowRight") {
+        if (dx <= 0) return;
+        primary = dx;
+        perpendicular = Math.abs(dy);
+      } else if (dir === "ArrowUp") {
+        if (dy >= 0) return;
+        primary = -dy;
+        perpendicular = Math.abs(dx);
+      } else { // ArrowDown
+        if (dy <= 0) return;
+        primary = dy;
+        perpendicular = Math.abs(dx);
+      }
+      var cost = primary + perpendicular * 2;
+      if (cost < bestCost) {
+        bestCost = cost;
+        best = key;
+      }
+    });
+    return best || "";
+  }
+
+  function navigateNodes(root, dir) {
+    var current = state(root).selectedNode;
+    var next = current ? nearestNodeKey(root, current, dir) : firstNodeKey(root);
+    if (!next || next === current) return;
+    setState(root, { selectedNode: next });
+  }
+
+  function isArrowKey(key) {
+    return key === "ArrowUp" || key === "ArrowDown" || key === "ArrowLeft" || key === "ArrowRight";
+  }
+
   function handleKeydown(root, event) {
     var target = event.target;
     if (target && target.matches && target.matches("input, textarea, select")) return;
@@ -232,6 +312,17 @@
     } else if (event.key === "0") {
       event.preventDefault();
       zoomAction(root, "reset");
+    } else if (isArrowKey(event.key)) {
+      event.preventDefault();
+      navigateNodes(root, event.key);
+    } else if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+      var selected = state(root).selectedNode;
+      if (!selected) return;
+      event.preventDefault();
+      root.dispatchEvent(new CustomEvent("gosxstudio:site-map-activate", {
+        bubbles: true,
+        detail: { key: selected },
+      }));
     } else if (event.key === "Escape") {
       if (state(root).selectedNodes.length) {
         event.preventDefault();
