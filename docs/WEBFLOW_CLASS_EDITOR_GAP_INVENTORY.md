@@ -35,7 +35,7 @@ still split across `gosx-studio`, `gosx-cms/studio`, Muddy Noni, and Pajaritos.
 | Studio package boundary | `README.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md` | The docs already define Studio as the authoring layer beside CMS/Admin, not inside a host app. |
 | Host shell contract | `store.go:12`, `store.go:27` | Hosts can feed Studio panels, media, revisions, readiness, adapters, and a normalized shell. |
 | Reusable workbench shell projection | `workbench_shell_view.go` | Studio now owns the shared editor shell view payload for workbench chrome, preview-shell attrs, zoom levels, rail resizers, CSRF/action metadata, and host label overrides. |
-| Reusable workbench toolbar renderer | `workbench_toolbar.go` | Studio now renders the first shared shell chrome from `WorkbenchShellView`: toolbar title, summary, save status, history controls, preview link, and save button. |
+| Reusable workbench toolbar renderer | `workbench_toolbar.go` | Studio now renders shared shell chrome from `WorkbenchShellView`: toolbar title, summary, mode controls, metrics, command palette, save status, history controls, preview link, and save button. |
 | Authoring projection | `authoring.go:9`, `authoring.go:21`, `authoring.go:47` | `AuthoringSurface` exposes pages, selected page, palette, intents, workspace graph, and canvas layout. |
 | Authoring mutation contract | `mutations.go` | Studio now has typed operation kinds, form field names, `AuthoringMutation`, `AuthoringAdapter`, validation/result envelopes, and a GoSX action handler for host-owned persistence. |
 | Typed page/component model | `studio.go:151`, `studio.go:156`, `studio.go:292` | Pages, components, controls, canvas blocks, blueprints, templates, and composition intents exist as contracts. |
@@ -62,9 +62,12 @@ Current:
   `gosx-studio`, and both Noni and Pajaritos consume it for workbench metadata,
   preview-shell attributes, zoom controls, rail resizers, and save/preview
   labels.
-- `RenderWorkbenchToolbar` now gives Go-rendered hosts a Studio-owned toolbar
-  path that consumes `WorkbenchShellView`. Pajaritos uses it for the visible
-  editor toolbar while preserving host-branded copy and existing CSS hooks.
+- `RenderWorkbenchToolbar`, `RenderWorkbenchModebar`,
+  `RenderWorkbenchMetricStrip`, and `RenderWorkbenchCommandPalette` now give
+  Go-rendered hosts a Studio-owned toolbar path that consumes
+  `WorkbenchShellView`. Muddy/Noni and Pajaritos both use it for visible editor
+  toolbar chrome while preserving host-branded copy, existing CSS hooks, and the
+  approved footer attribution shape.
 
 Missing:
 
@@ -765,14 +768,21 @@ These are the current places to mine for reusable Studio behavior.
   top editor toolbar from the Studio-owned `WorkbenchShellView` path, including
   host-branded title, summary, save state, history controls, preview link, and
   save action without reintroducing "GoSX Studio" client copy.
+- 2026-06-01: Extended the shared toolbar renderer with Studio-owned modebar,
+  metric-strip, and command-palette chrome. Muddy/Noni now renders its top
+  editor toolbar from `WorkbenchShellView` and deleted the app-local toolbar,
+  modebar, metric strip, command palette, save status, and history controls.
+  The reference-app browser suite verifies both apps across authoring,
+  performance, desktop/mobile visual integrity, accessibility, and host-branded
+  copy expectations.
 
 ## Next Execution Slice
 
 The next practical slice is the next shell/render extraction:
 
-- Move the Muddy/Noni top toolbar or the shared command-palette node onto the
-  Studio-owned render path so both reference apps use the same shell chrome
-  contract for visible editor actions.
+- Move the remaining workbench stage/rail wrapper onto a Studio-owned render
+  path so app editor pages become route/data wrappers instead of owning the
+  outer form, stage, canvas, and rail structure.
 - Extend `authoringruntime` host-backed smoke coverage to assert
   changed-object selection and preview refresh after those persisted actions.
 - Keep broadening visual/accessibility/performance checks as inspector, media,

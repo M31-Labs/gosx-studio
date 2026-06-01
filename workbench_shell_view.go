@@ -12,6 +12,7 @@ type WorkbenchShellSource struct {
 	BlockCount    int
 	MediaCount    int
 	RevisionCount int
+	Metrics       []Metric
 	Modes         []Mode
 	Viewports     []Viewport
 	Canvas        CanvasSurface
@@ -86,6 +87,7 @@ func WorkbenchShellSourceFromShell(shell Shell) WorkbenchShellSource {
 		BlockCount:    shell.BlockCount,
 		MediaCount:    shell.MediaCount,
 		RevisionCount: shell.RevisionCount,
+		Metrics:       append([]Metric(nil), shell.Metrics...),
 		Modes:         append([]Mode(nil), shell.Modes...),
 		Viewports:     append([]Viewport(nil), shell.Viewports...),
 		Canvas:        shell.Canvas,
@@ -118,6 +120,8 @@ func WorkbenchShellView(source WorkbenchShellSource, options WorkbenchShellViewO
 		"blockCount":         strconv.Itoa(source.BlockCount),
 		"mediaCount":         strconv.Itoa(source.MediaCount),
 		"revisionCount":      strconv.Itoa(source.RevisionCount),
+		"metrics":            shellMetricViews(NormalizeMetrics(source.Metrics)),
+		"modes":              shellModeViews(NormalizeModes(source.Modes)),
 		"autosaveURL":        FirstNonEmpty(options.AutosaveURL, action),
 		"autosaveDelay":      strconv.Itoa(firstPositive(options.AutosaveDelay, 1400)),
 		"mode":               FirstNonEmpty(options.Mode, activeWorkbenchModeKey(source.Modes)),

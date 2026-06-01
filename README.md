@@ -37,10 +37,11 @@ The first public contracts are intentionally small:
 - `RuntimeContract`, `RuntimeMethod`, and `RuntimePayloadField` declare the browser runtime APIs that engines expose, including the preview, workbench, brand, style, and block-layout globals used by canvas editing.
 - `HostConfig` ties product labels, features, engines, and the editable site map together.
 - `ShellConfig` describes the reusable Studio chrome a host app configures: operator labels, modes, panels, resource links, engine globals, server actions, permissions, feature flags, and canvas preview shell.
-- `WorkbenchShellView` and `RenderWorkbenchToolbar` provide the first shared
-  shell render path: hosts feed one normalized workbench projection, then
-  Studio renders toolbar title, status, history, preview, and save controls
-  without host-local chrome code.
+- `WorkbenchShellView` and the `RenderWorkbench*` chrome renderers provide the
+  first shared shell render path: hosts feed one normalized workbench
+  projection, then Studio renders toolbar title, mode controls, metrics,
+  command palette, status, history, preview, and save controls without
+  host-local chrome code.
 - Runtime assets and handlers serve the shared Studio stylesheet plus the combined preview and engine runtime at the public `/_gosx/studio/*` paths. Host apps can mount these assets while keeping their own CMS/Admin scripts behind separate adapters.
 - `plugins/showcase3d` defines the CMS/Studio contract for source photos, generated model artifacts, provenance, moderation, lifecycle readiness, no-code placement controls, and Scene3D viewer descriptors.
 
