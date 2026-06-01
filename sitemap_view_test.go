@@ -2,6 +2,94 @@ package studio
 
 import "testing"
 
+func TestAuthoringSiteMapViewStampsNodePositions(t *testing.T) {
+	// A host that persisted node coordinates from gosxstudio:sitemap-node-moved
+	// supplies them via SiteMapViewOptions.NodePositions. The matching workspace
+	// node map must carry numeric x/y (so the board renders it absolutely);
+	// nodes without an entry stay untouched (lane flow).
+	surface := NoCodeAuthoringSurface(SiteMap{Pages: []Page{{
+		Key:           "home",
+		Label:         "Home",
+		Route:         "/",
+		Group:         PageGroupSite,
+		GoSXComponent: "HomePage",
+		Editable:      true,
+		Selected:      true,
+		Components: []Component{{
+			Key:           "hero",
+			Label:         "Hero",
+			GoSXComponent: "HomeHero",
+			Source:        ComponentSourceHost,
+			Editable:      true,
+		}},
+	}}})
+
+	view := AuthoringSiteMapView(surface, SiteMapViewOptions{
+		NodePositions: map[string]SiteMapNodePosition{
+			"page:home": {X: 120, Y: 40},
+		},
+	})
+
+	positioned, unpositioned := findWorkspaceNode(t, view, "page:home"), findWorkspaceNode(t, view, "component:home:hero")
+
+	x, xok := positioned["x"].(float64)
+	y, yok := positioned["y"].(float64)
+	if !xok || !yok || x != 120 || y != 40 {
+		t.Fatalf("positioned node must carry numeric x=120 y=40, got x=%v(%T) y=%v(%T)", positioned["x"], positioned["x"], positioned["y"], positioned["y"])
+	}
+	if _, ok := unpositioned["x"]; ok {
+		t.Fatalf("node without a saved position must not carry x: %#v", unpositioned)
+	}
+	if _, ok := unpositioned["y"]; ok {
+		t.Fatalf("node without a saved position must not carry y: %#v", unpositioned)
+	}
+}
+
+func TestAuthoringSiteMapViewWithoutNodePositionsLeavesNodesUnpositioned(t *testing.T) {
+	// The default view (no NodePositions) must not stamp any coordinates, so the
+	// reference editors keep rendering nodes in lane flow.
+	surface := NoCodeAuthoringSurface(SiteMap{Pages: []Page{{
+		Key:           "home",
+		Label:         "Home",
+		Route:         "/",
+		Group:         PageGroupSite,
+		GoSXComponent: "HomePage",
+		Editable:      true,
+		Selected:      true,
+	}}})
+
+	view := AuthoringSiteMapView(surface, SiteMapViewOptions{})
+
+	node := findWorkspaceNode(t, view, "page:home")
+	if _, ok := node["x"]; ok {
+		t.Fatalf("default view must not stamp x onto nodes: %#v", node)
+	}
+	if _, ok := node["y"]; ok {
+		t.Fatalf("default view must not stamp y onto nodes: %#v", node)
+	}
+}
+
+func findWorkspaceNode(t *testing.T, view map[string]any, key string) map[string]any {
+	t.Helper()
+	layers, ok := view["workspaceLayers"].([]map[string]any)
+	if !ok {
+		t.Fatalf("view missing workspaceLayers: %#v", view["workspaceLayers"])
+	}
+	for _, layer := range layers {
+		nodes, ok := layer["nodes"].([]map[string]any)
+		if !ok {
+			continue
+		}
+		for _, node := range nodes {
+			if stringMapValue(node, "key") == key {
+				return node
+			}
+		}
+	}
+	t.Fatalf("workspace node %q not found in any layer", key)
+	return nil
+}
+
 func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 	siteMap := SiteMap{Pages: []Page{{
 		Key:           "home",

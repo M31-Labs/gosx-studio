@@ -129,6 +129,67 @@ func TestRenderSiteMapBoardPanSurfaceIsPositionedAnchor(t *testing.T) {
 	}
 }
 
+func TestRenderSiteMapBoardRoundTripsNodePositions(t *testing.T) {
+	// Closing the loop with the runtime's gosxstudio:sitemap-node-moved event:
+	// the {key,x,y} a host stores are pan-surface-LOCAL pixels, and feeding the
+	// same {x,y} back through SiteMapViewOptions.NodePositions must reproduce the
+	// exact absolute style and node-x/-y the runtime reads (1:1 round-trip).
+	surface := NoCodeAuthoringSurface(SiteMap{Pages: []Page{{
+		Key:           "home",
+		Label:         "Home",
+		Route:         "/",
+		Group:         PageGroupSite,
+		GoSXComponent: "HomePage",
+		Editable:      true,
+		Selected:      true,
+	}}})
+
+	view := AuthoringSiteMapView(surface, SiteMapViewOptions{
+		NodePositions: map[string]SiteMapNodePosition{
+			"page:home": {X: 120, Y: 40},
+		},
+	})
+	html := gosx.RenderHTML(RenderSiteMapBoard(view, SiteMapBoardOptions{}))
+
+	for _, fragment := range []string{
+		`data-studio-site-map-node-x="120"`,
+		`data-studio-site-map-node-y="40"`,
+		`style="position:absolute;left:120px;top:40px"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("positioned site-map board missing %q:\n%s", fragment, html)
+		}
+	}
+}
+
+func TestRenderSiteMapBoardWithoutNodePositionsStaysInLaneFlow(t *testing.T) {
+	// The default render (no NodePositions) must be layout-neutral: no absolute
+	// positioning and no node-x attrs anywhere, so the reference editors are
+	// visually unchanged.
+	surface := NoCodeAuthoringSurface(SiteMap{Pages: []Page{{
+		Key:           "home",
+		Label:         "Home",
+		Route:         "/",
+		Group:         PageGroupSite,
+		GoSXComponent: "HomePage",
+		Editable:      true,
+		Selected:      true,
+	}}})
+
+	view := AuthoringSiteMapView(surface, SiteMapViewOptions{})
+	html := gosx.RenderHTML(RenderSiteMapBoard(view, SiteMapBoardOptions{}))
+
+	if !strings.Contains(html, `data-studio-site-map-workspace-node="page:home"`) {
+		t.Fatalf("default render should still render the workspace node:\n%s", html)
+	}
+	if strings.Contains(html, "position:absolute") {
+		t.Fatalf("default site-map board must not position nodes absolutely:\n%s", html)
+	}
+	if strings.Contains(html, "data-studio-site-map-node-x") {
+		t.Fatalf("default site-map board must not emit data-studio-site-map-node-x:\n%s", html)
+	}
+}
+
 func TestRenderSiteMapBoardWorkspaceNodeWithoutPositionStaysInLaneFlow(t *testing.T) {
 	// A node map WITHOUT x/y keys must render exactly as today: no absolute
 	// position, no node-x/node-y attrs. This keeps the default

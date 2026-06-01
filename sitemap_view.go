@@ -16,6 +16,22 @@ type SiteMapViewOptions struct {
 	WorkspaceInputName    string
 	PreviewHref           func(route string) string
 	CompositionIntentView func(CompositionIntent) map[string]any
+	// NodePositions carries free-placed workspace node coordinates keyed by node
+	// key (e.g. "page:home", "component:home:hero"). A host persists these from
+	// the runtime's gosxstudio:sitemap-node-moved event (detail {key,x,y}) and
+	// feeds them back so dragged nodes re-render where they were left. The
+	// coordinates are pan-surface-LOCAL pixels and round-trip 1:1 with that
+	// event. Nodes without an entry stay in lane flow (the default).
+	NodePositions map[string]SiteMapNodePosition
+}
+
+// SiteMapNodePosition is a free-placed workspace node's saved location on the
+// pan surface, in pan-surface-LOCAL pixels (the same coordinate space the
+// runtime emits in gosxstudio:sitemap-node-moved and writes back into
+// data-studio-site-map-node-x/-y).
+type SiteMapNodePosition struct {
+	X float64
+	Y float64
 }
 
 func SiteMapAuthoringView(siteMap SiteMap, options SiteMapViewOptions) map[string]any {
@@ -113,7 +129,7 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 		"empty":                              "No editable pages are configured.",
 		"sources":                            sources,
 		"hasSources":                         len(sources) > 0,
-		"workspaceLayers":                    authoringSiteMapWorkspaceLayerViews(siteMap, workspace),
+		"workspaceLayers":                    authoringSiteMapWorkspaceLayerViews(siteMap, workspace, options.NodePositions),
 		"workspaceLinks":                     authoringSiteMapWorkspaceLinkViews(workspace),
 		"workspaceCanvasViewBox":             canvas.ViewBox,
 		"workspaceCanvasLinks":               authoringSiteMapWorkspaceCanvasLinkViews(workspace, canvas),
@@ -678,7 +694,7 @@ func authoringSiteMapStepViews(steps []CompositionStep) []map[string]any {
 	return out
 }
 
-func authoringSiteMapWorkspaceLayerViews(siteMap SiteMap, workspace CompositionWorkspace) []map[string]any {
+func authoringSiteMapWorkspaceLayerViews(siteMap SiteMap, workspace CompositionWorkspace, positions map[string]SiteMapNodePosition) []map[string]any {
 	siteMap = siteMap.Normalize()
 	workspace = workspace.Normalize()
 	pagesByKey := map[string]Page{}
@@ -697,7 +713,16 @@ func authoringSiteMapWorkspaceLayerViews(siteMap SiteMap, workspace CompositionW
 			if !ok {
 				continue
 			}
-			nodes = append(nodes, authoringSiteMapWorkspaceNodeView(node))
+			nodeView := authoringSiteMapWorkspaceNodeView(node)
+			// Stamp a saved free placement (pan-surface-LOCAL px) when the host
+			// supplied one for this node key. renderSiteMapBoardWorkspaceNode reads
+			// numeric x/y to position the node absolutely; nodes without an entry
+			// stay in lane flow, keeping the default view unchanged.
+			if position, ok := positions[node.Key]; ok {
+				nodeView["x"] = position.X
+				nodeView["y"] = position.Y
+			}
+			nodes = append(nodes, nodeView)
 		}
 		if len(nodes) == 0 {
 			continue
