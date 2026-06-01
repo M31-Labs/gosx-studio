@@ -41,6 +41,7 @@ func HostShell(store Store, shell ShellConfig) Shell {
 		Extras: map[string]any{
 			"resources": hostShellResourceViews(normalized.Resources),
 			"authoring": AuthoringSurfaceView(authoring),
+			"siteMap":   AuthoringSiteMapView(authoring, SiteMapViewOptions{}),
 		},
 	}
 	if store != nil {

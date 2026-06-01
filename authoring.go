@@ -89,9 +89,9 @@ func authoringCreatePageIntents(library CompositionLibrary) []CompositionIntent 
 func authoringCreatePageIntent(blueprint PageBlueprint) CompositionIntent {
 	blueprint = blueprint.Normalize()
 	steps := []CompositionStep{{
-		Key:           "page",
-		Label:         blueprint.Label,
-		Summary:       firstNonEmpty(authoringRouteSummary(blueprint.RoutePattern), blueprint.Summary),
+		Key:           "route",
+		Label:         firstNonEmpty(blueprint.RoutePattern, "New route"),
+		Summary:       firstNonEmpty(authoringRouteSummary(blueprint.RoutePattern), "Create page route"),
 		GoSXComponent: blueprint.GoSXComponent,
 	}}
 	for _, component := range blueprint.Components {
@@ -106,9 +106,10 @@ func authoringCreatePageIntent(blueprint PageBlueprint) CompositionIntent {
 	return CompositionIntent{
 		Key:                "create-page:" + workspaceToken(blueprint.Key),
 		Label:              "Create " + blueprint.Label,
-		Summary:            firstNonEmpty(blueprint.Summary, "Create a "+strings.ToLower(blueprint.GroupLabel())+" page."),
+		Summary:            "Adds " + firstNonEmpty(blueprint.RoutePattern, "a new route") + " with " + countLabel(blueprint.ComponentCount(), "building block", "building blocks") + ".",
 		Kind:               CompositionIntentCreatePage,
 		TargetRoute:        blueprint.RoutePattern,
+		TargetRegion:       blueprint.GroupLabel(),
 		PageBlueprintKey:   blueprint.Key,
 		PageBlueprintLabel: blueprint.Label,
 		GoSXComponent:      blueprint.GoSXComponent,
@@ -133,35 +134,44 @@ func authoringAddComponentIntents(page Page, hasPage bool, library CompositionLi
 func authoringAddComponentIntent(page Page, template ComponentTemplate) CompositionIntent {
 	template = template.Normalize()
 	label := firstNonEmpty(template.AddLabel, "Add "+template.Label)
+	steps := []CompositionStep{
+		{
+			Key:           "target",
+			Label:         page.Label,
+			Summary:       "Selected route " + page.Route,
+			GoSXComponent: page.GoSXComponent,
+		},
+		{
+			Key:           "component",
+			Label:         template.Label,
+			Summary:       firstNonEmpty(template.Summary, "Add "+template.SourceLabel()+" component."),
+			GoSXComponent: template.GoSXComponent,
+			Binding:       template.DefaultBinding,
+		},
+	}
+	if template.ControlCount() > 0 {
+		steps = append(steps, CompositionStep{
+			Key:     "controls",
+			Label:   countLabel(template.ControlCount(), "field", "fields"),
+			Summary: "Expose no-code controls",
+			Binding: template.DefaultBinding,
+		})
+	}
 	return CompositionIntent{
 		Key:                  "add-component:" + workspaceToken(page.Key) + ":" + workspaceToken(template.Key),
 		Label:                label,
-		Summary:              firstNonEmpty(template.Summary, "Add "+template.Label+" to "+page.Label+"."),
+		Summary:              "Places " + template.Label + " on " + firstNonEmpty(page.Route, page.Label) + " and exposes " + countLabel(template.ControlCount(), "field", "fields") + ".",
 		Kind:                 CompositionIntentAddComponent,
 		TargetPageKey:        page.Key,
 		TargetPageLabel:      page.Label,
 		TargetRoute:          page.Route,
-		TargetRegion:         "main",
+		TargetRegion:         "Main content",
 		ComponentTemplateKey: template.Key,
 		ComponentLabel:       template.Label,
 		GoSXComponent:        template.GoSXComponent,
 		Binding:              template.DefaultBinding,
 		Status:               firstNonEmpty(template.Status, "Draft"),
-		Steps: []CompositionStep{
-			{
-				Key:           "target",
-				Label:         page.Label,
-				Summary:       "Selected route " + page.Route,
-				GoSXComponent: page.GoSXComponent,
-			},
-			{
-				Key:           "component",
-				Label:         template.Label,
-				Summary:       firstNonEmpty(template.Summary, "Add "+template.SourceLabel()+" component."),
-				GoSXComponent: template.GoSXComponent,
-				Binding:       template.DefaultBinding,
-			},
-		},
+		Steps:                steps,
 	}.Normalize()
 }
 
