@@ -230,6 +230,8 @@ func authoringComponentView(page Page, component Component) map[string]any {
 		"binding":             component.Binding,
 		"status":              component.Status,
 		"editable":            component.Editable,
+		"position":            component.Position,
+		"canReorder":          component.CanReorder,
 		"visible":             component.Visible,
 		"canToggleVisibility": component.CanToggleVisibility,
 		"controlCount":        component.ControlCount(),

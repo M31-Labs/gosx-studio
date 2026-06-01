@@ -97,6 +97,29 @@ func TestAuthoringMutationForComponentVisibilityBuildsTogglePayload(t *testing.T
 	}
 }
 
+func TestAuthoringMutationForComponentReorderBuildsPositionPayload(t *testing.T) {
+	mutation := AuthoringMutationForComponentReorder(Page{
+		Key:   "home",
+		Label: "Home",
+		Route: "/",
+	}, Component{
+		Key:     "gallery",
+		Label:   "Gallery",
+		Binding: "home.section.gallery",
+	}, 1)
+	values := mutation.FormValues()
+
+	if mutation.Kind != AuthoringOperationReorderComponent || mutation.PageKey != "home" || mutation.ComponentKey != "gallery" {
+		t.Fatalf("unexpected reorder mutation: %#v", mutation)
+	}
+	if !mutation.HasPosition || mutation.Position != 1 {
+		t.Fatalf("expected explicit target position: %#v", mutation)
+	}
+	if values[AuthoringFieldOperation] != "reorder-component" || values[AuthoringFieldPosition] != "1" || values[AuthoringFieldBinding] != "home.section.gallery" {
+		t.Fatalf("unexpected reorder form values: %#v", values)
+	}
+}
+
 func TestAuthoringMutationFromFormNormalizesAndValidates(t *testing.T) {
 	mutation, validation := AuthoringMutationFromForm(map[string]string{
 		AuthoringFieldOperation:    " save-control ",

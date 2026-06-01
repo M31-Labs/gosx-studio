@@ -1,6 +1,9 @@
 package studio
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 type SiteMapViewOptions struct {
 	Kicker                string
@@ -45,6 +48,7 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 	}
 	pages := authoringSiteMapPageViews(siteMap.Pages, options)
 	metadataPage := authoringSiteMapMetadataPageView(siteMap.Pages)
+	reorderComponent := authoringSiteMapReorderComponentView(siteMap.Pages)
 	visibilityComponent := authoringSiteMapVisibilityComponentView(siteMap.Pages)
 	sources := authoringSiteMapSourceViews(siteMap)
 	blueprints := authoringSiteMapPageBlueprintViews(siteMap.Library.PageBlueprints, options)
@@ -93,6 +97,8 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 		"hasPages":                           len(pages) > 0,
 		"metadataPage":                       metadataPage,
 		"hasMetadataPage":                    len(metadataPage) > 0,
+		"reorderComponent":                   reorderComponent,
+		"hasReorderComponent":                len(reorderComponent) > 0,
 		"visibilityComponent":                visibilityComponent,
 		"hasVisibilityComponent":             len(visibilityComponent) > 0,
 		"empty":                              "No editable pages are configured.",
@@ -174,8 +180,23 @@ func authoringSiteMapMetadataPageView(pages []Page) map[string]any {
 func authoringSiteMapComponentViews(page Page, components []Component) []map[string]any {
 	out := make([]map[string]any, 0, len(components))
 	page = page.Normalize()
-	for _, component := range components {
+	for index, component := range components {
 		component = component.Normalize()
+		component.Position = index
+		moveUpMutation := AuthoringMutation{}
+		moveDownMutation := AuthoringMutation{}
+		moveUpFormValues := map[string]string(nil)
+		moveDownFormValues := map[string]string(nil)
+		canMoveUp := component.CanReorder && index > 0
+		canMoveDown := component.CanReorder && index < len(components)-1
+		if canMoveUp {
+			moveUpMutation = AuthoringMutationForComponentReorder(page, component, index-1)
+			moveUpFormValues = moveUpMutation.FormValues()
+		}
+		if canMoveDown {
+			moveDownMutation = AuthoringMutationForComponentReorder(page, component, index+1)
+			moveDownFormValues = moveDownMutation.FormValues()
+		}
 		visibilityMutation := AuthoringMutation{}
 		visibilityFormValues := map[string]string(nil)
 		visibilityActionLabel := ""
@@ -200,6 +221,25 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 			"binding":                      component.Binding,
 			"statusLabel":                  component.Status,
 			"editable":                     component.Editable,
+			"position":                     index,
+			"positionLabel":                strconv.Itoa(index + 1),
+			"canReorder":                   component.CanReorder,
+			"canMoveUp":                    canMoveUp,
+			"canMoveDown":                  canMoveDown,
+			"moveUpActionLabel":            "Move up",
+			"moveDownActionLabel":          "Move down",
+			"moveUpAuthoringOperation":     string(moveUpMutation.Kind),
+			"moveUpAuthoringPageKey":       moveUpMutation.PageKey,
+			"moveUpAuthoringComponent":     moveUpMutation.ComponentKey,
+			"moveUpAuthoringPosition":      moveUpMutation.Position,
+			"moveUpMutation":               AuthoringMutationView(moveUpMutation),
+			"moveUpFormValues":             moveUpFormValues,
+			"moveDownAuthoringOperation":   string(moveDownMutation.Kind),
+			"moveDownAuthoringPageKey":     moveDownMutation.PageKey,
+			"moveDownAuthoringComponent":   moveDownMutation.ComponentKey,
+			"moveDownAuthoringPosition":    moveDownMutation.Position,
+			"moveDownMutation":             AuthoringMutationView(moveDownMutation),
+			"moveDownFormValues":           moveDownFormValues,
 			"visible":                      component.Visible,
 			"canToggleVisibility":          component.CanToggleVisibility,
 			"visibilityActionLabel":        visibilityActionLabel,
@@ -215,6 +255,49 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 		})
 	}
 	return out
+}
+
+func authoringSiteMapReorderComponentView(pages []Page) map[string]any {
+	for _, page := range pages {
+		page = page.Normalize()
+		for index, component := range page.Components {
+			component = component.Normalize()
+			component.Position = index
+			if !component.CanReorder {
+				continue
+			}
+			targetPosition := index + 1
+			actionLabel := "Move down"
+			if targetPosition >= len(page.Components) {
+				if index == 0 {
+					continue
+				}
+				targetPosition = index - 1
+				actionLabel = "Move up"
+			}
+			mutation := AuthoringMutationForComponentReorder(page, component, targetPosition)
+			return map[string]any{
+				"key":                 component.Key,
+				"label":               component.Label,
+				"pageKey":             page.Key,
+				"pageLabel":           page.Label,
+				"binding":             component.Binding,
+				"statusLabel":         component.Status,
+				"position":            index,
+				"positionLabel":       strconv.Itoa(index + 1),
+				"targetPosition":      targetPosition,
+				"targetPositionLabel": strconv.Itoa(targetPosition + 1),
+				"actionLabel":         actionLabel,
+				"authoringOperation":  string(mutation.Kind),
+				"authoringPageKey":    mutation.PageKey,
+				"authoringComponent":  mutation.ComponentKey,
+				"authoringPosition":   mutation.Position,
+				"mutation":            AuthoringMutationView(mutation),
+				"formValues":          mutation.FormValues(),
+			}
+		}
+	}
+	return nil
 }
 
 func authoringSiteMapVisibilityComponentView(pages []Page) map[string]any {

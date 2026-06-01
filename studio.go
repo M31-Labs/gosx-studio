@@ -241,6 +241,8 @@ type Component struct {
 	Binding             string
 	Status              string
 	Editable            bool
+	Position            int
+	CanReorder          bool
 	Visible             bool
 	CanToggleVisibility bool
 	Controls            []Control
@@ -1833,6 +1835,9 @@ func (component Component) Normalize() Component {
 	component.Source = normalizeComponentSource(component.Source)
 	component.Binding = strings.TrimSpace(component.Binding)
 	component.Status = strings.TrimSpace(component.Status)
+	if component.Position < 0 {
+		component.Position = 0
+	}
 	component.Controls = normalizeControls(component.Controls)
 	return component
 }

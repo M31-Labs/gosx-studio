@@ -20,6 +20,7 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 			Binding:             "pages.home.hero",
 			Status:              "Visible",
 			Editable:            true,
+			CanReorder:          true,
 			Visible:             true,
 			CanToggleVisibility: true,
 			Controls: []Control{{
@@ -29,6 +30,15 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 				Binding: "pages.home.hero.headline",
 				Value:   "Forest days",
 			}},
+		}, {
+			Key:           "gallery",
+			Label:         "Gallery",
+			GoSXComponent: "GalleryGrid",
+			Source:        ComponentSourceCMS,
+			Binding:       "media.gallery",
+			Status:        "Visible",
+			Editable:      true,
+			CanReorder:    true,
 		}},
 	}}, Library: CompositionLibrary{
 		PageBlueprints: []PageBlueprint{{
@@ -63,7 +73,7 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 		},
 	})
 
-	if view["pageCountLabel"] != "1 page" || view["componentCountLabel"] != "1 component" || view["controlCountLabel"] != "1 field" {
+	if view["pageCountLabel"] != "1 page" || view["componentCountLabel"] != "2 components" || view["controlCountLabel"] != "1 field" {
 		t.Fatalf("unexpected labels: %#v", view)
 	}
 	if view["selectedPageLabel"] != "Home /" || view["defaultWorkspaceNodeKey"] != "component:home:hero" {
@@ -88,6 +98,14 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 	}
 	if hero["canToggleVisibility"] != true || hero["visibilityActionLabel"] != "Hide" {
 		t.Fatalf("expected hero visibility authoring projection: %#v", hero)
+	}
+	if hero["canReorder"] != true || hero["canMoveUp"] != false || hero["canMoveDown"] != true || hero["positionLabel"] != "1" {
+		t.Fatalf("expected hero reorder authoring projection: %#v", hero)
+	}
+	reorderPage := view["reorderComponent"].(map[string]any)
+	reorderForm := reorderPage["formValues"].(map[string]string)
+	if view["hasReorderComponent"] != true || reorderPage["authoringOperation"] != "reorder-component" || reorderForm[AuthoringFieldPosition] != "1" {
+		t.Fatalf("unexpected reorder component payload: %#v", reorderPage)
 	}
 	visibilityPage := view["visibilityComponent"].(map[string]any)
 	visibilityForm := visibilityPage["formValues"].(map[string]string)
@@ -123,7 +141,7 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 		t.Fatalf("unexpected add intent form: %#v", addForm)
 	}
 	workspaceLayers := view["workspaceLayers"].([]map[string]any)
-	if len(workspaceLayers) == 0 || workspaceLayers[0]["hasPageComposition"] != true || workspaceLayers[0]["sectionCountLabel"] != "1 section" {
+	if len(workspaceLayers) == 0 || workspaceLayers[0]["hasPageComposition"] != true || workspaceLayers[0]["sectionCountLabel"] != "2 sections" {
 		t.Fatalf("unexpected workspace layer: %#v", workspaceLayers)
 	}
 	if view["hasWorkspaceCanvasLinks"] != true || view["workspaceCanvasViewBox"] != "0 0 100 100" {

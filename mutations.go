@@ -175,6 +175,22 @@ func AuthoringMutationForPage(page Page) AuthoringMutation {
 	}.Normalize()
 }
 
+func AuthoringMutationForComponentReorder(page Page, component Component, position int) AuthoringMutation {
+	page = page.Normalize()
+	component = component.Normalize()
+	return AuthoringMutation{
+		Kind:           AuthoringOperationReorderComponent,
+		PageKey:        page.Key,
+		PageLabel:      page.Label,
+		PageRoute:      page.Route,
+		ComponentKey:   component.Key,
+		ComponentLabel: component.Label,
+		Binding:        component.Binding,
+		Position:       position,
+		HasPosition:    true,
+	}.Normalize()
+}
+
 func AuthoringMutationForComponentVisibility(page Page, component Component, visible bool) AuthoringMutation {
 	page = page.Normalize()
 	component = component.Normalize()
