@@ -412,6 +412,10 @@ Acceptance:
 Current:
 
 - Go tests and parity e2e tests exist for several runtime slices.
+- `parity_e2e/authoringruntime_test.ts` now covers the browser-side authoring
+  result feedback loop without requiring a host server: changed-object
+  selection, canvas selection sync, preview refresh, save-state feedback, and
+  `gosxstudio:authoring-result` dispatch.
 - `docs/PUBLIC_READINESS.md` names the release posture concerns.
 
 Missing:
@@ -575,6 +579,10 @@ These are the current places to mine for reusable Studio behavior.
   first persisted visibility operation in both reference apps. Noni can show or
   hide homepage sections, while Pajaritos can show or hide the home family
   request form, with both returning preview-refresh authoring changes.
+- 2026-06-01: Added a Playwright smoke test for `authoringruntime` that runs in
+  a real Chromium page and verifies successful authoring results select the
+  changed component, sync canvas selection, refresh the preview iframe, update
+  save feedback, and emit `gosxstudio:authoring-result`.
 
 ## Next Execution Slice
 
@@ -582,9 +590,9 @@ The next practical slice is e2e authoring confidence plus component operations:
 
 - Add Noni and Pajaritos e2e smoke tests for create page, add component, and
   edit control through the visible editor surface.
-- Use the new `gosxstudio:authoring-result` event in the smoke tests to assert
-  changed-object selection and preview refresh instead of only checking stored
-  data.
+- Extend the new `authoringruntime` browser smoke into host-backed smoke tests
+  that assert changed-object selection and preview refresh instead of only
+  checking stored data.
 - Add the first persisted component reorder operation so the site-map and
   canvas can change placed section order rather than only fields, visibility,
   and page metadata.
