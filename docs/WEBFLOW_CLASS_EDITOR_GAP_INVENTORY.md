@@ -38,6 +38,7 @@ still split across `gosx-studio`, `gosx-cms/studio`, Muddy Noni, and Pajaritos.
 | Reusable workbench toolbar renderer | `workbench_toolbar.go` | Studio now renders shared shell chrome from `WorkbenchShellView`: toolbar title, summary, mode controls, metrics, command palette, save status, history controls, preview link, and save button. |
 | Reusable site-map authoring panels | `sitemap_authoring_panels.go` | Studio now renders shared page metadata, editable control, reorder, duplicate, visibility, delete, composition-intent, and optional page-list panels from `AuthoringSiteMapView`. Muddy/Noni and Pajaritos feed host views/options instead of duplicating that panel markup. |
 | Reusable site-map authoring forms | `sitemap_authoring_forms.go` | Studio now renders the hidden managed forms used by site-map authoring panels, including scoped composition-intent forms, operation forms, and CSRF inputs. Muddy/Noni and Pajaritos no longer duplicate that form scaffold. |
+| Reusable site-map engine frame | `sitemap_engine.go` | Studio now renders shared site-map engine frame segments: root semantics, header chrome, stats, source legend, and renderer markers. Muddy/Noni consumes those segments around its current interactive canvas island while the full board extraction remains pending. |
 | Authoring projection | `authoring.go:9`, `authoring.go:21`, `authoring.go:47` | `AuthoringSurface` exposes pages, selected page, palette, intents, workspace graph, and canvas layout. |
 | Authoring mutation contract | `mutations.go` | Studio now has typed operation kinds, form field names, `AuthoringMutation`, `AuthoringAdapter`, validation/result envelopes, and a GoSX action handler for host-owned persistence. |
 | Typed page/component model | `studio.go:151`, `studio.go:156`, `studio.go:292` | Pages, components, controls, canvas blocks, blueprints, templates, and composition intents exist as contracts. |
@@ -79,6 +80,9 @@ Current:
 - `RenderSiteMapAuthoringForms` now gives hosts the matching Studio-owned
   hidden managed form scaffold for those panels, including CSRF input support
   and the existing managed GoSX form attributes.
+- `RenderSiteMapEngineSegments` now gives hosts Studio-owned site-map engine
+  frame chrome for root semantics, summary stats, source legend, and stable
+  renderer markers while preserving host-owned interaction slots.
 
 Missing:
 
@@ -173,11 +177,18 @@ Current:
   attributes for existing runtimes and tests.
 - `RenderSiteMapAuthoringForms` now renders the matching managed form stack for
   composition intents and site-map operations in both reference apps.
+- `RenderSiteMapEngineSegments` now owns the first visible site-map engine
+  frame segments. Muddy/Noni wraps its current interactive `SiteMapCanvasIsland`
+  with those Studio-rendered root, header, and source legend nodes; Pajaritos
+  stays on the same shared site-map projection contracts as the simpler
+  second-host baseline.
 
 Missing:
 
-- A Studio-owned site-map engine that renders pages, routes, components,
-  source bindings, readiness, and allowed operations.
+- A complete Studio-owned site-map engine that renders pages, routes,
+  components, source bindings, readiness, and allowed operations.
+- Full board/canvas interaction ownership, including the current
+  `SiteMapCanvasIsland` behavior that is still app-local in Muddy/Noni.
 - Full route editing across all editable pages, page grouping, selection state,
   and conflict validation inside the visual graph.
 - Keyboard and pointer interactions suitable for a visual graph.
@@ -636,28 +647,31 @@ These are the current places to mine for reusable Studio behavior.
 11. Done on 2026-06-01: add a Studio-owned managed form scaffold for site-map
     authoring panels, including composition-intent forms, operation forms, and
     CSRF support; adopt it in Muddy/Noni and Pajaritos.
-12. Move workbench, command palette, and state runtime ownership out of
+12. Done on 2026-06-01: add Studio-owned site-map engine frame segments for
+    root semantics, header chrome, stats, and source legend; adopt them in
+    Muddy/Noni around the current interaction island.
+13. Move workbench, command palette, and state runtime ownership out of
    `gosx-cms/studio` when the dependent hosts are ready.
-13. Implement `SiteMapEngine.gsx` against the existing `CompositionWorkspace`
+14. Implement `SiteMapEngine.gsx` against the existing `CompositionWorkspace`
    and `WorkspaceCanvas` contracts.
-14. Implement `InspectorIsland.gsx` for the current `ControlKind` set with
+15. Implement `InspectorIsland.gsx` for the current `ControlKind` set with
    dirty/valid/saving states.
-15. Implement canvas selection and inline text editing through the Studio
+16. Implement canvas selection and inline text editing through the Studio
     preview/selection/field runtimes.
-16. Add Noni and Pajaritos e2e smoke tests for create page, add component,
+17. Add Noni and Pajaritos e2e smoke tests for create page, add component,
     edit control, responsive preview, staging publish readiness, and rollback.
-17. Write the visual-system spec for the Studio editor UI before the major
+18. Write the visual-system spec for the Studio editor UI before the major
     shell styling pass, including density, typography, color roles,
     accessibility states, and responsive behavior.
-18. Done on 2026-06-01: render visible create-page/add-section apply controls
+19. Done on 2026-06-01: render visible create-page/add-section apply controls
     from shared site-map composition intent payloads in Noni and Pajaritos.
-19. Done on 2026-06-01: add reference-app visual/accessibility gates for the
+20. Done on 2026-06-01: add reference-app visual/accessibility gates for the
     Studio shell, site-map/canvas surface, publishing section, responsive
     preview, keyboard focus, accessible names, reduced motion, contrast, and
     desktop/mobile viewport fit.
-20. Done on 2026-06-01: add reference-app performance budgets for runtime
+21. Done on 2026-06-01: add reference-app performance budgets for runtime
     payload, preview latency, canvas overlay cost, and publish readiness.
-21. Done on 2026-06-01: add the structural authoring fragment-refresh contract
+22. Done on 2026-06-01: add the structural authoring fragment-refresh contract
     and graduate create-page, add-section, duplicate-section, and
     delete-section capable forms to managed in-place authoring in both
     reference apps.
@@ -875,13 +889,20 @@ These are the current places to mine for reusable Studio behavior.
   Muddy/Noni and Pajaritos hidden composition-intent and site-map operation
   form scaffolds behind it. The shared renderer owns managed GoSX form attrs
   and CSRF input support for the forms submitted by the shared panels.
+- 2026-06-01: Added `RenderSiteMapEngineSegments` in `gosx-studio` as the
+  first visible site-map engine extraction. The renderer owns root semantics,
+  header chrome, summary stats, source legend, and stable renderer markers
+  without adding client-visible platform copy. Muddy/Noni now wraps its
+  existing `SiteMapCanvasIsland` with those Studio-rendered segments while the
+  full interaction board remains the next extraction target.
 
 ## Next Execution Slice
 
-The next practical slice is the full site-map engine extraction:
+The next practical slice is the full site-map canvas/island extraction:
 
-- Extract Muddy's `SiteMapEnginePanel` / `SiteMapCanvasIsland` behavior into a
-  Studio-owned site-map engine surface that consumes `AuthoringSiteMapView`.
+- Move Muddy's `SiteMapCanvasIsland` behavior into a Studio-owned site-map
+  engine surface that consumes `AuthoringSiteMapView` and can be hosted by both
+  reference apps.
 - Preserve the current map/build/components/controls/sources interactions and
   managed authoring submit path while moving host routes toward data loading
   and slots.
