@@ -440,6 +440,11 @@ Current:
   create-page, add-component, duplicate-component, and edit-control workflows,
   then verifies managed action feedback selects the changed surface, refreshes
   the preview, and updates save-state UI.
+- A local Pajaritos browser check now clicks the visible create-page control
+  through a real admin editor page, posts through the GoSX authoring action with
+  CSRF, follows the redirect, and verifies the new page appears. That check also
+  caught and fixed a transformed canvas overlay that was intercepting authoring
+  controls.
 - `docs/PUBLIC_READINESS.md` names the release posture concerns.
 
 Missing:
@@ -650,6 +655,12 @@ These are the current places to mine for reusable Studio behavior.
   drives scoped/external forms, simulates GoSX managed action results, and
   verifies authoring runtime selection, preview refresh, save feedback, and
   persisted workflow state.
+- 2026-06-01: Ran the first real Pajaritos admin editor browser click against a
+  local app server. The create-page form now submits through the visible
+  control and persists after redirect; Pajaritos also has a CSS regression test
+  for the canvas stacking and pointer-events rules that keep transformed site
+  map layers from blocking authoring controls while preserving canvas-node
+  clicks.
 
 ## Next Execution Slice
 
@@ -659,7 +670,8 @@ extraction:
 - Turn the persisted editor-surface smoke tests into browser-driven reference
   app flows that run with real authenticated/CSRF-capable sessions or a
   local-only test bypass. The shared runtime-level browser-click coverage is
-  now in place.
+  now in place, and the first Pajaritos create-page browser click has been
+  verified against a real local app server.
 - Continue the shell extraction by moving the next visible wrapper/toolbar
   piece behind a Studio-owned render path that consumes `WorkbenchShellView`.
 - Extend `authoringruntime` host-backed smoke coverage to assert
