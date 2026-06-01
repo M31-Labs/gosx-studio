@@ -36,6 +36,7 @@ still split across `gosx-studio`, `gosx-cms/studio`, Muddy Noni, and Pajaritos.
 | Host shell contract | `store.go:12`, `store.go:27` | Hosts can feed Studio panels, media, revisions, readiness, adapters, and a normalized shell. |
 | Reusable workbench shell projection | `workbench_shell_view.go` | Studio now owns the shared editor shell view payload for workbench chrome, preview-shell attrs, zoom levels, rail resizers, CSRF/action metadata, and host label overrides. |
 | Reusable workbench toolbar renderer | `workbench_toolbar.go` | Studio now renders shared shell chrome from `WorkbenchShellView`: toolbar title, summary, mode controls, metrics, command palette, save status, history controls, preview link, and save button. |
+| Reusable site-map authoring panels | `sitemap_authoring_panels.go` | Studio now renders shared page metadata, editable control, reorder, duplicate, visibility, delete, composition-intent, and optional page-list panels from `AuthoringSiteMapView`. Muddy/Noni and Pajaritos feed host views/options instead of duplicating that panel markup. |
 | Authoring projection | `authoring.go:9`, `authoring.go:21`, `authoring.go:47` | `AuthoringSurface` exposes pages, selected page, palette, intents, workspace graph, and canvas layout. |
 | Authoring mutation contract | `mutations.go` | Studio now has typed operation kinds, form field names, `AuthoringMutation`, `AuthoringAdapter`, validation/result envelopes, and a GoSX action handler for host-owned persistence. |
 | Typed page/component model | `studio.go:151`, `studio.go:156`, `studio.go:292` | Pages, components, controls, canvas blocks, blueprints, templates, and composition intents exist as contracts. |
@@ -68,6 +69,12 @@ Current:
   `WorkbenchShellView`. Muddy/Noni and Pajaritos both use it for visible editor
   toolbar chrome while preserving host-branded copy, existing CSS hooks, and the
   approved footer attribution shape.
+- `RenderSiteMapAuthoringPanels` now gives Go-rendered hosts a Studio-owned
+  renderer for page metadata, editable-control, component reorder/duplicate/
+  visibility/delete, composition-intent, and page-list panels. Muddy/Noni and
+  Pajaritos consume it with host styling options, so visible copy remains
+  host-branded and the approved small GoSX/M31 footer attribution stays outside
+  the editor panel renderer.
 
 Missing:
 
@@ -157,6 +164,9 @@ Current:
   create-page and add-component drafts. Noni and Pajaritos render visible
   "Create page" / "Add section" controls from those payloads, and Pajaritos now
   derives its editor panel site-map from `NoCodeAuthoringSurface`.
+- `RenderSiteMapAuthoringPanels` now renders the first Studio-owned site-map
+  authoring control stack for both reference apps while preserving legacy data
+  attributes for existing runtimes and tests.
 
 Missing:
 
@@ -614,9 +624,12 @@ These are the current places to mine for reusable Studio behavior.
 9. Done on 2026-06-01: add duplicate component operations with a dynamic
    component-instance model, host-backed persistence, and visible site-map
    controls.
-10. Move workbench, command palette, and state runtime ownership out of
+10. Done on 2026-06-01: add a Studio-owned site-map authoring panel renderer
+    for metadata, editable fields, reorder, duplicate, visibility, delete,
+    composition intents, and page lists; adopt it in Muddy/Noni and Pajaritos.
+11. Move workbench, command palette, and state runtime ownership out of
    `gosx-cms/studio` when the dependent hosts are ready.
-11. Implement `SiteMapEngine.gsx` against the existing `CompositionWorkspace`
+12. Implement `SiteMapEngine.gsx` against the existing `CompositionWorkspace`
    and `WorkspaceCanvas` contracts.
 12. Implement `InspectorIsland.gsx` for the current `ControlKind` set with
    dirty/valid/saving states.
