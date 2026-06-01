@@ -601,8 +601,9 @@ These are the current places to mine for reusable Studio behavior.
    persistence in both reference apps.
 8. In progress on 2026-06-01: build a reusable shell path that consumes
    `ShellConfig` and `AuthoringSurfaceView`. The shared Go workbench shell
-   projection and first Studio-owned toolbar renderer are done; the complete
-   `StudioShell.gsx` surface remains.
+   projection, Studio-owned toolbar renderer, and first frame/stage/rail
+   renderer primitives are done; the complete `StudioShell.gsx` surface
+   remains.
 9. Done on 2026-06-01: add duplicate component operations with a dynamic
    component-instance model, host-backed persistence, and visible site-map
    controls.
@@ -775,14 +776,21 @@ These are the current places to mine for reusable Studio behavior.
   The reference-app browser suite verifies both apps across authoring,
   performance, desktop/mobile visual integrity, accessibility, and host-branded
   copy expectations.
+- 2026-06-01: Added `RenderWorkbenchFrame` and
+  `RenderWorkbenchRailResizer` to `gosx-studio` as the next shell extraction
+  path. The renderer owns root/form/stage/rail/main/canvas-shell semantics,
+  stable renderer markers, CSRF/autosave/state attributes, feature-flag
+  passthrough, and host slots without injecting product copy. Muddy/Noni now
+  consumes the Studio-owned rail resizer and removed its local `.gsx` resizer
+  component while keeping the existing route-owned panel markup intact.
 
 ## Next Execution Slice
 
 The next practical slice is the next shell/render extraction:
 
-- Move the remaining workbench stage/rail wrapper onto a Studio-owned render
-  path so app editor pages become route/data wrappers instead of owning the
-  outer form, stage, canvas, and rail structure.
+- Flip Muddy/Noni's remaining outer form, stage, canvas shell, and rail
+  wrappers to `RenderWorkbenchFrame` slots, then use the same frame path in
+  Pajaritos so both reference apps consume Studio-owned shell structure.
 - Extend `authoringruntime` host-backed smoke coverage to assert
   changed-object selection and preview refresh after those persisted actions.
 - Keep broadening visual/accessibility/performance checks as inspector, media,
