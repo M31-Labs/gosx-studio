@@ -14,6 +14,7 @@ import (
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/previewruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
+	"m31labs.dev/gosx-studio/sitemapruntime"
 	"m31labs.dev/gosx-studio/styleruntime"
 	"m31labs.dev/gosx-studio/workbenchruntime"
 )
@@ -37,6 +38,7 @@ func EngineRuntimeScript() []byte {
 		workbenchruntime.Bundle(),
 		previewruntime.Bundle(),
 		authoringruntime.Bundle(),
+		sitemapruntime.Bundle(),
 	}
 	total := 0
 	for _, slice := range slices {
@@ -88,6 +90,13 @@ func PreviewSubscriberScript() []byte {
 // hosts that still compose their editor chrome from gosx-cms/studio helpers.
 func AuthoringRuntimeScript() []byte {
 	return authoringruntime.Bundle()
+}
+
+// SiteMapRuntimeScript returns the browser runtime that owns site-map board
+// filters, detail tabs, palette state, and selection synchronization for hosts
+// that have not yet switched to the full Studio engine bundle.
+func SiteMapRuntimeScript() []byte {
+	return sitemapruntime.Bundle()
 }
 
 // PreviewSubscriberHandler serves PreviewSubscriberScript() at

@@ -229,6 +229,22 @@ func TestEngineRuntimeIncludesAuthoringRuntimeBundle(t *testing.T) {
 	}
 }
 
+func TestEngineRuntimeIncludesSiteMapRuntimeBundle(t *testing.T) {
+	engines := string(EngineRuntimeScript())
+	for _, fragment := range []string{
+		"window.GoSXStudioSiteMapRuntime",
+		"data-studio-site-map-filter-control",
+		"data-studio-site-map-detail-target",
+		"data-studio-site-map-palette-control",
+		"data-studio-site-map-selected-node",
+		"gosxstudio:site-map-change",
+	} {
+		if !strings.Contains(engines, fragment) {
+			t.Fatalf("engine runtime missing sitemapruntime fragment %q", fragment)
+		}
+	}
+}
+
 func TestAuthoringRuntimeScriptIsNonEmpty(t *testing.T) {
 	runtime := string(AuthoringRuntimeScript())
 	if runtime == "" {
@@ -236,6 +252,16 @@ func TestAuthoringRuntimeScriptIsNonEmpty(t *testing.T) {
 	}
 	if !strings.Contains(runtime, "GoSXStudioAuthoringRuntime") {
 		t.Fatalf("AuthoringRuntimeScript() missing authoring runtime global")
+	}
+}
+
+func TestSiteMapRuntimeScriptIsNonEmpty(t *testing.T) {
+	runtime := string(SiteMapRuntimeScript())
+	if runtime == "" {
+		t.Fatal("SiteMapRuntimeScript() must return non-empty bundle")
+	}
+	if !strings.Contains(runtime, "GoSXStudioSiteMapRuntime") {
+		t.Fatalf("SiteMapRuntimeScript() missing site-map runtime global")
 	}
 }
 
