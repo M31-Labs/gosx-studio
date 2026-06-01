@@ -1,9 +1,10 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   authoringParam,
   applyAuthoringPanelInPlace,
   applyCompositionIntentInPlace,
   clickEditorActionButton,
+  expectButtonReceivesPointer,
   expectPajaritosPublishingReadiness,
   expectPanelButtonReceivesPointer,
   reorderComponent,
@@ -54,6 +55,16 @@ test.describe("@reference-apps browser authoring workflows", () => {
 
       await toggleComponentVisibility(page, { reloadAfter: false });
       await reorderComponent(page, { reloadAfter: false });
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("Muddy/Noni shared site-map board renderer drives real editor interactions", async ({ page, request }) => {
+    const server = await startMuddy(request);
+    try {
+      await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "networkidle" });
+      await expectMuddySharedSiteMapBoard(page);
     } finally {
       await server.stop();
     }
@@ -127,3 +138,66 @@ test.describe("@reference-apps browser authoring workflows", () => {
     }
   });
 });
+
+async function expectMuddySharedSiteMapBoard(page: Page) {
+  const board = page.locator("[data-gosx-studio-site-map-board-renderer='gosx-studio']").first();
+  await expect(board).toBeAttached();
+  await expect(board).toHaveAttribute("data-studio-site-map-board", "true");
+  await expect(board).toHaveAttribute("data-gosx-studio-site-map-runtime-bound", "true");
+
+  const addTabSelector = "[data-gosx-studio-site-map-board-renderer='gosx-studio'] .studio-site-map-board__detail [data-studio-site-map-detail-target='build']";
+  await expectButtonReceivesPointer(page, addTabSelector, "Muddy shared site-map Add tab");
+  await page.locator(addTabSelector).click();
+  await expect(board).toHaveAttribute("data-studio-site-map-detail", "build");
+  await expect(board).toHaveAttribute("data-studio-site-map-palette", "page-sections");
+  await expect(board.locator("[data-studio-site-map-builder='true']")).toHaveAttribute("data-studio-site-map-panel-visible", "true");
+  await expect(board.locator("[data-studio-site-map-workspace='true']")).toHaveAttribute("data-studio-site-map-panel-visible", "false");
+
+  await board.locator("[data-studio-site-map-palette-control='content']").click();
+  await expect(board).toHaveAttribute("data-studio-site-map-palette", "content");
+
+  await board.locator(".studio-site-map-board__detail [data-studio-site-map-detail-target='components']").click();
+  await expect(board).toHaveAttribute("data-studio-site-map-detail", "components");
+  await expect(board.locator("[data-studio-site-map-viewport='true']")).toHaveAttribute("data-studio-site-map-panel-visible", "true");
+
+  await board.locator(".studio-site-map-board__detail [data-studio-site-map-detail-target='map']").click();
+  await expect(board).toHaveAttribute("data-studio-site-map-detail", "map");
+  await expect(board.locator("[data-studio-site-map-workspace='true']")).toHaveAttribute("data-studio-site-map-panel-visible", "true");
+
+  await board.locator("[data-studio-site-map-filter-control='site']").click();
+  await expect(board).toHaveAttribute("data-studio-site-map-filter", "site");
+  await expect(board.locator("[data-studio-site-map-filter-control='site']")).toHaveAttribute("aria-pressed", "true");
+
+  const targetNode = board.locator("[data-studio-site-map-workspace-node][data-studio-site-map-node-kind='component'][data-studio-site-map-visible='true']").first();
+  await expect(targetNode).toBeAttached();
+  const targetNodeKey = await targetNode.getAttribute("data-studio-site-map-workspace-node");
+  const targetNodeLabel = await targetNode.getAttribute("data-studio-site-map-node-label");
+  expect(targetNodeKey).toBeTruthy();
+  expect(targetNodeLabel).toBeTruthy();
+  await targetNode.click();
+  await expect(board).toHaveAttribute("data-studio-site-map-selected-node", targetNodeKey ?? "");
+  await expect(board.locator("[data-studio-site-map-selected-label]").first()).toHaveText(targetNodeLabel ?? "");
+
+  await page.locator(addTabSelector).click();
+  await expect(board).toHaveAttribute("data-studio-site-map-detail", "build");
+  await expect(board.locator("[data-studio-site-map-builder='true']")).toHaveAttribute("data-studio-site-map-panel-visible", "true");
+
+  const blueprint = board.locator("[data-studio-site-map-blueprint]").first();
+  await expect(blueprint).toBeAttached();
+  const blueprintKey = await blueprint.getAttribute("data-studio-site-map-blueprint");
+  await blueprint.click();
+  await expect(board).toHaveAttribute("data-studio-site-map-selected-blueprint", blueprintKey ?? "");
+
+  const template = board.locator("[data-studio-site-map-component-template][data-studio-site-map-visible='true']").first();
+  await expect(template).toBeAttached();
+  const templateKey = await template.getAttribute("data-studio-site-map-component-template");
+  await template.click();
+  await expect(board).toHaveAttribute("data-studio-site-map-selected-template", templateKey ?? "");
+
+  await board.locator("[data-studio-site-map-zoom-control='wide']").click();
+  await board.locator("[data-studio-site-map-density-control='dense']").click();
+  await board.locator("[data-studio-site-map-grid-control='off']").click();
+  await expect(board).toHaveAttribute("data-studio-site-map-zoom", "wide");
+  await expect(board).toHaveAttribute("data-studio-site-map-density", "dense");
+  await expect(board).toHaveAttribute("data-studio-site-map-grid", "off");
+}

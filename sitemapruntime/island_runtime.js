@@ -3,6 +3,7 @@
 
   var BOARD = "[data-studio-site-map-board='true']";
   var BOUND = "data-gosx-studio-site-map-runtime-bound";
+  var BOUND_PROP = "__gosxStudioSiteMapRuntimeBound";
 
   function attr(el, name, fallback) {
     if (!el || !el.getAttribute) return fallback || "";
@@ -232,6 +233,7 @@
 
   function controlValue(target, attrName) {
     var control = closest(target, "[" + attrName + "]");
+    if (control && control.matches && control.matches(BOARD)) return "";
     return control ? attr(control, attrName, "") : "";
   }
 
@@ -293,7 +295,8 @@
   }
 
   function bind(root) {
-    if (!root || attr(root, BOUND, "") === "true") return root;
+    if (!root || root[BOUND_PROP] === true) return root;
+    root[BOUND_PROP] = true;
     setAttr(root, BOUND, "true");
     root.addEventListener("click", function (event) {
       handleClick(root, event);

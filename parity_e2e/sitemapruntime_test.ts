@@ -16,6 +16,8 @@ test.describe("@smoke GoSXStudioSiteMapRuntime interactions", () => {
         data-studio-site-map-detail="map"
         data-studio-site-map-palette="all"
         data-studio-site-map-focus="all"
+        data-studio-site-map-detail-control="runtime"
+        data-studio-site-map-focus-control="runtime"
         data-studio-site-map-zoom="fit"
         data-studio-site-map-density="roomy"
         data-studio-site-map-grid="on"
@@ -129,5 +131,31 @@ test.describe("@smoke GoSXStudioSiteMapRuntime interactions", () => {
     await expect(board).toHaveAttribute("data-studio-site-map-zoom", "wide");
     await expect(board).toHaveAttribute("data-studio-site-map-density", "dense");
     await expect(board).toHaveAttribute("data-studio-site-map-grid", "off");
+  });
+
+  test("rebinds boards that already carry the public bound attribute", async ({ page }) => {
+    await page.setContent(`
+      <section
+        data-studio-site-map-board="true"
+        data-gosx-studio-site-map-runtime-bound="true"
+        data-studio-site-map-detail="map"
+        data-studio-site-map-detail-control="runtime"
+        data-studio-site-map-palette="all"
+        data-studio-site-map-focus="all"
+        data-studio-site-map-focus-control="runtime"
+      >
+        <button type="button" data-studio-site-map-detail-target="build" aria-pressed="false">Add</button>
+        <div data-studio-site-map-workspace="true" data-studio-site-map-panel-visible="true"></div>
+        <div data-studio-site-map-builder="true" data-studio-site-map-panel-visible="false"></div>
+      </section>
+    `);
+    await page.addScriptTag({ content: runtimeJS });
+
+    const board = page.locator("[data-studio-site-map-board='true']");
+    await page.locator("[data-studio-site-map-detail-target='build']").click();
+    await expect(board).toHaveAttribute("data-studio-site-map-detail", "build");
+    await expect(board).toHaveAttribute("data-studio-site-map-palette", "page-sections");
+    await expect(page.locator("[data-studio-site-map-workspace='true']")).toHaveAttribute("data-studio-site-map-panel-visible", "false");
+    await expect(page.locator("[data-studio-site-map-builder='true']")).toHaveAttribute("data-studio-site-map-panel-visible", "true");
   });
 });
