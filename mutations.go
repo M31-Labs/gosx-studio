@@ -221,6 +221,23 @@ func AuthoringMutationForComponentDelete(page Page, component Component) Authori
 	}.Normalize()
 }
 
+func AuthoringMutationForComponentDuplicate(page Page, component Component, position int) AuthoringMutation {
+	page = page.Normalize()
+	component = component.Normalize()
+	return AuthoringMutation{
+		Kind:                 AuthoringOperationDuplicateComponent,
+		PageKey:              page.Key,
+		PageLabel:            page.Label,
+		PageRoute:            page.Route,
+		ComponentKey:         component.Key,
+		ComponentLabel:       component.Label,
+		ComponentTemplateKey: firstNonEmpty(component.TemplateKey, component.Key),
+		Binding:              component.Binding,
+		Position:             position,
+		HasPosition:          true,
+	}.Normalize()
+}
+
 func AuthoringMutationFromForm(form map[string]string) (AuthoringMutation, AuthoringValidation) {
 	mutation := AuthoringMutation{
 		Kind:                 AuthoringOperationKind(formValue(form, AuthoringFieldOperation)),

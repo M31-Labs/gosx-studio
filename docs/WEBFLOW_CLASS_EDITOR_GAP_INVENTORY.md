@@ -101,13 +101,15 @@ Current:
   storefront section by disabling it in site settings, and Pajaritos removes a
   home section from the configured order while keeping it restorable from the
   component palette.
+- `AuthoringSiteMapView` now exposes component duplicate payloads with a
+  template key and target insert position. Noni persists repeatable homepage
+  section instances, and Pajaritos persists repeatable home sections through
+  preview settings metadata.
 
 Missing:
 
-- Host implementations in Noni and Pajaritos for the remaining operations:
-  - duplicating components with dynamic component instances
 - Cross-operation validation beyond the current create-page, add-component,
-  save-control, page metadata, visibility, reorder, and delete paths.
+  save-control, page metadata, visibility, reorder, duplicate, and delete paths.
 - Route-level examples showing how host apps register `AuthoringActionHandler`
   beside page modules.
 
@@ -470,12 +472,12 @@ These are the current places to mine for reusable Studio behavior.
 - Introduce an `AuthoringAdapter` or equivalent mutation interface. Done in the
   first execution slice.
 - Implement apply-intent, save-control, route metadata, first visibility,
-  reorder, and delete operations. Duplicate and broader validation operations
+  reorder, duplicate, and delete operations. Broader validation operations
   remain.
 - Add server-action helpers and focused tests.
 - Wire both Noni and Pajaritos to the same action contract. Pajaritos and Noni
   now have create-page, add-component, save-control, page metadata, visibility,
-  reorder, and delete slices.
+  reorder, duplicate, and delete slices.
 
 ### Phase 2: Extract the Visible Shell
 
@@ -529,8 +531,9 @@ These are the current places to mine for reusable Studio behavior.
    persistence in both reference apps.
 8. Build a reusable `StudioShell.gsx` that consumes `ShellConfig` and
    `AuthoringSurfaceView`.
-9. Add duplicate component operations with a dynamic component-instance model,
-   host-backed persistence, and visible canvas/site-map controls.
+9. Done on 2026-06-01: add duplicate component operations with a dynamic
+   component-instance model, host-backed persistence, and visible site-map
+   controls.
 10. Move workbench, command palette, and state runtime ownership out of
    `gosx-cms/studio` when the dependent hosts are ready.
 11. Implement `SiteMapEngine.gsx` against the existing `CompositionWorkspace`
@@ -596,19 +599,24 @@ These are the current places to mine for reusable Studio behavior.
   a real Chromium page and verifies successful authoring results select the
   changed component, sync canvas selection, refresh the preview iframe, update
   save feedback, and emit `gosxstudio:authoring-result`.
+- 2026-06-01: Added shared component duplicate mutation payloads and wired
+  repeatable home-section persistence in both reference apps. Noni now stores
+  instance keys such as `hero__copy_2` while preserving the template key for
+  rendering and settings saves; Pajaritos stores repeatable ordered home
+  section instances in metadata.
 
 ## Next Execution Slice
 
-The next practical slice is e2e authoring confidence plus component operations:
+The next practical slice is e2e authoring confidence plus reusable shell
+extraction:
 
-- Add Noni and Pajaritos e2e smoke tests for create page, add component, and
-  edit control through the visible editor surface.
+- Add Noni and Pajaritos e2e smoke tests for create page, add component,
+  duplicate component, and edit control through the visible editor surface.
 - Extend the new `authoringruntime` browser smoke into host-backed smoke tests
   that assert changed-object selection and preview refresh instead of only
   checking stored data.
-- Add the first persisted component reorder operation so the site-map and
-  canvas can change placed section order rather than only fields, visibility,
-  and page metadata.
+- Build the first reusable `StudioShell.gsx` slice so Muddy and Pajaritos stop
+  carrying app-local editor chrome for the shared workbench shell.
 
 ## Definition of Done
 

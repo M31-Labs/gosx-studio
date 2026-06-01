@@ -234,6 +234,7 @@ type Page struct {
 
 type Component struct {
 	Key                 string
+	TemplateKey         string
 	Label               string
 	Summary             string
 	GoSXComponent       string
@@ -243,6 +244,7 @@ type Component struct {
 	Editable            bool
 	Position            int
 	CanReorder          bool
+	CanDuplicate        bool
 	Visible             bool
 	CanToggleVisibility bool
 	CanDelete           bool
@@ -1830,6 +1832,7 @@ func (component Component) ControlCount() int {
 
 func (component Component) Normalize() Component {
 	component.Key = strings.TrimSpace(component.Key)
+	component.TemplateKey = strings.TrimSpace(component.TemplateKey)
 	component.Label = strings.TrimSpace(component.Label)
 	component.Summary = strings.TrimSpace(component.Summary)
 	component.GoSXComponent = strings.TrimSpace(component.GoSXComponent)

@@ -49,6 +49,7 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 	pages := authoringSiteMapPageViews(siteMap.Pages, options)
 	metadataPage := authoringSiteMapMetadataPageView(siteMap.Pages)
 	reorderComponent := authoringSiteMapReorderComponentView(siteMap.Pages)
+	duplicateComponent := authoringSiteMapDuplicateComponentView(siteMap.Pages)
 	visibilityComponent := authoringSiteMapVisibilityComponentView(siteMap.Pages)
 	deleteComponent := authoringSiteMapDeleteComponentView(siteMap.Pages)
 	sources := authoringSiteMapSourceViews(siteMap)
@@ -100,6 +101,8 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 		"hasMetadataPage":                    len(metadataPage) > 0,
 		"reorderComponent":                   reorderComponent,
 		"hasReorderComponent":                len(reorderComponent) > 0,
+		"duplicateComponent":                 duplicateComponent,
+		"hasDuplicateComponent":              len(duplicateComponent) > 0,
 		"visibilityComponent":                visibilityComponent,
 		"hasVisibilityComponent":             len(visibilityComponent) > 0,
 		"deleteComponent":                    deleteComponent,
@@ -217,8 +220,15 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 			deleteMutation = AuthoringMutationForComponentDelete(page, component)
 			deleteFormValues = deleteMutation.FormValues()
 		}
+		duplicateMutation := AuthoringMutation{}
+		duplicateFormValues := map[string]string(nil)
+		if component.CanDuplicate {
+			duplicateMutation = AuthoringMutationForComponentDuplicate(page, component, index+1)
+			duplicateFormValues = duplicateMutation.FormValues()
+		}
 		out = append(out, map[string]any{
 			"key":                          component.Key,
+			"templateKey":                  component.TemplateKey,
 			"selectionKey":                 component.SelectionKey(page.Key),
 			"label":                        component.Label,
 			"summary":                      firstNonEmpty(component.Summary, authoringComponentDefaultSummary(component)),
@@ -233,6 +243,7 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 			"position":                     index,
 			"positionLabel":                strconv.Itoa(index + 1),
 			"canReorder":                   component.CanReorder,
+			"canDuplicate":                 component.CanDuplicate,
 			"canMoveUp":                    canMoveUp,
 			"canMoveDown":                  canMoveDown,
 			"moveUpActionLabel":            "Move up",
@@ -265,6 +276,14 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 			"deleteAuthoringComponent":     deleteMutation.ComponentKey,
 			"deleteMutation":               AuthoringMutationView(deleteMutation),
 			"deleteFormValues":             deleteFormValues,
+			"duplicateActionLabel":         "Duplicate",
+			"duplicateAuthoringOperation":  string(duplicateMutation.Kind),
+			"duplicateAuthoringPageKey":    duplicateMutation.PageKey,
+			"duplicateAuthoringComponent":  duplicateMutation.ComponentKey,
+			"duplicateAuthoringTemplate":   duplicateMutation.ComponentTemplateKey,
+			"duplicateAuthoringPosition":   duplicateMutation.Position,
+			"duplicateMutation":            AuthoringMutationView(duplicateMutation),
+			"duplicateFormValues":          duplicateFormValues,
 			"controls":                     authoringSiteMapControlViews(page, component, component.Controls),
 			"hasControls":                  component.ControlCount() > 0,
 			"controlLabel":                 countLabel(component.ControlCount(), "field", "fields"),
@@ -310,6 +329,41 @@ func authoringSiteMapReorderComponentView(pages []Page) map[string]any {
 				"authoringPosition":   mutation.Position,
 				"mutation":            AuthoringMutationView(mutation),
 				"formValues":          mutation.FormValues(),
+			}
+		}
+	}
+	return nil
+}
+
+func authoringSiteMapDuplicateComponentView(pages []Page) map[string]any {
+	for _, page := range pages {
+		page = page.Normalize()
+		for index, component := range page.Components {
+			component = component.Normalize()
+			component.Position = index
+			if !component.CanDuplicate {
+				continue
+			}
+			mutation := AuthoringMutationForComponentDuplicate(page, component, index+1)
+			return map[string]any{
+				"key":                component.Key,
+				"templateKey":        component.TemplateKey,
+				"label":              component.Label,
+				"pageKey":            page.Key,
+				"pageLabel":          page.Label,
+				"binding":            component.Binding,
+				"statusLabel":        component.Status,
+				"position":           index,
+				"positionLabel":      strconv.Itoa(index + 1),
+				"targetPosition":     mutation.Position,
+				"actionLabel":        "Duplicate",
+				"authoringOperation": string(mutation.Kind),
+				"authoringPageKey":   mutation.PageKey,
+				"authoringComponent": mutation.ComponentKey,
+				"authoringTemplate":  mutation.ComponentTemplateKey,
+				"authoringPosition":  mutation.Position,
+				"mutation":           AuthoringMutationView(mutation),
+				"formValues":         mutation.FormValues(),
 			}
 		}
 	}

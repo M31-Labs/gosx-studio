@@ -221,6 +221,7 @@ func authoringComponentView(page Page, component Component) map[string]any {
 	component = component.Normalize()
 	return map[string]any{
 		"key":                 component.Key,
+		"templateKey":         component.TemplateKey,
 		"label":               component.Label,
 		"summary":             component.Summary,
 		"hasSummary":          component.Summary != "",
@@ -232,6 +233,7 @@ func authoringComponentView(page Page, component Component) map[string]any {
 		"editable":            component.Editable,
 		"position":            component.Position,
 		"canReorder":          component.CanReorder,
+		"canDuplicate":        component.CanDuplicate,
 		"visible":             component.Visible,
 		"canToggleVisibility": component.CanToggleVisibility,
 		"canDelete":           component.CanDelete,

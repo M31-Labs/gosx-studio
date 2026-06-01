@@ -140,6 +140,30 @@ func TestAuthoringMutationForComponentDeleteBuildsComponentPayload(t *testing.T)
 	}
 }
 
+func TestAuthoringMutationForComponentDuplicateBuildsTemplatePayload(t *testing.T) {
+	mutation := AuthoringMutationForComponentDuplicate(Page{
+		Key:   "home",
+		Label: "Home",
+		Route: "/",
+	}, Component{
+		Key:         "hero-copy",
+		TemplateKey: "hero",
+		Label:       "Hero copy",
+		Binding:     "home.section.hero-copy",
+	}, 2)
+	values := mutation.FormValues()
+
+	if mutation.Kind != AuthoringOperationDuplicateComponent || mutation.PageKey != "home" || mutation.ComponentKey != "hero-copy" || mutation.ComponentTemplateKey != "hero" {
+		t.Fatalf("unexpected duplicate mutation: %#v", mutation)
+	}
+	if !mutation.HasPosition || mutation.Position != 2 {
+		t.Fatalf("expected explicit duplicate target position: %#v", mutation)
+	}
+	if values[AuthoringFieldOperation] != "duplicate-component" || values[AuthoringFieldComponentTemplateKey] != "hero" || values[AuthoringFieldPosition] != "2" {
+		t.Fatalf("unexpected duplicate form values: %#v", values)
+	}
+}
+
 func TestAuthoringMutationFromFormNormalizesAndValidates(t *testing.T) {
 	mutation, validation := AuthoringMutationFromForm(map[string]string{
 		AuthoringFieldOperation:    " save-control ",

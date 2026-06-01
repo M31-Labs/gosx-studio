@@ -14,6 +14,7 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 		Selected:      true,
 		Components: []Component{{
 			Key:                 "hero",
+			TemplateKey:         "hero",
 			Label:               "Hero",
 			GoSXComponent:       "HomeHero",
 			Source:              ComponentSourceHost,
@@ -21,6 +22,7 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 			Status:              "Visible",
 			Editable:            true,
 			CanReorder:          true,
+			CanDuplicate:        true,
 			Visible:             true,
 			CanToggleVisibility: true,
 			CanDelete:           true,
@@ -103,6 +105,9 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 	if hero["canDelete"] != true || hero["deleteAuthoringOperation"] != "delete-component" {
 		t.Fatalf("expected hero delete authoring projection: %#v", hero)
 	}
+	if hero["canDuplicate"] != true || hero["duplicateAuthoringOperation"] != "duplicate-component" || hero["duplicateAuthoringTemplate"] != "hero" {
+		t.Fatalf("expected hero duplicate authoring projection: %#v", hero)
+	}
 	if hero["canReorder"] != true || hero["canMoveUp"] != false || hero["canMoveDown"] != true || hero["positionLabel"] != "1" {
 		t.Fatalf("expected hero reorder authoring projection: %#v", hero)
 	}
@@ -120,6 +125,11 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 	deleteForm := deletePage["formValues"].(map[string]string)
 	if view["hasDeleteComponent"] != true || deletePage["authoringOperation"] != "delete-component" || deleteForm[AuthoringFieldComponentKey] != "hero" {
 		t.Fatalf("unexpected delete component payload: %#v", deletePage)
+	}
+	duplicatePage := view["duplicateComponent"].(map[string]any)
+	duplicateForm := duplicatePage["formValues"].(map[string]string)
+	if view["hasDuplicateComponent"] != true || duplicatePage["authoringOperation"] != "duplicate-component" || duplicateForm[AuthoringFieldComponentTemplateKey] != "hero" || duplicateForm[AuthoringFieldPosition] != "1" {
+		t.Fatalf("unexpected duplicate component payload: %#v", duplicatePage)
 	}
 	headline := hero["controls"].([]map[string]any)[0]
 	if headline["authoringOperation"] != "save-control" || headline["authoringBinding"] != "pages.home.hero.headline" || headline["value"] != "Forest days" {
