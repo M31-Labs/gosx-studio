@@ -48,6 +48,18 @@ type SiteMapCanvasOptions struct {
 	// OnPick is the Go handler name wired to CanvasBoard pick events. Defaults
 	// to "handleSiteMapPick" when blank.
 	OnPick string
+
+	// WASMFree opts the surface into the WASM-free render path. When true the
+	// renderer emits a plain <canvas> that DELIBERATELY carries NO
+	// data-gosx-surface-kind (and instead carries data-gosx-canvas-wasm-free),
+	// so the gosx client bootstrap's canvas discovery
+	// ([data-gosx-surface-kind]:not([data-gosx-engine-bytecode])) never tries to
+	// WASM-hydrate it. The SAME server-precomputed inline RenderBundle is still
+	// emitted next to the canvas, so a WASM-free client (gosx-studio's host ships
+	// a ported JS painter + interaction loop) can paint and drive it with no WASM.
+	// When false (the default) the surface emits the WASM gosx.CanvasBoard exactly
+	// as before, so the existing co-render / canvas-default modes are unchanged.
+	WASMFree bool
 }
 
 const (
@@ -111,25 +123,40 @@ func RenderSiteMapCanvasEngine(siteMapView map[string]any, options SiteMapCanvas
 	nodes := siteMapCanvasNodes(siteMapView)
 	background := FirstNonEmpty(options.Background, siteMapCanvasDefaultBackground)
 
-	board := gosx.CanvasBoard(gosx.CanvasBoardProps{
-		ID:         "studio-site-map-canvas-board",
-		Width:      options.Width,
-		Height:     options.Height,
-		Background: background,
-		Zoom:       1.0,
-		Nodes:      nodes,
-		OnPick:     FirstNonEmpty(options.OnPick, siteMapCanvasDefaultOnPick),
-		ClassName:  options.CanvasClass,
-	})
+	// In the WASM-free path we emit a plain <canvas> that carries NO
+	// data-gosx-surface-kind, so the gosx client bootstrap never WASM-hydrates it;
+	// otherwise we emit the WASM gosx.CanvasBoard exactly as before. Either way the
+	// same inline RenderBundle (computed below) ships next to the canvas.
+	var board gosx.Node
+	if options.WASMFree {
+		board = siteMapCanvasWASMFreeCanvas(background, options.Width, options.Height, options.CanvasClass)
+	} else {
+		board = gosx.CanvasBoard(gosx.CanvasBoardProps{
+			ID:         "studio-site-map-canvas-board",
+			Width:      options.Width,
+			Height:     options.Height,
+			Background: background,
+			Zoom:       1.0,
+			Nodes:      nodes,
+			OnPick:     FirstNonEmpty(options.OnPick, siteMapCanvasDefaultOnPick),
+			ClassName:  options.CanvasClass,
+		})
+	}
 
 	// gosx.El takes ...any (AttrList + Node children), so children carry as []any.
+	sectionAttrs := []any{
+		gosx.Attr("class", FirstNonEmpty(options.Class, "studio-site-map-canvas")),
+		gosx.Attr("data-studio-site-map-canvas-engine", "true"),
+		gosx.Attr("data-gosx-studio-site-map-canvas-renderer", "gosx-studio"),
+		gosx.Attr("aria-label", "Site map canvas surface"),
+	}
+	if options.WASMFree {
+		// Mark the surface section so the host (and e2e) can confirm the
+		// WASM-free render path owns this board.
+		sectionAttrs = append(sectionAttrs, gosx.Attr("data-gosx-canvas-wasm-free", "true"))
+	}
 	children := []any{
-		gosx.Attrs(
-			gosx.Attr("class", FirstNonEmpty(options.Class, "studio-site-map-canvas")),
-			gosx.Attr("data-studio-site-map-canvas-engine", "true"),
-			gosx.Attr("data-gosx-studio-site-map-canvas-renderer", "gosx-studio"),
-			gosx.Attr("aria-label", "Site map canvas surface"),
-		),
+		gosx.Attrs(sectionAttrs...),
 		board,
 	}
 	if bundleScript, ok := siteMapCanvasBundleScript(nodes, background, options.Width, options.Height); ok {
@@ -141,6 +168,66 @@ func RenderSiteMapCanvasEngine(siteMapView map[string]any, options SiteMapCanvas
 	}
 
 	return gosx.El("section", children...)
+}
+
+// siteMapCanvasWASMFreeCanvas emits the WASM-free site-map <canvas>. It carries
+// the SAME id and size the WASM gosx.CanvasBoard would, but DELIBERATELY OMITS
+// data-gosx-surface-kind (and the other data-gosx-engine-* / data-gosx-canvas2d
+// attributes the WASM path uses for hydration). That omission is the
+// decoupling: the gosx client bootstrap discovers canvas surfaces via
+// `[data-gosx-surface-kind]:not([data-gosx-engine-bytecode])`
+// (client/js/bootstrap-src/26b-feature-engines-prefix.js), so a canvas without
+// that attribute is invisible to the WASM hydration path. Instead it carries
+// data-gosx-canvas-wasm-free="true", the marker the muddy WASM-free client keys
+// on to own painting + interaction. Width/Height default to the same 1280x720
+// the WASM board uses so the inline bundle's framebuffer matches.
+func siteMapCanvasWASMFreeCanvas(background string, width, height int, canvasClass string) gosx.Node {
+	w, h := width, height
+	if w == 0 && h == 0 {
+		w, h = 1280, 720
+	}
+	attrs := []any{
+		gosx.Attr("id", "studio-site-map-canvas-board"),
+		gosx.Attr("data-gosx-canvas-wasm-free", "true"),
+		gosx.Attr("width", intToString(w)),
+		gosx.Attr("height", intToString(h)),
+		// A focusable canvas so arrow-key navigation targets it (the WASM-free
+		// client calls canvas.focus() on pointerdown and listens for keydown).
+		gosx.Attr("tabindex", "0"),
+	}
+	if background != "" {
+		// Match the WASM CanvasBoard's inline background so the element shows the
+		// board surface color before the first JS paint.
+		attrs = append(attrs, gosx.Attr("style", "background:"+background))
+	}
+	if canvasClass != "" {
+		attrs = append(attrs, gosx.Attr("class", canvasClass))
+	}
+	return gosx.El("canvas", gosx.Attrs(attrs...))
+}
+
+// intToString renders a non-negative int as a decimal string without pulling in
+// strconv at this seam (the file is otherwise import-light).
+func intToString(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	var buf [20]byte
+	i := len(buf)
+	for n > 0 {
+		i--
+		buf[i] = byte('0' + n%10)
+		n /= 10
+	}
+	if neg {
+		i--
+		buf[i] = '-'
+	}
+	return string(buf[i:])
 }
 
 // siteMapCanvasBundleScript computes the Canvas2D RenderBundle for the board

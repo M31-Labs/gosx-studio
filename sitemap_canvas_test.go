@@ -126,6 +126,49 @@ func TestRenderSiteMapCanvasEngineEmitsCanvas2DSurface(t *testing.T) {
 	}
 }
 
+// TestRenderSiteMapCanvasEngineWASMFreeOmitsSurfaceKind locks the WASM-free
+// decoupling: with WASMFree=true the engine emits a muddy-owned <canvas> that
+// carries data-gosx-canvas-wasm-free but DELIBERATELY OMITS data-gosx-surface-kind
+// (and the data-gosx-engine-* hydration attributes), so the gosx client
+// bootstrap's canvas discovery never WASM-hydrates it. The SAME server-precomputed
+// inline RenderBundle must still ship next to the canvas so a WASM-free client can
+// paint it.
+func TestRenderSiteMapCanvasEngineWASMFreeOmitsSurfaceKind(t *testing.T) {
+	html := gosx.RenderHTML(RenderSiteMapCanvasEngine(siteMapCanvasTestView(), SiteMapCanvasOptions{
+		Enabled:  true,
+		WASMFree: true,
+		Class:    "host-canvas-board",
+	}))
+
+	// The decoupling markers must be present.
+	for _, fragment := range []string{
+		`data-studio-site-map-canvas-engine="true"`,
+		`data-gosx-canvas-wasm-free="true"`,
+		`id="studio-site-map-canvas-board"`,
+		// The inline bundle still ships for the WASM-free painter.
+		`data-gosx-canvas-bundle="studio-site-map-canvas-board"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("wasm-free site-map canvas engine missing %q:\n%s", fragment, html)
+		}
+	}
+	// The WASM hydration attributes must be ABSENT (the gosx bootstrap discovers
+	// `[data-gosx-surface-kind]:not([data-gosx-engine-bytecode])`; omitting the
+	// surface-kind is what keeps this canvas out of the WASM hydration path).
+	for _, forbidden := range []string{
+		`data-gosx-surface-kind="canvas2d"`,
+		`data-gosx-engine-component="CanvasBoard"`,
+		`data-gosx-canvas2d="1"`,
+	} {
+		if strings.Contains(html, forbidden) {
+			t.Fatalf("wasm-free site-map canvas engine must NOT carry %q (so the gosx bootstrap skips it):\n%s", forbidden, html)
+		}
+	}
+	if strings.Contains(html, "GoSX Studio") {
+		t.Fatalf("site-map canvas engine must not inject visible platform copy:\n%s", html)
+	}
+}
+
 func TestRenderSiteMapCanvasEngineDisabledByDefault(t *testing.T) {
 	html := gosx.RenderHTML(RenderSiteMapCanvasEngine(siteMapCanvasTestView(), SiteMapCanvasOptions{}))
 

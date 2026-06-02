@@ -509,6 +509,19 @@ export async function startMuddyCanvasDefault(request: APIRequestContext): Promi
   return startMuddy(request, { MUDDY_SITEMAP_CANVAS: "canvas-default" });
 }
 
+// startMuddyCanvasWASMFree boots Muddy/Noni in WASM-free Canvas2D mode
+// (MUDDY_CANVAS_WASM_FREE=1): the Canvas2D site-map board paints + handles
+// interaction with NO gosx client WASM. The editor emits a muddy-owned <canvas>
+// (no data-gosx-surface-kind, so the gosx bootstrap never WASM-hydrates it) plus
+// the same server-precomputed inline RenderBundle, and the muddy WASM-free
+// scripts (ported painter + interaction client) own it. Because no shared-runtime
+// engine is registered, the editor loads only the LIGHT islands-only WASM — the
+// full gosx-runtime.wasm is dropped. Default OFF — only the wasm-free parity e2e
+// flips this on.
+export async function startMuddyCanvasWASMFree(request: APIRequestContext): Promise<ServerHandle> {
+  return startMuddy(request, { MUDDY_CANVAS_WASM_FREE: "1" });
+}
+
 export async function startPajaritos(request: APIRequestContext): Promise<ServerHandle> {
   const port = await freePort();
   const tempDir = mkdtempSync(path.join(tmpdir(), "gosx-studio-pajaritos-e2e-"));
