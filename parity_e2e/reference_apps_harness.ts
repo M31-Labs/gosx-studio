@@ -466,7 +466,7 @@ export function authoringParam(response: { request(): { postData(): string | nul
   return match?.[1] ?? null;
 }
 
-export async function startMuddy(request: APIRequestContext): Promise<ServerHandle> {
+export async function startMuddy(request: APIRequestContext, extraEnv?: Record<string, string>): Promise<ServerHandle> {
   const port = await freePort();
   const tempDir = mkdtempSync(path.join(tmpdir(), "gosx-studio-muddy-e2e-"));
   mkdirSync(path.join(tempDir, "media"), { recursive: true });
@@ -483,9 +483,18 @@ export async function startMuddy(request: APIRequestContext): Promise<ServerHand
       MUDDY_MEDIA_PATH: path.join(tempDir, "media"),
       MUDDY_MOCK_AUTH: "1",
       MUDDY_MOCK_CHECKOUT: "1",
+      ...(extraEnv ?? {}),
     },
     tempDir,
   });
+}
+
+// startMuddyCanvas boots Muddy/Noni with the opt-in Canvas2D site-map board
+// flag enabled (MUDDY_SITEMAP_CANVAS=1). The editor then renders the canvas
+// board surface in addition to the default DOM board. Default OFF — only the
+// canvas live-proof e2e flips this on.
+export async function startMuddyCanvas(request: APIRequestContext): Promise<ServerHandle> {
+  return startMuddy(request, { MUDDY_SITEMAP_CANVAS: "1" });
 }
 
 export async function startPajaritos(request: APIRequestContext): Promise<ServerHandle> {
