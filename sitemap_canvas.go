@@ -2,6 +2,7 @@ package studio
 
 import (
 	"m31labs.dev/gosx"
+	"m31labs.dev/gosx/render/bundle2d"
 )
 
 // SiteMapCanvasOptions configures the opt-in Canvas2D site-map surface.
@@ -104,23 +105,73 @@ func RenderSiteMapCanvasEngine(siteMapView map[string]any, options SiteMapCanvas
 		))
 	}
 
+	// Build the board nodes once and feed BOTH the (WASM) CanvasBoard primitive
+	// and the server-precomputed bundle below, so the inline bundle is exactly
+	// what the WASM path would produce for this surface.
+	nodes := siteMapCanvasNodes(siteMapView)
+	background := FirstNonEmpty(options.Background, siteMapCanvasDefaultBackground)
+
 	board := gosx.CanvasBoard(gosx.CanvasBoardProps{
 		ID:         "studio-site-map-canvas-board",
 		Width:      options.Width,
 		Height:     options.Height,
-		Background: FirstNonEmpty(options.Background, siteMapCanvasDefaultBackground),
+		Background: background,
 		Zoom:       1.0,
-		Nodes:      siteMapCanvasNodes(siteMapView),
+		Nodes:      nodes,
 		OnPick:     FirstNonEmpty(options.OnPick, siteMapCanvasDefaultOnPick),
 		ClassName:  options.CanvasClass,
 	})
 
-	return gosx.El("section", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.Class, "studio-site-map-canvas")),
-		gosx.Attr("data-studio-site-map-canvas-engine", "true"),
-		gosx.Attr("data-gosx-studio-site-map-canvas-renderer", "gosx-studio"),
-		gosx.Attr("aria-label", "Site map canvas surface"),
-	), board)
+	// gosx.El takes ...any (AttrList + Node children), so children carry as []any.
+	children := []any{
+		gosx.Attrs(
+			gosx.Attr("class", FirstNonEmpty(options.Class, "studio-site-map-canvas")),
+			gosx.Attr("data-studio-site-map-canvas-engine", "true"),
+			gosx.Attr("data-gosx-studio-site-map-canvas-renderer", "gosx-studio"),
+			gosx.Attr("aria-label", "Site map canvas surface"),
+		),
+		board,
+	}
+	if bundleScript, ok := siteMapCanvasBundleScript(nodes, background, options.Width, options.Height); ok {
+		// Additive: the WASM path still hydrates `board` from data-gosx-engine-props.
+		// This script ADDS the same bundle precomputed server-side (plain Go, no
+		// WASM) so a WASM-free client can paint it directly. Placed after the canvas
+		// so a client can resolve the surface, then read its sibling bundle.
+		children = append(children, bundleScript)
+	}
+
+	return gosx.El("section", children...)
+}
+
+// siteMapCanvasBundleScript computes the Canvas2D RenderBundle for the board
+// nodes SERVER-SIDE (plain Go, no syscall/js) via gosx's bundle2d API and wraps
+// the painter-ready JSON in a <script type="application/json"
+// data-gosx-canvas-bundle> element. The WASM-free client locates the surface,
+// reads this sibling script's textContent, JSON.parses it, and paints — no WASM,
+// no extra round-trip.
+//
+// Width/Height are resolved to the SAME defaults gosx.CanvasBoard applies (both
+// zero → 1280x720) and the camera matches the board's authored Zoom=1, Pan=(0,0),
+// so the inline bundle is byte-identical to what the WASM CanvasBoardAdapter
+// would render for this surface. The JSON is embedded raw: gosx/bundle2d marshals
+// via encoding/json, which escapes <, >, & as </>/&, so the payload
+// can never contain a literal </script> sequence. Returns ok=false (and no
+// script) only if marshaling fails, leaving the WASM path untouched.
+func siteMapCanvasBundleScript(nodes []gosx.CanvasBoardNode, background string, width, height int) (gosx.Node, bool) {
+	w, h := width, height
+	if w == 0 && h == 0 {
+		w, h = 1280, 720
+	}
+	bundle := bundle2d.ComputeCanvasBundleWithBackground(nodes, background, w, h, 1.0, 0, 0)
+	payload, err := bundle2d.MarshalCanvasBundle(bundle)
+	if err != nil {
+		return gosx.Node{}, false
+	}
+	script := gosx.El("script", gosx.Attrs(
+		gosx.Attr("type", "application/json"),
+		gosx.Attr("data-gosx-canvas-bundle", "studio-site-map-canvas-board"),
+	), gosx.RawHTML(payload))
+	return script, true
 }
 
 // siteMapCanvasNodes builds CanvasBoardNodes from an AuthoringSiteMapView.
