@@ -27,53 +27,27 @@ import { startMuddyCanvas } from "./reference_apps_harness";
 // Polls with generous timeouts (WASM cold-load is slow); no arbitrary sleeps.
 //
 // ============================================================================
-// STATUS: test.fixme — the canvas HYDRATES but does NOT paint board content.
+// STATUS: live — the canvas hydrates AND paints the board content.
 // ============================================================================
-// First real-browser run (2026-06-01, headless Chromium, Muddy editor with
-// MUDDY_SITEMAP_CANVAS=1 against local ../gosx @ v0.24.0-50-g8ed0df4) proved:
-//   ✓ editor selects the FULL shared WASM runtime (/gosx/runtime.wasm),
-//   ✓ bootstrap-feature-engines.js discovers the <canvas
-//     data-gosx-surface-kind="canvas2d"> placeholder,
-//   ✓ window.__gosx.ready === true, <html data-gosx-runtime-ready="true">,
-//   ✓ window.__gosx_canvas_board_screen_transform / __gosx_paint_canvas_bundle
-//     / __gosx_render_canvas / __gosx_hydrate are all installed (function),
-//   ✓ the canvas hydrates into a CanvasBoardAdapter (registered under the
-//     bootstrap's internal id "gosx-engine-surface-1"),
-//   ✓ the rAF paint loop runs and clears+fills the board BACKGROUND (#0f1720).
-//
-// BUT the board CONTENT does not paint. The server emits 102 nodes
-// (30 lines + 36 rects + 36 labels) in data-gosx-engine-props, yet
-// __gosx_render_canvas("gosx-engine-surface-1", 1280, 720, t) returns a
-// bundle with NO drawable objects:
-//   {"background":"#0f1720","camera":{"mode":"ortho2d",...},"environment":{}}
-// (93 bytes, no objects/lines/labels arrays), so getImageData reads a flat
-// #0f1720 canvas: distinctColors=1, nonBackground=0.
-//
-// ROOT CAUSE (gosx framework, NOT this editor wiring or gosx-studio):
-//   vm.CanvasBoardAdapter.RenderBundle() builds objects ONLY from
-//   prog.EngineNodes (the COMPILED .gsx engine-node path). A Go-constructed
-//   gosx.CanvasBoard (what gosx-studio RenderSiteMapCanvasEngine emits) carries
-//   its nodes in the runtime data-gosx-engine-props JSON instead. The browser
-//   bootstrap intentionally hydrates that "static primitive" with an EMPTY
-//   program ("{}") — see gosx client/bridge/bridge_canvasboard_full.go
-//   DecodeCanvasBoardProgram ("a static CanvasBoard is a no-code primitive…
-//   To keep that path crash-free, an empty payload is treated as {}"). So
-//   prog.EngineNodes is empty and snapshot() returns nil → zero render objects.
-//   The props.nodes → render-bundle path is simply NOT IMPLEMENTED in gosx; the
-//   passing unit/wasm tests (TestHydrateReconcilerCanvas2DSucceeds) exercise the
-//   compiled-EngineNodes path, never the props.nodes path.
-//
-// Fixing this requires a gosx-framework change (render gosx.CanvasBoard's
-// props.nodes, OR compile RenderSiteMapCanvasEngine's nodes into EngineNodes),
-// which is out of scope for this editor-flag slice. Flip this back to test()
-// once gosx renders CanvasBoard props.nodes — the assertion below already
-// verifies genuine paint (non-background pixels) and will go green then.
+// History: the first real-browser run (2026-06-01) hydrated the canvas and ran
+// the rAF loop, but only the board BACKGROUND (#0f1720) painted — board CONTENT
+// was missing. Root cause was in the gosx framework, not this wiring:
+// vm.CanvasBoardAdapter.RenderBundle() built render objects ONLY from
+// prog.EngineNodes (the compiled-.gsx path), while a Go-constructed
+// gosx.CanvasBoard (what gosx-studio RenderSiteMapCanvasEngine emits) carries
+// its nodes in the runtime props JSON under props.nodes and hydrates with an
+// empty {} program, so snapshot() was nil and zero objects rendered.
+// gosx fix d636df9 ("fix static CanvasBoard rendering regression") taught
+// RenderBundle to project props.nodes through canvasBoardNodesFromProps when
+// EngineNodes is empty (compiled EngineNodes keep strict precedence), so static
+// boards now paint their rects/lines/labels. With Muddy's dist rebuilt against
+// that fixed gosx, the assertion below (genuine non-background paint) goes green.
 
 test.describe("@reference-apps canvas2d site-map board live paint", () => {
   test.describe.configure({ timeout: 300_000 });
   test.skip(process.env.GOSX_STUDIO_REFERENCE_APP_E2E !== "1", "set GOSX_STUDIO_REFERENCE_APP_E2E=1 to boot sibling reference apps");
 
-  test.fixme("Muddy/Noni editor canvas2d site-map board hydrates and paints in headless Chromium", async ({ page, request }) => {
+  test("Muddy/Noni editor canvas2d site-map board hydrates and paints in headless Chromium", async ({ page, request }) => {
     const consoleErrors: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(message.text());
