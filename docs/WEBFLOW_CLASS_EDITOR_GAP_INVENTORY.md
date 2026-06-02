@@ -1031,14 +1031,23 @@ follow-up. The next practical slices, in order, are:
    decode fix `9d30d02`), and a **paint loop** renders the board — rects/lines/
    labels through the OrthoCamera2D transform via `__gosx_render_canvas` + a JS
    2D painter (willow, `8ed0df4`; also fixed colorless rects by emitting deduped
-   `bundle.Materials`). All verified by Go/JS/wasm suites (260 JS, both wasm
-   flavors) — **but not yet in a real browser, and not yet wired into a host.**
-   Remaining: (a) **wire into the Muddy editor behind a flag + a live Playwright
-   parity e2e proving the canvas hydrates + paints** (next); (b) interaction —
-   pointer pan/zoom + click pick (`__gosx_canvas_event` → `$surface.event.*` per
-   ADR 0007 + JS hit-test; `window.__gosx_canvas_board_screen_transform` is
-   exported for the inverse); (c) persist positions instead of the structural
-   grid; (d) flag-flip once at parity with the DOM board.
+   `bundle.Materials`). All verified by Go/JS/wasm suites.
+   **LIVE PAINT PROVEN 2026-06-02** — rowan's `d636df9` closed the static-board
+   gap (the adapter now renders a Go-built board's `props.nodes`, not only
+   compiled `EngineNodes`). A headless-Chromium parity e2e (gosx-studio
+   `1169328`) with the Muddy editor flag on (`MUDDY_SITEMAP_CANVAS=1` /
+   `?sitemap=canvas`, default-off; hazel `7f40464`) shows the canvas painting the
+   page graph: 26,510 non-background px, 561 distinct colors, pickable rects for
+   home + hero/products/gallery/blog/contact. Full reference suite 9/9 green.
+   (NB: Muddy now `replace`s `m31labs.dev/gosx => ../gosx` to ride the fixed
+   framework; revisit via a gosx release bump.)
+   Remaining: (a) **interaction — drag-to-pan, wheel-to-zoom, click-to-pick**
+   (the bootstrap canvas2d branch has no input loop yet; objects are pickable and
+   the adapter reads pan/zoom from props, so wire pointer/wheel → camera +
+   `$surface.event.*` per ADR 0007, hit-test via the exported
+   `window.__gosx_canvas_board_screen_transform`) — NEXT; (b) persist positions
+   instead of the structural grid; (c) flag-flip once at parity with the DOM
+   board.
 3. Decide the Pajaritos map path: adopt the shared board directly, or provide a
    host-styled board slot that still uses `AuthoringSiteMapView` plus
    `sitemapruntime`.
