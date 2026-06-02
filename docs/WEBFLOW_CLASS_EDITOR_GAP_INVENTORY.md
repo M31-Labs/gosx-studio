@@ -1052,6 +1052,19 @@ follow-up. The next practical slices, in order, are:
    complete and live behind the flag.** Remaining: (b) persist positions
    instead of the structural grid; (c) flag-flip once at parity with the DOM
    board.
+   **CANVAS-AS-DEFAULT MVP COMPLETE 2026-06-02** (parity push, slices 1/2/4/5):
+   (1) selection bridge — canvas pick → editor inspector + selection card
+   (muddy `4af9611`, e2e `e8d79ad`); (2) authoring parity — create-page +
+   add-component work with the canvas active, canvas-vs-panel overlap fixed via
+   gated CSS (muddy `b056a01`, e2e `85cd9d8`); (4) **`canvas-default` mode** —
+   3-state flag (`off`/`co-render`/`canvas-default`); canvas-default hides ONLY
+   the DOM graph (`__surface`) via `:has([data-studio-site-map-canvas-default])`
+   CSS, preserving the board runtime + selection card + authoring panels the
+   bridge depends on (muddy `bbba1fa`); (5) parity e2e — canvas-default reaches
+   the same selection/authoring state as co-render (e2e `a6947c9`).
+   **Reference e2e 13/13 on merged main; production default byte-identical.**
+   Remaining-optional: marquee/keyboard on the canvas (Slice 3); and the
+   production flip + DOM-board retirement (Slice 6 — a product decision).
 3. Decide the Pajaritos map path: adopt the shared board directly, or provide a
    host-styled board slot that still uses `AuthoringSiteMapView` plus
    `sitemapruntime`.
