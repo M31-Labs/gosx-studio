@@ -1045,7 +1045,11 @@ follow-up. The next practical slices, in order, are:
    (the bootstrap canvas2d branch has no input loop yet; objects are pickable and
    the adapter reads pan/zoom from props, so wire pointer/wheel → camera +
    `$surface.event.*` per ADR 0007, hit-test via the exported
-   `window.__gosx_canvas_board_screen_transform`) — NEXT; (b) persist positions
+   `window.__gosx_canvas_board_screen_transform`) — **SHIPPED 2026-06-02** (juniper:
+   gosx `aa1f8d6` + e2e gosx-studio `4e57ac3`; live-verified in headless
+   Chromium — drag-to-pan, wheel-zoom-to-cursor, click-pick →
+   `$surface.event.selectedID`). **The Canvas2D track is now functionally
+   complete and live behind the flag.** Remaining: (b) persist positions
    instead of the structural grid; (c) flag-flip once at parity with the DOM
    board.
 3. Decide the Pajaritos map path: adopt the shared board directly, or provide a
