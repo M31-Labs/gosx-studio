@@ -497,6 +497,18 @@ export async function startMuddyCanvas(request: APIRequestContext): Promise<Serv
   return startMuddy(request, { MUDDY_SITEMAP_CANVAS: "1" });
 }
 
+// startMuddyCanvasDefault boots Muddy/Noni in canvas-default mode
+// (MUDDY_SITEMAP_CANVAS=canvas-default): the Canvas2D board becomes the SOLE
+// site-map graph visual and the DOM board's graph sub-tree
+// (.studio-site-map-workspace__surface — the workspace layers/nodes + SVG link
+// paths) is hidden via gated CSS, while the DOM board element, its
+// sitemapruntime binding, the selection detail card, and the host authoring
+// panels stay live (so the Slice-1 selection bridge and Slice-2 authoring keep
+// working). Default OFF — only the canvas-default parity e2e flips this on.
+export async function startMuddyCanvasDefault(request: APIRequestContext): Promise<ServerHandle> {
+  return startMuddy(request, { MUDDY_SITEMAP_CANVAS: "canvas-default" });
+}
+
 export async function startPajaritos(request: APIRequestContext): Promise<ServerHandle> {
   const port = await freePort();
   const tempDir = mkdtempSync(path.join(tmpdir(), "gosx-studio-pajaritos-e2e-"));
