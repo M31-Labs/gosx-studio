@@ -1023,13 +1023,22 @@ follow-up. The next practical slices, in order, are:
    persist `{key,x,y}` per surface to a "Saved canvas positions" store, and feed
    that map into `SiteMapViewOptions.NodePositions` on render so a reload keeps
    the layout. App-coupled (each app's editor route + store).
-2. **Parallel track — Canvas2D engine (foundation shipped 2026-06-01, `0b23c8e`).**
-   `RenderSiteMapCanvasEngine` (opt-in, default-off) mounts `gosx.CanvasBoard`
-   for the page graph. Remaining: browser/WASM hydration e2e for the canvas
-   surface; grid/marquee/drag wiring on it (the primitive ships
-   render/pan/zoom/pick only); deterministic positions persisted instead of
-   structural grid; and a host opt-in + flag flip once at parity with the DOM
-   board.
+2. **Parallel track — Canvas2D engine (browser pipeline now built).** Studio:
+   `RenderSiteMapCanvasEngine` (opt-in, default-off, `0b23c8e`) mounts
+   `gosx.CanvasBoard`. Framework (gosx, 2026-06-01/02): the browser bootstrap
+   now **discovers** `[data-gosx-surface-kind="canvas2d"]` placeholders and
+   hydrates them via unified `__gosx_hydrate` (maple, `c1f992f`; empty-program
+   decode fix `9d30d02`), and a **paint loop** renders the board — rects/lines/
+   labels through the OrthoCamera2D transform via `__gosx_render_canvas` + a JS
+   2D painter (willow, `8ed0df4`; also fixed colorless rects by emitting deduped
+   `bundle.Materials`). All verified by Go/JS/wasm suites (260 JS, both wasm
+   flavors) — **but not yet in a real browser, and not yet wired into a host.**
+   Remaining: (a) **wire into the Muddy editor behind a flag + a live Playwright
+   parity e2e proving the canvas hydrates + paints** (next); (b) interaction —
+   pointer pan/zoom + click pick (`__gosx_canvas_event` → `$surface.event.*` per
+   ADR 0007 + JS hit-test; `window.__gosx_canvas_board_screen_transform` is
+   exported for the inverse); (c) persist positions instead of the structural
+   grid; (d) flag-flip once at parity with the DOM board.
 3. Decide the Pajaritos map path: adopt the shared board directly, or provide a
    host-styled board slot that still uses `AuthoringSiteMapView` plus
    `sitemapruntime`.
