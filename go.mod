@@ -17,7 +17,7 @@ require (
 require (
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/odvcencio/corkscrewdb v0.2.0 // indirect
-	github.com/odvcencio/gotreesitter v0.15.3 // indirect
+	github.com/odvcencio/gotreesitter v0.20.0 // indirect
 	github.com/odvcencio/manta v0.0.13 // indirect
 	github.com/odvcencio/mll v0.0.1 // indirect
 	github.com/odvcencio/turboquant v0.1.3 // indirect
