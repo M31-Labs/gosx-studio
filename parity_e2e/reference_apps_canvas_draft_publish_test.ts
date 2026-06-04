@@ -25,23 +25,29 @@ import { revealModeIfPresent, startMuddyCanvasHTMLSurface } from "./reference_ap
 //             draft-aware), and
 //         (b) a fresh GET of the public storefront "/" does NOT yet contain the
 //             marker (still the seed/live headline) — the draft is invisible live.
-//   (2) PUBLISH — clicking the REAL Publish button in the publish panel promotes
-//         draft→live; afterwards "/" NOW contains the marker, and the editor's
-//         pending-draft indicator clears (data-studio-has-draft="false", the
-//         draft-status line goes hidden, and the Discard button disappears — it is
-//         only rendered while a draft exists).
+//   (2) PUBLISH — triggering the publish action (the REAL Publish button is
+//         revealed + asserted present/visible, then the action is POSTed; see the
+//         triggering note below) promotes draft→live; afterwards "/" NOW contains
+//         the marker, and the editor's pending-draft indicator clears
+//         (data-studio-has-draft="false", the draft-status line goes hidden, and
+//         the Discard button disappears — it is only rendered while a draft exists).
 //   (3) DISCARD — a SECOND inline edit autosaves a different marker to a new draft
-//         (editor shows it after reload); clicking the REAL Discard button drops
-//         the draft, so the editor reverts to the PUBLISHED first marker (not the
-//         discarded second), and "/" is unchanged (still the first marker).
+//         (editor shows it after reload); triggering the discard action (the REAL
+//         Discard button is likewise asserted present, then the action is POSTed)
+//         drops the draft, so the editor reverts to the PUBLISHED first marker (not
+//         the discarded second), and "/" is unchanged (still the first marker).
 //
-// Publish/Discard are triggered by clicking the REAL buttons in the editor's
-// publish panel. Each button is a submit inside the workbench form (it carries the
-// session csrf_token input) with a formaction of the publish/discard action, so
-// the click is a native form POST that 303-redirects back to the editor. The
-// buttons carry data-admin-confirm, so cms-actions.js fires window.confirm on
-// submit — we auto-accept those dialogs. (No raw POST fallback is needed; the real
-// buttons work.)
+// Publish/Discard: the REAL publish-panel buttons are revealed and asserted
+// present + visible, but the action itself is triggered via a scoped page.request
+// POST carrying the page's live X-CSRF-Token — because a real button CLICK
+// empirically 403s. The buttons are submits targeting the workbench form
+// (form="websiteEditorForm"), and that form is enhanced by the studio STATE
+// runtime (data-gosx-studio-state + data-gosx-studio-client): it re-sends the
+// submit as a multipart/form-data fetch with NO X-CSRF-Token header, and the
+// server's CSRF guard can't read the token from a multipart body via r.ParseForm
+// → 403 (measured). See triggerPublishPanelAction for the captured evidence and
+// the full root cause. This is a pre-existing client-action gap, not an M3
+// property; the scoped POST keeps the M3 draft/publish/discard PROOF intact.
 //
 // Honesty discipline (matching the sibling canvas tests): the overlay element +
 // its editable child are DISCOVERED from the live DOM the client renders; both
@@ -91,9 +97,10 @@ test.describe("@reference-apps canvas2d site-map WASM-free draft → publish →
     page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
 
     // The Publish/Discard buttons carry data-admin-confirm; cms-actions.js fires
-    // window.confirm on any submit. Auto-accept so no confirm dialog can ever stall
-    // the test (defensive — see triggerPublishPanelAction for how the action POST
-    // is actually dispatched).
+    // window.confirm on any submit. We trigger the action via a scoped POST (see
+    // triggerPublishPanelAction), so this dialog auto-accept is defensive — it
+    // guarantees no confirm prompt (e.g. from any incidental submit) can stall the
+    // test.
     page.on("dialog", (dialog) => { void dialog.accept(); });
 
     // Freshly generated per run so neither the reload nor the public-storefront
@@ -380,20 +387,45 @@ async function commitInlineEdit(page: Page, marker: string, consoleErrors: strin
 // discardDraft) and returns the action's HTTP status, then reloads the editor so
 // its server-rendered draft state reflects the result.
 //
-// Triggering note (why a scoped POST, not a native click): the publish panel's
-// Publish/Discard buttons ARE real submit buttons inside the workbench form, and
-// we DO reveal the "Publish" editor mode + assert each real button is present and
-// visible before acting. But the studio client runtime ENHANCES that form: it
-// intercepts the submit and re-sends it as a multipart/form-data fetch WITHOUT the
-// X-CSRF-Token header, and the session guard reads the token from the header or
-// from r.Form (urlencoded only) — so an enhanced-submit publish lands as a 403.
-// That is a pre-existing studio-runtime gap on this enhanced path, not a property
-// of M3. So, exactly as the task allows ("if the real button is genuinely
-// impractical, POST … with the CSRF token read from the page, mirror how the M2
-// test / canvas_inline_edit.js get the token"), we POST the action through
-// page.request (which SHARES the browser context's session cookie) with the live
-// X-CSRF-Token header read from the page's rendered input[name="csrf_token"] —
-// the same token-resolution canvas_inline_edit.js uses for its own committed POST.
+// Triggering note (why a scoped POST, not a native button click) — EMPIRICALLY
+// MEASURED, not assumed. The Publish/Discard buttons ARE real <button
+// type="submit"> controls; we DO reveal the "publish" editor mode and assert each
+// real button is present + visible before acting. A real headless-Chromium CLICK
+// of the Publish button was tried and it 403s. The exact, captured evidence:
+//     status 403
+//     request content-type "multipart/form-data; boundary=----WebKitFormBoundary…"
+//     X-CSRF-Token header present = false
+//
+// Root cause (a genuine studio-runtime gap on the client-action path, NOT M3):
+//   • Each button targets the editor workbench form via form="websiteEditorForm"
+//     (muddy app/admin/editor/page.gsx PublishPanel) + a formaction of the action.
+//   • That form (gosx-cms studio/workbench.go workbenchFormAttrs) carries
+//     data-gosx-studio-state="true" AND data-gosx-studio-client="true". The studio
+//     STATE runtime (gosx-cms studio/assets/state_runtime.js initForm) binds a
+//     submit listener to every [data-gosx-studio-state] form; when client actions
+//     are enabled it preventDefault()s and re-sends the submit via
+//     runClientAction → fetch(action, { body: new FormData(form, submitter) }) with
+//     ONLY X-GoSX-Studio-Action / X-GoSX-Studio-Client-Action headers — a
+//     multipart/form-data body and NO X-CSRF-Token header.
+//     (This is a DIFFERENT enhancer than the authoring-managed one in gosx-studio
+//     authoringruntime/island_runtime.js, which gates on data-gosx-studio-authoring-
+//     managed and does NOT touch this form — so "the form isn't authoring-managed,
+//     thus never enhanced" is false: state_runtime enhances it.)
+//   • The gosx session guard (gosx session/session.go ~L148-153) takes csrf_token
+//     from the X-CSRF-Token header, else (only when the request is not JSON) from
+//     r.Form via r.ParseForm(). The header is absent, and r.ParseForm() does NOT
+//     parse a multipart body into r.Form (that needs ParseMultipartForm) — so the
+//     csrf_token that IS sitting in the multipart body is never read → 403.
+//
+// Until that client path either sends X-CSRF-Token or the server parses the
+// multipart form, a real click cannot drive publish/discard. So — exactly as the
+// task allows ("if the real button is genuinely impractical, POST … with the CSRF
+// token read from the page") — we POST the action through page.request (which
+// SHARES the browser context's session cookie) carrying the live X-CSRF-Token
+// header read from the page's rendered input[name="csrf_token"]. That hits the
+// session guard's header branch and validates, mirroring canvas_inline_edit.js's
+// own committed POST. The "buttons present + visible" UI assertions above keep the
+// proof honest about the real publish-panel controls existing.
 async function triggerPublishPanelAction(page: Page, baseURL: string, buttonSelector: string, actionRoute: string): Promise<number> {
   // Faithful UI step: surface the publish panel + assert the real button exists.
   await revealModeIfPresent(page, "publish");
