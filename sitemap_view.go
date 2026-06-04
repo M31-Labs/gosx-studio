@@ -488,6 +488,10 @@ func authoringSiteMapEditableControlView(pages []Page) map[string]any {
 				if control.Key == "" || control.Label == "" {
 					continue
 				}
+				// Dev-locked controls are never offered as editable fields.
+				if control.Locked {
+					continue
+				}
 				mutation := AuthoringMutationForControl(page, component, control)
 				view := authoringSiteMapControlView(control)
 				view["pageKey"] = page.Key
@@ -522,6 +526,10 @@ func authoringSiteMapControlViews(page Page, component Component, controls []Con
 		if control.Key == "" || control.Label == "" {
 			continue
 		}
+		// Dev-locked controls are never offered as editable fields.
+		if control.Locked {
+			continue
+		}
 		mutation := AuthoringMutationForControl(page, component, control)
 		view := authoringSiteMapControlView(control)
 		view["inputName"] = AuthoringFieldValue
@@ -546,6 +554,10 @@ func authoringSiteMapStaticControlViews(controls []Control) []map[string]any {
 		if control.Key == "" || control.Label == "" {
 			continue
 		}
+		// Dev-locked controls are never offered as editable fields.
+		if control.Locked {
+			continue
+		}
 		out = append(out, authoringSiteMapControlView(control))
 	}
 	return out
@@ -561,6 +573,7 @@ func authoringSiteMapControlView(control Control) map[string]any {
 		"value":     control.Value,
 		"advanced":  control.Advanced,
 		"required":  control.Required,
+		"locked":    control.Locked,
 	}
 }
 

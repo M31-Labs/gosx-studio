@@ -260,7 +260,12 @@ type Control struct {
 	Help     string
 	Required bool
 	Advanced bool
-	Options  []ControlOption
+	// Locked marks a dev-set control that the editor must never offer for
+	// editing (e.g. a plugin checkout endpoint or API-key reference). Its
+	// binding/value still travel with the template; editor control-view
+	// builders simply exclude it from the editable set.
+	Locked  bool `json:"locked,omitempty"`
+	Options []ControlOption
 }
 
 type ControlOption struct {

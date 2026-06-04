@@ -251,6 +251,11 @@ func authoringControlViews(page Page, component Component, controls []Control) [
 		if control.Key == "" || control.Label == "" {
 			continue
 		}
+		// Dev-locked controls are never offered as editable fields; their
+		// wiring still travels with the raw template.
+		if control.Locked {
+			continue
+		}
 		view := map[string]any{
 			"key":       control.Key,
 			"label":     control.Label,
@@ -261,6 +266,7 @@ func authoringControlViews(page Page, component Component, controls []Control) [
 			"help":      control.Help,
 			"required":  control.Required,
 			"advanced":  control.Advanced,
+			"locked":    control.Locked,
 			"options":   authoringControlOptionViews(control.Options),
 			"inputName": AuthoringFieldValue,
 		}
