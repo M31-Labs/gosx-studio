@@ -26,7 +26,8 @@ require (
 	google.golang.org/grpc v1.80.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
-	m31labs.dev/eos v0.1.1 // indirect
+	m31labs.dev/eos v0.1.4 // indirect
 	m31labs.dev/mll v0.1.0 // indirect
+	m31labs.dev/prism v0.1.2 // indirect
 	m31labs.dev/turboquant v0.2.0 // indirect
 )
