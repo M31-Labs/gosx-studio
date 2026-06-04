@@ -37,17 +37,15 @@ import { revealModeIfPresent, startMuddyCanvasHTMLSurface } from "./reference_ap
 //         drops the draft, so the editor reverts to the PUBLISHED first marker (not
 //         the discarded second), and "/" is unchanged (still the first marker).
 //
-// Publish/Discard: the REAL publish-panel buttons are revealed and asserted
-// present + visible, but the action itself is triggered via a scoped page.request
-// POST carrying the page's live X-CSRF-Token — because a real button CLICK
-// empirically 403s. The buttons are submits targeting the workbench form
-// (form="websiteEditorForm"), and that form is enhanced by the studio STATE
-// runtime (data-gosx-studio-state + data-gosx-studio-client): it re-sends the
-// submit as a multipart/form-data fetch with NO X-CSRF-Token header, and the
-// server's CSRF guard can't read the token from a multipart body via r.ParseForm
-// → 403 (measured). See triggerPublishPanelAction for the captured evidence and
-// the full root cause. This is a pre-existing client-action gap, not an M3
-// property; the scoped POST keeps the M3 draft/publish/discard PROOF intact.
+// Publish/Discard: the REAL publish-panel buttons are revealed, asserted present +
+// visible, and triggered via a NATIVE button CLICK. Each button is a submit
+// targeting the workbench form (form="websiteEditorForm"); that form is enhanced by
+// the studio STATE runtime (data-gosx-studio-state + data-gosx-studio-client),
+// which re-sends the submit as a multipart/form-data fetch carrying the hidden
+// csrf_token input but no X-CSRF-Token header. The gosx CSRF guard now reads the
+// csrf_token out of the multipart body (r.FormValue), so the native click validates
+// and the action responds non-403 — see triggerPublishPanelAction, which asserts
+// status != 403 on every publish/discard.
 //
 // Honesty discipline (matching the sibling canvas tests): the overlay element +
 // its editable child are DISCOVERED from the live DOM the client renders; both
@@ -384,67 +382,50 @@ async function commitInlineEdit(page: Page, marker: string, consoleErrors: strin
 }
 
 // triggerPublishPanelAction fires a real publish-panel action (publish /
-// discardDraft) and returns the action's HTTP status, then reloads the editor so
-// its server-rendered draft state reflects the result.
+// discardDraft) by NATIVELY CLICKING the real editor button, returns the action's
+// HTTP status, then reloads the editor so its server-rendered draft state reflects
+// the result.
 //
-// Triggering note (why a scoped POST, not a native button click) — EMPIRICALLY
-// MEASURED, not assumed. The Publish/Discard buttons ARE real <button
-// type="submit"> controls; we DO reveal the "publish" editor mode and assert each
-// real button is present + visible before acting. A real headless-Chromium CLICK
-// of the Publish button was tried and it 403s. The exact, captured evidence:
-//     status 403
-//     request content-type "multipart/form-data; boundary=----WebKitFormBoundary…"
-//     X-CSRF-Token header present = false
+// Triggering: a real headless-Chromium CLICK of the actual <button type="submit">
+// publish-panel control. Each button targets the editor workbench form via
+// form="websiteEditorForm" (muddy app/admin/editor/page.gsx PublishPanel) + a
+// formaction of the action. That form (gosx-cms studio/workbench.go
+// workbenchFormAttrs) carries data-gosx-studio-state + data-gosx-studio-client, so
+// the studio STATE runtime (gosx-cms studio/assets/state_runtime.js initForm)
+// intercepts the submit and re-sends it via runClientAction → fetch(action, {
+// body: new FormData(form, submitter) }) — a multipart/form-data body that carries
+// the hidden csrf_token input but NO X-CSRF-Token header.
 //
-// Root cause (a genuine studio-runtime gap on the client-action path, NOT M3):
-//   • Each button targets the editor workbench form via form="websiteEditorForm"
-//     (muddy app/admin/editor/page.gsx PublishPanel) + a formaction of the action.
-//   • That form (gosx-cms studio/workbench.go workbenchFormAttrs) carries
-//     data-gosx-studio-state="true" AND data-gosx-studio-client="true". The studio
-//     STATE runtime (gosx-cms studio/assets/state_runtime.js initForm) binds a
-//     submit listener to every [data-gosx-studio-state] form; when client actions
-//     are enabled it preventDefault()s and re-sends the submit via
-//     runClientAction → fetch(action, { body: new FormData(form, submitter) }) with
-//     ONLY X-GoSX-Studio-Action / X-GoSX-Studio-Client-Action headers — a
-//     multipart/form-data body and NO X-CSRF-Token header.
-//     (This is a DIFFERENT enhancer than the authoring-managed one in gosx-studio
-//     authoringruntime/island_runtime.js, which gates on data-gosx-studio-authoring-
-//     managed and does NOT touch this form — so "the form isn't authoring-managed,
-//     thus never enhanced" is false: state_runtime enhances it.)
-//   • The gosx session guard (gosx session/session.go ~L148-153) takes csrf_token
-//     from the X-CSRF-Token header, else (only when the request is not JSON) from
-//     r.Form via r.ParseForm(). The header is absent, and r.ParseForm() does NOT
-//     parse a multipart body into r.Form (that needs ParseMultipartForm) — so the
-//     csrf_token that IS sitting in the multipart body is never read → 403.
+// This used to 403: the gosx session guard read csrf_token from the X-CSRF-Token
+// header, else (for non-JSON requests) from r.Form via r.ParseForm() — and
+// r.ParseForm() does NOT parse a multipart body, so the csrf_token sitting in the
+// multipart body was never read. The guard now uses r.FormValue(csrf_token), which
+// parses multipart bodies (ParseMultipartForm) as well as urlencoded ones, so the
+// native click's multipart submit validates. We assert below the action response
+// is NOT 403 — the whole point of this upgrade.
 //
-// Until that client path either sends X-CSRF-Token or the server parses the
-// multipart form, a real click cannot drive publish/discard. So — exactly as the
-// task allows ("if the real button is genuinely impractical, POST … with the CSRF
-// token read from the page") — we POST the action through page.request (which
-// SHARES the browser context's session cookie) carrying the live X-CSRF-Token
-// header read from the page's rendered input[name="csrf_token"]. That hits the
-// session guard's header branch and validates, mirroring canvas_inline_edit.js's
-// own committed POST. The "buttons present + visible" UI assertions above keep the
-// proof honest about the real publish-panel controls existing.
+// cms-actions.js fires window.confirm on submit of buttons carrying
+// data-admin-confirm; the test-level page.on("dialog", d => d.accept()) handles it.
 async function triggerPublishPanelAction(page: Page, baseURL: string, buttonSelector: string, actionRoute: string): Promise<number> {
+  void baseURL;
   // Faithful UI step: surface the publish panel + assert the real button exists.
   await revealModeIfPresent(page, "publish");
   const button = page.locator(buttonSelector).first();
   await expect(button, `the ${buttonSelector} button must be present + visible to trigger the action`).toBeVisible({ timeout: 30_000 });
 
-  const csrf = await page.evaluate(() => {
-    const input = document.querySelector("input[name='csrf_token']") as HTMLInputElement | null;
-    return input ? (input.value || "") : "";
-  });
-  expect(csrf, "the editor page must render a csrf_token the action POST can carry").not.toBe("");
-
-  const response = await page.request.post(`${baseURL}${actionRoute}`, {
-    headers: { "X-CSRF-Token": csrf, "X-Requested-With": "XMLHttpRequest" },
-    form: {},
-    failOnStatusCode: false,
-    timeout: 30_000,
-  });
+  // Native click submits websiteEditorForm; the studio state runtime re-sends it
+  // as a multipart/form-data fetch whose csrf_token the gosx guard now reads.
+  const responsePromise = page.waitForResponse(
+    (response) => response.url().includes(actionRoute) && response.request().method() === "POST",
+    { timeout: 30_000 },
+  );
+  await button.click();
+  const response = await responsePromise;
   const status = response.status();
+  expect(
+    status,
+    `the native ${buttonSelector} click must NOT 403 (gosx now reads the multipart csrf_token); got ${status}`,
+  ).not.toBe(403);
 
   // Reload so the editor re-renders from the post-action store state (draft-aware).
   await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
