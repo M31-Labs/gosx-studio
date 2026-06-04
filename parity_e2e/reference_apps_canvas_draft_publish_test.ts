@@ -91,7 +91,9 @@ test.describe("@reference-apps canvas2d site-map WASM-free draft → publish →
     page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
 
     // The Publish/Discard buttons carry data-admin-confirm; cms-actions.js fires
-    // window.confirm on submit. Auto-accept so the native form POST proceeds.
+    // window.confirm on any submit. Auto-accept so no confirm dialog can ever stall
+    // the test (defensive — see triggerPublishPanelAction for how the action POST
+    // is actually dispatched).
     page.on("dialog", (dialog) => { void dialog.accept(); });
 
     // Freshly generated per run so neither the reload nor the public-storefront
