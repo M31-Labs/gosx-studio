@@ -49,6 +49,7 @@ const NAVIGATION_ROUTE = "/admin/editor/__actions/navigation";
 const PUBLISH_ROUTE = "/admin/editor/__actions/publish";
 const PUBLISH_PANEL = "[data-studio-publish-panel='true']";
 const PUBLISH_BUTTON = "[data-studio-submit-action='publish']";
+const NAV_SAVE_BUTTON = `${NAV_PANEL} [data-studio-submit-action='navigation']`;
 
 // Items the derived nav always carries (seed-independent).
 const ALWAYS_NAV = [
@@ -127,40 +128,26 @@ test.describe("@reference-apps muddy M5 auto-derived navigation: derived render 
       await page.keyboard.type(marker, { delay: 8 });
       expect(await labelLocator.inputValue(), "the marker must land in the About label input before save").toBe(marker);
 
-      // KNOWN BREAKAGE (reported for follow-up): the panel wraps its rows + "Save
-      // navigation" submit in a nested <form action=navigation>, but the whole panel
-      // is itself inside the workbench <form id=websiteEditorForm> (page.gsx
-      // workbenchFrameFormOpen…Close). HTML forbids nested forms, so the browser
-      // parser DROPS the inner <form>: at runtime no form.studio-navigation-panel__form
-      // exists, the "Save navigation" submit re-associates to the OUTER workbench form
-      // (no formaction=navigation), and a UI click would POST the workbench form to
-      // the wrong action — the navigation action is never hit. The fix is the
-      // <button form=websiteEditorForm formaction=navigation> pattern (mirroring the
-      // Publish button), or hoisting the panel out of the workbench form.
-      const nestedFormDropped = await page.evaluate(() => {
-        const panel = document.querySelector("[data-studio-navigation-panel='true']");
-        return !!panel && panel.querySelector("form.studio-navigation-panel__form") === null;
-      });
-      // Proven, not assumed: the nested nav <form> really is absent at runtime, so a
-      // "Save navigation" UI click cannot reach the navigation action. (If a future
-      // panel fix restores a real nav form / button-formaction path, flip this test
-      // to a UI click and drop the direct POST below.)
-      expect(
-        nestedFormDropped,
-        "EXPECTED KNOWN BREAKAGE: the nested <form action=navigation> is dropped by HTML form-nesting (panel sits inside the workbench form). If this is now false, the panel was fixed — switch the test to a real 'Save navigation' UI click.",
-      ).toBe(true);
+      // Drive the nav edit through the REAL UI: the "Save navigation" button is a
+      // <button type=submit form=websiteEditorForm formaction=navigation> (mirroring
+      // the Publish button) — no nested <form>, so the studio STATE runtime re-sends
+      // the workbench form (carrying the typed marker in the /about label + the
+      // workbench csrf_token) as a multipart fetch to the navigation editor action.
+      // Click it and await the navigation action's POST response.
+      const navSave = await clickSaveNavigation(page);
 
-      // Drive the nav edit HONESTLY despite the dropped form: build the full nav row
-      // set from the live DOM (the exact navigation*{i} fields + csrf_token the panel
-      // emitted), substitute the marker into the /about label, and POST the real
-      // `navigation` editor action with the page's session cookie + CSRF token. This
-      // is the same DRAFT path the (currently-broken) UI button targets.
-      const navSave = await postNavigationAction(page, server.baseURL, marker);
-
-      // ── (2a) NAV SAVE landed (DRAFT path accepted, non-403) ───────────────────
+      // ── (2a) NAV SAVE landed (real button reached the navigation action) ──────
+      // The real "Save navigation" click must hit the navigation editor action with
+      // a 2xx/3xx (NOT 403/4xx): proves the formaction button submits the workbench
+      // form to the navigation action (not the workbench save action, and not blocked
+      // by CSRF).
       expect(
-        [200, 303].includes(navSave.status),
-        `the navigation action POST must be accepted (2xx/3xx); url=${navSave.url} status=${navSave.status} body=${navSave.body.slice(0, 200)}`,
+        navSave.status,
+        `the real Save-navigation click must NOT 403 (workbench csrf_token carries through the formaction submit); url=${navSave.url} status=${navSave.status} body=${navSave.body.slice(0, 200)}`,
+      ).not.toBe(403);
+      expect(
+        navSave.status >= 200 && navSave.status < 400,
+        `the real Save-navigation click must reach the navigation action with 2xx/3xx (not a 4xx/wrong-action); url=${navSave.url} status=${navSave.status} body=${navSave.body.slice(0, 200)}`,
       ).toBe(true);
 
       // After save the editor draft must carry the new label (draft-aware editor
@@ -257,66 +244,33 @@ async function navRowLabelValueForHref(page: Page, href: string): Promise<string
   }, href);
 }
 
-// postNavigationAction collects the full navigation row field set the panel emitted
-// into the live DOM (navigationLabel{i} / navigationHref{i} / navigationEnabled{i}
-// / navigationOrder{i} + the csrf_token hidden input), substitutes the per-run
-// marker into the /about row's label, and POSTs them to the real `navigation`
-// editor action via the page's request context (which shares the browser session
-// cookie, so the rendered csrf_token validates against the cookie-bound session).
-// This drives the same DRAFT path (store.SaveDraftSettings) the UI button targets
-// — used because the panel's nested <form> is dropped by HTML form-nesting (see the
-// KNOWN BREAKAGE note at the call site). Returns the action's url + status + body.
-async function postNavigationAction(page: Page, baseURL: string, marker: string): Promise<{ url: string; status: number; body: string }> {
-  const collected = await page.evaluate((wantHref) => {
-    const panel = document.querySelector("[data-studio-navigation-panel='true']");
-    if (!panel) return null;
-    const fields: Array<[string, string]> = [];
-    // csrf_token hidden input (cookie-bound session token).
-    const csrf = panel.querySelector("input[name='csrf_token']") as HTMLInputElement | null;
-    const csrfToken = csrf ? csrf.value : "";
-    if (csrfToken) fields.push(["csrf_token", csrfToken]);
-    // Every nav row's emitted fields, in DOM order.
-    const inputs = Array.from(panel.querySelectorAll("input[name^='navigation']")) as HTMLInputElement[];
-    // Resolve which row index is /about, so the marker is applied by content.
-    let aboutIndex = -1;
-    for (const input of inputs) {
-      const m = /^navigationHref(\d+)$/.exec(input.name);
-      if (m && input.value === wantHref) aboutIndex = Number(m[1]);
-    }
-    for (const input of inputs) {
-      if (input.type === "checkbox") {
-        // Only submit the enabled flag when checked (browser form semantics).
-        if (input.checked) fields.push([input.name, input.value || "true"]);
-        continue;
-      }
-      let value = input.value;
-      const labelMatch = /^navigationLabel(\d+)$/.exec(input.name);
-      if (labelMatch && Number(labelMatch[1]) === aboutIndex) value = "__MARKER__";
-      fields.push([input.name, value]);
-    }
-    return { csrfToken, fields, aboutIndex };
-  }, "/about");
+// clickSaveNavigation clicks the REAL "Save navigation" button — a
+// <button type=submit form=websiteEditorForm formaction=navigation> that mirrors
+// the Publish button. The studio STATE runtime intercepts the workbench form
+// submit and re-sends it as a multipart fetch honoring the submitter's
+// formaction (the navigation editor action), carrying the live workbench form
+// fields (the typed marker in the /about label + the workbench csrf_token). We
+// await that POST response so the assertion proves the click really reached the
+// navigation action. Returns the action's url + status + body.
+async function clickSaveNavigation(page: Page): Promise<{ url: string; status: number; body: string }> {
+  const button = page.locator(NAV_SAVE_BUTTON).first();
+  await expect(
+    button,
+    "the real 'Save navigation' button (form=websiteEditorForm formaction=navigation) must be present + visible",
+  ).toBeVisible({ timeout: 30_000 });
 
-  expect(collected, "the Navigation panel must expose its nav row fields in the DOM").not.toBeNull();
-  const data = collected as { csrfToken: string; fields: Array<[string, string]>; aboutIndex: number };
-  expect(data.csrfToken, "the Navigation panel must render a csrf_token for the navigation action").not.toBe("");
-  expect(data.aboutIndex, "the Navigation panel must include an /about nav row to relabel").toBeGreaterThanOrEqual(0);
-
-  const body = new URLSearchParams();
-  for (const [key, value] of data.fields) {
-    body.append(key, value === "__MARKER__" ? marker : value);
-  }
-
-  const response = await page.request.post(`${baseURL}${NAVIGATION_ROUTE}`, {
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "X-CSRF-Token": data.csrfToken,
-    },
-    data: body.toString(),
-    failOnStatusCode: false,
-    timeout: 30_000,
-  });
-  return { url: response.url(), status: response.status(), body: await response.text() };
+  const responsePromise = page.waitForResponse(
+    (response) => response.url().includes(NAVIGATION_ROUTE) && response.request().method() === "POST",
+    { timeout: 30_000 },
+  );
+  await button.click();
+  const response = await responsePromise;
+  const status = response.status();
+  // Redirect responses (the navigation action answers 303 → editor) have no
+  // readable body; only read the body for non-redirect statuses so a successful
+  // redirect doesn't throw.
+  const body = status >= 300 && status < 400 ? "" : await response.text();
+  return { url: response.url(), status, body };
 }
 
 // triggerPublish reveals the publish panel + clicks the REAL Publish button
