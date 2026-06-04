@@ -49,6 +49,15 @@ type SiteMapCanvasOptions struct {
 	// to "handleSiteMapPick" when blank.
 	OnPick string
 
+	// ExtraNodes are appended verbatim to the deterministically-laid-out
+	// site-map nodes before the bundle is computed, so a host can place
+	// additional CanvasBoardNodes (e.g. a Kind:"html" surface) onto the same
+	// board. They paint AND serialize through the identical bundle path as the
+	// site-map rects/labels/lines, so an "html" node here flows into the inline
+	// RenderBundle's html records (and thus the WASM-free overlay). Empty by
+	// default, so the standard site-map render is unchanged.
+	ExtraNodes []gosx.CanvasBoardNode
+
 	// WASMFree opts the surface into the WASM-free render path. When true the
 	// renderer emits a plain <canvas> that DELIBERATELY carries NO
 	// data-gosx-surface-kind (and instead carries data-gosx-canvas-wasm-free),
@@ -121,6 +130,12 @@ func RenderSiteMapCanvasEngine(siteMapView map[string]any, options SiteMapCanvas
 	// and the server-precomputed bundle below, so the inline bundle is exactly
 	// what the WASM path would produce for this surface.
 	nodes := siteMapCanvasNodes(siteMapView)
+	if len(options.ExtraNodes) > 0 {
+		// Appended last so host-supplied nodes (e.g. a Kind:"html" surface)
+		// paint on top of the site-map graph and serialize through the same
+		// bundle path.
+		nodes = append(nodes, options.ExtraNodes...)
+	}
 	background := FirstNonEmpty(options.Background, siteMapCanvasDefaultBackground)
 
 	// In the WASM-free path we emit a plain <canvas> that carries NO

@@ -522,6 +522,18 @@ export async function startMuddyCanvasWASMFree(request: APIRequestContext): Prom
   return startMuddy(request, { MUDDY_CANVAS_WASM_FREE: "1" });
 }
 
+// startMuddyCanvasHTMLSurface boots Muddy/Noni in WASM-free Canvas2D mode
+// (MUDDY_CANVAS_WASM_FREE=1) AND injects one real Kind:"html" CanvasBoardNode
+// onto the board via MUDDY_EDITOR_SCENE_DOM=1. The editor then paints a DOM
+// surface (the "hero" node) over the Canvas2D board through the same
+// server-precomputed RenderBundle path — landing in bundle.html and rendered into
+// the canvas overlay by the WASM-free client with no WASM. This is the fixture for
+// the in-surface click-to-select + contenteditable live-proof e2e. Default OFF —
+// only the canvas-html-surface parity e2e flips these on.
+export async function startMuddyCanvasHTMLSurface(request: APIRequestContext): Promise<ServerHandle> {
+  return startMuddy(request, { MUDDY_CANVAS_WASM_FREE: "1", MUDDY_EDITOR_SCENE_DOM: "1" });
+}
+
 export async function startPajaritos(request: APIRequestContext): Promise<ServerHandle> {
   const port = await freePort();
   const tempDir = mkdtempSync(path.join(tmpdir(), "gosx-studio-pajaritos-e2e-"));
