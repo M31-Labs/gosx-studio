@@ -49,6 +49,17 @@ type SiteMapCanvasOptions struct {
 	// to "handleSiteMapPick" when blank.
 	OnPick string
 
+	// Thumbnails maps a page card's workspace node key (e.g. "page:home") to a
+	// per-page thumbnail data URI (the real themed page content, generated
+	// upstream by muddy as an SVG-<foreignObject> data URI). When a page card's
+	// node key is present here with a non-empty value, the shared node builder
+	// emits an ADDITIONAL Kind:"image" node (ID = key+":thumb", Src = the data
+	// URI) at the card's exact placement bounds, so the painter can paint it as
+	// a full-card overlay at medium zoom. Pages with no entry (or an empty
+	// value) get no image node, and entries keyed to non-page nodes are ignored.
+	// Empty/nil by default, so the standard site-map render is unchanged.
+	Thumbnails map[string]string
+
 	// ExtraNodes are appended verbatim to the deterministically-laid-out
 	// site-map nodes before the bundle is computed, so a host can place
 	// additional CanvasBoardNodes (e.g. a Kind:"html" surface) onto the same
@@ -134,7 +145,7 @@ func RenderSiteMapCanvasEngine(siteMapView map[string]any, options SiteMapCanvas
 	// Build the board nodes once and feed BOTH the (WASM) CanvasBoard primitive
 	// and the server-precomputed bundle below, so the inline bundle is exactly
 	// what the WASM path would produce for this surface.
-	nodes := siteMapCanvasNodes(siteMapView)
+	nodes := siteMapCanvasNodesWith(siteMapView, options)
 	if len(options.ExtraNodes) > 0 {
 		// Appended last so host-supplied nodes (e.g. a Kind:"html" surface)
 		// paint on top of the site-map graph and serialize through the same
@@ -294,14 +305,16 @@ func siteMapCanvasBundleScript(nodes []gosx.CanvasBoardNode, background string, 
 // the center of its from-rect to the center of its to-rect, when both
 // endpoints resolve to placed nodes.
 func siteMapCanvasNodes(siteMapView map[string]any) []gosx.CanvasBoardNode {
-	return siteMapCanvasNodesWith(siteMapView, siteMapCanvasLayoutFrom(SiteMapCanvasOptions{}))
+	return siteMapCanvasNodesWith(siteMapView, SiteMapCanvasOptions{})
 }
 
-func siteMapCanvasNodesWith(siteMapView map[string]any, layout siteMapCanvasLayout) []gosx.CanvasBoardNode {
+func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOptions) []gosx.CanvasBoardNode {
+	layout := siteMapCanvasLayoutFrom(options)
 	layers := workbenchViewMapList(siteMapView, "workspaceLayers")
 	placements := map[string]siteMapCanvasNodePlacement{}
 
 	rects := make([]gosx.CanvasBoardNode, 0)
+	thumbs := make([]gosx.CanvasBoardNode, 0)
 	labels := make([]gosx.CanvasBoardNode, 0)
 
 	for layerIndex, layer := range layers {
@@ -362,6 +375,25 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, layout siteMapCanvasLayo
 						Text:  route,
 					})
 				}
+
+				// When a per-page thumbnail data URI is supplied for this page
+				// card's node key, emit an additional "image" node at the card's
+				// exact placement bounds. It serializes through the same bundle
+				// path as the rects/labels (adapter case "image","sprite" → a
+				// sprite), so the WASM-free painter can show it as a full-card
+				// overlay. Keyed by the page node key; only page cards are
+				// eligible, and only when the value is non-empty.
+				if dataURI := options.Thumbnails[key]; dataURI != "" {
+					thumbs = append(thumbs, gosx.CanvasBoardNode{
+						ID:     key + ":thumb",
+						Kind:   "image",
+						Src:    dataURI,
+						X:      placement.x,
+						Y:      placement.y,
+						Width:  placement.width,
+						Height: placement.height,
+					})
+				}
 			}
 		}
 	}
@@ -384,10 +416,13 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, layout siteMapCanvasLayo
 		})
 	}
 
-	// Draw links first so rects/labels paint on top of connectors.
-	out := make([]gosx.CanvasBoardNode, 0, len(lines)+len(rects)+len(labels))
+	// Draw links first so rects paint on top of connectors; thumbnail images
+	// paint over their card's rect fill; labels paint last so card text stays
+	// legible above the thumbnail overlay. Ordering is deterministic.
+	out := make([]gosx.CanvasBoardNode, 0, len(lines)+len(rects)+len(thumbs)+len(labels))
 	out = append(out, lines...)
 	out = append(out, rects...)
+	out = append(out, thumbs...)
 	out = append(out, labels...)
 	return out
 }

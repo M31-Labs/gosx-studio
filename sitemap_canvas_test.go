@@ -199,6 +199,69 @@ func pointInRect(px, py float64, rect gosx.CanvasBoardNode) bool {
 		py >= rect.Y && py <= rect.Y+rect.Height
 }
 
+// TestSiteMapCanvasNodesEmitThumbnailImageForPageCards locks M8-1: when a page
+// card's node key is present in options.Thumbnails with a non-empty value, the
+// shared node builder emits an ADDITIONAL "image"-kind node whose Src is the
+// thumbnail data URI and whose bounds (X/Y/Width/Height) exactly match the
+// page's rect placement. Pages without a thumbnail entry get no image node, and
+// thumbnails keyed to non-page nodes are ignored (only page cards get an image).
+func TestSiteMapCanvasNodesEmitThumbnailImageForPageCards(t *testing.T) {
+	const homeThumb = "data:image/svg+xml;base64,AAAA"
+	nodes := siteMapCanvasNodesWith(siteMapCanvasTestView(), SiteMapCanvasOptions{
+		Thumbnails: map[string]string{
+			// A real page card → must yield an image node at the card bounds.
+			"page:home": homeThumb,
+			// A non-page node → must be ignored (no image node for it).
+			"resource:home-section-hero": "data:image/svg+xml;base64,BBBB",
+			// A page that does not exist in this view → no node, no crash.
+			"page:missing": "data:image/svg+xml;base64,CCCC",
+			// An empty value for a real page → treated as no thumbnail.
+			"component:home:hero": "",
+		},
+	})
+
+	rects := map[string]gosx.CanvasBoardNode{}
+	images := map[string]gosx.CanvasBoardNode{}
+	for _, node := range nodes {
+		switch node.Kind {
+		case "rect":
+			rects[node.ID] = node
+		case "image":
+			images[node.ID] = node
+		}
+	}
+
+	// Exactly one image node, for the single page card carrying a thumbnail.
+	if len(images) != 1 {
+		t.Fatalf("expected exactly one thumbnail image node, got %d: %#v", len(images), images)
+	}
+
+	pageRect, ok := rects["page:home"]
+	if !ok {
+		t.Fatalf("expected a rect for page:home; got %v", rectKeys(rects))
+	}
+	thumb, ok := images["page:home:thumb"]
+	if !ok {
+		t.Fatalf("expected a thumbnail image node id %q; got images %v", "page:home:thumb", rectKeys(images))
+	}
+	if thumb.Src != homeThumb {
+		t.Fatalf("thumbnail Src = %q, want %q", thumb.Src, homeThumb)
+	}
+	// The image node must occupy the exact card bounds so the painter can paint
+	// it as a full-card overlay.
+	if thumb.X != pageRect.X || thumb.Y != pageRect.Y ||
+		thumb.Width != pageRect.Width || thumb.Height != pageRect.Height {
+		t.Fatalf("thumbnail bounds (%v,%v,%v,%v) must equal page rect bounds (%v,%v,%v,%v)",
+			thumb.X, thumb.Y, thumb.Width, thumb.Height,
+			pageRect.X, pageRect.Y, pageRect.Width, pageRect.Height)
+	}
+
+	// The non-page node with a thumbnail entry must NOT get an image node.
+	if _, exists := images["resource:home-section-hero:thumb"]; exists {
+		t.Fatalf("non-page node must not receive a thumbnail image node: %#v", images)
+	}
+}
+
 func TestRenderSiteMapCanvasEngineEmitsCanvas2DSurface(t *testing.T) {
 	html := gosx.RenderHTML(RenderSiteMapCanvasEngine(siteMapCanvasTestView(), SiteMapCanvasOptions{
 		Enabled: true,
