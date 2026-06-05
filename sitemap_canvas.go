@@ -79,7 +79,12 @@ const (
 	siteMapCanvasDefaultBackground   = "#0f1720"
 	siteMapCanvasLabelInsetX         = 14.0
 	siteMapCanvasLabelInsetY         = 28.0
-	siteMapCanvasDefaultOnPick       = "handleSiteMapPick"
+	// siteMapCanvasRouteInsetY stacks the page route subtitle a row below the
+	// title (title at +28, route at +48), staying inside the default 72-tall rect
+	// so the muddy painter associates it to the card by world-point containment
+	// and renders it as the muted subtitle.
+	siteMapCanvasRouteInsetY   = 48.0
+	siteMapCanvasDefaultOnPick = "handleSiteMapPick"
 )
 
 // siteMapCanvasLayout captures the resolved grid spacing for node placement.
@@ -338,6 +343,26 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, layout siteMapCanvasLayo
 				Color: siteMapCanvasLabelColor,
 				Text:  siteMapCanvasNodeText(node),
 			})
+
+			// For a PAGE node that carries a route, stack the route as a muted
+			// subtitle label a row below the title but still inside the rect
+			// bounds, so the muddy painter associates it to the card by
+			// world-point containment and renders it as the subtitle. The
+			// authoring view exposes "route" only on page nodes (components and
+			// resources leave it empty), so the kind+route gate keeps the route
+			// label off non-page cards.
+			if workbenchMapString(node, "kind") == string(WorkspaceNodePage) {
+				if route := workbenchMapString(node, "route"); route != "" {
+					labels = append(labels, gosx.CanvasBoardNode{
+						ID:    key + ":route",
+						Kind:  "label",
+						X:     placement.x + siteMapCanvasLabelInsetX,
+						Y:     placement.y + siteMapCanvasRouteInsetY,
+						Color: siteMapCanvasSubtitleColor,
+						Text:  route,
+					})
+				}
+			}
 		}
 	}
 
@@ -376,7 +401,10 @@ func siteMapCanvasNodeText(node map[string]any) string {
 
 const (
 	siteMapCanvasLabelColor = "#e2e8f0"
-	siteMapCanvasLinkColor  = "#475569"
+	// siteMapCanvasSubtitleColor is the dimmer fill for the page route subtitle,
+	// so the route reads as muted secondary text under the card title.
+	siteMapCanvasSubtitleColor = "#94a3b8"
+	siteMapCanvasLinkColor     = "#475569"
 )
 
 // siteMapCanvasGroupColor maps a page group key to a stable rect fill color so

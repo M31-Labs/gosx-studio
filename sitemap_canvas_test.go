@@ -43,7 +43,9 @@ func TestSiteMapCanvasNodesDeriveFromWorkspaceLayers(t *testing.T) {
 	//   layer "home":      page:home, component:home:hero
 	//   layer "resources": resource:home_section_hero
 	// plus two workspace links (contains + binds). Each workspace node maps to
-	// one rect (id == node key) and one label; each link maps to one line.
+	// one rect (id == node key) and one title label; each link maps to one line.
+	// Each PAGE node with a route additionally maps to one route subtitle label,
+	// so the only routed page (page:home → "/") contributes a second label.
 	rects := map[string]gosx.CanvasBoardNode{}
 	labels := 0
 	lines := 0
@@ -83,8 +85,12 @@ func TestSiteMapCanvasNodesDeriveFromWorkspaceLayers(t *testing.T) {
 	if len(rects) != len(wantRectIDs) {
 		t.Fatalf("expected %d rect nodes, got %d (%v)", len(wantRectIDs), len(rects), rectKeys(rects))
 	}
-	if labels != len(wantRectIDs) {
-		t.Fatalf("expected one label per workspace node (%d), got %d", len(wantRectIDs), labels)
+	// One title label per workspace node, plus one route subtitle label for the
+	// single routed page node (page:home → "/").
+	const routedPageCards = 1
+	wantLabels := len(wantRectIDs) + routedPageCards
+	if labels != wantLabels {
+		t.Fatalf("expected one title label per workspace node plus %d route subtitle label(s) (%d), got %d", routedPageCards, wantLabels, labels)
 	}
 	if lines != 2 {
 		t.Fatalf("expected two link lines (contains + binds), got %d", lines)
@@ -102,6 +108,95 @@ func TestSiteMapCanvasNodesDeriveFromWorkspaceLayers(t *testing.T) {
 	if !canvasNodesContainText(nodes, "Hero") {
 		t.Fatalf("expected a label node carrying the Hero title; got %#v", nodes)
 	}
+}
+
+// TestSiteMapCanvasNodesEmitRouteSubtitleForPageCards locks M7-3: each PAGE node
+// that carries a route gets an ADDITIONAL label node whose Text is the route and
+// whose point sits below the title label but inside the page rect's bounds (so the
+// muddy painter associates it to the card by world-point containment and stacks it
+// as the muted subtitle). Non-page nodes (component/resource) get NO route label.
+func TestSiteMapCanvasNodesEmitRouteSubtitleForPageCards(t *testing.T) {
+	nodes := siteMapCanvasNodes(siteMapCanvasTestView())
+
+	// Collect rects by ID and group labels by which rect bounds contain their point.
+	rects := map[string]gosx.CanvasBoardNode{}
+	var labels []gosx.CanvasBoardNode
+	for _, node := range nodes {
+		switch node.Kind {
+		case "rect":
+			rects[node.ID] = node
+		case "label":
+			labels = append(labels, node)
+		}
+	}
+
+	pageRect, ok := rects["page:home"]
+	if !ok {
+		t.Fatalf("expected a rect for page:home; got %v", rectKeys(rects))
+	}
+
+	// Labels whose point falls inside the page:home rect bounds.
+	var inPage []gosx.CanvasBoardNode
+	for _, label := range labels {
+		if pointInRect(label.X, label.Y, pageRect) {
+			inPage = append(inPage, label)
+		}
+	}
+	if len(inPage) != 2 {
+		t.Fatalf("expected page:home card to carry a title + route subtitle label (2), got %d: %#v", len(inPage), inPage)
+	}
+
+	// The title ("Home") and the route subtitle ("/") must both be present, with
+	// the route label strictly below the title and still inside the rect bounds.
+	var title, route *gosx.CanvasBoardNode
+	for i := range inPage {
+		switch strings.TrimSpace(inPage[i].Text) {
+		case "Home":
+			title = &inPage[i]
+		case "/":
+			route = &inPage[i]
+		}
+	}
+	if title == nil {
+		t.Fatalf("expected the page title label %q inside the card; got %#v", "Home", inPage)
+	}
+	if route == nil {
+		t.Fatalf("expected the route subtitle label %q inside the card; got %#v", "/", inPage)
+	}
+	if !(route.Y > title.Y) {
+		t.Fatalf("route subtitle (y=%v) must sit below the title (y=%v)", route.Y, title.Y)
+	}
+	if !pointInRect(route.X, route.Y, pageRect) {
+		t.Fatalf("route subtitle point (%v,%v) must be inside page rect bounds (%v,%v,%v,%v)",
+			route.X, route.Y, pageRect.X, pageRect.Y, pageRect.Width, pageRect.Height)
+	}
+	if route.ID == title.ID {
+		t.Fatalf("route subtitle label must carry a distinct ID from the title (%q)", title.ID)
+	}
+
+	// Non-page nodes (component, resource) must NOT receive a route subtitle: no
+	// label node may carry a route-looking Text inside their bounds beyond the
+	// single title label.
+	for _, id := range []string{"component:home:hero", "resource:home-section-hero"} {
+		rect, ok := rects[id]
+		if !ok {
+			t.Fatalf("expected a rect for %q; got %v", id, rectKeys(rects))
+		}
+		count := 0
+		for _, label := range labels {
+			if pointInRect(label.X, label.Y, rect) {
+				count++
+			}
+		}
+		if count != 1 {
+			t.Fatalf("non-page node %q must carry exactly one (title) label, got %d", id, count)
+		}
+	}
+}
+
+func pointInRect(px, py float64, rect gosx.CanvasBoardNode) bool {
+	return px >= rect.X && px <= rect.X+rect.Width &&
+		py >= rect.Y && py <= rect.Y+rect.Height
 }
 
 func TestRenderSiteMapCanvasEngineEmitsCanvas2DSurface(t *testing.T) {

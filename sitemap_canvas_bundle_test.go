@@ -78,9 +78,11 @@ func parseInlineCanvasBundle(t *testing.T, htmlOut string) siteMapCanvasBundle {
 // for gosx-studio: the enabled canvas engine emits the server-precomputed
 // RenderBundle as inline JSON on the surface, and that JSON parses into a bundle
 // whose objects/labels/lines match the known site map. The same view yields 3
-// workspace rects, 3 labels, and 2 links (see
+// workspace rects, 3 title labels + 1 route subtitle label for the single routed
+// page (page:home → "/"), and 2 links (see
 // TestSiteMapCanvasNodesDeriveFromWorkspaceLayers) — so the bundle must carry 3
-// rect objects, 3 labels, and 2 lines.
+// rect objects, 4 labels, and 2 lines. The route subtitle flows through the
+// shared bundle adapter identically to the title labels.
 func TestRenderSiteMapCanvasEngineEmitsInlineServerBundle(t *testing.T) {
 	htmlOut := gosx.RenderHTML(RenderSiteMapCanvasEngine(siteMapCanvasTestView(), SiteMapCanvasOptions{
 		Enabled: true,
@@ -97,8 +99,8 @@ func TestRenderSiteMapCanvasEngineEmitsInlineServerBundle(t *testing.T) {
 	if got := len(bundle.Objects); got != 3 {
 		t.Errorf("inline bundle objects (rects) = %d, want 3", got)
 	}
-	if got := len(bundle.Labels); got != 3 {
-		t.Errorf("inline bundle labels = %d, want 3", got)
+	if got := len(bundle.Labels); got != 4 {
+		t.Errorf("inline bundle labels = %d, want 4", got)
 	}
 	if got := len(bundle.Lines); got != 2 {
 		t.Errorf("inline bundle lines = %d, want 2", got)
@@ -161,6 +163,11 @@ func TestRenderSiteMapCanvasEngineEmitsInlineServerBundle(t *testing.T) {
 	// Human-readable content survives into the bundle labels.
 	if !bundleHasLabel(bundle, "Hero") {
 		t.Errorf("inline bundle labels missing the Hero title; labels=%+v", bundle.Labels)
+	}
+	// The page route subtitle flows through the shared bundle adapter identically
+	// to the title labels (M7-3): the routed page's "/" route must survive.
+	if !bundleHasLabel(bundle, "/") {
+		t.Errorf("inline bundle labels missing the page route subtitle %q; labels=%+v", "/", bundle.Labels)
 	}
 
 	// No visible platform copy regression.
