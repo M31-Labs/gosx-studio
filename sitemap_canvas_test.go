@@ -194,6 +194,76 @@ func TestSiteMapCanvasNodesEmitRouteSubtitleForPageCards(t *testing.T) {
 	}
 }
 
+// TestSiteMapCanvasNodesPageArtboardsOnly locks M9-1: with
+// options.PageArtboardsOnly=true the shared node builder emits rect + title
+// label (+ thumbnail/route subtitle) ONLY for nodes whose kind is
+// WorkspaceNodePage, skipping component and resource nodes entirely, AND emits
+// ZERO Kind:"line" nodes (no spiderweb). With the flag OFF (default) behavior is
+// unchanged: all workspace nodes AND the link lines are present.
+func TestSiteMapCanvasNodesPageArtboardsOnly(t *testing.T) {
+	view := siteMapCanvasTestView()
+
+	// Flag ON: only the page artboard survives.
+	on := siteMapCanvasNodesWith(view, SiteMapCanvasOptions{PageArtboardsOnly: true})
+	rectsOn := map[string]gosx.CanvasBoardNode{}
+	linesOn := 0
+	for _, node := range on {
+		switch node.Kind {
+		case "rect":
+			rectsOn[node.ID] = node
+		case "line":
+			linesOn++
+		}
+	}
+	if linesOn != 0 {
+		t.Fatalf("PageArtboardsOnly must emit zero line nodes (no spiderweb), got %d", linesOn)
+	}
+	if _, ok := rectsOn["page:home"]; !ok {
+		t.Fatalf("PageArtboardsOnly must keep the page rect; got rects %v", rectKeys(rectsOn))
+	}
+	for _, id := range []string{"component:home:hero", "resource:home-section-hero"} {
+		if _, ok := rectsOn[id]; ok {
+			t.Fatalf("PageArtboardsOnly must skip non-page node %q; got rects %v", id, rectKeys(rectsOn))
+		}
+	}
+	if len(rectsOn) != 1 {
+		t.Fatalf("PageArtboardsOnly must emit exactly one (page) rect, got %d (%v)", len(rectsOn), rectKeys(rectsOn))
+	}
+	// The page's title + route subtitle labels still compose (no component/resource labels).
+	if !canvasNodesContainText(on, "Home") {
+		t.Fatalf("PageArtboardsOnly must keep the page title label; got %#v", on)
+	}
+	if canvasNodesContainText(on, "Hero") {
+		t.Fatalf("PageArtboardsOnly must drop the component (Hero) label; got %#v", on)
+	}
+
+	// Flag OFF (default): byte-identical to the un-optioned builder.
+	off := siteMapCanvasNodesWith(view, SiteMapCanvasOptions{})
+	base := siteMapCanvasNodes(view)
+	if len(off) != len(base) {
+		t.Fatalf("flag OFF must match default builder: got %d nodes, want %d", len(off), len(base))
+	}
+	for i := range base {
+		if off[i] != base[i] {
+			t.Fatalf("flag OFF node[%d] diverged from default builder:\n got %#v\nwant %#v", i, off[i], base[i])
+		}
+	}
+	// Sanity: the default still carries the spiderweb (lines) and non-page nodes.
+	rectsOff := 0
+	linesOff := 0
+	for _, node := range off {
+		switch node.Kind {
+		case "rect":
+			rectsOff++
+		case "line":
+			linesOff++
+		}
+	}
+	if rectsOff != 3 || linesOff != 2 {
+		t.Fatalf("flag OFF must keep all 3 rects + 2 lines, got %d rects / %d lines", rectsOff, linesOff)
+	}
+}
+
 func pointInRect(px, py float64, rect gosx.CanvasBoardNode) bool {
 	return px >= rect.X && px <= rect.X+rect.Width &&
 		py >= rect.Y && py <= rect.Y+rect.Height

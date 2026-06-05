@@ -69,6 +69,15 @@ type SiteMapCanvasOptions struct {
 	// default, so the standard site-map render is unchanged.
 	ExtraNodes []gosx.CanvasBoardNode
 
+	// PageArtboardsOnly renders the canvas as page artboards only: when true the
+	// shared node builder emits rect + title label (+ route subtitle + thumbnail)
+	// ONLY for workspace nodes whose kind is WorkspaceNodePage, skipping
+	// component and resource nodes entirely, AND emits NO Kind:"line" nodes (the
+	// link "spiderweb" between nodes is dropped). When false (the default) the
+	// full authoring graph renders — all workspace nodes plus the connecting
+	// lines — exactly as before, so existing callers are unchanged.
+	PageArtboardsOnly bool
+
 	// WASMFree opts the surface into the WASM-free render path. When true the
 	// renderer emits a plain <canvas> that DELIBERATELY carries NO
 	// data-gosx-surface-kind (and instead carries data-gosx-canvas-wasm-free),
@@ -325,6 +334,14 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 			if key == "" {
 				continue
 			}
+			// PageArtboardsOnly renders page artboards only: skip component and
+			// resource nodes entirely so the board shows just page cards. Their
+			// placements are never recorded, but that's safe because the link
+			// "spiderweb" loop below is also skipped under this flag, so there are
+			// no dangling endpoints to resolve.
+			if options.PageArtboardsOnly && workbenchMapString(node, "kind") != string(WorkspaceNodePage) {
+				continue
+			}
 			if _, seen := placements[key]; seen {
 				// A node may appear in more than one layer view (e.g. shared
 				// resources). Place it once, at its first occurrence.
@@ -399,21 +416,26 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 	}
 
 	lines := make([]gosx.CanvasBoardNode, 0)
-	for _, link := range workbenchViewMapList(siteMapView, "workspaceLinks") {
-		from, okFrom := placements[workbenchMapString(link, "fromNodeKey")]
-		to, okTo := placements[workbenchMapString(link, "toNodeKey")]
-		if !okFrom || !okTo {
-			continue
+	// PageArtboardsOnly drops the link "spiderweb": with page artboards only there
+	// are no inter-node connectors to draw (and non-page endpoints have no
+	// placements anyway). When the flag is off this emits the full link graph.
+	if !options.PageArtboardsOnly {
+		for _, link := range workbenchViewMapList(siteMapView, "workspaceLinks") {
+			from, okFrom := placements[workbenchMapString(link, "fromNodeKey")]
+			to, okTo := placements[workbenchMapString(link, "toNodeKey")]
+			if !okFrom || !okTo {
+				continue
+			}
+			lines = append(lines, gosx.CanvasBoardNode{
+				ID:    workbenchMapString(link, "key"),
+				Kind:  "line",
+				X1:    from.centerX(),
+				Y1:    from.centerY(),
+				X2:    to.centerX(),
+				Y2:    to.centerY(),
+				Color: siteMapCanvasLinkColor,
+			})
 		}
-		lines = append(lines, gosx.CanvasBoardNode{
-			ID:    workbenchMapString(link, "key"),
-			Kind:  "line",
-			X1:    from.centerX(),
-			Y1:    from.centerY(),
-			X2:    to.centerX(),
-			Y2:    to.centerY(),
-			Color: siteMapCanvasLinkColor,
-		})
 	}
 
 	// Draw links first so rects paint on top of connectors; thumbnail images
