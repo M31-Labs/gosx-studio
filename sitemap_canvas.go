@@ -60,6 +60,19 @@ type SiteMapCanvasOptions struct {
 	// Empty/nil by default, so the standard site-map render is unchanged.
 	Thumbnails map[string]string
 
+	// PageSurfaces maps a page card's workspace node key (e.g. "page:home") to
+	// the host-supplied full editable HTML markup for that page. When a page
+	// card's node key is present here with a non-empty value, the shared node
+	// builder emits an ADDITIONAL Kind:"html" node (ID = the page node key, which
+	// is the painter mount key; Markup = the supplied HTML; PointerEvents =
+	// "auto") at the card's exact placement bounds, so the painter can mount it
+	// as a full-card LIVE editable surface at near zoom. The html node is appended
+	// AFTER the thumbnail images so live surfaces paint last (on top). Pages with
+	// no entry (or an empty value) get no html node, and entries keyed to non-page
+	// nodes are ignored. Empty/nil by default, so the standard site-map render is
+	// unchanged.
+	PageSurfaces map[string]string
+
 	// ExtraNodes are appended verbatim to the deterministically-laid-out
 	// site-map nodes before the bundle is computed, so a host can place
 	// additional CanvasBoardNodes (e.g. a Kind:"html" surface) onto the same
@@ -324,6 +337,7 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 
 	rects := make([]gosx.CanvasBoardNode, 0)
 	thumbs := make([]gosx.CanvasBoardNode, 0)
+	surfaces := make([]gosx.CanvasBoardNode, 0)
 	labels := make([]gosx.CanvasBoardNode, 0)
 
 	for layerIndex, layer := range layers {
@@ -411,6 +425,25 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 						Height: placement.height,
 					})
 				}
+
+				// When a per-page full editable HTML surface is supplied for this
+				// page card's node key, emit an additional "html" node at the card's
+				// exact placement bounds. Its ID is the page node key (the painter
+				// mount key) and PointerEvents is "auto" so the painter can mount it
+				// as a full-card LIVE editable surface. Keyed by the page node key;
+				// only page cards are eligible, and only when the value is non-empty.
+				if markup := options.PageSurfaces[key]; markup != "" {
+					surfaces = append(surfaces, gosx.CanvasBoardNode{
+						ID:            key,
+						Kind:          "html",
+						Markup:        markup,
+						X:             placement.x,
+						Y:             placement.y,
+						Width:         placement.width,
+						Height:        placement.height,
+						PointerEvents: "auto",
+					})
+				}
 			}
 		}
 	}
@@ -439,12 +472,14 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 	}
 
 	// Draw links first so rects paint on top of connectors; thumbnail images
-	// paint over their card's rect fill; labels paint last so card text stays
-	// legible above the thumbnail overlay. Ordering is deterministic.
-	out := make([]gosx.CanvasBoardNode, 0, len(lines)+len(rects)+len(thumbs)+len(labels))
+	// paint over their card's rect fill; live html surfaces paint over the
+	// thumbnails (so the editable surface wins at near zoom); labels paint last so
+	// card text stays legible above the overlays. Ordering is deterministic.
+	out := make([]gosx.CanvasBoardNode, 0, len(lines)+len(rects)+len(thumbs)+len(surfaces)+len(labels))
 	out = append(out, lines...)
 	out = append(out, rects...)
 	out = append(out, thumbs...)
+	out = append(out, surfaces...)
 	out = append(out, labels...)
 	return out
 }

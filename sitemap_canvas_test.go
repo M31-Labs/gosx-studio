@@ -332,6 +332,83 @@ func TestSiteMapCanvasNodesEmitThumbnailImageForPageCards(t *testing.T) {
 	}
 }
 
+// TestSiteMapCanvasNodesEmitPageSurfaceForPageCards locks M10-1: when a page
+// card's node key is present in options.PageSurfaces with a non-empty value, the
+// shared node builder emits an ADDITIONAL "html"-kind node whose ID is the page
+// node key (the painter mount key), whose Markup is the supplied editable HTML,
+// whose PointerEvents is "auto", and whose bounds (X/Y/Width/Height) exactly
+// match the page's rect placement. Pages without a PageSurfaces entry get no
+// html node, and an empty/nil PageSurfaces map leaves the render unchanged.
+func TestSiteMapCanvasNodesEmitPageSurfaceForPageCards(t *testing.T) {
+	const homeSurface = `<h1 data-gosx-html-key="page:home">hi</h1>`
+	nodes := siteMapCanvasNodesWith(siteMapCanvasTestView(), SiteMapCanvasOptions{
+		PageSurfaces: map[string]string{
+			// A real page card → must yield an html node at the card bounds.
+			"page:home": homeSurface,
+		},
+	})
+
+	rects := map[string]gosx.CanvasBoardNode{}
+	htmls := map[string]gosx.CanvasBoardNode{}
+	for _, node := range nodes {
+		switch node.Kind {
+		case "rect":
+			rects[node.ID] = node
+		case "html":
+			htmls[node.ID] = node
+		}
+	}
+
+	// Exactly one html node, for the single page card carrying a surface.
+	if len(htmls) != 1 {
+		t.Fatalf("expected exactly one html surface node, got %d: %#v", len(htmls), htmls)
+	}
+
+	pageRect, ok := rects["page:home"]
+	if !ok {
+		t.Fatalf("expected a rect for page:home; got %v", rectKeys(rects))
+	}
+	// The html node's ID must be the page node key — that is the painter mount key.
+	surface, ok := htmls["page:home"]
+	if !ok {
+		t.Fatalf("expected an html surface node id %q; got htmls %v", "page:home", rectKeys(htmls))
+	}
+	if surface.Markup != homeSurface {
+		t.Fatalf("surface Markup = %q, want %q", surface.Markup, homeSurface)
+	}
+	if surface.PointerEvents != "auto" {
+		t.Fatalf("surface PointerEvents = %q, want %q", surface.PointerEvents, "auto")
+	}
+	// The html node must occupy the exact card bounds so the painter can mount it
+	// as a full-card live surface.
+	if surface.X != pageRect.X || surface.Y != pageRect.Y ||
+		surface.Width != pageRect.Width || surface.Height != pageRect.Height {
+		t.Fatalf("surface bounds (%v,%v,%v,%v) must equal page rect bounds (%v,%v,%v,%v)",
+			surface.X, surface.Y, surface.Width, surface.Height,
+			pageRect.X, pageRect.Y, pageRect.Width, pageRect.Height)
+	}
+
+	// A page card with NO PageSurfaces entry must NOT get an html node: the test
+	// view has exactly one page (home), so once it carries the only entry, any
+	// other page key absent from the map must be silently skipped. Re-derive with
+	// the home entry pointed at a non-existent page to prove absence yields none.
+	absent := siteMapCanvasNodesWith(siteMapCanvasTestView(), SiteMapCanvasOptions{
+		PageSurfaces: map[string]string{"page:missing": homeSurface},
+	})
+	for _, node := range absent {
+		if node.Kind == "html" {
+			t.Fatalf("page with no PageSurfaces entry must not receive an html node: %#v", node)
+		}
+	}
+
+	// Empty/nil PageSurfaces (the default) → no html nodes at all (unchanged).
+	for _, node := range siteMapCanvasNodesWith(siteMapCanvasTestView(), SiteMapCanvasOptions{}) {
+		if node.Kind == "html" {
+			t.Fatalf("default (nil PageSurfaces) must not emit any html node: %#v", node)
+		}
+	}
+}
+
 func TestRenderSiteMapCanvasEngineEmitsCanvas2DSurface(t *testing.T) {
 	html := gosx.RenderHTML(RenderSiteMapCanvasEngine(siteMapCanvasTestView(), SiteMapCanvasOptions{
 		Enabled: true,
