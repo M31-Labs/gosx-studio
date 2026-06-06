@@ -6,9 +6,9 @@ import { startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
 //
 // Builds on the M0/M2 fixture (MUDDY_CANVAS_WASM_FREE=1 + MUDDY_EDITOR_SCENE_DOM=1,
 // see reference_apps_canvas_html_surface_test.ts): the host injects ONE real
-// Kind:"html" "hero" surface that the WASM-free client mounts as a live DOM
-// element ([data-gosx-canvas-html]) in a camera-positioned overlay above the
-// Canvas2D board. M7 adds two things this file proves end-to-end:
+// Kind:"html" "page:home" full-page surface that the WASM-free client mounts as a
+// live DOM element ([data-gosx-canvas-html]) in a camera-positioned overlay above
+// the Canvas2D board. M7 adds two things this file proves end-to-end:
 //
 //   (A) ENRICHED CARDS — gosx-studio (sitemap_canvas.go) now stacks each PAGE
 //       card's route as a muted subtitle LABEL a row under the card title. That
@@ -47,7 +47,10 @@ const CANVAS_SELECTOR = "canvas[data-gosx-canvas-wasm-free='true']";
 const BOARD_SELECTOR = "[data-studio-site-map-board='true']";
 const BUNDLE_SELECTOR = "[data-gosx-canvas-bundle]";
 const OVERLAY_SURFACE = "[data-gosx-canvas-html]";
-const EDITABLE_HERO = "[data-gosx-html-key='hero']";
+// M10: the full-page surface root carries data-gosx-html-key="page:home" but is a
+// non-editable wrapper; the contenteditable hero heading the focus-guard step
+// focuses is the nested <h1 data-studio-field="home.hero.headline"> INSIDE it.
+const EDITABLE_HERO = "[data-studio-field='home.hero.headline']";
 
 type CameraHook = {
   camera: () => { x: number; y: number; z: number };

@@ -7,9 +7,9 @@ import { startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
 //
 // Builds directly on the M0 fixture (MUDDY_CANVAS_WASM_FREE=1 +
 // MUDDY_EDITOR_SCENE_DOM=1, see reference_apps_canvas_html_surface_test.ts): the
-// host injects ONE Kind:"html" "hero" surface whose <h1> shows the REAL current
-// store hero headline and carries data-studio-field="home.hero.headline" +
-// contenteditable. M2 adds the muddy-side commit bridge (canvas_inline_edit.js,
+// host injects ONE Kind:"html" "page:home" full-page surface whose nested <h1>
+// shows the REAL current store hero headline and carries
+// data-studio-field="home.hero.headline" + contenteditable. M2 adds the muddy-side commit bridge (canvas_inline_edit.js,
 // window.__muddyCanvasInlineEdit): on blur / Enter it POSTs an edit-commit to
 // /admin/editor/__actions/authoring, which the muddy authoring adapter routes
 // (saveHeroHeadline) into store.SaveSettings + a settings checkpoint revision.
@@ -38,8 +38,11 @@ import { startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
 const CANVAS_SELECTOR = "canvas[data-gosx-canvas-wasm-free='true']";
 const BOARD_SELECTOR = "[data-studio-site-map-board='true']";
 const SELECTED_NODE_ATTR = "data-studio-site-map-selected-node";
-const OVERLAY_HERO = "[data-gosx-canvas-html='hero']";
-const EDITABLE_HERO = "[data-gosx-html-key='hero']";
+const OVERLAY_HERO = "[data-gosx-canvas-html='page:home']";
+// M10: the full-page surface root carries data-gosx-html-key="page:home" but is a
+// non-editable wrapper; the store-bound, contenteditable hero heading is the nested
+// <h1 data-studio-field="home.hero.headline"> INSIDE that surface.
+const EDITABLE_HERO = "[data-studio-field='home.hero.headline']";
 const FIELD_HERO = "[data-studio-field='home.hero.headline']";
 const AUTHORING_ROUTE = "/admin/editor/__actions/authoring";
 const BINDING = "home.hero.headline";
@@ -91,7 +94,7 @@ test.describe("@reference-apps canvas2d site-map WASM-free inline-edit loop", ()
       const overlayHero = page.locator(OVERLAY_HERO).first();
       await expect(
         overlayHero,
-        "the painter must mount the html surface as an overlay element [data-gosx-canvas-html='hero'] above the canvas",
+        "the painter must mount the html surface as an overlay element [data-gosx-canvas-html='page:home'] above the canvas",
       ).toBeAttached({ timeout: 60_000 });
 
       const editable = page.locator(EDITABLE_HERO).first();
@@ -112,7 +115,7 @@ test.describe("@reference-apps canvas2d site-map WASM-free inline-edit loop", ()
       // Click selects the surface (setState → board selection attr), then we focus,
       // select-all, and type the unique marker.
       await editable.click();
-      await pollForSelectedNode(page, "hero");
+      await pollForSelectedNode(page, "page:home");
 
       // Arm network capture for the commit POST BEFORE we trigger the blur, so the
       // request can't slip past us.

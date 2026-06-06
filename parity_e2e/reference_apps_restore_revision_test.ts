@@ -47,8 +47,11 @@ import { revealModeIfPresent, startMuddyCanvasHTMLSurface } from "./reference_ap
 const CANVAS_SELECTOR = "canvas[data-gosx-canvas-wasm-free='true']";
 const BOARD_SELECTOR = "[data-studio-site-map-board='true']";
 const SELECTED_NODE_ATTR = "data-studio-site-map-selected-node";
-const OVERLAY_HERO = "[data-gosx-canvas-html='hero']";
-const EDITABLE_HERO = "[data-gosx-html-key='hero']";
+const OVERLAY_HERO = "[data-gosx-canvas-html='page:home']";
+// M10: the full-page surface root carries data-gosx-html-key="page:home" but is a
+// non-editable wrapper; the home.hero.headline-bound contenteditable <h1> is nested
+// INSIDE that surface.
+const EDITABLE_HERO = "[data-studio-field='home.hero.headline']";
 const FIELD_HERO = "[data-studio-field='home.hero.headline']";
 const AUTHORING_ROUTE = "/admin/editor/__actions/authoring";
 const PUBLISH_ROUTE = "/admin/editor/__actions/publish";
@@ -262,7 +265,7 @@ async function waitForHeroEditable(page: Page) {
   const overlayHero = page.locator(OVERLAY_HERO).first();
   await expect(
     overlayHero,
-    "the painter must mount the html surface as an overlay element [data-gosx-canvas-html='hero'] above the canvas",
+    "the painter must mount the html surface as an overlay element [data-gosx-canvas-html='page:home'] above the canvas",
   ).toBeAttached({ timeout: 90_000 });
   const editable = page.locator(EDITABLE_HERO).first();
   await expect(editable, "the host markup's contenteditable hero must render inside the overlay").toBeAttached({ timeout: 30_000 });
@@ -274,7 +277,7 @@ async function waitForHeroEditable(page: Page) {
 async function commitInlineEdit(page: Page, marker: string, consoleErrors: string[]) {
   const editable = page.locator(EDITABLE_HERO).first();
   await editable.click();
-  await pollForSelectedNode(page, "hero");
+  await pollForSelectedNode(page, "page:home");
 
   const authoringPostPromise = page.waitForRequest(
     (req: Request) => req.url().includes(AUTHORING_ROUTE) && req.method() === "POST",

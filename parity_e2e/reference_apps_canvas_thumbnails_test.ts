@@ -8,8 +8,8 @@ import { startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
 // see reference_apps_canvas_cards_lod_test.ts): the host paints the Canvas2D
 // board from one server-precomputed inline RenderBundle
 // (<script data-gosx-canvas-bundle>…</script>) and, with MUDDY_EDITOR_SCENE_DOM=1,
-// injects ONE real Kind:"html" "hero" surface that the WASM-free client mounts as
-// a live DOM element ([data-gosx-canvas-html]) in a camera-positioned overlay
+// injects ONE real Kind:"html" "page:home" full-page surface that the WASM-free
+// client mounts as a live DOM element ([data-gosx-canvas-html]) in a camera-positioned overlay
 // above the board. M8 adds the FAITHFUL THUMBNAIL middle tier this file proves
 // end-to-end:
 //
@@ -49,7 +49,10 @@ const BOARD_SELECTOR = "[data-studio-site-map-board='true']";
 const BUNDLE_SELECTOR = "[data-gosx-canvas-bundle]";
 const OVERLAY_SURFACE = "[data-gosx-canvas-html]";
 const THUMB_IMG = "[data-gosx-canvas-thumb]";
-const EDITABLE_HERO = "[data-gosx-html-key='hero']";
+// M10: the full-page surface root carries data-gosx-html-key="page:home" but is a
+// non-editable wrapper; the contenteditable hero heading is the nested
+// <h1 data-studio-field="home.hero.headline"> INSIDE that surface.
+const EDITABLE_HERO = "[data-studio-field='home.hero.headline']";
 const SVG_DATA_PREFIX = "data:image/svg+xml";
 
 test.describe("@reference-apps canvas2d site-map WASM-free faithful thumbnails + 3-tier LOD", () => {

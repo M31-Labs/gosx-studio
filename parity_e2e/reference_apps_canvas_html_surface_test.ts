@@ -6,22 +6,24 @@ import { startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
 //
 // In wasm-free mode (MUDDY_CANVAS_WASM_FREE=1) the editor renders + drives the
 // Canvas2D site-map board with NO gosx client WASM. With MUDDY_EDITOR_SCENE_DOM=1
-// the host also injects ONE real Kind:"html" CanvasBoardNode (the "hero" node)
-// onto the board. That node serializes through the SAME server-precomputed
-// RenderBundle path as the site-map rects (gosx vm.canvasBoardHTML →
-// RenderBundle.HTML), so it lands in bundle.html. The WASM-free client mounts each
-// bundle.html entry as a camera-positioned DOM element in an overlay above the
-// canvas ([data-gosx-canvas-html="hero"]), with the host markup inside it
-// (<h1 data-gosx-html-key="hero" contenteditable>Hello</h1>).
+// the host also injects ONE real Kind:"html" CanvasBoardNode — the M10 full-page
+// home surface (node id "page:home") — onto the board. That node serializes through
+// the SAME server-precomputed RenderBundle path as the site-map rects (gosx
+// vm.canvasBoardHTML → RenderBundle.HTML), so it lands in bundle.html. The WASM-free
+// client mounts each bundle.html entry as a camera-positioned DOM element in an
+// overlay above the canvas ([data-gosx-canvas-html="page:home"]), with the host
+// full-page markup inside it: a non-editable surface root
+// (<div data-gosx-html-key="page:home">) wrapping the editable hero heading
+// (<h1 data-studio-field="home.hero.headline" contenteditable>…</h1>).
 //
 // This file asserts, end-to-end in headless Chromium, the two M0 in-surface
 // behaviors:
 //
-//   (1) CLICK-TO-SELECT — a click on the rendered [data-gosx-html-key="hero"]
-//       element walks to its data-gosx-html-key and calls
-//       GoSXStudioSiteMapRuntime.setState({selectedNode:"hero"}) (the SAME public
-//       API a DOM-board click uses), so the DOM site-map board's selection attr
-//       (data-studio-site-map-selected-node) reflects "hero".
+//   (1) CLICK-TO-SELECT — a click on the rendered surface (the contenteditable hero
+//       heading) walks up to the nearest data-gosx-html-key ("page:home") and calls
+//       GoSXStudioSiteMapRuntime.setState({selectedNode:"page:home"}) (the SAME
+//       public API a DOM-board click uses), so the DOM site-map board's selection
+//       attr (data-studio-site-map-selected-node) reflects "page:home".
 //   (2) CONTENTEDITABLE — focusing the contenteditable inside the surface, typing
 //       text, lands that text in the surface DOM and is NOT clobbered by the rAF
 //       paint loop (renderCanvasBoardHTML skips innerHTML rewrites while a
@@ -29,7 +31,7 @@ import { startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
 //
 // Honesty discipline (matching the sibling canvas tests): the overlay element +
 // its editable child are DISCOVERED from the live DOM the client renders — nothing
-// is hardcoded beyond the host-authored "hero" id/markup the fixture injects. If
+// is hardcoded beyond the host-authored "page:home" id/markup the fixture injects. If
 // either behavior genuinely does not work WASM-free, the offending assertion is
 // left with the observed evidence rather than faked.
 //
@@ -39,8 +41,11 @@ import { startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
 const CANVAS_SELECTOR = "canvas[data-gosx-canvas-wasm-free='true']";
 const BOARD_SELECTOR = "[data-studio-site-map-board='true']";
 const SELECTED_NODE_ATTR = "data-studio-site-map-selected-node";
-const OVERLAY_HERO = "[data-gosx-canvas-html='hero']";
-const EDITABLE_HERO = "[data-gosx-html-key='hero']";
+const OVERLAY_HERO = "[data-gosx-canvas-html='page:home']";
+// M10: the full-page surface root carries data-gosx-html-key="page:home" but is a
+// non-editable wrapper <div>; the editable hero heading is the nested
+// contenteditable <h1 data-studio-field="home.hero.headline"> INSIDE that surface.
+const EDITABLE_HERO = "[data-studio-field='home.hero.headline']";
 
 test.describe("@reference-apps canvas2d site-map WASM-free HTML surface", () => {
   test.describe.configure({ timeout: 300_000 });
@@ -90,28 +95,28 @@ test.describe("@reference-apps canvas2d site-map WASM-free HTML surface", () => 
         return { hasHook: true, html };
       }, CANVAS_SELECTOR);
       expect(heroInBundle.hasHook, "the WASM-free client test hook must expose the live bundle").toBe(true);
-      const heroEntry = heroInBundle.html.find((h) => (h as { id?: string }).id === "hero") as { id?: string; markup?: string } | undefined;
+      const heroEntry = heroInBundle.html.find((h) => (h as { id?: string }).id === "page:home") as { id?: string; markup?: string } | undefined;
       expect(
         heroEntry,
-        `the injected Kind:"html" node must land in bundle.html as id "hero"; bundle.html=${JSON.stringify(heroInBundle.html)}`,
+        `the injected full-page Kind:"html" node must land in bundle.html as id "page:home"; bundle.html=${JSON.stringify(heroInBundle.html)}`,
       ).toBeTruthy();
       expect(
         heroEntry!.markup || "",
         "the html surface markup must carry the contenteditable hero heading",
-      ).toMatch(/data-gosx-html-key="hero"/);
+      ).toMatch(/data-studio-field="home\.hero\.headline"/);
 
       // The WASM-free client + painter must mount the html surface into a
       // camera-positioned overlay element above the canvas.
       const overlayHero = page.locator(OVERLAY_HERO).first();
       await expect(
         overlayHero,
-        "the painter must mount the html surface as an overlay element [data-gosx-canvas-html='hero'] above the canvas",
+        "the painter must mount the html surface as an overlay element [data-gosx-canvas-html='page:home'] above the canvas",
       ).toBeAttached({ timeout: 60_000 });
 
       const editable = page.locator(EDITABLE_HERO).first();
       await expect(
         editable,
-        "the host markup's contenteditable [data-gosx-html-key='hero'] must render inside the overlay",
+        "the host markup's contenteditable [data-studio-field='home.hero.headline'] must render inside the overlay",
       ).toBeAttached({ timeout: 30_000 });
       await expect(editable, "the editable hero element must be visible (overlay sized + positioned)").toBeVisible({ timeout: 30_000 });
       // Sanity: the injected element is the host markup we authored.
@@ -120,14 +125,14 @@ test.describe("@reference-apps canvas2d site-map WASM-free HTML surface", () => 
 
       // ── (1) CLICK-TO-SELECT ──────────────────────────────────────────────────
       // Click the rendered surface element; the overlay click-delegate walks to
-      // data-gosx-html-key and calls setState({selectedNode:"hero"}).
+      // data-gosx-html-key ("page:home") and calls setState({selectedNode:"page:home"}).
       const selectedBefore = await readSelectedNode(page);
       await editable.click();
-      const selected = await pollForSelectedNode(page, "hero");
+      const selected = await pollForSelectedNode(page, "page:home");
       expect(
         selected,
-        `clicking the html surface should set board ${SELECTED_NODE_ATTR}="hero"; before=${JSON.stringify(selectedBefore)}, got=${JSON.stringify(selected)}, console=${JSON.stringify(consoleErrors.slice(-6))}`,
-      ).toBe("hero");
+        `clicking the html surface should set board ${SELECTED_NODE_ATTR}="page:home"; before=${JSON.stringify(selectedBefore)}, got=${JSON.stringify(selected)}, console=${JSON.stringify(consoleErrors.slice(-6))}`,
+      ).toBe("page:home");
       // Cross-check the runtime exposes the same selection (parity with a DOM-board
       // click that flows through the identical setState API).
       const runtimeSelected = await page.evaluate(() => {
@@ -142,7 +147,7 @@ test.describe("@reference-apps canvas2d site-map WASM-free HTML surface", () => 
         }
       });
       if (runtimeSelected !== undefined) {
-        expect(runtimeSelected, "GoSXStudioSiteMapRuntime selection should also reflect hero").toBe("hero");
+        expect(runtimeSelected, "GoSXStudioSiteMapRuntime selection should also reflect page:home").toBe("page:home");
       }
 
       // ── (2) CONTENTEDITABLE ──────────────────────────────────────────────────
