@@ -14,11 +14,11 @@ import { startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
 // end-to-end:
 //
 //   (A) FAITHFUL-THUMBNAIL DATA — muddy generates a self-contained
-//       SVG-<foreignObject> data URI (themed hero/title content) per page card and
+//       raster PNG data URI (themed hero/title content) per page card and
 //       gosx-studio attaches it as an "image" node at the card bounds, which rides
 //       the SAME inline RenderBundle as a `sprite`
-//       ({id, src:"data:image/svg+xml;base64,…", position, width, height}).
-//       Asserting ≥1 bundle.sprites entry whose src starts "data:image/svg+xml"
+//       ({id, src:"data:image/png;base64,…", position, width, height}).
+//       Asserting ≥1 bundle.sprites entry whose src starts "data:image/png"
 //       proves the faithful-thumbnail data reaches the board.
 //
 //   (B) 3-TIER LOD — the painter renders these as overlay
@@ -53,13 +53,13 @@ const THUMB_IMG = "[data-gosx-canvas-thumb]";
 // non-editable wrapper; the contenteditable hero heading is the nested
 // <h1 data-studio-field="home.hero.headline"> INSIDE that surface.
 const EDITABLE_HERO = "[data-studio-field='home.hero.headline']";
-const SVG_DATA_PREFIX = "data:image/svg+xml";
+const PNG_DATA_PREFIX = "data:image/png";
 
 test.describe("@reference-apps canvas2d site-map WASM-free faithful thumbnails + 3-tier LOD", () => {
   test.describe.configure({ timeout: 300_000 });
   test.skip(process.env.GOSX_STUDIO_REFERENCE_APP_E2E !== "1", "set GOSX_STUDIO_REFERENCE_APP_E2E=1 to boot sibling reference apps");
 
-  test("Muddy/Noni wasm-free: faithful per-page thumbnails ride the bundle as SVG sprites, and the overlay swaps cards → thumbnail img → live surface across the 3-tier LOD bands", async ({ page, request }) => {
+  test("Muddy/Noni wasm-free: faithful per-page thumbnails ride the bundle as PNG sprites, and the overlay swaps cards → thumbnail img → live surface across the 3-tier LOD bands", async ({ page, request }) => {
     const consoleErrors: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(message.text());
@@ -119,11 +119,11 @@ test.describe("@reference-apps canvas2d site-map WASM-free faithful thumbnails +
         `SURFACE_ZOOM (${lod.surface}) must sit strictly above THUMB_ZOOM (${lod.thumb}) for a non-empty medium band`,
       ).toBeGreaterThan(lod.thumb);
 
-      // ── (A) FAITHFUL-THUMBNAIL DATA: SVG sprite in the bundle ──────────────────
+      // ── (A) FAITHFUL-THUMBNAIL DATA: PNG sprite in the bundle ──────────────────
       // Read the inline server bundle JSON and prove a faithful per-page thumbnail
       // reached the board as a sprite whose src is a self-contained
-      // "data:image/svg+xml…" data URI. This is the faithful-thumbnail data flowing
-      // to the board (decoding the SVG is the browser's job at render time).
+      // "data:image/png…" data URI. This is the faithful-thumbnail data flowing
+      // to the board (decoding the PNG is the browser's job at render time).
       const sprite = await page.evaluate(({ sel, prefix }) => {
         const el = document.querySelector(sel);
         const raw = el ? (el.textContent || "").trim() : "";
@@ -138,16 +138,16 @@ test.describe("@reference-apps canvas2d site-map WASM-free faithful thumbnails +
         // src prefixes for diagnostics.
         const summary = sprites.map((s) => ({ id: s?.id, src: typeof s?.src === "string" ? s.src.slice(0, 32) : s?.src }));
         return { parsed: true, sprites: summary, match: match ? { id: match.id, src: match.src!.slice(0, 64) } : null };
-      }, { sel: BUNDLE_SELECTOR, prefix: SVG_DATA_PREFIX });
+      }, { sel: BUNDLE_SELECTOR, prefix: PNG_DATA_PREFIX });
       expect(sprite.parsed, "the inline [data-gosx-canvas-bundle] JSON must parse").toBe(true);
       expect(
         sprite.match,
-        `a page card must carry a faithful thumbnail as a sprite (src ~ "${SVG_DATA_PREFIX}…") in bundle.sprites; sprites=${JSON.stringify(sprite.sprites)}`,
+        `a page card must carry a faithful thumbnail as a sprite (src ~ "${PNG_DATA_PREFIX}…") in bundle.sprites; sprites=${JSON.stringify(sprite.sprites)}`,
       ).toBeTruthy();
       expect(
         sprite.match!.src ?? "",
-        "the sprite src must be a self-contained SVG data URI",
-      ).toMatch(/^data:image\/svg\+xml/);
+        "the sprite src must be a self-contained PNG data URI",
+      ).toMatch(/^data:image\/png/);
 
       // The live surface must mount at the default (>= SURFACE_ZOOM) camera before
       // we start swapping LOD — it is the near tier we hand off to.
@@ -194,14 +194,14 @@ test.describe("@reference-apps canvas2d site-map WASM-free faithful thumbnails +
         mediumSurfaces,
         `medium band (z=${appliedMedium} < SURFACE ${lod.surface}) must hold ZERO live surfaces (the thumbnail stands in); got ${mediumSurfaces}`,
       ).toBe(0);
-      // Faithfulness sanity: the mounted thumbnail img carries the SVG data URI src
+      // Faithfulness sanity: the mounted thumbnail img carries the PNG data URI src
       // (the same self-contained faithful data the bundle shipped; decoding it is
       // the browser's job).
       const thumbSrc = await page.evaluate((sel) => {
         const img = document.querySelector(sel) as HTMLImageElement | null;
         return img ? img.getAttribute("src") : null;
       }, THUMB_IMG);
-      expect(thumbSrc ?? "", `the mounted thumbnail img src must be a faithful SVG data URI; got ${JSON.stringify(thumbSrc)}`).toMatch(/^data:image\/svg\+xml/);
+      expect(thumbSrc ?? "", `the mounted thumbnail img src must be a faithful PNG data URI; got ${JSON.stringify(thumbSrc)}`).toMatch(/^data:image\/png/);
 
       // NEAR band (z >= SURFACE_ZOOM): the live editable dom surface owns the page —
       // zero thumbnail imgs AND at least one live surface (the LOD handed off).
