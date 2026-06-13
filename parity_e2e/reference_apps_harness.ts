@@ -489,24 +489,23 @@ export async function startMuddy(request: APIRequestContext, extraEnv?: Record<s
   });
 }
 
-// startMuddyCanvas boots Muddy/Noni with the opt-in Canvas2D site-map board
-// flag enabled (MUDDY_SITEMAP_CANVAS=1). The editor then renders the canvas
-// board surface in addition to the default DOM board. Default OFF — only the
-// canvas live-proof e2e flips this on.
+// startMuddyCanvas boots Muddy/Noni with explicit co-render mode
+// (MUDDY_SITEMAP_CANVAS=1). The editor renders the canvas board surface in
+// addition to the DOM board for parity/debug comparisons.
 export async function startMuddyCanvas(request: APIRequestContext): Promise<ServerHandle> {
   return startMuddy(request, { MUDDY_SITEMAP_CANVAS: "1" });
 }
 
-// startMuddyCanvasDefault boots Muddy/Noni in canvas-default mode
-// (MUDDY_SITEMAP_CANVAS=canvas-default): the Canvas2D board becomes the SOLE
-// site-map graph visual and the DOM board's graph sub-tree
+// startMuddyCanvasDefault boots Muddy/Noni with no canvas env override, proving
+// the production default. The Canvas2D board becomes the SOLE site-map graph
+// visual and the DOM board's graph sub-tree
 // (.studio-site-map-workspace__surface — the workspace layers/nodes + SVG link
 // paths) is hidden via gated CSS, while the DOM board element, its
 // sitemapruntime binding, the selection detail card, and the host authoring
 // panels stay live (so the Slice-1 selection bridge and Slice-2 authoring keep
-// working). Default OFF — only the canvas-default parity e2e flips this on.
+// working).
 export async function startMuddyCanvasDefault(request: APIRequestContext): Promise<ServerHandle> {
-  return startMuddy(request, { MUDDY_SITEMAP_CANVAS: "canvas-default" });
+  return startMuddy(request);
 }
 
 // startMuddyCanvasWASMFree boots Muddy/Noni in WASM-free Canvas2D mode

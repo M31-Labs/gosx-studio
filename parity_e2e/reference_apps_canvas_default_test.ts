@@ -6,11 +6,10 @@ import {
   startMuddyCanvasDefault,
 } from "./reference_apps_harness";
 
-// Live-proof e2e for CANVAS-DEFAULT mode (Slice 4+5 of the "Canvas2D board →
-// default editor" push).
+// Live-proof e2e for the no-signal CanvasBoard default.
 //
-// canvas-default mode (MUDDY_SITEMAP_CANVAS=canvas-default) makes the Canvas2D
-// board the SOLE site-map graph visual: the DOM board's graph SUB-TREE
+// With no Muddy canvas env/query override, canvas-default mode makes the
+// Canvas2D board the SOLE site-map graph visual: the DOM board's graph SUB-TREE
 // (.studio-site-map-workspace__surface — the workspace layers/nodes + the SVG
 // link paths) is hidden by a gated CSS rule, while the DOM board element, its
 // sitemapruntime binding, the selection detail card, the workspace rail, and
@@ -48,11 +47,11 @@ const FORMS_SELECTOR = "[data-studio-composition-intent-forms='true']";
 // is component:home:hero-copy-2 (same as the co-render authoring test).
 const NEW_NODE_KEY = "component:home:hero-copy-2";
 
-test.describe("@reference-apps canvas2d canvas-default mode", () => {
+test.describe("@reference-apps canvas2d default canvas-default mode", () => {
   test.describe.configure({ timeout: 300_000 });
   test.skip(process.env.GOSX_STUDIO_REFERENCE_APP_E2E !== "1", "set GOSX_STUDIO_REFERENCE_APP_E2E=1 to boot sibling reference apps");
 
-  test("Muddy/Noni canvas-default: canvas is the sole graph, DOM graph hidden, selection + authoring intact + parity with co-render", async ({ page, request }) => {
+  test("Muddy/Noni default route boots CanvasBoard as sole graph with selection + authoring parity", async ({ page, request }) => {
     const consoleErrors: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(message.text());
