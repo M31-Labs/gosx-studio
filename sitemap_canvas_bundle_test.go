@@ -74,18 +74,33 @@ func parseInlineCanvasBundle(t *testing.T, htmlOut string) siteMapCanvasBundle {
 	return bundle
 }
 
-// TestRenderSiteMapCanvasEngineEmitsInlineServerBundle is the Slice-1 acceptance
-// for gosx-studio: the enabled canvas engine emits the server-precomputed
-// RenderBundle as inline JSON on the surface, and that JSON parses into a bundle
-// whose objects/labels/lines match the known site map. The same view yields 3
-// workspace rects, 3 title labels + 1 route subtitle label for the single routed
-// page (page:home → "/"), and 2 links (see
-// TestSiteMapCanvasNodesDeriveFromWorkspaceLayers) — so the bundle must carry 3
-// rect objects, 4 labels, and 2 lines. The route subtitle flows through the
-// shared bundle adapter identically to the title labels.
-func TestRenderSiteMapCanvasEngineEmitsInlineServerBundle(t *testing.T) {
+// TestRenderSiteMapCanvasEngineDefaultOmitsInlineServerBundle locks the M2
+// default path: enabled non-WASMFree rendering goes through the real
+// gosx.CanvasBoard WebGPU backend and does not emit the legacy inline
+// server-side bundle.
+func TestRenderSiteMapCanvasEngineDefaultOmitsInlineServerBundle(t *testing.T) {
 	htmlOut := gosx.RenderHTML(RenderSiteMapCanvasEngine(siteMapCanvasTestView(), SiteMapCanvasOptions{
 		Enabled: true,
+	}))
+
+	if strings.Contains(htmlOut, "data-gosx-canvas-bundle") {
+		t.Fatalf("default enabled canvas engine must not emit an inline bundle:\n%s", htmlOut)
+	}
+}
+
+// TestRenderSiteMapCanvasEngineWASMFreeEmitsInlineServerBundle is the
+// compatibility-path acceptance for gosx-studio: with WASMFree=true the enabled
+// canvas engine emits the server-precomputed RenderBundle as inline JSON on the
+// surface, and that JSON parses into a bundle whose objects/labels/lines match
+// the known site map. The same view yields 3 workspace rects, 3 title labels + 1
+// route subtitle label for the single routed page (page:home → "/"), and 2
+// links (see TestSiteMapCanvasNodesDeriveFromWorkspaceLayers) — so the bundle
+// must carry 3 rect objects, 4 labels, and 2 lines. The route subtitle flows
+// through the shared bundle adapter identically to the title labels.
+func TestRenderSiteMapCanvasEngineWASMFreeEmitsInlineServerBundle(t *testing.T) {
+	htmlOut := gosx.RenderHTML(RenderSiteMapCanvasEngine(siteMapCanvasTestView(), SiteMapCanvasOptions{
+		Enabled:  true,
+		WASMFree: true,
 	}))
 
 	// The script element itself must be present (data-attribute hook the

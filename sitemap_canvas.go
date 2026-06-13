@@ -50,36 +50,41 @@ type SiteMapCanvasOptions struct {
 	OnPick string
 
 	// Thumbnails maps a page card's workspace node key (e.g. "page:home") to a
-	// per-page thumbnail data URI (the real themed page content, generated
-	// upstream by muddy as an SVG-<foreignObject> data URI). When a page card's
-	// node key is present here with a non-empty value, the shared node builder
-	// emits an ADDITIONAL Kind:"image" node (ID = key+":thumb", Src = the data
-	// URI) at the card's exact placement bounds, so the painter can paint it as
-	// a full-card overlay at medium zoom. Pages with no entry (or an empty
-	// value) get no image node, and entries keyed to non-page nodes are ignored.
-	// Empty/nil by default, so the standard site-map render is unchanged.
+	// per-page thumbnail image/texture URI. When a page card's node key is
+	// present here with a non-empty value, the shared node builder emits an
+	// ADDITIONAL Kind:"image" node (ID = key+":thumb", Src = the URI) at the
+	// card's exact placement bounds. In the default path that node serializes
+	// into gosx.CanvasBoard's data-gosx-engine-props payload and is consumed by
+	// the CanvasBoard/WebGPU render path as an image/sprite node; the explicit
+	// WASMFree compatibility path also carries it through the legacy inline
+	// bundle. Pages with no entry (or an empty value) get no image node, and
+	// entries keyed to non-page nodes are ignored. Empty/nil by default, so the
+	// standard site-map render is unchanged.
 	Thumbnails map[string]string
 
 	// PageSurfaces maps a page card's workspace node key (e.g. "page:home") to
 	// the host-supplied full editable HTML markup for that page. When a page
 	// card's node key is present here with a non-empty value, the shared node
-	// builder emits an ADDITIONAL Kind:"html" node (ID = the page node key, which
-	// is the painter mount key; Markup = the supplied HTML; PointerEvents =
-	// "auto") at the card's exact placement bounds, so the painter can mount it
-	// as a full-card LIVE editable surface at near zoom. The html node is appended
-	// AFTER the thumbnail images so live surfaces paint last (on top). Pages with
-	// no entry (or an empty value) get no html node, and entries keyed to non-page
-	// nodes are ignored. Empty/nil by default, so the standard site-map render is
-	// unchanged.
+	// builder emits an ADDITIONAL Kind:"html" node (ID = the page node key;
+	// Markup = the supplied HTML; PointerEvents = "auto") at the card's exact
+	// placement bounds. In the default path that html node serializes into
+	// gosx.CanvasBoard's data-gosx-engine-props payload and becomes a scene/html
+	// DOM overlay in the CanvasBoard render bundle; the explicit WASMFree
+	// compatibility path carries it through the legacy inline bundle. The html
+	// node is appended AFTER thumbnail images so live surfaces win ordering at
+	// near zoom. Pages with no entry (or an empty value) get no html node, and
+	// entries keyed to non-page nodes are ignored. Empty/nil by default, so the
+	// standard site-map render is unchanged.
 	PageSurfaces map[string]string
 
 	// ExtraNodes are appended verbatim to the deterministically-laid-out
 	// site-map nodes before the bundle is computed, so a host can place
 	// additional CanvasBoardNodes (e.g. a Kind:"html" surface) onto the same
-	// board. They paint AND serialize through the identical bundle path as the
-	// site-map rects/labels/lines, so an "html" node here flows into the inline
-	// RenderBundle's html records (and thus the WASM-free overlay). Empty by
-	// default, so the standard site-map render is unchanged.
+	// board. In the default path they serialize into the same gosx.CanvasBoard
+	// props payload as the site-map rects/labels/lines/images/html surfaces; in
+	// the explicit WASMFree compatibility path they also flow into the legacy
+	// inline RenderBundle. Empty by default, so the standard site-map render is
+	// unchanged.
 	ExtraNodes []gosx.CanvasBoardNode
 
 	// PageArtboardsOnly renders the canvas as page artboards only: when true the
@@ -91,16 +96,12 @@ type SiteMapCanvasOptions struct {
 	// lines — exactly as before, so existing callers are unchanged.
 	PageArtboardsOnly bool
 
-	// WASMFree opts the surface into the WASM-free render path. When true the
-	// renderer emits a plain <canvas> that DELIBERATELY carries NO
+	// WASMFree opts the surface into the legacy WASM-free compatibility path.
+	// When true the renderer emits a plain <canvas> that DELIBERATELY carries NO
 	// data-gosx-surface-kind (and instead carries data-gosx-canvas-wasm-free),
-	// so the gosx client bootstrap's canvas discovery
-	// ([data-gosx-surface-kind]:not([data-gosx-engine-bytecode])) never tries to
-	// WASM-hydrate it. The SAME server-precomputed inline RenderBundle is still
-	// emitted next to the canvas, so a WASM-free client (gosx-studio's host ships
-	// a ported JS painter + interaction loop) can paint and drive it with no WASM.
-	// When false (the default) the surface emits the WASM gosx.CanvasBoard exactly
-	// as before, so the existing co-render / canvas-default modes are unchanged.
+	// plus the server-precomputed inline RenderBundle used by that JS painter.
+	// When false (the default) the surface emits the real gosx.CanvasBoard marked
+	// for the WebGPU backend.
 	WASMFree bool
 }
 
@@ -114,8 +115,8 @@ const (
 	siteMapCanvasLabelInsetY         = 28.0
 	// siteMapCanvasRouteInsetY stacks the page route subtitle a row below the
 	// title (title at +28, route at +48), staying inside the default 72-tall rect
-	// so the muddy painter associates it to the card by world-point containment
-	// and renders it as the muted subtitle.
+	// so CanvasBoard/render-bundle consumers can associate it to the card by
+	// world-point containment and render it as the muted subtitle.
 	siteMapCanvasRouteInsetY   = 48.0
 	siteMapCanvasDefaultOnPick = "handleSiteMapPick"
 )
@@ -164,9 +165,8 @@ func RenderSiteMapCanvasEngine(siteMapView map[string]any, options SiteMapCanvas
 		))
 	}
 
-	// Build the board nodes once and feed BOTH the (WASM) CanvasBoard primitive
-	// and the server-precomputed bundle below, so the inline bundle is exactly
-	// what the WASM path would produce for this surface.
+	// Build the board nodes once and feed them to either the real CanvasBoard or
+	// the explicit WASM-free compatibility bundle.
 	nodes := siteMapCanvasNodesWith(siteMapView, options)
 	if len(options.ExtraNodes) > 0 {
 		// Appended last so host-supplied nodes (e.g. a Kind:"html" surface)
@@ -177,9 +177,8 @@ func RenderSiteMapCanvasEngine(siteMapView map[string]any, options SiteMapCanvas
 	background := FirstNonEmpty(options.Background, siteMapCanvasDefaultBackground)
 
 	// In the WASM-free path we emit a plain <canvas> that carries NO
-	// data-gosx-surface-kind, so the gosx client bootstrap never WASM-hydrates it;
-	// otherwise we emit the WASM gosx.CanvasBoard exactly as before. Either way the
-	// same inline RenderBundle (computed below) ships next to the canvas.
+	// data-gosx-surface-kind, so the gosx client bootstrap never WASM-hydrates it.
+	// Otherwise we emit the real gosx.CanvasBoard and mark it for WebGPU.
 	var board gosx.Node
 	if options.WASMFree {
 		board = siteMapCanvasWASMFreeCanvas(background, options.Width, options.Height, options.CanvasClass)
@@ -189,6 +188,7 @@ func RenderSiteMapCanvasEngine(siteMapView map[string]any, options SiteMapCanvas
 			Width:      options.Width,
 			Height:     options.Height,
 			Background: background,
+			Backend:    gosx.CanvasBoardBackendWebGPU,
 			Zoom:       1.0,
 			Nodes:      nodes,
 			OnPick:     FirstNonEmpty(options.OnPick, siteMapCanvasDefaultOnPick),
@@ -212,12 +212,12 @@ func RenderSiteMapCanvasEngine(siteMapView map[string]any, options SiteMapCanvas
 		gosx.Attrs(sectionAttrs...),
 		board,
 	}
-	if bundleScript, ok := siteMapCanvasBundleScript(nodes, background, options.Width, options.Height); ok {
-		// Additive: the WASM path still hydrates `board` from data-gosx-engine-props.
-		// This script ADDS the same bundle precomputed server-side (plain Go, no
-		// WASM) so a WASM-free client can paint it directly. Placed after the canvas
-		// so a client can resolve the surface, then read its sibling bundle.
-		children = append(children, bundleScript)
+	if options.WASMFree {
+		if bundleScript, ok := siteMapCanvasBundleScript(nodes, background, options.Width, options.Height); ok {
+			// The explicit WASM-free client reads this server-side bundle after
+			// locating the preceding canvas.
+			children = append(children, bundleScript)
+		}
 	}
 
 	return gosx.El("section", children...)
@@ -290,13 +290,14 @@ func intToString(n int) string {
 // reads this sibling script's textContent, JSON.parses it, and paints — no WASM,
 // no extra round-trip.
 //
-// Width/Height are resolved to the SAME defaults gosx.CanvasBoard applies (both
-// zero → 1280x720) and the camera matches the board's authored Zoom=1, Pan=(0,0),
-// so the inline bundle is byte-identical to what the WASM CanvasBoardAdapter
-// would render for this surface. The JSON is embedded raw: gosx/bundle2d marshals
+// Width/Height are resolved to the same defaults gosx.CanvasBoard applies (both
+// zero -> 1280x720), and the camera matches the authored Zoom=1, Pan=(0,0), so
+// the explicit WASM-free path gets painter-shaped server bundle JSON from the
+// same dimensions and camera. The JSON is embedded raw: gosx/bundle2d marshals
 // via encoding/json, which escapes <, >, & as </>/&, so the payload
 // can never contain a literal </script> sequence. Returns ok=false (and no
-// script) only if marshaling fails, leaving the WASM path untouched.
+// script) only if marshaling fails, leaving the default CanvasBoard path
+// untouched.
 func siteMapCanvasBundleScript(nodes []gosx.CanvasBoardNode, background string, width, height int) (gosx.Node, bool) {
 	w, h := width, height
 	if w == 0 && h == 0 {
@@ -390,8 +391,8 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 
 			// For a PAGE node that carries a route, stack the route as a muted
 			// subtitle label a row below the title but still inside the rect
-			// bounds, so the muddy painter associates it to the card by
-			// world-point containment and renders it as the subtitle. The
+			// bounds, so CanvasBoard/render-bundle consumers associate it to the
+			// card by world-point containment and render it as the subtitle. The
 			// authoring view exposes "route" only on page nodes (components and
 			// resources leave it empty), so the kind+route gate keeps the route
 			// label off non-page cards.
@@ -407,13 +408,12 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 					})
 				}
 
-				// When a per-page thumbnail data URI is supplied for this page
-				// card's node key, emit an additional "image" node at the card's
-				// exact placement bounds. It serializes through the same bundle
-				// path as the rects/labels (adapter case "image","sprite" → a
-				// sprite), so the WASM-free painter can show it as a full-card
-				// overlay. Keyed by the page node key; only page cards are
-				// eligible, and only when the value is non-empty.
+				// When a per-page thumbnail URI is supplied for this page card's
+				// node key, emit an additional "image" node at the card's exact
+				// placement bounds. It serializes with the rects/labels into the
+				// default CanvasBoard props payload and is carried through the
+				// legacy WASMFree inline bundle when that compatibility path is
+				// explicitly selected.
 				if dataURI := options.Thumbnails[key]; dataURI != "" {
 					thumbs = append(thumbs, gosx.CanvasBoardNode{
 						ID:     key + ":thumb",
@@ -428,10 +428,10 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 
 				// When a per-page full editable HTML surface is supplied for this
 				// page card's node key, emit an additional "html" node at the card's
-				// exact placement bounds. Its ID is the page node key (the painter
-				// mount key) and PointerEvents is "auto" so the painter can mount it
-				// as a full-card LIVE editable surface. Keyed by the page node key;
-				// only page cards are eligible, and only when the value is non-empty.
+				// exact placement bounds. Its ID is the page node key and
+				// PointerEvents is "auto" so the CanvasBoard render bundle can expose
+				// it as a scene/html DOM overlay. Keyed by the page node key; only
+				// page cards are eligible, and only when the value is non-empty.
 				if markup := options.PageSurfaces[key]; markup != "" {
 					surfaces = append(surfaces, gosx.CanvasBoardNode{
 						ID:            key,

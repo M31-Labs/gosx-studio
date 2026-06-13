@@ -1,11 +1,17 @@
 package studio
 
 import (
+	"encoding/json"
+	"html"
 	"strings"
 	"testing"
 
 	"m31labs.dev/gosx"
 )
+
+type siteMapCanvasBoardPayload struct {
+	Nodes []gosx.CanvasBoardNode `json:"nodes"`
+}
 
 // siteMapCanvasTestView builds the same AuthoringSiteMapView shape that
 // sitemap_board_test.go exercises, so the Canvas2D derivation is validated
@@ -113,8 +119,9 @@ func TestSiteMapCanvasNodesDeriveFromWorkspaceLayers(t *testing.T) {
 // TestSiteMapCanvasNodesEmitRouteSubtitleForPageCards locks M7-3: each PAGE node
 // that carries a route gets an ADDITIONAL label node whose Text is the route and
 // whose point sits below the title label but inside the page rect's bounds (so the
-// muddy painter associates it to the card by world-point containment and stacks it
-// as the muted subtitle). Non-page nodes (component/resource) get NO route label.
+// CanvasBoard/render-bundle path can associate it to the card by world-point
+// containment and stack it as the muted subtitle). Non-page nodes
+// (component/resource) get NO route label.
 func TestSiteMapCanvasNodesEmitRouteSubtitleForPageCards(t *testing.T) {
 	nodes := siteMapCanvasNodes(siteMapCanvasTestView())
 
@@ -317,8 +324,8 @@ func TestSiteMapCanvasNodesEmitThumbnailImageForPageCards(t *testing.T) {
 	if thumb.Src != homeThumb {
 		t.Fatalf("thumbnail Src = %q, want %q", thumb.Src, homeThumb)
 	}
-	// The image node must occupy the exact card bounds so the painter can paint
-	// it as a full-card overlay.
+	// The image node must occupy the exact card bounds so CanvasBoard/WebGPU can
+	// render it as a full-card image overlay.
 	if thumb.X != pageRect.X || thumb.Y != pageRect.Y ||
 		thumb.Width != pageRect.Width || thumb.Height != pageRect.Height {
 		t.Fatalf("thumbnail bounds (%v,%v,%v,%v) must equal page rect bounds (%v,%v,%v,%v)",
@@ -335,10 +342,11 @@ func TestSiteMapCanvasNodesEmitThumbnailImageForPageCards(t *testing.T) {
 // TestSiteMapCanvasNodesEmitPageSurfaceForPageCards locks M10-1: when a page
 // card's node key is present in options.PageSurfaces with a non-empty value, the
 // shared node builder emits an ADDITIONAL "html"-kind node whose ID is the page
-// node key (the painter mount key), whose Markup is the supplied editable HTML,
-// whose PointerEvents is "auto", and whose bounds (X/Y/Width/Height) exactly
-// match the page's rect placement. Pages without a PageSurfaces entry get no
-// html node, and an empty/nil PageSurfaces map leaves the render unchanged.
+// node key (the CanvasBoard surface key), whose Markup is the supplied editable
+// HTML, whose PointerEvents is "auto", and whose bounds (X/Y/Width/Height)
+// exactly match the page's rect placement. Pages without a PageSurfaces entry
+// get no html node, and an empty/nil PageSurfaces map leaves the render
+// unchanged.
 func TestSiteMapCanvasNodesEmitPageSurfaceForPageCards(t *testing.T) {
 	const homeSurface = `<h1 data-gosx-html-key="page:home">hi</h1>`
 	nodes := siteMapCanvasNodesWith(siteMapCanvasTestView(), SiteMapCanvasOptions{
@@ -368,7 +376,8 @@ func TestSiteMapCanvasNodesEmitPageSurfaceForPageCards(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected a rect for page:home; got %v", rectKeys(rects))
 	}
-	// The html node's ID must be the page node key — that is the painter mount key.
+	// The html node's ID must be the page node key, which CanvasBoard uses as the
+	// surface key.
 	surface, ok := htmls["page:home"]
 	if !ok {
 		t.Fatalf("expected an html surface node id %q; got htmls %v", "page:home", rectKeys(htmls))
@@ -379,8 +388,8 @@ func TestSiteMapCanvasNodesEmitPageSurfaceForPageCards(t *testing.T) {
 	if surface.PointerEvents != "auto" {
 		t.Fatalf("surface PointerEvents = %q, want %q", surface.PointerEvents, "auto")
 	}
-	// The html node must occupy the exact card bounds so the painter can mount it
-	// as a full-card live surface.
+	// The html node must occupy the exact card bounds so the CanvasBoard render
+	// bundle can expose it as a full-card live surface.
 	if surface.X != pageRect.X || surface.Y != pageRect.Y ||
 		surface.Width != pageRect.Width || surface.Height != pageRect.Height {
 		t.Fatalf("surface bounds (%v,%v,%v,%v) must equal page rect bounds (%v,%v,%v,%v)",
@@ -409,6 +418,64 @@ func TestSiteMapCanvasNodesEmitPageSurfaceForPageCards(t *testing.T) {
 	}
 }
 
+// TestRenderSiteMapCanvasEngineSerializesPageContentNodes locks the default
+// CanvasBoard/WebGPU contract: page thumbnails and editable page surfaces must
+// be present in the rendered data-gosx-engine-props nodes payload, not only in
+// the legacy WASMFree inline bundle.
+func TestRenderSiteMapCanvasEngineSerializesPageContentNodes(t *testing.T) {
+	const (
+		homeThumb   = "data:image/png;base64,HOME"
+		homeSurface = `<main data-gosx-html-key="page:home"><button>Save</button></main>`
+	)
+	htmlOut := gosx.RenderHTML(RenderSiteMapCanvasEngine(siteMapCanvasTestView(), SiteMapCanvasOptions{
+		Enabled: true,
+		Thumbnails: map[string]string{
+			"page:home": homeThumb,
+		},
+		PageSurfaces: map[string]string{
+			"page:home": homeSurface,
+		},
+	}))
+
+	for _, fragment := range []string{
+		`data-gosx-canvas-backend="webgpu"`,
+		`data-gosx-engine-component="CanvasBoard"`,
+	} {
+		if !strings.Contains(htmlOut, fragment) {
+			t.Fatalf("rendered default CanvasBoard missing %q:\n%s", fragment, htmlOut)
+		}
+	}
+	if strings.Contains(htmlOut, "data-gosx-canvas-bundle") {
+		t.Fatalf("default CanvasBoard path must not emit the WASMFree inline bundle:\n%s", htmlOut)
+	}
+
+	payload := parseRenderedCanvasBoardPayload(t, htmlOut)
+	rect := findCanvasNode(payload.Nodes, "rect", "page:home")
+	if rect == nil {
+		t.Fatalf("rendered CanvasBoard props missing page rect node; nodes=%#v", payload.Nodes)
+	}
+	thumb := findCanvasNode(payload.Nodes, "image", "page:home:thumb")
+	if thumb == nil {
+		t.Fatalf("rendered CanvasBoard props missing thumbnail image node; nodes=%#v", payload.Nodes)
+	}
+	if thumb.Src != homeThumb {
+		t.Fatalf("thumbnail Src = %q, want %q", thumb.Src, homeThumb)
+	}
+	assertCanvasNodeBoundsEqual(t, "thumbnail", *thumb, *rect)
+
+	surface := findCanvasNode(payload.Nodes, "html", "page:home")
+	if surface == nil {
+		t.Fatalf("rendered CanvasBoard props missing page html surface node; nodes=%#v", payload.Nodes)
+	}
+	if surface.Markup != homeSurface {
+		t.Fatalf("surface Markup = %q, want %q", surface.Markup, homeSurface)
+	}
+	if surface.PointerEvents != "auto" {
+		t.Fatalf("surface PointerEvents = %q, want %q", surface.PointerEvents, "auto")
+	}
+	assertCanvasNodeBoundsEqual(t, "html surface", *surface, *rect)
+}
+
 func TestRenderSiteMapCanvasEngineEmitsCanvas2DSurface(t *testing.T) {
 	html := gosx.RenderHTML(RenderSiteMapCanvasEngine(siteMapCanvasTestView(), SiteMapCanvasOptions{
 		Enabled: true,
@@ -418,6 +485,7 @@ func TestRenderSiteMapCanvasEngineEmitsCanvas2DSurface(t *testing.T) {
 	for _, fragment := range []string{
 		`data-studio-site-map-canvas-engine="true"`,
 		`data-gosx-surface-kind="canvas2d"`,
+		`data-gosx-canvas-backend="webgpu"`,
 		`data-gosx-engine-component="CanvasBoard"`,
 		`class="host-canvas-board"`,
 		`data-gosx-onpick="handleSiteMapPick"`,
@@ -428,6 +496,9 @@ func TestRenderSiteMapCanvasEngineEmitsCanvas2DSurface(t *testing.T) {
 	}
 	if strings.Contains(html, "GoSX Studio") {
 		t.Fatalf("site-map canvas engine must not inject visible platform copy:\n%s", html)
+	}
+	if strings.Contains(html, "data-gosx-canvas-bundle") {
+		t.Fatalf("default enabled site-map canvas engine must not emit the WASM-free inline bundle:\n%s", html)
 	}
 }
 
@@ -462,6 +533,7 @@ func TestRenderSiteMapCanvasEngineWASMFreeOmitsSurfaceKind(t *testing.T) {
 	// surface-kind is what keeps this canvas out of the WASM hydration path).
 	for _, forbidden := range []string{
 		`data-gosx-surface-kind="canvas2d"`,
+		`data-gosx-canvas-backend="webgpu"`,
 		`data-gosx-engine-component="CanvasBoard"`,
 		`data-gosx-canvas2d="1"`,
 	} {
@@ -479,6 +551,9 @@ func TestRenderSiteMapCanvasEngineDisabledByDefault(t *testing.T) {
 
 	if strings.Contains(html, `data-gosx-surface-kind="canvas2d"`) {
 		t.Fatalf("canvas engine must be OFF by default and not emit a canvas2d surface:\n%s", html)
+	}
+	if strings.Contains(html, `<canvas`) {
+		t.Fatalf("disabled canvas engine must stay inert and emit no canvas:\n%s", html)
 	}
 	if !strings.Contains(html, `data-studio-site-map-canvas-engine="disabled"`) {
 		t.Fatalf("disabled canvas engine should emit a stable disabled hook:\n%s", html)
@@ -500,4 +575,49 @@ func canvasNodesContainText(nodes []gosx.CanvasBoardNode, text string) bool {
 		}
 	}
 	return false
+}
+
+func parseRenderedCanvasBoardPayload(t *testing.T, htmlOut string) siteMapCanvasBoardPayload {
+	t.Helper()
+	propsJSON := extractRenderedAttr(htmlOut, "data-gosx-engine-props")
+	if propsJSON == "" {
+		t.Fatalf("data-gosx-engine-props missing or empty:\n%s", htmlOut)
+	}
+	var payload siteMapCanvasBoardPayload
+	if err := json.Unmarshal([]byte(propsJSON), &payload); err != nil {
+		t.Fatalf("data-gosx-engine-props JSON did not parse: %v\nJSON: %s", err, propsJSON)
+	}
+	return payload
+}
+
+func extractRenderedAttr(htmlOut, name string) string {
+	prefix := name + `="`
+	i := strings.Index(htmlOut, prefix)
+	if i < 0 {
+		return ""
+	}
+	start := i + len(prefix)
+	end := strings.Index(htmlOut[start:], `"`)
+	if end < 0 {
+		return ""
+	}
+	return html.UnescapeString(htmlOut[start : start+end])
+}
+
+func findCanvasNode(nodes []gosx.CanvasBoardNode, kind, id string) *gosx.CanvasBoardNode {
+	for i := range nodes {
+		if nodes[i].Kind == kind && nodes[i].ID == id {
+			return &nodes[i]
+		}
+	}
+	return nil
+}
+
+func assertCanvasNodeBoundsEqual(t *testing.T, name string, got, want gosx.CanvasBoardNode) {
+	t.Helper()
+	if got.X != want.X || got.Y != want.Y || got.Width != want.Width || got.Height != want.Height {
+		t.Fatalf("%s bounds (%v,%v,%v,%v) must equal page rect bounds (%v,%v,%v,%v)",
+			name, got.X, got.Y, got.Width, got.Height,
+			want.X, want.Y, want.Width, want.Height)
+	}
 }
