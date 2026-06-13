@@ -4,6 +4,10 @@ import {
   gotoEditor,
   startMuddyCanvas,
 } from "./reference_apps_harness";
+import {
+  formatCanvasRenderEvidence,
+  waitForCanvasBoardRenderEvidence,
+} from "./canvas_render_evidence";
 
 // Live-proof e2e for AUTHORING PARITY with the Canvas2D site-map board active
 // (Slice 2 of the "Canvas2D board → default editor" parity push).
@@ -36,7 +40,7 @@ import {
 //   the added section appears in the reloaded canvas graph.
 //
 // Honesty discipline: the canvas must be genuinely active (canvas2d surface
-// attached, full-build painter installed, board paints non-background pixels)
+// attached, route evidence observed (true WebGPU or explicit 2D fallback paint))
 // before any authoring is driven, and the canvas-graph assertion reads the live
 // __gosx_render_canvas bundle — nothing is hardcoded.
 //
@@ -57,8 +61,10 @@ test.describe("@reference-apps canvas2d authoring parity", () => {
 
   test("Muddy/Noni create-page and add-component work with the canvas board active", async ({ page, request }) => {
     const consoleErrors: string[] = [];
+    const consoleWarnings: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(message.text());
+      if (message.type() === "warning") consoleWarnings.push(message.text());
     });
     page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
 
@@ -71,6 +77,7 @@ test.describe("@reference-apps canvas2d authoring parity", () => {
       // and the host authoring chrome (managed forms) present alongside it.
       const canvas = page.locator(CANVAS_SELECTOR).first();
       await expect(canvas, "canvas2d surface should be emitted under MUDDY_SITEMAP_CANVAS=1").toBeAttached({ timeout: 30_000 });
+      await expect(canvas, "full-runtime CanvasBoard should request the WebGPU backend").toHaveAttribute("data-gosx-canvas-backend", "webgpu");
       await expect(page.locator(BOARD_SELECTOR).first(), "DOM site-map board renders alongside the canvas today").toBeAttached();
       await expect(page.locator(FORMS_SELECTOR), "managed authoring forms (host chrome) must be present with the canvas active").toBeAttached();
 
@@ -85,7 +92,11 @@ test.describe("@reference-apps canvas2d authoring parity", () => {
           typeof w.__gosx_canvas_board_screen_transform === "function" &&
           typeof w.__gosx_paint_canvas_bundle === "function";
       }, null, { timeout: 120_000 });
-      expect(await pollForPaint(page), "canvas board must paint before authoring is driven").toBe(true);
+      const initialRenderEvidence = await waitForCanvasBoardRenderEvidence(page, consoleWarnings);
+      expect(
+        initialRenderEvidence.webgpuRoute || initialRenderEvidence.fallback2D,
+        `canvas board must render before authoring is driven; evidence=${formatCanvasRenderEvidence(initialRenderEvidence)}`,
+      ).toBe(true);
 
       // ── create-page from a blueprint ───────────────────────────────────────
       // The CMS pages list must NOT already carry the landing draft, so the
@@ -143,7 +154,11 @@ test.describe("@reference-apps canvas2d authoring parity", () => {
           (w.__gosx as { ready?: boolean } | undefined)?.ready === true ||
           document.documentElement.getAttribute("data-gosx-runtime-ready") === "true";
       }, null, { timeout: 120_000 });
-      expect(await pollForPaint(page), "canvas must paint after reload").toBe(true);
+      const reloadRenderEvidence = await waitForCanvasBoardRenderEvidence(page, consoleWarnings);
+      expect(
+        reloadRenderEvidence.webgpuRoute || reloadRenderEvidence.fallback2D,
+        `canvas must render after reload; evidence=${formatCanvasRenderEvidence(reloadRenderEvidence)}`,
+      ).toBe(true);
 
       const found = await pollForCanvasNode(page, NEW_NODE_KEY);
       expect(
@@ -188,42 +203,6 @@ async function pollForCanvasNode(page: Page, key: string): Promise<boolean> {
       return objects.some((obj) => obj && obj.kind === "rect" && obj.id === nodeKey);
     }, { canvasSel: CANVAS_SELECTOR, nodeKey: key });
     if (hit) return true;
-    await page.waitForTimeout(250);
-  }
-  return false;
-}
-
-// pollForPaint waits until the canvas backing store has at least one
-// non-background pixel — i.e. the rAF loop actually drew the board content.
-async function pollForPaint(page: Page): Promise<boolean> {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    const nonBackground = await page.evaluate((selector) => {
-      const canvas = document.querySelector(selector);
-      if (!(canvas instanceof HTMLCanvasElement)) return 0;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return 0;
-      const wpx = canvas.width;
-      const hpx = canvas.height;
-      if (wpx === 0 || hpx === 0) return 0;
-      let data: Uint8ClampedArray;
-      try {
-        data = ctx.getImageData(0, 0, wpx, hpx).data;
-      } catch {
-        return 0;
-      }
-      const bg = { r: 0x0f, g: 0x17, b: 0x20 };
-      const tol = 10;
-      let count = 0;
-      const stride = 4 * Math.max(1, Math.floor((wpx * hpx) / 50000));
-      for (let i = 0; i < data.length; i += stride) {
-        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-        if (a === 0) continue;
-        if (Math.abs(r - bg.r) > tol || Math.abs(g - bg.g) > tol || Math.abs(b - bg.b) > tol) count++;
-      }
-      return count;
-    }, CANVAS_SELECTOR);
-    if (nonBackground > 0) return true;
     await page.waitForTimeout(250);
   }
   return false;

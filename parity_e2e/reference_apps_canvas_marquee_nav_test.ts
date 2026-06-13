@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { gotoEditor, startMuddyCanvasDefault } from "./reference_apps_harness";
+import {
+  formatCanvasRenderEvidence,
+  waitForCanvasBoardRenderEvidence,
+} from "./canvas_render_evidence";
 
 // Live-proof e2e for Slice 3 — Canvas2D marquee multi-select + keyboard
 // node-navigation, reaching interaction parity with the DOM site-map board.
@@ -52,8 +56,10 @@ test.describe("@reference-apps canvas2d marquee + keyboard nav", () => {
 
   test("Muddy/Noni canvas-default: shift-drag marquee multi-selects + arrow-key nav moves to the spatial neighbor", async ({ page, request }) => {
     const consoleErrors: string[] = [];
+    const consoleWarnings: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(message.text());
+      if (message.type() === "warning") consoleWarnings.push(message.text());
     });
     page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
 
@@ -64,6 +70,7 @@ test.describe("@reference-apps canvas2d marquee + keyboard nav", () => {
       await expect(page.locator(BOARD_SELECTOR).first(), "DOM site-map board element must stay in the markup (bridge target)").toBeAttached();
       const canvas = page.locator(CANVAS_SELECTOR).first();
       await expect(canvas, "canvas2d surface must be emitted in canvas-default mode").toBeAttached({ timeout: 30_000 });
+      await expect(canvas, "canvas-default CanvasBoard should request the WebGPU backend").toHaveAttribute("data-gosx-canvas-backend", "webgpu");
 
       // Runtime + canvas entrypoints + the new marquee/nav event surface + the
       // DOM board runtime (bridge sink) + the muddy bridge must all be present.
@@ -86,8 +93,11 @@ test.describe("@reference-apps canvas2d marquee + keyboard nav", () => {
       const box = await canvas.boundingBox();
       expect(box, "canvas should have a layout box").not.toBeNull();
 
-      // The board must paint real content before there is anything to select.
-      expect(await pollForPaint(page), "the canvas board must paint before interaction").toBe(true);
+      const renderEvidence = await waitForCanvasBoardRenderEvidence(page, consoleWarnings);
+      expect(
+        renderEvidence.webgpuRoute || renderEvidence.fallback2D,
+        `the canvas board must render before interaction; evidence=${formatCanvasRenderEvidence(renderEvidence)}`,
+      ).toBe(true);
 
       // Discover the rects the DOM board can resolve, with on-screen + world
       // centers, from the live RenderBundle. Need >=2 fully on-screen to marquee.
@@ -346,36 +356,4 @@ async function readSelectedSignal(page: Page): Promise<string | null> {
     if (typeof raw !== "string") return null;
     try { const p = JSON.parse(raw); return typeof p === "string" ? p : String(p); } catch { return raw; }
   });
-}
-
-// pollForPaint waits until the canvas backing store has at least one
-// non-background pixel — i.e. the rAF loop actually drew the board content.
-async function pollForPaint(page: Page): Promise<boolean> {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    const nonBackground = await page.evaluate((selector) => {
-      const canvas = document.querySelector(selector);
-      if (!(canvas instanceof HTMLCanvasElement)) return 0;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return 0;
-      const wpx = canvas.width;
-      const hpx = canvas.height;
-      if (wpx === 0 || hpx === 0) return 0;
-      let data: Uint8ClampedArray;
-      try { data = ctx.getImageData(0, 0, wpx, hpx).data; } catch { return 0; }
-      const bg = { r: 0x0f, g: 0x17, b: 0x20 };
-      const tol = 10;
-      let count = 0;
-      const stride = 4 * Math.max(1, Math.floor((wpx * hpx) / 50000));
-      for (let i = 0; i < data.length; i += stride) {
-        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-        if (a === 0) continue;
-        if (Math.abs(r - bg.r) > tol || Math.abs(g - bg.g) > tol || Math.abs(b - bg.b) > tol) count++;
-      }
-      return count;
-    }, CANVAS_SELECTOR);
-    if (nonBackground > 0) return true;
-    await page.waitForTimeout(250);
-  }
-  return false;
 }

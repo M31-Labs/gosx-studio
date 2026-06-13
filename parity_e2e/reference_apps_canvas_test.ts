@@ -1,5 +1,9 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { startMuddyCanvas } from "./reference_apps_harness";
+import {
+  formatCanvasRenderEvidence,
+  waitForCanvasBoardRenderEvidence,
+} from "./canvas_render_evidence";
 
 // Live-proof e2e for the Canvas2D site-map board (GoSX Studio Canvas2D track).
 //
@@ -12,7 +16,7 @@ import { startMuddyCanvas } from "./reference_apps_harness";
 // test. The Muddy/Noni admin editor renders the canvas board behind a flag
 // (MUDDY_SITEMAP_CANVAS=1, default OFF — the DOM board stays the default).
 //
-// The assertion genuinely verifies PAINT, not just element existence:
+// The assertion genuinely verifies rendering, not just element existence:
 //   1. wait for the gosx runtime ready signal (window.__gosx.ready /
 //      <html data-gosx-runtime-ready="true">),
 //   2. wait for the canvas2d paint hook to be installed
@@ -20,9 +24,10 @@ import { startMuddyCanvas } from "./reference_apps_harness";
 //      full-build canvas painter) AND a board adapter registered,
 //   3. assert the <canvas data-gosx-surface-kind="canvas2d"> exists with
 //      non-zero CSS size,
-//   4. read back the canvas pixels (getImageData) and require at least one
-//      non-background pixel — i.e. the rAF loop actually drew the page-graph
-//      rects/labels/links onto the 2D context.
+//   4. accept either true WebGPU CanvasBoard evidence from the runtime/host
+//      diagnostics or an explicit WebGPU fallback warning followed by 2D
+//      non-background paint. The test never probes getContext("2d") before the
+//      runtime has proven it is on the fallback route.
 //
 // Polls with generous timeouts (WASM cold-load is slow); no arbitrary sleeps.
 //
@@ -49,8 +54,10 @@ test.describe("@reference-apps canvas2d site-map board live paint", () => {
 
   test("Muddy/Noni editor canvas2d site-map board hydrates and paints in headless Chromium", async ({ page, request }) => {
     const consoleErrors: string[] = [];
+    const consoleWarnings: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(message.text());
+      if (message.type() === "warning") consoleWarnings.push(message.text());
     });
     page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
 
@@ -65,6 +72,7 @@ test.describe("@reference-apps canvas2d site-map board live paint", () => {
       const canvas = page.locator("canvas[data-gosx-surface-kind='canvas2d']").first();
       await expect(canvas, "canvas2d placeholder should be emitted under MUDDY_SITEMAP_CANVAS=1").toBeAttached({ timeout: 30_000 });
       await expect(canvas).toHaveAttribute("data-gosx-engine-component", "CanvasBoard");
+      await expect(canvas, "full-runtime CanvasBoard should request the WebGPU backend").toHaveAttribute("data-gosx-canvas-backend", "webgpu");
 
       // Wait for the gosx runtime to come ready. The canvas discovery
       // (nn() in bootstrap-feature-engines.js) runs inside runtimeReady, so
@@ -96,14 +104,11 @@ test.describe("@reference-apps canvas2d site-map board live paint", () => {
       expect(box!.width, "canvas CSS width should be non-zero").toBeGreaterThan(0);
       expect(box!.height, "canvas CSS height should be non-zero").toBeGreaterThan(0);
 
-      // PAINT PROOF: poll the canvas backing store until the rAF loop has
-      // drawn at least one non-background pixel. We compare against the board
-      // background (#0f1720, the gosx-studio canvas default). A blank/transparent
-      // canvas — or one filled only with the background color — fails.
-      const paint = await pollForPaint(page);
+      const renderEvidence = await waitForCanvasBoardRenderEvidence(page, consoleWarnings);
       expect(
-        paint.painted,
-        `canvas should paint non-background pixels (last sample: ${JSON.stringify(paint)}; console: ${JSON.stringify(consoleErrors.slice(-12))})`,
+        renderEvidence.webgpuRoute || renderEvidence.fallback2D,
+        `CanvasBoard should render via true WebGPU or explicit 2D fallback; evidence=${formatCanvasRenderEvidence(renderEvidence)}; ` +
+          `consoleErrors=${JSON.stringify(consoleErrors.slice(-12))}`,
       ).toBe(true);
 
       // Sanity: zero unexpected console errors that mention the canvas path.
@@ -114,75 +119,3 @@ test.describe("@reference-apps canvas2d site-map board live paint", () => {
     }
   });
 });
-
-type PaintSample = {
-  painted: boolean;
-  width: number;
-  height: number;
-  nonBackground: number;
-  distinctColors: number;
-  reason: string;
-};
-
-// pollForPaint repeatedly reads the canvas 2D backing store and reports
-// whether the rAF paint loop has drawn anything beyond the flat background.
-// Returns as soon as paint is detected, or after the deadline with the last
-// sample (so the failure message carries real evidence).
-async function pollForPaint(page: Page): Promise<PaintSample> {
-  const deadline = Date.now() + 60_000;
-  let last: PaintSample = { painted: false, width: 0, height: 0, nonBackground: 0, distinctColors: 0, reason: "not-sampled" };
-  while (Date.now() < deadline) {
-    last = await page.evaluate(() => {
-      const canvas = document.querySelector("canvas[data-gosx-surface-kind='canvas2d']");
-      if (!(canvas instanceof HTMLCanvasElement)) {
-        return { painted: false, width: 0, height: 0, nonBackground: 0, distinctColors: 0, reason: "no-canvas" };
-      }
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        return { painted: false, width: 0, height: 0, nonBackground: 0, distinctColors: 0, reason: "no-2d-context" };
-      }
-      const w = canvas.width;
-      const h = canvas.height;
-      if (w === 0 || h === 0) {
-        return { painted: false, width: w, height: h, nonBackground: 0, distinctColors: 0, reason: "zero-backing-store" };
-      }
-      let data: Uint8ClampedArray;
-      try {
-        data = ctx.getImageData(0, 0, w, h).data;
-      } catch (error) {
-        return { painted: false, width: w, height: h, nonBackground: 0, distinctColors: 0, reason: `getImageData-threw:${String(error)}` };
-      }
-      // Board background is #0f1720 (gosx-studio canvas default). Count pixels
-      // that differ from it (with a small tolerance) and that are opaque —
-      // those are the painted rects/labels/links.
-      const bg = { r: 0x0f, g: 0x17, b: 0x20 };
-      const tol = 10;
-      let nonBackground = 0;
-      const colors = new Set<number>();
-      // Sample on a stride to keep the readback cheap on large canvases.
-      const stride = 4 * Math.max(1, Math.floor((w * h) / 200000));
-      for (let i = 0; i < data.length; i += stride) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        const a = data[i + 3];
-        if (a === 0) continue;
-        colors.add((r << 16) | (g << 8) | b);
-        if (Math.abs(r - bg.r) > tol || Math.abs(g - bg.g) > tol || Math.abs(b - bg.b) > tol) {
-          nonBackground++;
-        }
-      }
-      return {
-        painted: nonBackground > 0 && colors.size > 1,
-        width: w,
-        height: h,
-        nonBackground,
-        distinctColors: colors.size,
-        reason: nonBackground > 0 ? "painted" : "background-only",
-      };
-    });
-    if (last.painted) return last;
-    await page.waitForTimeout(250);
-  }
-  return last;
-}

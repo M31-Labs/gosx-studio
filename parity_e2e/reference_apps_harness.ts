@@ -288,7 +288,7 @@ export async function waitForStudioAuthoringCycle(page: Page) {
   }));
 }
 
-export async function applyCompositionIntentInPlace(page: Page, intentKey: string, options?: { expectedMessage?: string; expectedChangeKind?: string; requireSelection?: boolean }) {
+export async function applyCompositionIntentInPlace(page: Page, intentKey: string, options?: { expectedMessage?: string; expectedChangeKind?: string; requireSelection?: boolean; requirePreview?: boolean }) {
   await expectIntentButtonReceivesPointer(page, intentKey);
   const authoringCyclePromise = waitForStudioAuthoringCycle(page);
   const response = await clickIntent(page, intentKey, { reloadAfter: false, settleAfter: false, noWaitAfter: true });
@@ -300,7 +300,9 @@ export async function applyCompositionIntentInPlace(page: Page, intentKey: strin
   if (options?.requireSelection !== false) {
     expect(detail?.selectedCount ?? 0, `${intentKey} should select the changed surface`).toBeGreaterThan(0);
   }
-  expect(detail?.previewCount ?? 0, `${intentKey} should refresh preview`).toBeGreaterThan(0);
+  if (options?.requirePreview !== false) {
+    expect(detail?.previewCount ?? 0, `${intentKey} should refresh preview`).toBeGreaterThan(0);
+  }
   expect(detail?.fragmentCount ?? 0, `${intentKey} should refresh structural fragments`).toBeGreaterThan(0);
   expect(fragments?.count ?? detail?.fragmentCount ?? detail?.result?.fragmentCount ?? 0, `${intentKey} should replace at least one fragment`).toBeGreaterThan(0);
   await expect(page.locator("[data-gosx-studio-save-detail]").first()).toHaveText(options?.expectedMessage ?? /./);

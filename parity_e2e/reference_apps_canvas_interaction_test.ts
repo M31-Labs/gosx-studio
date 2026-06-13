@@ -1,5 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { startMuddyCanvas } from "./reference_apps_harness";
+import {
+  canvasFingerprint2D,
+  formatCanvasRenderEvidence,
+  readCanvasWebGPUFrameSeq,
+  waitForCanvasBoardRenderEvidence,
+  waitForCanvasWebGPUFrameAdvance,
+} from "./canvas_render_evidence";
 
 // Live-proof e2e for Canvas2D site-map board INTERACTION (drag-to-pan,
 // wheel-to-zoom toward cursor, click-to-pick).
@@ -12,8 +19,9 @@ import { startMuddyCanvas } from "./reference_apps_harness";
 //
 // Honesty discipline: every assertion is driven off observable browser state —
 // the rendered RenderBundle JSON (window.__gosx_render_canvas), the live screen
-// transform (window.__gosx_canvas_board_screen_transform), real readback of the
-// canvas pixels, and the shared-signal getter (window.__gosx_get_shared_signal).
+// transform (window.__gosx_canvas_board_screen_transform), route evidence from
+// WebGPU host diagnostics or explicit fallback paint, and the shared-signal
+// getter (window.__gosx_get_shared_signal).
 // On-screen target positions are DISCOVERED from the live bundle, never
 // hardcoded, so the test follows whatever the editor actually renders. Each
 // interaction either passes against live evidence or is reported honestly.
@@ -30,8 +38,10 @@ test.describe("@reference-apps canvas2d site-map board live interaction", () => 
 
   test("Muddy/Noni canvas2d board pans, zooms, and picks in headless Chromium", async ({ page, request }) => {
     const consoleErrors: string[] = [];
+    const consoleWarnings: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(message.text());
+      if (message.type() === "warning") consoleWarnings.push(message.text());
     });
     page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
 
@@ -42,6 +52,7 @@ test.describe("@reference-apps canvas2d site-map board live interaction", () => 
 
       const canvas = page.locator(CANVAS_SELECTOR).first();
       await expect(canvas, "canvas2d placeholder should be emitted under MUDDY_SITEMAP_CANVAS=1").toBeAttached({ timeout: 30_000 });
+      await expect(canvas, "full-runtime CanvasBoard should request the WebGPU backend").toHaveAttribute("data-gosx-canvas-backend", "webgpu");
 
       // Runtime ready + the full-build canvas painter AND the interaction entry
       // (__gosx_canvas_event) must be installed. If __gosx_canvas_event is
@@ -65,10 +76,11 @@ test.describe("@reference-apps canvas2d site-map board live interaction", () => 
       expect(box!.width, "canvas CSS width > 0").toBeGreaterThan(0);
       expect(box!.height, "canvas CSS height > 0").toBeGreaterThan(0);
 
-      // Wait until the board has actually painted content (not just background)
-      // before probing interaction — otherwise there's nothing to pan/pick.
-      const painted = await pollForPaint(page);
-      expect(painted.painted, `board must paint before interaction (last: ${JSON.stringify(painted)})`).toBe(true);
+      const renderEvidence = await waitForCanvasBoardRenderEvidence(page, consoleWarnings);
+      expect(
+        renderEvidence.webgpuRoute || renderEvidence.fallback2D,
+        `board must render before interaction; evidence=${formatCanvasRenderEvidence(renderEvidence)}`,
+      ).toBe(true);
 
       // ----------------------------------------------------------------------
       // (c) CLICK-TO-PICK (run FIRST, against the pristine camera where the
@@ -92,13 +104,15 @@ test.describe("@reference-apps canvas2d site-map board live interaction", () => 
       ).toBe(target!.id);
 
       // ----------------------------------------------------------------------
-      // (a) DRAG-TO-PAN: record a fingerprint of the painted pixels, drag the
-      // canvas by a known screen delta, and assert the painted content shifted.
+      // (a) DRAG-TO-PAN: drag the canvas by a known screen delta and assert the
+      // route produced new evidence (WebGPU frame seq or fallback 2D pixels).
       // The pan is verified two independent ways: the rendered camera.x/.y moved
-      // by the expected world delta, AND the on-screen pixel fingerprint changed.
+      // by the expected world delta, AND the route-specific render evidence
+      // advanced.
       // ----------------------------------------------------------------------
       const camBefore = await readCamera(page);
-      const before = await canvasFingerprint(page);
+      const before = renderEvidence.fallback2D ? await canvasFingerprint2D(page, CANVAS_SELECTOR) : null;
+      const frameBeforePan = renderEvidence.webgpuRoute ? await readCanvasWebGPUFrameSeq(page, CANVAS_SELECTOR) : 0;
 
       const cx = box!.x + box!.width / 2;
       const cy = box!.y + box!.height / 2;
@@ -120,26 +134,36 @@ test.describe("@reference-apps canvas2d site-map board live interaction", () => 
       expect(camAfterPan!.x, "drag right should decrease camera.x (content moves right)").toBeLessThan(camBefore.x - 1);
       expect(camAfterPan!.y, "drag down should increase camera.y (Y flipped)").toBeGreaterThan(camBefore.y + 1);
 
-      const afterPan = await canvasFingerprint(page);
-      expect(
-        afterPan.signature !== before.signature,
-        `painted pixels should shift after pan (before=${before.signature}, after=${afterPan.signature})`,
-      ).toBe(true);
+      if (renderEvidence.fallback2D && before) {
+        const afterPan = await canvasFingerprint2D(page, CANVAS_SELECTOR);
+        expect(
+          afterPan.signature !== before.signature,
+          `fallback 2D painted pixels should shift after pan (before=${before.signature}, after=${afterPan.signature})`,
+        ).toBe(true);
+      } else {
+        const frameAfterPan = await waitForCanvasWebGPUFrameAdvance(page, frameBeforePan, { selector: CANVAS_SELECTOR });
+        expect(
+          frameAfterPan,
+          `WebGPU frame sequence should advance after pan; before=${frameBeforePan}, evidence=${formatCanvasRenderEvidence(renderEvidence)}`,
+        ).not.toBeNull();
+      }
 
       // ----------------------------------------------------------------------
       // (b) WHEEL-TO-ZOOM (toward cursor): wheel up over the canvas and assert
       // the rendered scale (camera.z) grew. camera.z is the authoritative scale
       // the OrthoCamera2D transform applies, so a strictly-larger z proves the
-      // wheel zoomed in. We ALSO require the painted pixels to change (the zoom
-      // actually re-rendered) and verify the world point under the cursor stays
-      // pinned (the zoom-toward-cursor property), reading the live transform.
+      // wheel zoomed in. We ALSO require route-specific render evidence to
+      // advance (the zoom actually re-rendered) and verify the world point under
+      // the cursor stays pinned (the zoom-toward-cursor property), reading the
+      // live transform.
       // (We deliberately do NOT assert a visible-bbox area grows: zooming in
       // pushes content past the viewport edges, so the bbox of *visible* painted
       // pixels is not monotonic with zoom — camera.z is the honest signal.)
       // ----------------------------------------------------------------------
       const camBeforeZoom = await readCamera(page);
       const zoomBefore = camBeforeZoom.z;
-      const fpBeforeZoom = await canvasFingerprint(page);
+      const fpBeforeZoom = renderEvidence.fallback2D ? await canvasFingerprint2D(page, CANVAS_SELECTOR) : null;
+      const frameBeforeZoom = renderEvidence.webgpuRoute ? await readCanvasWebGPUFrameSeq(page, CANVAS_SELECTOR) : 0;
       // World point currently under the canvas center, via the live transform.
       const worldUnderCursorBefore = await worldAtScreen(page, box!.width / 2, box!.height / 2);
 
@@ -152,11 +176,19 @@ test.describe("@reference-apps canvas2d site-map board live interaction", () => 
       expect(zoomAfter, "wheel should change the rendered zoom").not.toBeNull();
       expect(zoomAfter!, "wheel up should increase zoom (camera.z)").toBeGreaterThan(zoomBefore + 0.01);
 
-      const fpAfterZoom = await canvasFingerprint(page);
-      expect(
-        fpAfterZoom.signature !== fpBeforeZoom.signature,
-        "zoom should re-render the painted pixels",
-      ).toBe(true);
+      if (renderEvidence.fallback2D && fpBeforeZoom) {
+        const fpAfterZoom = await canvasFingerprint2D(page, CANVAS_SELECTOR);
+        expect(
+          fpAfterZoom.signature !== fpBeforeZoom.signature,
+          "fallback 2D zoom should re-render the painted pixels",
+        ).toBe(true);
+      } else {
+        const frameAfterZoom = await waitForCanvasWebGPUFrameAdvance(page, frameBeforeZoom, { selector: CANVAS_SELECTOR });
+        expect(
+          frameAfterZoom,
+          `WebGPU frame sequence should advance after zoom; before=${frameBeforeZoom}, evidence=${formatCanvasRenderEvidence(renderEvidence)}`,
+        ).not.toBeNull();
+      }
 
       // Zoom-toward-cursor: the world point that was under the canvas center
       // before the zoom must still map back to (approximately) the canvas center.
@@ -304,55 +336,4 @@ async function pickTarget(page: Page): Promise<{ id: string; screenX: number; sc
     }
     return null;
   }, CANVAS_SELECTOR);
-}
-
-// canvasFingerprint samples the canvas backing store and returns a cheap
-// signature (a coarse hash of sampled pixels) so we can detect that the painted
-// image changed after a pan, without asserting an exact image.
-async function canvasFingerprint(page: Page): Promise<{ signature: number; nonBackground: number }> {
-  return page.evaluate((selector) => {
-    const canvas = document.querySelector(selector);
-    if (!(canvas instanceof HTMLCanvasElement)) return { signature: -1, nonBackground: 0 };
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return { signature: -1, nonBackground: 0 };
-    const w = canvas.width;
-    const h = canvas.height;
-    if (w === 0 || h === 0) return { signature: -1, nonBackground: 0 };
-    let data: Uint8ClampedArray;
-    try {
-      data = ctx.getImageData(0, 0, w, h).data;
-    } catch {
-      return { signature: -1, nonBackground: 0 };
-    }
-    const bg = { r: 0x0f, g: 0x17, b: 0x20 };
-    const tol = 10;
-    let sig = 2166136261 >>> 0; // FNV-1a seed
-    let nonBackground = 0;
-    const stride = 4 * Math.max(1, Math.floor((w * h) / 50000));
-    for (let i = 0; i < data.length; i += stride) {
-      const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-      if (a === 0) continue;
-      if (Math.abs(r - bg.r) > tol || Math.abs(g - bg.g) > tol || Math.abs(b - bg.b) > tol) {
-        nonBackground++;
-        // Fold position + color into the signature so a spatial shift changes it.
-        sig ^= (i & 0xffff) ^ ((r << 16) | (g << 8) | b);
-        sig = Math.imul(sig, 16777619) >>> 0;
-      }
-    }
-    return { signature: sig, nonBackground };
-  }, CANVAS_SELECTOR);
-}
-
-// pollForPaint mirrors the sibling paint test: wait until the board draws at
-// least one non-background pixel.
-async function pollForPaint(page: Page): Promise<{ painted: boolean; nonBackground: number; reason: string }> {
-  const deadline = Date.now() + 60_000;
-  let last = { painted: false, nonBackground: 0, reason: "not-sampled" };
-  while (Date.now() < deadline) {
-    const fp = await canvasFingerprint(page);
-    last = { painted: fp.nonBackground > 0, nonBackground: fp.nonBackground, reason: fp.nonBackground > 0 ? "painted" : "background-only" };
-    if (last.painted) return last;
-    await page.waitForTimeout(250);
-  }
-  return last;
 }

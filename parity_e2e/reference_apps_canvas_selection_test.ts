@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { startMuddyCanvas } from "./reference_apps_harness";
+import {
+  formatCanvasRenderEvidence,
+  waitForCanvasBoardRenderEvidence,
+} from "./canvas_render_evidence";
 
 // Live-proof e2e for the Canvas2D site-map SELECTION BRIDGE (Slice 1 of the
 // "Canvas2D board → default editor" parity push).
@@ -43,8 +47,10 @@ test.describe("@reference-apps canvas2d site-map selection bridge", () => {
 
   test("Muddy/Noni canvas pick drives the right-rail inspector like a DOM-board selection", async ({ page, request }) => {
     const consoleErrors: string[] = [];
+    const consoleWarnings: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(message.text());
+      if (message.type() === "warning") consoleWarnings.push(message.text());
     });
     page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
 
@@ -56,6 +62,7 @@ test.describe("@reference-apps canvas2d site-map selection bridge", () => {
 
       const canvas = page.locator(CANVAS_SELECTOR).first();
       await expect(canvas, "canvas2d surface should be emitted under MUDDY_SITEMAP_CANVAS=1").toBeAttached({ timeout: 30_000 });
+      await expect(canvas, "full-runtime CanvasBoard should request the WebGPU backend").toHaveAttribute("data-gosx-canvas-backend", "webgpu");
 
       // Runtime ready + the canvas interaction entry (__gosx_canvas_event) AND
       // the DOM board runtime (GoSXStudioSiteMapRuntime.setState — the bridge's
@@ -83,10 +90,12 @@ test.describe("@reference-apps canvas2d site-map selection bridge", () => {
       expect(box!.width, "canvas CSS width > 0").toBeGreaterThan(0);
       expect(box!.height, "canvas CSS height > 0").toBeGreaterThan(0);
 
-      // Wait for the board to actually paint before probing — otherwise there's
-      // nothing to pick.
-      const painted = await pollForPaint(page);
-      expect(painted, "board must paint before selection").toBe(true);
+      const renderEvidence = await waitForCanvasBoardRenderEvidence(page, consoleWarnings);
+      expect(
+        renderEvidence.webgpuRoute || renderEvidence.fallback2D,
+        `board must render before selection; evidence=${formatCanvasRenderEvidence(renderEvidence)}; ` +
+          `console=${JSON.stringify(consoleErrors.slice(-8))}`,
+      ).toBe(true);
 
       // Discover a pickable rect from the live bundle AND read the label the DOM
       // board carries for that same node key — the inspector should end up
@@ -250,39 +259,4 @@ async function pollForSelection(page: Page, wantKey: string, wantLabel: string):
     await page.waitForTimeout(120);
   }
   return last;
-}
-
-// pollForPaint waits until the board draws at least one non-background pixel.
-async function pollForPaint(page: Page): Promise<boolean> {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    const nonBackground = await page.evaluate((selector) => {
-      const canvas = document.querySelector(selector);
-      if (!(canvas instanceof HTMLCanvasElement)) return 0;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return 0;
-      const wpx = canvas.width;
-      const hpx = canvas.height;
-      if (wpx === 0 || hpx === 0) return 0;
-      let data: Uint8ClampedArray;
-      try {
-        data = ctx.getImageData(0, 0, wpx, hpx).data;
-      } catch {
-        return 0;
-      }
-      const bg = { r: 0x0f, g: 0x17, b: 0x20 };
-      const tol = 10;
-      let count = 0;
-      const stride = 4 * Math.max(1, Math.floor((wpx * hpx) / 50000));
-      for (let i = 0; i < data.length; i += stride) {
-        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-        if (a === 0) continue;
-        if (Math.abs(r - bg.r) > tol || Math.abs(g - bg.g) > tol || Math.abs(b - bg.b) > tol) count++;
-      }
-      return count;
-    }, CANVAS_SELECTOR);
-    if (nonBackground > 0) return true;
-    await page.waitForTimeout(250);
-  }
-  return false;
 }

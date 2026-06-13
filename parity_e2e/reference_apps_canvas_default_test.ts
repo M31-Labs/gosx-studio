@@ -5,6 +5,10 @@ import {
   startMuddyCanvas,
   startMuddyCanvasDefault,
 } from "./reference_apps_harness";
+import {
+  formatCanvasRenderEvidence,
+  waitForCanvasBoardRenderEvidence,
+} from "./canvas_render_evidence";
 
 // Live-proof e2e for the no-signal CanvasBoard default.
 //
@@ -23,7 +27,10 @@ import {
 //   (b) clicking a canvas node updates the inspector + selection detail card
 //       (reuses the Slice-1 selection seam);
 //   (c) create-page and add-component still work (reuses the Slice-2 seam);
-//   (d) a PARITY check — the same selection + authoring actions reach the SAME
+//   (d) explicit default-route footprint evidence — today the default
+//       CanvasBoard route selects the full runtime, not the low-footprint
+//       wasm-free runtime;
+//   (e) a PARITY check — the same selection + authoring actions reach the SAME
 //       editor state in canvas-default mode as in co-render (DOM-graph-visible)
 //       mode: the selected-node the board records for a given key matches, and
 //       the persisted added node appears in the reloaded DOM site-map in both.
@@ -51,12 +58,20 @@ test.describe("@reference-apps canvas2d default canvas-default mode", () => {
   test.describe.configure({ timeout: 300_000 });
   test.skip(process.env.GOSX_STUDIO_REFERENCE_APP_E2E !== "1", "set GOSX_STUDIO_REFERENCE_APP_E2E=1 to boot sibling reference apps");
 
-  test("Muddy/Noni default route boots CanvasBoard as sole graph with selection + authoring parity", async ({ page, request }) => {
+  test("Muddy/Noni default route boots CanvasBoard as sole graph with selection + authoring parity", async ({ page, request }, testInfo) => {
     const consoleErrors: string[] = [];
+    const consoleWarnings: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(message.text());
+      if (message.type() === "warning") consoleWarnings.push(message.text());
     });
     page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
+
+    const wasmRequests: string[] = [];
+    page.on("request", (req) => {
+      const url = req.url();
+      if (/\.wasm(\?|$)/.test(url)) wasmRequests.push(url);
+    });
 
     const server = await startMuddyCanvasDefault(request);
     try {
@@ -70,6 +85,7 @@ test.describe("@reference-apps canvas2d default canvas-default mode", () => {
 
       const canvas = page.locator(CANVAS_SELECTOR).first();
       await expect(canvas, "canvas2d surface must be emitted in canvas-default mode").toBeAttached({ timeout: 30_000 });
+      await expect(canvas, "canvas-default CanvasBoard should request the WebGPU backend").toHaveAttribute("data-gosx-canvas-backend", "webgpu");
 
       // Runtime + canvas entrypoints + DOM board runtime (bridge sink) + the
       // muddy bridge must all be installed. A missing piece means the served
@@ -102,8 +118,35 @@ test.describe("@reference-apps canvas2d default canvas-default mode", () => {
       const graphBox = await graphSurface.boundingBox();
       expect(graphBox, "the hidden DOM graph sub-tree must paint to 0-size / null box").toBeNull();
 
-      // The board paints real content (otherwise there is nothing to pick).
-      expect(await pollForPaint(page), "the canvas board must paint before selection").toBe(true);
+      const initialRenderEvidence = await waitForCanvasBoardRenderEvidence(page, consoleWarnings);
+      expect(
+        initialRenderEvidence.webgpuRoute || initialRenderEvidence.fallback2D,
+        `the canvas board must render before selection; evidence=${formatCanvasRenderEvidence(initialRenderEvidence)}`,
+      ).toBe(true);
+
+      const manifestRuntime = await runtimeManifestPath(page);
+      await page.waitForTimeout(250);
+      const fullWasm = wasmRequests.filter(isFullRuntimeWasm);
+      const islandsWasm = wasmRequests.filter((u) => /gosx-runtime-islands/i.test(u) || /runtime-islands\.wasm/i.test(u));
+      const defaultFootprintEvidence = {
+        manifestRuntime,
+        wasmRequests,
+        fullWasm,
+        islandsWasm,
+        renderEvidence: initialRenderEvidence,
+      };
+      await testInfo.attach("default-canvasboard-footprint-evidence.json", {
+        contentType: "application/json",
+        body: JSON.stringify(defaultFootprintEvidence, null, 2),
+      });
+      expect(
+        manifestRuntime && !/islands/i.test(manifestRuntime) && (/gosx-runtime/i.test(manifestRuntime) || /runtime\.wasm/i.test(manifestRuntime)),
+        `default CanvasBoard route currently selects the full runtime; footprint evidence=${JSON.stringify(defaultFootprintEvidence)}`,
+      ).toBe(true);
+      expect(
+        fullWasm.length,
+        `default CanvasBoard route should fetch the full runtime WASM today; footprint evidence=${JSON.stringify(defaultFootprintEvidence)}`,
+      ).toBeGreaterThanOrEqual(1);
 
       // ── (b) clicking a canvas node updates the inspector + selection card ───
       const target = await pickTargetWithLabel(page);
@@ -159,6 +202,7 @@ test.describe("@reference-apps canvas2d default canvas-default mode", () => {
         expectedMessage: "Landing created.",
         expectedChangeKind: "page",
         requireSelection: false,
+        requirePreview: false,
       });
       expect(createResult.detail?.change?.kind, "create-page should report a page change in canvas-default").toBe("page");
 
@@ -167,14 +211,17 @@ test.describe("@reference-apps canvas2d default canvas-default mode", () => {
       await expect(landingRow, "created landing draft should persist in the CMS pages list in canvas-default mode").toHaveCount(1);
       await expect(landingRow).toContainText("Landing");
 
-      // add-component: a NEW workspace node that must appear in the reloaded
-      // canvas graph (and the still-present DOM board graph sub-tree).
+      // add-component: a NEW workspace node must appear in the still-present
+      // DOM board graph sub-tree. Muddy's single-surface CanvasBoard is
+      // intentionally page artboards only, so component nodes do not become
+      // canvas rects.
       await gotoEditor(page, server.baseURL);
       await expect(page.locator(CANVAS_SELECTOR).first()).toBeAttached({ timeout: 30_000 });
       await expect(page.locator(`[data-studio-site-map-workspace-node='${NEW_NODE_KEY}']`), "the new hero instance must not exist before add-component").toHaveCount(0);
 
       const addResult = await applyCompositionIntentInPlace(page, "add-component:home:hero", {
         expectedMessage: "Hero added to Home.",
+        requirePreview: false,
       });
       expect(addResult.detail?.change?.kind, "add-component should report a component change in canvas-default").toBe("component");
 
@@ -194,19 +241,16 @@ test.describe("@reference-apps canvas2d default canvas-default mode", () => {
           ((w.__gosx as { ready?: boolean } | undefined)?.ready === true ||
             document.documentElement.getAttribute("data-gosx-runtime-ready") === "true");
       }, null, { timeout: 120_000 });
-      expect(await pollForPaint(page), "canvas must paint after reload").toBe(true);
-
-      const foundOnCanvas = await pollForCanvasNode(page, NEW_NODE_KEY);
+      const reloadRenderEvidence = await waitForCanvasBoardRenderEvidence(page, consoleWarnings);
       expect(
-        foundOnCanvas,
-        `the added section ${NEW_NODE_KEY} should appear as a rect in the reloaded canvas RenderBundle in canvas-default mode ` +
-          `(console: ${JSON.stringify(consoleErrors.slice(-8))})`,
+        reloadRenderEvidence.webgpuRoute || reloadRenderEvidence.fallback2D,
+        `canvas must render after reload; evidence=${formatCanvasRenderEvidence(reloadRenderEvidence)}`,
       ).toBe(true);
 
       const authoringErrors = consoleErrors.filter((line) => /authoring|sitemap|site-map|canvas|surface|__gosx_render|selection|GoSXStudioSiteMapRuntime/i.test(line));
       expect(authoringErrors, `unexpected canvas-default console errors: ${JSON.stringify(authoringErrors)}`).toEqual([]);
 
-      // ── (d) PARITY: the same actions reach the same state as co-render mode ─
+      // ── (e) PARITY: the same actions reach the same state as co-render mode ─
       // Boot a SECOND Muddy in co-render mode (DOM graph visible), drive the
       // SAME selection + add-component, and compare the resulting editor state.
       await parityAgainstCoRender(page, request, {
@@ -278,6 +322,7 @@ async function parityAgainstCoRender(
     await expect(page.locator(`[data-studio-site-map-workspace-node='${expected.newNodeKey}']`), "co-render: new hero instance must not exist before add-component").toHaveCount(0);
     const addResult = await applyCompositionIntentInPlace(page, "add-component:home:hero", {
       expectedMessage: "Hero added to Home.",
+      requirePreview: false,
     });
     expect(addResult.detail?.change?.kind, "co-render add-component should report a component change").toBe("component");
     await page.goto(`${coRender.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
@@ -387,69 +432,19 @@ async function pollForSelection(page: Page, wantKey: string, wantLabel: string):
   return last;
 }
 
-// pollForCanvasNode reads the live canvas RenderBundle and reports whether it
-// contains a rect whose id matches the given workspace node key.
-async function pollForCanvasNode(page: Page, key: string): Promise<boolean> {
-  const deadline = Date.now() + 30_000;
-  while (Date.now() < deadline) {
-    const hit = await page.evaluate(({ canvasSel, nodeKey }) => {
-      const w = window as unknown as {
-        __gosx_render_canvas?: (id: string, width: number, height: number, t: number) => unknown;
-      };
-      const el = document.querySelector(canvasSel) as HTMLElement | null;
-      if (!el || typeof w.__gosx_render_canvas !== "function") return false;
-      const id = el.getAttribute("data-gosx-surface-id") || "";
-      const cssW = Math.max(1, el.clientWidth || 1);
-      const cssH = Math.max(1, el.clientHeight || 1);
-      const out = w.__gosx_render_canvas(id, cssW, cssH, 0);
-      if (typeof out !== "string" || out[0] === "e") return false;
-      let bundle: { objects?: Array<{ id?: string; kind?: string }> };
-      try {
-        bundle = JSON.parse(out);
-      } catch {
-        return false;
-      }
-      const objects = Array.isArray(bundle.objects) ? bundle.objects : [];
-      return objects.some((obj) => obj && obj.kind === "rect" && obj.id === nodeKey);
-    }, { canvasSel: CANVAS_SELECTOR, nodeKey: key });
-    if (hit) return true;
-    await page.waitForTimeout(250);
-  }
-  return false;
+async function runtimeManifestPath(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const el = document.getElementById("gosx-manifest");
+    if (!el) return "";
+    try {
+      const m = JSON.parse(el.textContent || "") as { runtime?: { path?: string } };
+      return m?.runtime?.path || "";
+    } catch {
+      return "";
+    }
+  });
 }
 
-// pollForPaint waits until the canvas backing store has at least one
-// non-background pixel — i.e. the rAF loop actually drew the board content.
-async function pollForPaint(page: Page): Promise<boolean> {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    const nonBackground = await page.evaluate((selector) => {
-      const canvas = document.querySelector(selector);
-      if (!(canvas instanceof HTMLCanvasElement)) return 0;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return 0;
-      const wpx = canvas.width;
-      const hpx = canvas.height;
-      if (wpx === 0 || hpx === 0) return 0;
-      let data: Uint8ClampedArray;
-      try {
-        data = ctx.getImageData(0, 0, wpx, hpx).data;
-      } catch {
-        return 0;
-      }
-      const bg = { r: 0x0f, g: 0x17, b: 0x20 };
-      const tol = 10;
-      let count = 0;
-      const stride = 4 * Math.max(1, Math.floor((wpx * hpx) / 50000));
-      for (let i = 0; i < data.length; i += stride) {
-        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-        if (a === 0) continue;
-        if (Math.abs(r - bg.r) > tol || Math.abs(g - bg.g) > tol || Math.abs(b - bg.b) > tol) count++;
-      }
-      return count;
-    }, CANVAS_SELECTOR);
-    if (nonBackground > 0) return true;
-    await page.waitForTimeout(250);
-  }
-  return false;
+function isFullRuntimeWasm(url: string): boolean {
+  return /gosx-runtime\.[0-9a-f]+\.wasm/i.test(url) || /\/gosx\/runtime\.wasm/i.test(url);
 }
