@@ -499,40 +499,41 @@ export async function startMuddyCanvas(request: APIRequestContext): Promise<Serv
 }
 
 // startMuddyCanvasDefault boots Muddy/Noni with no canvas env override, proving
-// the production default. The Canvas2D board becomes the SOLE site-map graph
-// visual and the DOM board's graph sub-tree
+// the production default. The low-WASM static WebGPU/Canvas2D-fallback board
+// becomes the SOLE site-map graph visual and the DOM board's graph sub-tree
 // (.studio-site-map-workspace__surface — the workspace layers/nodes + SVG link
 // paths) is hidden via gated CSS, while the DOM board element, its
 // sitemapruntime binding, the selection detail card, and the host authoring
-// panels stay live (so the Slice-1 selection bridge and Slice-2 authoring keep
-// working).
+// panels stay live.
 export async function startMuddyCanvasDefault(request: APIRequestContext): Promise<ServerHandle> {
   return startMuddy(request);
 }
 
+// startMuddyCanvasFullWASM boots Muddy/Noni in explicit full-WASM CanvasBoard
+// mode (MUDDY_SITEMAP_CANVAS=canvas-default). This preserves compatibility
+// coverage for the gosx CanvasBoard surface, shared runtime globals, and
+// selection bridge without treating that mode as the production default.
+export async function startMuddyCanvasFullWASM(request: APIRequestContext): Promise<ServerHandle> {
+  return startMuddy(request, { MUDDY_SITEMAP_CANVAS: "canvas-default" });
+}
+
 // startMuddyCanvasWASMFree boots Muddy/Noni in WASM-free Canvas2D mode
-// (MUDDY_CANVAS_WASM_FREE=1): the Canvas2D site-map board paints + handles
-// interaction with NO gosx client WASM. The editor emits a muddy-owned <canvas>
-// (no data-gosx-surface-kind, so the gosx bootstrap never WASM-hydrates it) plus
-// the same server-precomputed inline RenderBundle, and the muddy WASM-free
-// scripts (ported painter + interaction client) own it. Because no shared-runtime
-// engine is registered, the editor loads only the LIGHT islands-only WASM — the
-// full gosx-runtime.wasm is dropped. Default OFF — only the wasm-free parity e2e
-// flips this on.
+// (MUDDY_CANVAS_WASM_FREE=1): the same low-WASM static WebGPU/Canvas2D-fallback
+// path as the production default. Kept as an explicit forcing helper for parity
+// and regression tests.
 export async function startMuddyCanvasWASMFree(request: APIRequestContext): Promise<ServerHandle> {
   return startMuddy(request, { MUDDY_CANVAS_WASM_FREE: "1" });
 }
 
-// startMuddyCanvasHTMLSurface boots Muddy/Noni in WASM-free Canvas2D mode
-// (MUDDY_CANVAS_WASM_FREE=1) AND injects one real Kind:"html" CanvasBoardNode
-// onto the board via MUDDY_EDITOR_SCENE_DOM=1. The editor then paints a DOM
-// surface (the "hero" node) over the Canvas2D board through the same
-// server-precomputed RenderBundle path — landing in bundle.html and rendered into
-// the canvas overlay by the WASM-free client with no WASM. This is the fixture for
-// the in-surface click-to-select + contenteditable live-proof e2e. Default OFF —
-// only the canvas-html-surface parity e2e flips these on.
+// startMuddyCanvasHTMLSurface boots Muddy/Noni on the low-WASM canvas route and
+// injects one real Kind:"html" CanvasBoardNode onto the board via
+// MUDDY_EDITOR_SCENE_DOM=1. The editor then paints a DOM surface (the "hero"
+// node) over the Canvas2D board through the same server-precomputed RenderBundle
+// path — landing in bundle.html and rendered into the canvas overlay by the
+// WASM-free client with no full CanvasBoard WASM. The HTML-surface injection is
+// opt-in; only the canvas-html-surface parity e2e flips it on.
 export async function startMuddyCanvasHTMLSurface(request: APIRequestContext): Promise<ServerHandle> {
-  return startMuddy(request, { MUDDY_CANVAS_WASM_FREE: "1", MUDDY_EDITOR_SCENE_DOM: "1" });
+  return startMuddy(request, { MUDDY_EDITOR_SCENE_DOM: "1" });
 }
 
 export async function startPajaritos(request: APIRequestContext): Promise<ServerHandle> {

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { gotoEditor, startMuddyCanvasDefault } from "./reference_apps_harness";
+import { gotoEditor, startMuddyCanvasFullWASM } from "./reference_apps_harness";
 import {
   formatCanvasRenderEvidence,
   waitForCanvasBoardRenderEvidence,
@@ -63,7 +63,7 @@ test.describe("@reference-apps canvas2d marquee + keyboard nav", () => {
     });
     page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
 
-    const server = await startMuddyCanvasDefault(request);
+    const server = await startMuddyCanvasFullWASM(request);
     try {
       await gotoEditor(page, server.baseURL);
 
