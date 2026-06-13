@@ -18,6 +18,10 @@ var canvasBundleScript = regexp.MustCompile(
 	`(?s)<script type="application/json" data-gosx-canvas-bundle="[^"]*">(.*?)</script>`,
 )
 
+var canvasWebGPUBundleScript = regexp.MustCompile(
+	`(?s)<script type="application/json" data-gosx-canvas-webgpu-bundle="[^"]*">(.*?)</script>`,
+)
+
 // siteMapCanvasBundle mirrors the painter-facing bundle shape (the JSON the JS
 // canvas2d painter consumes). Only the fields this test asserts are modeled;
 // json.Unmarshal ignores the rest, which is the point — the inline JSON must
@@ -61,6 +65,23 @@ type siteMapCanvasBundle struct {
 	} `json:"labels"`
 }
 
+type siteMapCanvasWebGPUBundle struct {
+	Background     string    `json:"background"`
+	WorldPositions []float64 `json:"worldPositions"`
+	WorldNormals   []float64 `json:"worldNormals"`
+	WorldUVs       []float64 `json:"worldUVs"`
+	Camera         struct {
+		Mode string `json:"mode"`
+	} `json:"camera"`
+	Objects []struct {
+		ID            string `json:"id"`
+		Kind          string `json:"kind"`
+		VertexOffset  int    `json:"vertexOffset"`
+		VertexCount   int    `json:"vertexCount"`
+		MaterialIndex int    `json:"materialIndex"`
+	} `json:"objects"`
+}
+
 func parseInlineCanvasBundle(t *testing.T, htmlOut string) siteMapCanvasBundle {
 	t.Helper()
 	m := canvasBundleScript.FindStringSubmatch(htmlOut)
@@ -70,6 +91,19 @@ func parseInlineCanvasBundle(t *testing.T, htmlOut string) siteMapCanvasBundle {
 	var bundle siteMapCanvasBundle
 	if err := json.Unmarshal([]byte(m[1]), &bundle); err != nil {
 		t.Fatalf("inline canvas bundle JSON did not parse: %v\nJSON: %s", err, m[1])
+	}
+	return bundle
+}
+
+func parseInlineCanvasWebGPUBundle(t *testing.T, htmlOut string) siteMapCanvasWebGPUBundle {
+	t.Helper()
+	m := canvasWebGPUBundleScript.FindStringSubmatch(htmlOut)
+	if m == nil {
+		t.Fatalf("inline canvas WebGPU bundle script not found in rendered HTML:\n%s", htmlOut)
+	}
+	var bundle siteMapCanvasWebGPUBundle
+	if err := json.Unmarshal([]byte(m[1]), &bundle); err != nil {
+		t.Fatalf("inline canvas WebGPU bundle JSON did not parse: %v\nJSON: %s", err, m[1])
 	}
 	return bundle
 }
@@ -85,6 +119,9 @@ func TestRenderSiteMapCanvasEngineDefaultOmitsInlineServerBundle(t *testing.T) {
 
 	if strings.Contains(htmlOut, "data-gosx-canvas-bundle") {
 		t.Fatalf("default enabled canvas engine must not emit an inline bundle:\n%s", htmlOut)
+	}
+	if strings.Contains(htmlOut, "data-gosx-canvas-webgpu-bundle") {
+		t.Fatalf("default enabled canvas engine must not emit an inline WebGPU bundle:\n%s", htmlOut)
 	}
 }
 
@@ -107,6 +144,9 @@ func TestRenderSiteMapCanvasEngineWASMFreeEmitsInlineServerBundle(t *testing.T) 
 	// WASM-free client locates) and typed as a JSON data block.
 	if !strings.Contains(htmlOut, `<script type="application/json" data-gosx-canvas-bundle="studio-site-map-canvas-board">`) {
 		t.Fatalf("expected inline canvas-bundle <script>, not found:\n%s", htmlOut)
+	}
+	if !strings.Contains(htmlOut, `<script type="application/json" data-gosx-canvas-webgpu-bundle="studio-site-map-canvas-board">`) {
+		t.Fatalf("expected inline canvas-webgpu-bundle <script>, not found:\n%s", htmlOut)
 	}
 
 	bundle := parseInlineCanvasBundle(t, htmlOut)
@@ -191,6 +231,49 @@ func TestRenderSiteMapCanvasEngineWASMFreeEmitsInlineServerBundle(t *testing.T) 
 	}
 }
 
+func TestRenderSiteMapCanvasEngineWASMFreeEmitsStaticWebGPUBundle(t *testing.T) {
+	htmlOut := gosx.RenderHTML(RenderSiteMapCanvasEngine(siteMapCanvasTestView(), SiteMapCanvasOptions{
+		Enabled:  true,
+		WASMFree: true,
+	}))
+
+	bundle := parseInlineCanvasWebGPUBundle(t, htmlOut)
+
+	if bundle.Camera.Mode != "ortho2d" {
+		t.Errorf("inline WebGPU bundle camera mode = %q, want ortho2d", bundle.Camera.Mode)
+	}
+	if bundle.Background != siteMapCanvasDefaultBackground {
+		t.Errorf("inline WebGPU bundle background = %q, want %q", bundle.Background, siteMapCanvasDefaultBackground)
+	}
+	if len(bundle.WorldPositions) == 0 || len(bundle.WorldNormals) == 0 || len(bundle.WorldUVs) == 0 {
+		t.Fatalf("inline WebGPU bundle missing GPU vertex buffers: positions=%d normals=%d uvs=%d",
+			len(bundle.WorldPositions), len(bundle.WorldNormals), len(bundle.WorldUVs))
+	}
+
+	var homeRect *struct {
+		VertexOffset int
+		VertexCount  int
+	}
+	for _, obj := range bundle.Objects {
+		if obj.ID == "page:home" && obj.Kind == "rect" {
+			homeRect = &struct {
+				VertexOffset int
+				VertexCount  int
+			}{VertexOffset: obj.VertexOffset, VertexCount: obj.VertexCount}
+			break
+		}
+	}
+	if homeRect == nil {
+		t.Fatalf("inline WebGPU bundle missing GPU rect for page:home: %+v", bundle.Objects)
+	}
+	if homeRect.VertexCount <= 0 {
+		t.Fatalf("page:home GPU rect vertexCount = %d, want > 0", homeRect.VertexCount)
+	}
+	if homeRect.VertexOffset < 0 {
+		t.Fatalf("page:home GPU rect vertexOffset = %d, want >= 0", homeRect.VertexOffset)
+	}
+}
+
 // TestRenderSiteMapCanvasEngineDisabledEmitsNoBundle confirms the additive
 // emission stays behind the Enabled flag: the disabled path emits no inline
 // bundle script (and still no canvas), so hosts that never opt in are
@@ -199,6 +282,9 @@ func TestRenderSiteMapCanvasEngineDisabledEmitsNoBundle(t *testing.T) {
 	htmlOut := gosx.RenderHTML(RenderSiteMapCanvasEngine(siteMapCanvasTestView(), SiteMapCanvasOptions{}))
 	if strings.Contains(htmlOut, "data-gosx-canvas-bundle") {
 		t.Fatalf("disabled canvas engine must not emit an inline bundle:\n%s", htmlOut)
+	}
+	if strings.Contains(htmlOut, "data-gosx-canvas-webgpu-bundle") {
+		t.Fatalf("disabled canvas engine must not emit an inline WebGPU bundle:\n%s", htmlOut)
 	}
 }
 

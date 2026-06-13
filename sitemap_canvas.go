@@ -218,6 +218,12 @@ func RenderSiteMapCanvasEngine(siteMapView map[string]any, options SiteMapCanvas
 			// locating the preceding canvas.
 			children = append(children, bundleScript)
 		}
+		if bundleScript, ok := siteMapCanvasWebGPUBundleScript(nodes, background, options.Width, options.Height); ok {
+			// The low-WASM WebGPU route reads this second server-side bundle and
+			// renders it through GoSX's static Scene3D WebGPU renderer. The
+			// Canvas2D bundle above remains the fallback/hit-test payload.
+			children = append(children, bundleScript)
+		}
 	}
 
 	return gosx.El("section", children...)
@@ -311,6 +317,28 @@ func siteMapCanvasBundleScript(nodes []gosx.CanvasBoardNode, background string, 
 	script := gosx.El("script", gosx.Attrs(
 		gosx.Attr("type", "application/json"),
 		gosx.Attr("data-gosx-canvas-bundle", "studio-site-map-canvas-board"),
+	), gosx.RawHTML(payload))
+	return script, true
+}
+
+// siteMapCanvasWebGPUBundleScript computes the sibling GPU-ready RenderBundle
+// for the low-WASM static WebGPU path. It intentionally lives beside the
+// painter bundle rather than replacing it: the JS client uses this payload for
+// GoSX 16a WebGPU rendering when available, and keeps the Canvas2D bundle above
+// for fallback, hit-testing, overlay positioning, and non-WebGPU browsers.
+func siteMapCanvasWebGPUBundleScript(nodes []gosx.CanvasBoardNode, background string, width, height int) (gosx.Node, bool) {
+	w, h := width, height
+	if w == 0 && h == 0 {
+		w, h = 1280, 720
+	}
+	bundle := bundle2d.ComputeCanvasGPUBundleWithBackground(nodes, background, w, h, 1.0, 0, 0)
+	payload, err := bundle2d.MarshalCanvasBundle(bundle)
+	if err != nil {
+		return gosx.Node{}, false
+	}
+	script := gosx.El("script", gosx.Attrs(
+		gosx.Attr("type", "application/json"),
+		gosx.Attr("data-gosx-canvas-webgpu-bundle", "studio-site-map-canvas-board"),
 	), gosx.RawHTML(payload))
 	return script, true
 }

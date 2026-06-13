@@ -9,12 +9,13 @@ replace m31labs.dev/gosx-admin => ../gosx-admin
 replace m31labs.dev/gosx-cms => ../gosx-cms
 
 require (
-	m31labs.dev/gosx v0.18.28
+	m31labs.dev/gosx v0.25.2
 	m31labs.dev/gosx-admin v0.1.1
 	m31labs.dev/gosx-cms v0.0.0-00010101000000-000000000000
 )
 
 require (
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/odvcencio/corkscrewdb v0.2.0 // indirect
 	github.com/odvcencio/gotreesitter v0.20.1 // indirect
@@ -29,5 +30,6 @@ require (
 	m31labs.dev/eos v0.1.4 // indirect
 	m31labs.dev/mll v0.1.0 // indirect
 	m31labs.dev/prism v0.1.2 // indirect
+	m31labs.dev/selena v0.1.1 // indirect
 	m31labs.dev/turboquant v0.2.0 // indirect
 )

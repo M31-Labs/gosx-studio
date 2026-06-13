@@ -1,5 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { startMuddyCanvasWASMFree } from "./reference_apps_harness";
+import {
+  formatCanvasRenderEvidence,
+  waitForCanvasBoardRenderEvidence,
+  WASM_FREE_CANVAS_SELECTOR,
+} from "./canvas_render_evidence";
 
 // Live-proof e2e for the WASM-FREE Canvas2D site-map board — the payload payoff.
 //
@@ -63,10 +68,12 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
   test.describe.configure({ timeout: 300_000 });
   test.skip(process.env.GOSX_STUDIO_REFERENCE_APP_E2E !== "1", "set GOSX_STUDIO_REFERENCE_APP_E2E=1 to boot sibling reference apps");
 
-  test("Muddy/Noni wasm-free: canvas paints + pans/zooms/picks/marquees/navs + drives the inspector with the FULL WASM provably absent", async ({ page, request }) => {
+  test("Muddy/Noni wasm-free: canvas paints + pans/zooms/picks/marquees/navs + drives the inspector with the FULL WASM provably absent", async ({ page, request }, testInfo) => {
     const consoleErrors: string[] = [];
+    const consoleWarnings: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(message.text());
+      if (message.type() === "warning") consoleWarnings.push(message.text());
     });
     page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
 
@@ -108,17 +115,45 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
       const noWasmCanvasEntrypoints = await page.evaluate(() => {
         const w = window as unknown as Record<string, unknown>;
         return typeof w.__gosx_render_canvas !== "function" &&
-          typeof w.__gosx_canvas_event !== "function";
+          typeof w.__gosx_canvas_event !== "function" &&
+          typeof w.__gosx_canvas_set_backend !== "function";
       });
       expect(
         noWasmCanvasEntrypoints,
-        "the full-WASM canvas entrypoints (__gosx_render_canvas / __gosx_canvas_event) must be ABSENT in wasm-free mode",
+        "the full-WASM canvas entrypoints (__gosx_render_canvas / __gosx_canvas_event / __gosx_canvas_set_backend) must be ABSENT in wasm-free mode",
       ).toBe(true);
 
       const box = await canvas.boundingBox();
       expect(box, "canvas should have a layout box").not.toBeNull();
       expect(box!.width, "canvas CSS width > 0").toBeGreaterThan(0);
       expect(box!.height, "canvas CSS height > 0").toBeGreaterThan(0);
+
+      const renderEvidence = await waitForCanvasBoardRenderEvidence(page, consoleWarnings, {
+        selector: WASM_FREE_CANVAS_SELECTOR,
+      });
+      await testInfo.attach("wasm-free-static-webgpu-route-evidence.json", {
+        contentType: "application/json",
+        body: formatCanvasRenderEvidence(renderEvidence),
+      });
+      expect(
+        renderEvidence.webgpuLoaded,
+        `wasm-free route must load the scene3d-webgpu chunk; evidence=${formatCanvasRenderEvidence(renderEvidence)}`,
+      ).toBe(true);
+      expect(
+        renderEvidence.webgpuAPI,
+        `wasm-free route must expose window.__gosx_scene3d_webgpu_api.createRenderer; evidence=${formatCanvasRenderEvidence(renderEvidence)}`,
+      ).toBe(true);
+      expect(
+        renderEvidence.webgpuRoute || renderEvidence.fallback2D,
+        `wasm-free route must either publish WebGPU frame attrs or explicitly fall back to Canvas2D; evidence=${formatCanvasRenderEvidence(renderEvidence)}`,
+      ).toBe(true);
+      if (!renderEvidence.webgpuRoute) {
+        const fallbackReason = renderEvidence.hostAttrs["data-gosx-canvas-wasm-free-fallback-reason"];
+        expect(
+          fallbackReason,
+          `Canvas2D fallback must expose a stable fallback reason; evidence=${formatCanvasRenderEvidence(renderEvidence)}`,
+        ).toMatch(/\S/);
+      }
 
       // ── (a) PAINT ───────────────────────────────────────────────────────────
       const paintedCount = await pollForPaint(page);

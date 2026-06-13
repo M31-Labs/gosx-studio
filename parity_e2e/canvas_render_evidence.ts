@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 
 export const DEFAULT_CANVAS_SELECTOR = "canvas[data-gosx-surface-kind='canvas2d']";
+export const WASM_FREE_CANVAS_SELECTOR = "canvas[data-gosx-canvas-wasm-free='true']";
 
 export type CanvasPaintSample = {
   painted: boolean;
@@ -33,7 +34,7 @@ type WaitOptions = {
   timeoutMS?: number;
 };
 
-const WEBGPU_FALLBACK_RE = /canvas2d WebGPU backend unavailable/i;
+const WEBGPU_FALLBACK_RE = /(?:canvas2d WebGPU backend unavailable|wasm-free static WebGPU canvas unavailable)/i;
 
 export function canvasWebGPUFallbackWarnings(consoleWarnings: string[]): string[] {
   return consoleWarnings.filter((line) => WEBGPU_FALLBACK_RE.test(line));
@@ -145,6 +146,9 @@ async function readCanvasBoardRouteEvidence(
       "data-gosx-scene3d-webgpu-mesh-objects",
       "data-gosx-scene3d-webgpu-line-entries",
       "data-gosx-scene3d-webgpu-last-error",
+      "data-gosx-canvas-wasm-free-webgpu",
+      "data-gosx-canvas-wasm-free-fallback",
+      "data-gosx-canvas-wasm-free-fallback-reason",
     ]) {
       hostAttrs[name] = host instanceof Element ? host.getAttribute(name) : null;
     }
