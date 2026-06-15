@@ -9,7 +9,7 @@ replace m31labs.dev/gosx-admin => ../gosx-admin
 replace m31labs.dev/gosx-cms => ../gosx-cms
 
 require (
-	m31labs.dev/gosx v0.25.11
+	m31labs.dev/gosx v0.26.0
 	m31labs.dev/gosx-admin v0.1.1
 	m31labs.dev/gosx-cms v0.0.0-00010101000000-000000000000
 )
