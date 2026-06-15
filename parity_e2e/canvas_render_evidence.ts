@@ -34,7 +34,13 @@ type WaitOptions = {
   timeoutMS?: number;
 };
 
-const WEBGPU_FALLBACK_RE = /(?:canvas2d WebGPU backend unavailable|wasm-free static WebGPU canvas unavailable)/i;
+// Matches the WebGPU->fallback signals emitted on BOTH editor paths:
+//  - wasm-free JS client (canvas_wasm_free_client.js): "wasm-free static WebGPU canvas unavailable (...)"
+//  - full-WASM gosx CanvasBoard / core probe (bootstrap-feature-scene3d): "WebGPU probe: requestAdapter returned null", "No available adapters"
+// Previously only the first two were matched, so the full-WASM canvas tests never
+// recognised a no-GPU fallback and timed out instead of asserting the 2D route.
+const WEBGPU_FALLBACK_RE =
+  /(?:canvas2d WebGPU backend unavailable|wasm-free static WebGPU canvas unavailable|WebGPU probe: requestAdapter returned null|No available adapters|WebGPU backend unavailable|falling back to (?:Canvas2D|WebGL))/i;
 
 export function canvasWebGPUFallbackWarnings(consoleWarnings: string[]): string[] {
   return consoleWarnings.filter((line) => WEBGPU_FALLBACK_RE.test(line));
