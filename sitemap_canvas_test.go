@@ -155,6 +155,7 @@ func TestSiteMapCanvasNodesEmitRouteSubtitleForPageCards(t *testing.T) {
 
 	// The title ("Home") and the route subtitle ("/") must both be present, with
 	// the route label strictly below the title and still inside the rect bounds.
+	// Nodes are emitted +Y-up (flipBoardNodesYUp), so "below" means a SMALLER Y.
 	var title, route *gosx.CanvasBoardNode
 	for i := range inPage {
 		switch strings.TrimSpace(inPage[i].Text) {
@@ -170,8 +171,8 @@ func TestSiteMapCanvasNodesEmitRouteSubtitleForPageCards(t *testing.T) {
 	if route == nil {
 		t.Fatalf("expected the route subtitle label %q inside the card; got %#v", "/", inPage)
 	}
-	if !(route.Y > title.Y) {
-		t.Fatalf("route subtitle (y=%v) must sit below the title (y=%v)", route.Y, title.Y)
+	if !(route.Y < title.Y) {
+		t.Fatalf("route subtitle (y=%v) must sit below the title (y=%v) — smaller Y is lower in +Y-up", route.Y, title.Y)
 	}
 	if !pointInRect(route.X, route.Y, pageRect) {
 		t.Fatalf("route subtitle point (%v,%v) must be inside page rect bounds (%v,%v,%v,%v)",

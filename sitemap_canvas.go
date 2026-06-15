@@ -509,7 +509,48 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 	out = append(out, thumbs...)
 	out = append(out, surfaces...)
 	out = append(out, labels...)
-	return out
+	return flipBoardNodesYUp(out)
+}
+
+// flipBoardNodesYUp converts the board's top-down AUTHORING (row 0 at Y=0, the
+// route subtitle "below" the title at a larger Y, +Y-down screen convention)
+// into the +Y-up world space the GoSX renderers, click hit-testing, and the DOM
+// overlays all use. It mirrors every node's Y around the board's vertical extent
+// so the rendered board reads top-down (title above route, row 0 at the top) and
+// — crucially — every consumer agrees, with NO renderer-side projection flip
+// (which would desync render from picking/overlays). The board's bounding box is
+// preserved (mirror around maxY keeps nodes in [0, maxY]), so the camera/pan are
+// unaffected. Empty input is returned unchanged.
+func flipBoardNodesYUp(nodes []gosx.CanvasBoardNode) []gosx.CanvasBoardNode {
+	maxY := 0.0
+	for _, n := range nodes {
+		bottom := n.Y + n.Height // rect / image / html bottom edge
+		switch n.Kind {
+		case "label":
+			bottom = n.Y
+		case "line":
+			bottom = n.Y1
+			if n.Y2 > bottom {
+				bottom = n.Y2
+			}
+		}
+		if bottom > maxY {
+			maxY = bottom
+		}
+	}
+	for i := range nodes {
+		n := &nodes[i]
+		switch n.Kind {
+		case "label":
+			n.Y = maxY - n.Y
+		case "line":
+			n.Y1 = maxY - n.Y1
+			n.Y2 = maxY - n.Y2
+		default:
+			n.Y = maxY - n.Y - n.Height
+		}
+	}
+	return nodes
 }
 
 func siteMapCanvasNodeText(node map[string]any) string {
