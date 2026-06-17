@@ -300,3 +300,270 @@ func TestRenderStylePanelCSRFField(t *testing.T) {
 		t.Fatalf("a blank csrfToken must omit the csrf_token field:\n%s", htmlBlank)
 	}
 }
+
+// ============================================================
+// Font section tests
+// ============================================================
+
+// testFontsAny returns a []map[string]any font view fixture with all three roles.
+func testFontsAny() []map[string]any {
+	return []map[string]any{
+		{
+			"role":      "display",
+			"label":     "Display",
+			"nameField": "displayFont",
+			"urlField":  "displayFontUrl",
+			"family":    "Fraunces",
+			"url":       "https://example.com/fraunces.woff2",
+		},
+		{
+			"role":      "body",
+			"label":     "Body",
+			"nameField": "bodyFont",
+			"urlField":  "bodyFontUrl",
+			"family":    "Inter",
+			"url":       "https://example.com/inter.woff2",
+		},
+		{
+			"role":      "mono",
+			"label":     "Mono",
+			"nameField": "monoFont",
+			"urlField":  "monoFontUrl",
+			"family":    "JetBrains Mono",
+			"url":       "",
+		},
+	}
+}
+
+// testFontsString returns the same fixture as []map[string]string.
+func testFontsString() []map[string]string {
+	return []map[string]string{
+		{
+			"role":      "display",
+			"label":     "Display",
+			"nameField": "displayFont",
+			"urlField":  "displayFontUrl",
+			"family":    "Playfair Display",
+			"url":       "https://example.com/playfair.woff2",
+		},
+	}
+}
+
+// TestRenderStylePanelFontFamilyInput is the LIVE-PREVIEW GUARD for the family
+// input. styleruntime's bindFontsIsland (island_runtime.js:543) queries
+// [data-editor-font-name="{role}"] — the attribute value is the slot/role.
+// If the wrong attribute or value is emitted, font live-preview silently breaks.
+func TestRenderStylePanelFontFamilyInput(t *testing.T) {
+	view := map[string]any{
+		"fonts": testFontsAny(),
+	}
+	html := gosx.RenderHTML(RenderStylePanel(view, "fontsForm", styleTestAction, styleTestCSRF))
+
+	for _, entry := range testFontsAny() {
+		role := entry["role"].(string)
+		nameField := entry["nameField"].(string)
+		family := entry["family"].(string)
+
+		// LIVE-PREVIEW GUARD: data-editor-font-name must equal the slot role.
+		wantFontNameAttr := `data-editor-font-name="` + role + `"`
+		if !strings.Contains(html, wantFontNameAttr) {
+			t.Fatalf("family input must carry data-editor-font-name=%q (slot role).\nbindFontsIsland (island_runtime.js:551) queries [data-editor-font-name=%q] — wrong value breaks live preview.\nHTML:\n%s", role, role, html)
+		}
+
+		// name attribute must match the form field key for RawForm submission.
+		wantName := `name="` + nameField + `"`
+		if !strings.Contains(html, wantName) {
+			t.Fatalf("family input must carry name=%q for RawForm submission, not found in:\n%s", nameField, html)
+		}
+
+		// value must be the current family.
+		wantValue := `value="` + family + `"`
+		if !strings.Contains(html, wantValue) {
+			t.Fatalf("family input must carry value=%q, not found in:\n%s", family, html)
+		}
+
+		// Must be a text input.
+		if !strings.Contains(html, `type="text"`) {
+			t.Fatalf("family input must be type=text, not found in:\n%s", html)
+		}
+
+		// Must be bound to the form.
+		wantForm := `form="fontsForm"`
+		if !strings.Contains(html, wantForm) {
+			t.Fatalf("family input must carry form=%q, not found in:\n%s", "fontsForm", html)
+		}
+	}
+}
+
+// TestRenderStylePanelFontURLInput is the LIVE-PREVIEW GUARD for the URL input.
+// bindFontsIsland (island_runtime.js:552) queries [data-editor-font-url="{role}"].
+func TestRenderStylePanelFontURLInput(t *testing.T) {
+	view := map[string]any{
+		"fonts": testFontsAny(),
+	}
+	html := gosx.RenderHTML(RenderStylePanel(view, "fontsForm", styleTestAction, styleTestCSRF))
+
+	for _, entry := range testFontsAny() {
+		role := entry["role"].(string)
+		urlField := entry["urlField"].(string)
+
+		// LIVE-PREVIEW GUARD: data-editor-font-url must equal the slot role.
+		wantFontURLAttr := `data-editor-font-url="` + role + `"`
+		if !strings.Contains(html, wantFontURLAttr) {
+			t.Fatalf("URL input must carry data-editor-font-url=%q (slot role).\nbindFontsIsland (island_runtime.js:552) queries [data-editor-font-url=%q] — wrong value breaks live preview.\nHTML:\n%s", role, role, html)
+		}
+
+		// name attribute must match the form field key.
+		wantName := `name="` + urlField + `"`
+		if !strings.Contains(html, wantName) {
+			t.Fatalf("URL input must carry name=%q for RawForm submission, not found in:\n%s", urlField, html)
+		}
+
+		// Must be type=url.
+		if !strings.Contains(html, `type="url"`) {
+			t.Fatalf("URL input must be type=url, not found in:\n%s", html)
+		}
+
+		// Must be bound to the form.
+		if !strings.Contains(html, `form="fontsForm"`) {
+			t.Fatalf("URL input must carry form=%q, not found in:\n%s", "fontsForm", html)
+		}
+	}
+}
+
+// TestRenderStylePanelFontURLValue asserts the current URL value is rendered (or
+// empty string when url is blank — input should still be present).
+func TestRenderStylePanelFontURLValue(t *testing.T) {
+	view := map[string]any{
+		"fonts": testFontsAny(),
+	}
+	html := gosx.RenderHTML(RenderStylePanel(view, "fontsForm", styleTestAction, styleTestCSRF))
+
+	// Non-empty URL must appear as the value.
+	if !strings.Contains(html, `value="https://example.com/fraunces.woff2"`) {
+		t.Fatalf("URL input must carry the current font URL as value, not found in:\n%s", html)
+	}
+	if !strings.Contains(html, `value="https://example.com/inter.woff2"`) {
+		t.Fatalf("URL input must carry the current font URL as value, not found in:\n%s", html)
+	}
+
+	// Mono has empty url — the monoFontUrl input must still render (value="" is fine).
+	if !strings.Contains(html, `name="monoFontUrl"`) {
+		t.Fatalf("URL input for mono role must be present even when url is empty:\n%s", html)
+	}
+}
+
+// TestRenderStylePanelFontLabelRendered asserts the human label is rendered for
+// each font entry.
+func TestRenderStylePanelFontLabelRendered(t *testing.T) {
+	view := map[string]any{
+		"fonts": testFontsAny(),
+	}
+	html := gosx.RenderHTML(RenderStylePanel(view, "fontsForm", styleTestAction, styleTestCSRF))
+
+	for _, entry := range testFontsAny() {
+		label := entry["label"].(string)
+		if !strings.Contains(html, label) {
+			t.Fatalf("font label %q must appear in panel:\n%s", label, html)
+		}
+	}
+}
+
+// TestRenderStylePanelFontsOnlyViewHasFormAndOp asserts that a fonts-only view
+// (no palette) still renders the managed form with op + csrf + save/cancel.
+func TestRenderStylePanelFontsOnlyViewHasFormAndOp(t *testing.T) {
+	view := map[string]any{
+		"fonts": testFontsAny(),
+	}
+	html := gosx.RenderHTML(RenderStylePanel(view, "fontsForm", styleTestAction, styleTestCSRF))
+
+	if !strings.Contains(html, `data-gosx-studio-authoring-managed="true"`) {
+		t.Fatalf("fonts-only panel must include managed form marker:\n%s", html)
+	}
+	if !strings.Contains(html, `value="save-appearance"`) {
+		t.Fatalf("fonts-only panel must include save-appearance operation:\n%s", html)
+	}
+	if !strings.Contains(html, `name="csrf_token"`) {
+		t.Fatalf("fonts-only panel must include csrf_token field:\n%s", html)
+	}
+	if !strings.Contains(html, `type="submit"`) {
+		t.Fatalf("fonts-only panel must include submit button:\n%s", html)
+	}
+	if !strings.Contains(html, `type="reset"`) {
+		t.Fatalf("fonts-only panel must include reset/cancel button:\n%s", html)
+	}
+}
+
+// TestRenderStylePanelPaletteOnlyRendersNoFontInputs asserts that a palette-only
+// view (no fonts key) does NOT render any font inputs. Additive/no-regression.
+func TestRenderStylePanelPaletteOnlyRendersNoFontInputs(t *testing.T) {
+	view := map[string]any{
+		"palette": testPaletteAny(),
+	}
+	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction, styleTestCSRF))
+
+	if strings.Contains(html, `data-editor-font-name`) {
+		t.Fatalf("palette-only view must NOT render any data-editor-font-name inputs:\n%s", html)
+	}
+	if strings.Contains(html, `data-editor-font-url`) {
+		t.Fatalf("palette-only view must NOT render any data-editor-font-url inputs:\n%s", html)
+	}
+}
+
+// TestRenderStylePanelBothPaletteAndFonts asserts that a view with both palette
+// and fonts renders color inputs AND font inputs in the same form.
+func TestRenderStylePanelBothPaletteAndFonts(t *testing.T) {
+	view := map[string]any{
+		"palette": testPaletteAny(),
+		"fonts":   testFontsAny(),
+	}
+	html := gosx.RenderHTML(RenderStylePanel(view, "brandForm", styleTestAction, styleTestCSRF))
+
+	// Colors still present.
+	if !strings.Contains(html, `type="color"`) {
+		t.Fatalf("combined view must render color inputs:\n%s", html)
+	}
+	// Fonts also present.
+	if !strings.Contains(html, `data-editor-font-name="display"`) {
+		t.Fatalf("combined view must render font inputs:\n%s", html)
+	}
+	// Single form element only (no nested forms, no duplicate form ids).
+	formCount := strings.Count(html, `id="brandForm"`)
+	if formCount != 1 {
+		t.Fatalf("expected exactly 1 form with id=brandForm, got %d:\n%s", formCount, html)
+	}
+}
+
+// TestRenderStylePanelFontsStringShape asserts the []map[string]string variant
+// works (mirrors TestRenderStylePanelAcceptsStringPalette).
+func TestRenderStylePanelFontsStringShape(t *testing.T) {
+	view := map[string]any{
+		"fonts": testFontsString(),
+	}
+	html := gosx.RenderHTML(RenderStylePanel(view, "fontsForm", styleTestAction, styleTestCSRF))
+
+	for _, entry := range testFontsString() {
+		role := entry["role"]
+		wantFontNameAttr := `data-editor-font-name="` + role + `"`
+		if !strings.Contains(html, wantFontNameAttr) {
+			t.Fatalf("string-fonts: family input must carry data-editor-font-name=%q:\n%s", role, html)
+		}
+		wantFontURLAttr := `data-editor-font-url="` + role + `"`
+		if !strings.Contains(html, wantFontURLAttr) {
+			t.Fatalf("string-fonts: URL input must carry data-editor-font-url=%q:\n%s", role, html)
+		}
+	}
+}
+
+// TestRenderStylePanelFontsSectionDataAttr asserts the fonts subsection carries
+// a scoping data attribute so hosts can target it via CSS/JS.
+func TestRenderStylePanelFontsSectionDataAttr(t *testing.T) {
+	view := map[string]any{
+		"fonts": testFontsAny(),
+	}
+	html := gosx.RenderHTML(RenderStylePanel(view, "fontsForm", styleTestAction, styleTestCSRF))
+
+	if !strings.Contains(html, `data-gosx-studio-style-fonts`) {
+		t.Fatalf("fonts subsection must carry data-gosx-studio-style-fonts for host CSS/JS targeting:\n%s", html)
+	}
+}

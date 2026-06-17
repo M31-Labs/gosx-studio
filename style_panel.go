@@ -41,13 +41,31 @@ import (
 // mutation.RawForm["colorAccent"]) because save-appearance uses host-defined field
 // names rather than standard authoring fields.
 //
-// Fonts are the fast follow: styleruntime's bindFontsIsland + $preview.theme.fontsCustom
-// already exist for the next panel slice.
+// view["fonts"] must be []map[string]any or []map[string]string with entries:
+//
+//	{
+//	  "role":      "display"|"body"|"mono",  // slot role → data-editor-font-name + data-editor-font-url
+//	  "label":     "Display",                // display label
+//	  "nameField": "displayFont",            // form field name for the font-family (→ RawForm key)
+//	  "urlField":  "displayFontUrl",         // form field name for the @font-face URL (→ RawForm key)
+//	  "family":    "Fraunces",               // current font-family value
+//	  "url":       "https://...",            // current font URL (may be empty)
+//	}
+//
+// Font live-preview contract: styleruntime's bindFontsIsland (island_runtime.js:543)
+// queries [data-editor-font-name="{role}"] for the family input and
+// [data-editor-font-url="{role}"] for the URL input — the attribute VALUE is the
+// slot role ("display", "body", or "mono"). Wrong attribute value → silent live-preview
+// breakage. The host maps the submitted nameField/urlField keys from mutation.RawForm.
+//
+// NOTE: a curated font-family dropdown (Google Fonts, system stack presets) is
+// a later refinement. Text inputs are intentionally simple for this unit.
 func RenderStylePanel(view map[string]any, formID, action, csrfToken string) gosx.Node {
 	palette := stylePaletteEntries(view)
+	fonts := styleFontEntries(view)
 
-	// Empty or nil palette → render an inert section, no crash.
-	if len(palette) == 0 {
+	// Empty palette AND empty fonts → render an inert section, no crash.
+	if len(palette) == 0 && len(fonts) == 0 {
 		return gosx.El("section", gosx.Attrs(
 			gosx.Attr("data-gosx-studio-style-panel", "true"),
 			gosx.Attr("data-gosx-studio-authoring-panel-renderer", "gosx-studio"),
@@ -118,6 +136,58 @@ func RenderStylePanel(view map[string]any, formID, action, csrfToken string) gos
 		formChildren = append(formChildren, row)
 	}
 
+	// Fonts subsection: one row per font entry, rendered after the color grid.
+	// Only emitted when view["fonts"] is present and non-empty.
+	// Live-preview contract: bindFontsIsland (island_runtime.js:543) queries
+	// [data-editor-font-name="{role}"] for the family input and
+	// [data-editor-font-url="{role}"] for the URL input — the attribute VALUE
+	// is the slot role ("display", "body", "mono"). These attributes are
+	// idempotent with the existing runtime; no JS changes are required.
+	if len(fonts) > 0 {
+		fontRows := make([]gosx.Node, 0, len(fonts))
+		for _, entry := range fonts {
+			role := entry["role"]
+			label := entry["label"]
+			nameField := entry["nameField"]
+			urlField := entry["urlField"]
+			family := entry["family"]
+			url := entry["url"]
+
+			row := gosx.El("div", gosx.Attrs(
+				gosx.Attr("data-gosx-studio-style-font-row", role),
+			),
+				gosx.El("label", nil,
+					gosx.El("span", nil, gosx.Text(label)),
+					// Family text input — data-editor-font-name={role} is the
+					// live-preview hook; bindFontsIsland reads name.value as the
+					// font-family string.
+					gosx.El("input", gosx.Attrs(
+						gosx.Attr("form", formID),
+						gosx.Attr("type", "text"),
+						gosx.Attr("name", nameField),
+						gosx.Attr("value", family),
+						gosx.Attr("data-editor-font-name", role),
+					)),
+					// URL input — data-editor-font-url={role} is the live-preview
+					// hook; bindFontsIsland reads url.value to compose the
+					// @font-face src. type=url for browser validation.
+					gosx.El("input", gosx.Attrs(
+						gosx.Attr("form", formID),
+						gosx.Attr("type", "url"),
+						gosx.Attr("name", urlField),
+						gosx.Attr("value", url),
+						gosx.Attr("data-editor-font-url", role),
+					)),
+				),
+			)
+			fontRows = append(fontRows, row)
+		}
+		fontsSection := gosx.El("div", gosx.Attrs(
+			gosx.Attr("data-gosx-studio-style-fonts", "true"),
+		), gosx.Fragment(fontRows...))
+		formChildren = append(formChildren, fontsSection)
+	}
+
 	// The form itself is NOT emitted here; it is the outer workbench form or a
 	// host-managed <form id=formID> element. We output the save/cancel buttons
 	// bound to formID so the host can place the form anywhere in the document.
@@ -182,6 +252,39 @@ func stylePaletteEntries(view map[string]any) []map[string]string {
 				"cssVar":   workbenchMapString(entry, "cssVar"),
 				"value":    workbenchMapString(entry, "value"),
 				"fallback": workbenchMapString(entry, "fallback"),
+			})
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+// styleFontEntries extracts and normalizes font entries from the view map.
+// Mirrors stylePaletteEntries: accepts []map[string]any or []map[string]string.
+// Returns nil (and no fonts section is rendered) when view["fonts"] is absent or empty.
+func styleFontEntries(view map[string]any) []map[string]string {
+	raw, ok := view["fonts"]
+	if !ok || raw == nil {
+		return nil
+	}
+	switch typed := raw.(type) {
+	case []map[string]string:
+		out := make([]map[string]string, 0, len(typed))
+		for _, entry := range typed {
+			out = append(out, entry)
+		}
+		return out
+	case []map[string]any:
+		out := make([]map[string]string, 0, len(typed))
+		for _, entry := range typed {
+			out = append(out, map[string]string{
+				"role":      workbenchMapString(entry, "role"),
+				"label":     workbenchMapString(entry, "label"),
+				"nameField": workbenchMapString(entry, "nameField"),
+				"urlField":  workbenchMapString(entry, "urlField"),
+				"family":    workbenchMapString(entry, "family"),
+				"url":       workbenchMapString(entry, "url"),
 			})
 		}
 		return out
