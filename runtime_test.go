@@ -245,6 +245,23 @@ func TestEngineRuntimeIncludesSiteMapRuntimeBundle(t *testing.T) {
 	}
 }
 
+func TestEngineRuntimeIncludesInlineEditRuntimeBundle(t *testing.T) {
+	// InlineEditRuntime island contract — host-agnostic inline editing.
+	// See gosx-studio/inlineeditruntime/runtime.go.
+	engines := string(EngineRuntimeScript())
+	for _, fragment := range []string{
+		"window.GoSXStudioInlineEditRuntime",
+		"deriveKeys",
+		"data-studio-field",
+		"data-gosx-studio-inline-edit-action",
+		"data-gosx-studio-authoring-managed",
+	} {
+		if !strings.Contains(engines, fragment) {
+			t.Fatalf("engine runtime missing inlineeditruntime fragment %q", fragment)
+		}
+	}
+}
+
 func TestAuthoringRuntimeScriptIsNonEmpty(t *testing.T) {
 	runtime := string(AuthoringRuntimeScript())
 	if runtime == "" {

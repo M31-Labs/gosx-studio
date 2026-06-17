@@ -1,0 +1,235 @@
+package inlineeditruntime
+
+import (
+	"strings"
+	"testing"
+)
+
+// TestInlineEditRuntimeFeatureFlagKey verifies the Phase 3 naming convention.
+func TestInlineEditRuntimeFeatureFlagKey(t *testing.T) {
+	if FeatureFlagKey == "" {
+		t.Fatal("FeatureFlagKey must be set")
+	}
+	if !strings.HasSuffix(FeatureFlagKey, "-runtime-islands") {
+		t.Fatalf("FeatureFlagKey %q must end with -runtime-islands per Phase 3 convention", FeatureFlagKey)
+	}
+}
+
+// TestInlineEditRuntimeScriptIsNonEmpty checks the embedded JS is non-empty.
+func TestInlineEditRuntimeScriptIsNonEmpty(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	if body == "" {
+		t.Fatal("InlineEditRuntimeScript() must return a non-empty JS snippet")
+	}
+}
+
+// TestInlineEditRuntimePublishesGlobal checks the IIFE publishes the expected
+// window global with the install method.
+func TestInlineEditRuntimePublishesGlobal(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	if !strings.Contains(body, "window.GoSXStudioInlineEditRuntime") {
+		t.Fatalf("InlineEditRuntimeScript() must publish window.GoSXStudioInlineEditRuntime:\n%s", body)
+	}
+	if !strings.Contains(body, "install") {
+		t.Fatalf("InlineEditRuntimeScript() must expose an install method:\n%s", body)
+	}
+}
+
+// TestInlineEditRuntimeInstallIsIdempotent verifies the install-guard flag is
+// present in the source so a second call to install() on the same root is
+// a no-op.
+func TestInlineEditRuntimeInstallIsIdempotent(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	// The guard attribute must be referenced in the JS.
+	if !strings.Contains(body, "INSTALLED_FLAG") && !strings.Contains(body, "__gosxInlineEditInstalled") {
+		t.Fatalf("InlineEditRuntimeScript() must include an idempotency guard against double-install:\n%s", body)
+	}
+}
+
+// TestInlineEditRuntimeEditableFieldContract verifies the data-studio-field
+// + contenteditable delegate target contract.
+func TestInlineEditRuntimeEditableFieldContract(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	if !strings.Contains(body, "data-studio-field") {
+		t.Fatalf("InlineEditRuntimeScript() must reference data-studio-field attribute:\n%s", body)
+	}
+	if !strings.Contains(body, "contenteditable") {
+		t.Fatalf("InlineEditRuntimeScript() must check contenteditable attribute:\n%s", body)
+	}
+}
+
+// TestInlineEditRuntimeKeyDerivation verifies the deriveKeys function is
+// present and covers the leading-"pages"-drop and 3-segment tail contract.
+func TestInlineEditRuntimeKeyDerivation(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	if !strings.Contains(body, "deriveKeys") {
+		t.Fatalf("InlineEditRuntimeScript() must implement deriveKeys:\n%s", body)
+	}
+	// The function must split on "." and handle the "pages" prefix.
+	if !strings.Contains(body, `"pages"`) {
+		t.Fatalf("InlineEditRuntimeScript() deriveKeys must drop a leading \"pages\" segment:\n%s", body)
+	}
+	// The three output keys.
+	for _, key := range []string{"page", "component", "control"} {
+		if !strings.Contains(body, key) {
+			t.Fatalf("InlineEditRuntimeScript() deriveKeys must produce %q key:\n%s", key, body)
+		}
+	}
+}
+
+// TestInlineEditRuntimeCommitBehavior checks the commit-on-blur / Enter logic
+// and the duplicate-POST guard (rebase baseline after commit).
+func TestInlineEditRuntimeCommitBehavior(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	// Must handle focusin/focusout/keydown.
+	for _, event := range []string{"focusin", "focusout", "keydown"} {
+		if !strings.Contains(body, event) {
+			t.Fatalf("InlineEditRuntimeScript() must handle %q event:\n%s", event, body)
+		}
+	}
+	// Enter key guard.
+	if !strings.Contains(body, `"Enter"`) {
+		t.Fatalf("InlineEditRuntimeScript() must handle Enter key:\n%s", body)
+	}
+	// Must POST only when value changed.
+	if !strings.Contains(body, "prev") && !strings.Contains(body, "changed") {
+		t.Fatalf("InlineEditRuntimeScript() must guard against posting unchanged values:\n%s", body)
+	}
+}
+
+// TestInlineEditRuntimePOSTBody verifies the expected form field names that
+// mirror the server's AuthoringMutationFromForm contract.
+func TestInlineEditRuntimePOSTBody(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, field := range []string{
+		"gosx_studio_operation",
+		"gosx_studio_binding",
+		"gosx_studio_value",
+		"gosx_studio_page_key",
+		"gosx_studio_component_key",
+		"gosx_studio_control_key",
+	} {
+		if !strings.Contains(body, field) {
+			t.Fatalf("InlineEditRuntimeScript() POST body must include %q:\n%s", field, body)
+		}
+	}
+	// update-page operation support.
+	if !strings.Contains(body, "update-page") {
+		t.Fatalf("InlineEditRuntimeScript() must support update-page operation:\n%s", body)
+	}
+	// save-control default operation.
+	if !strings.Contains(body, "save-control") {
+		t.Fatalf("InlineEditRuntimeScript() must support save-control operation:\n%s", body)
+	}
+}
+
+// TestInlineEditRuntimeActionResolutionOrder verifies the four-step route
+// resolution is documented and the markers are present so muddy can rely on
+// it without reading internal source.
+func TestInlineEditRuntimeActionResolutionOrder(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+
+	// Step 1: opts.action / opts.csrfToken
+	if !strings.Contains(body, "opts.action") {
+		t.Fatalf("InlineEditRuntimeScript() must accept opts.action (resolution step 1):\n%s", body)
+	}
+	if !strings.Contains(body, "opts.csrfToken") {
+		t.Fatalf("InlineEditRuntimeScript() must accept opts.csrfToken (resolution step 1):\n%s", body)
+	}
+
+	// Step 2: data-gosx-studio-inline-edit-action / data-gosx-studio-inline-edit-csrf attributes on root.
+	if !strings.Contains(body, "data-gosx-studio-inline-edit-action") {
+		t.Fatalf("InlineEditRuntimeScript() must read data-gosx-studio-inline-edit-action from root (step 2):\n%s", body)
+	}
+	if !strings.Contains(body, "data-gosx-studio-inline-edit-csrf") {
+		t.Fatalf("InlineEditRuntimeScript() must read data-gosx-studio-inline-edit-csrf from root (step 2):\n%s", body)
+	}
+
+	// Step 3: managed authoring form in the document.
+	if !strings.Contains(body, "data-gosx-studio-authoring-managed") {
+		t.Fatalf("InlineEditRuntimeScript() must check data-gosx-studio-authoring-managed form (step 3):\n%s", body)
+	}
+
+	// Step 4: window.location.href fallback.
+	if !strings.Contains(body, "window.location.href") {
+		t.Fatalf("InlineEditRuntimeScript() must fall back to window.location.href (step 4):\n%s", body)
+	}
+}
+
+// TestInlineEditRuntimeNoHardcodedMuddyRoute asserts the muddy-specific
+// /admin/editor/__actions/authoring path is NOT hardcoded without an override
+// — i.e., it does not appear as an unoverridable constant.
+func TestInlineEditRuntimeNoHardcodedMuddyRoute(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	// The muddy default route must not be baked in as a constant.
+	// The file should not contain the muddy-specific literal at all.
+	if strings.Contains(body, "/admin/editor/__actions/authoring") {
+		t.Fatalf("InlineEditRuntimeScript() must NOT hardcode the muddy route /admin/editor/__actions/authoring; use configurable resolution:\n%s", body)
+	}
+}
+
+// TestInlineEditRuntimeCSRFResolution verifies the CSRF token is resolved and
+// attached as an X-CSRF-Token header on the POST.
+func TestInlineEditRuntimeCSRFResolution(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	if !strings.Contains(body, "X-CSRF-Token") {
+		t.Fatalf("InlineEditRuntimeScript() must set X-CSRF-Token header on POST:\n%s", body)
+	}
+}
+
+// TestInlineEditRuntimeAuthoringRuntimeIntegration verifies that after a
+// successful POST, the script hands off to window.GoSXStudioAuthoringRuntime
+// .handleResult when present.
+func TestInlineEditRuntimeAuthoringRuntimeIntegration(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	if !strings.Contains(body, "GoSXStudioAuthoringRuntime") {
+		t.Fatalf("InlineEditRuntimeScript() must integrate with window.GoSXStudioAuthoringRuntime:\n%s", body)
+	}
+	if !strings.Contains(body, "handleResult") {
+		t.Fatalf("InlineEditRuntimeScript() must call handleResult on GoSXStudioAuthoringRuntime:\n%s", body)
+	}
+}
+
+// TestInlineEditRuntimeOnCommitHook verifies the optional opts.onCommit hook
+// is invoked before the POST so muddy can supply repaint-safe behaviour.
+func TestInlineEditRuntimeOnCommitHook(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	if !strings.Contains(body, "opts.onCommit") {
+		t.Fatalf("InlineEditRuntimeScript() must expose opts.onCommit hook:\n%s", body)
+	}
+}
+
+// TestInlineEditRuntimeNoPersistRepaintSafeLogic verifies that muddy-specific
+// bundle-rewriting is NOT ported into the generic island. The prohibition is
+// documented in a header comment (it is fine for the word to appear there), but
+// the JS must not contain function declarations or calls that implement it.
+func TestInlineEditRuntimeNoPersistRepaintSafeLogic(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	// persistRepaintSafe must not be implemented as a function.
+	if strings.Contains(body, "function persistRepaintSafe") {
+		t.Fatalf("InlineEditRuntimeScript() must NOT implement persistRepaintSafe; use opts.onCommit instead:\n%s", body)
+	}
+	// Must not reference muddy canvas-board runtime attributes used only by persistRepaintSafe.
+	for _, muddySpecific := range []string{
+		"__muddyInlineEditInstalled",
+		"data-gosx-canvas-bundle",
+		"__muddyCanvasInlineEdit",
+		"PAINTER_CACHE",
+		"__gosxHTMLMarkup",
+	} {
+		if strings.Contains(body, muddySpecific) {
+			t.Fatalf("InlineEditRuntimeScript() must NOT reference muddy-specific symbol %q:\n%s", muddySpecific, body)
+		}
+	}
+}
+
+// TestBundleIsNonEmpty verifies Bundle() produces the same non-empty result.
+func TestBundleIsNonEmpty(t *testing.T) {
+	bundle := string(Bundle())
+	if bundle == "" {
+		t.Fatal("Bundle() must return a non-empty JS snippet")
+	}
+	if !strings.Contains(bundle, "window.GoSXStudioInlineEditRuntime") {
+		t.Fatalf("Bundle() must contain the inline-edit runtime global:\n%s", bundle)
+	}
+}

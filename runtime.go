@@ -12,6 +12,7 @@ import (
 	"m31labs.dev/gosx-studio/blocklayoutruntime"
 	"m31labs.dev/gosx-studio/brandruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
+	"m31labs.dev/gosx-studio/inlineeditruntime"
 	"m31labs.dev/gosx-studio/inspectorruntime"
 	"m31labs.dev/gosx-studio/previewruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
@@ -41,6 +42,7 @@ func EngineRuntimeScript() []byte {
 		authoringruntime.Bundle(),
 		sitemapruntime.Bundle(),
 		inspectorruntime.Bundle(),
+		inlineeditruntime.Bundle(),
 	}
 	total := 0
 	for _, slice := range slices {

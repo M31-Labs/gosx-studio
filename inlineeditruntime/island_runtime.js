@@ -1,0 +1,307 @@
+;(function () {
+  "use strict";
+
+  // GoSXStudioInlineEditRuntime — host-agnostic inline-edit island.
+  //
+  // Persists in-canvas contenteditable edits by POSTing a save-control mutation
+  // the moment an edit is committed (blur / Enter). Ported from the muddy-side
+  // canvas_inline_edit.js but made fully host-agnostic: no muddy-specific route,
+  // no bundle-rewriting machinery. Any host gets inline editing by calling
+  // window.GoSXStudioInlineEditRuntime.install(overlayEl, opts).
+  //
+  // Public API:
+  //   window.GoSXStudioInlineEditRuntime = { install, deriveKeys }
+  //
+  //   install(root, opts)
+  //     root : the overlay container element whose [contenteditable][data-studio-field]
+  //            descendants are editable canvas surfaces.
+  //     opts.action     : POST target URL (see resolution order below).
+  //     opts.csrfToken  : CSRF token string (see resolution order below).
+  //     opts.fetch      : injectable fetch (default window.fetch) — for tests.
+  //     opts.onCommit   : optional callback(field, value) called just BEFORE the
+  //                       POST so hosts can apply repaint-safe logic (e.g. muddy's
+  //                       persistRepaintSafe) without baking muddy logic here.
+  //
+  // Action / CSRF resolution order (first non-empty value wins):
+  //   1. opts.action / opts.csrfToken passed to install().
+  //   2. data-gosx-studio-inline-edit-action / data-gosx-studio-inline-edit-csrf
+  //      attribute on the root element.
+  //   3. A [data-gosx-studio-authoring-managed] form's action + csrf_token input
+  //      found anywhere in the document.
+  //   4. window.location.href (action) / "" (csrf — POST proceeds tokenless).
+  //
+  // After a successful POST the JSON response is handed to
+  // window.GoSXStudioAuthoringRuntime.handleResult(result, meta) when that
+  // global is present, so preview refresh, change selection, and save-chrome
+  // all update consistently.
+  //
+  // Muddy-specific bundle-rewriting (persistRepaintSafe) is intentionally NOT
+  // ported here. Supply opts.onCommit to attach host-specific behaviour before
+  // the POST.
+
+  if (typeof window === "undefined") return;
+
+  var FIELD_ATTR = "data-studio-field";
+  var OPERATION_ATTR = "data-studio-operation";
+  var PAGE_KEY_ATTR = "data-studio-page-key";
+  var PAGE_ROUTE_ATTR = "data-studio-page-route";
+  var ROOT_ACTION_ATTR = "data-gosx-studio-inline-edit-action";
+  var ROOT_CSRF_ATTR = "data-gosx-studio-inline-edit-csrf";
+  var MANAGED_FORM_ATTR = "data-gosx-studio-authoring-managed";
+  // Marks an overlay we have already wired so a second install() is a no-op.
+  var INSTALLED_FLAG = "__gosxInlineEditInstalled";
+
+  // isEditableField returns true when el is a non-null element that has a
+  // non-empty data-studio-field attribute and contenteditable !== "false".
+  function isEditableField(el) {
+    if (!el || typeof el.getAttribute !== "function") return false;
+    var binding = el.getAttribute(FIELD_ATTR);
+    if (!binding) return false;
+    var ce = el.getAttribute("contenteditable");
+    if (ce === null || ce === undefined) return false;
+    if (String(ce).toLowerCase() === "false") return false;
+    return true;
+  }
+
+  // editableField walks up from a node to the nearest ancestor that satisfies
+  // isEditableField, stopping at root. Returns the element or null.
+  function editableField(node, root) {
+    var el = node;
+    while (el && el !== root) {
+      if (isEditableField(el)) return el;
+      el = el.parentElement || null;
+    }
+    return null;
+  }
+
+  // textOf reads el.textContent defensively.
+  function textOf(el) {
+    if (!el) return "";
+    var t = el.textContent;
+    return typeof t === "string" ? t : "";
+  }
+
+  // deriveKeys maps a binding string to { page, component, control } by
+  // splitting on ".", dropping a leading "pages" segment, and trailing-aligning
+  // the last three segments. Fewer than three segments fill what they can,
+  // leaving the rest empty.
+  //
+  //   "pages.home.hero.headline" → { page:"home", component:"hero", control:"headline" }
+  //   "home.hero.headline"       → { page:"home", component:"hero", control:"headline" }
+  //   "hero.headline"            → { page:"",     component:"hero", control:"headline" }
+  //   "headline"                 → { page:"",     component:"",     control:"headline" }
+  function deriveKeys(binding) {
+    var parts = String(binding || "").split(".").filter(function (p) { return p !== ""; });
+    if (parts.length && parts[0] === "pages") parts = parts.slice(1);
+    var tail = parts.slice(-3);
+    var keys = { page: "", component: "", control: "" };
+    if (tail.length >= 1) keys.control = tail[tail.length - 1];
+    if (tail.length >= 2) keys.component = tail[tail.length - 2];
+    if (tail.length >= 3) keys.page = tail[tail.length - 3];
+    return keys;
+  }
+
+  // resolveAction resolves the POST target URL from the four-step priority chain.
+  function resolveAction(root, optsAction) {
+    // Step 1: explicit opt.
+    var v = typeof optsAction === "string" ? optsAction.trim() : "";
+    if (v) return v;
+    // Step 2: attribute on root.
+    if (root && typeof root.getAttribute === "function") {
+      v = (root.getAttribute(ROOT_ACTION_ATTR) || "").trim();
+      if (v) return v;
+    }
+    // Step 3: managed authoring form in the document.
+    if (typeof document !== "undefined" && document.querySelector) {
+      try {
+        var form = document.querySelector("[" + MANAGED_FORM_ATTR + "]");
+        if (form) {
+          v = (form.getAttribute("action") || "").trim();
+          if (v) return v;
+        }
+      } catch (e) { /* tolerate */ }
+    }
+    // Step 4: current page URL.
+    return (typeof window !== "undefined" && window.location) ? window.location.href : "";
+  }
+
+  // resolveCSRF resolves the CSRF token from the four-step priority chain.
+  function resolveCSRF(root, optsCSRF) {
+    // Step 1: explicit opt.
+    var v = typeof optsCSRF === "string" ? optsCSRF.trim() : "";
+    if (v) return v;
+    // Step 2: attribute on root.
+    if (root && typeof root.getAttribute === "function") {
+      v = (root.getAttribute(ROOT_CSRF_ATTR) || "").trim();
+      if (v) return v;
+    }
+    // Step 3: managed authoring form's csrf_token input in the document.
+    if (typeof document !== "undefined" && document.querySelector) {
+      try {
+        var form = document.querySelector("[" + MANAGED_FORM_ATTR + "]");
+        if (form) {
+          var input = form.querySelector ? form.querySelector("input[name='csrf_token']") : null;
+          if (input && typeof input.value === "string") {
+            v = input.value.trim();
+            if (v) return v;
+          }
+        }
+      } catch (e) { /* tolerate */ }
+    }
+    // Step 4: no token found — POST proceeds tokenless.
+    return "";
+  }
+
+  // editMetaFromElement extracts optional per-field operation overrides.
+  function editMetaFromElement(el) {
+    if (!el || typeof el.getAttribute !== "function") return {};
+    return {
+      operation: el.getAttribute(OPERATION_ATTR) || "",
+      pageKey: el.getAttribute(PAGE_KEY_ATTR) || "",
+      pageRoute: el.getAttribute(PAGE_ROUTE_ATTR) || "",
+    };
+  }
+
+  // buildBody assembles the application/x-www-form-urlencoded POST payload.
+  function buildBody(binding, value, meta) {
+    meta = meta || {};
+    var operation = meta.operation || "save-control";
+    var USP = (typeof URLSearchParams !== "undefined") ? URLSearchParams : null;
+    if (!USP) return "";
+
+    if (operation === "update-page") {
+      var up = new USP();
+      up.set("gosx_studio_operation", "update-page");
+      up.set("gosx_studio_page_key", meta.pageKey || "");
+      up.set("gosx_studio_page_label", value);
+      up.set("gosx_studio_page_route", meta.pageRoute || "");
+      return up.toString();
+    }
+
+    var keys = deriveKeys(binding);
+    var p = new USP();
+    p.set("gosx_studio_operation", "save-control");
+    p.set("gosx_studio_binding", binding);
+    p.set("gosx_studio_value", value);
+    p.set("gosx_studio_page_key", keys.page);
+    p.set("gosx_studio_component_key", keys.component);
+    p.set("gosx_studio_control_key", keys.control);
+    return p.toString();
+  }
+
+  // install wires delegated focusin/focusout/keydown listeners on root.
+  // Idempotent: a second call on the same root is a no-op.
+  function install(root, opts) {
+    if (!root || typeof root.addEventListener !== "function") return;
+    if (root[INSTALLED_FLAG] === true) return; // idempotent guard
+    root[INSTALLED_FLAG] = true;
+
+    opts = opts || {};
+
+    // Snapshot-baseline storage. WeakMap when available, single-slot fallback.
+    var hasWeakMap = (typeof WeakMap !== "undefined");
+    var starts = hasWeakMap ? new WeakMap() : null;
+    var fallbackEl = null;
+    var fallbackStart = "";
+
+    function rememberStart(el) {
+      var v = textOf(el);
+      if (hasWeakMap) starts.set(el, v);
+      else { fallbackEl = el; fallbackStart = v; }
+    }
+
+    function startOf(el) {
+      if (hasWeakMap) return starts.has(el) ? starts.get(el) : undefined;
+      return (fallbackEl === el) ? fallbackStart : undefined;
+    }
+
+    function clearStart(el) {
+      if (hasWeakMap) starts.delete(el);
+      else if (fallbackEl === el) { fallbackEl = null; fallbackStart = ""; }
+    }
+
+    // commit persists el's current text if it differs from the captured start.
+    // After a commit the new value becomes the baseline so the Enter→blur
+    // sequence cannot double-POST the same value.
+    function commit(el) {
+      if (!el) return;
+      var binding = el.getAttribute(FIELD_ATTR);
+      if (!binding) return;
+      var prev = startOf(el);
+      var value = textOf(el);
+      if (prev === undefined) return; // never focused or already committed
+      if (value === prev) { clearStart(el); return; } // unchanged — no-op
+
+      // Rebase the baseline BEFORE firing the async POST so a trailing blur
+      // after Enter→blur() does not double-POST.
+      if (hasWeakMap) starts.set(el, value);
+      else { fallbackEl = el; fallbackStart = value; }
+
+      // Resolve action + CSRF lazily at commit time so opts can be set after
+      // install() and so the managed-form token is always the live value.
+      var action = resolveAction(root, opts.action);
+      var csrf = resolveCSRF(root, opts.csrfToken);
+
+      // Optional pre-POST hook: lets hosts apply repaint-safe markup surgery
+      // (e.g. muddy's persistRepaintSafe) without that logic living here.
+      if (typeof opts.onCommit === "function") {
+        try { opts.onCommit(el, value); } catch (e) { /* never break the commit */ }
+      }
+
+      var doFetch = opts.fetch || (typeof window !== "undefined" ? window.fetch : null);
+      if (typeof doFetch !== "function") return;
+
+      var meta = editMetaFromElement(el);
+      var body = buildBody(binding, value, meta);
+      var headers = { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" };
+      if (csrf) headers["X-CSRF-Token"] = csrf;
+
+      var fetchPromise = doFetch(action, {
+        method: "POST",
+        headers: headers,
+        body: body,
+        credentials: "same-origin",
+      });
+
+      // After a successful POST, hand the JSON result to the authoring runtime
+      // so preview refresh, change selection, and save-chrome all update. No-op
+      // gracefully when GoSXStudioAuthoringRuntime is absent.
+      if (fetchPromise && typeof fetchPromise.then === "function") {
+        fetchPromise.then(function (response) {
+          if (!response || !response.ok) return;
+          return response.json().catch(function () { return null; });
+        }).then(function (result) {
+          if (!result) return;
+          var ar = typeof window !== "undefined" ? window.GoSXStudioAuthoringRuntime : null;
+          if (ar && typeof ar.handleResult === "function") {
+            try {
+              ar.handleResult(result, { action: action, method: "POST", ok: true });
+            } catch (e) { /* defensive */ }
+          }
+        }).catch(function () { /* network or parse errors are non-fatal */ });
+      }
+    }
+
+    root.addEventListener("focusin", function (ev) {
+      var el = editableField(ev.target, root);
+      if (el) rememberStart(el);
+    });
+
+    root.addEventListener("focusout", function (ev) {
+      var el = editableField(ev.target, root);
+      if (el) commit(el);
+    });
+
+    root.addEventListener("keydown", function (ev) {
+      if (ev.key !== "Enter" || ev.shiftKey === true) return;
+      var el = editableField(ev.target, root);
+      if (!el) return;
+      // Single-line field: Enter commits rather than inserting a newline.
+      if (typeof ev.preventDefault === "function") ev.preventDefault();
+      if (typeof el.blur === "function") el.blur(); // blur → focusout → commit()
+      else commit(el);
+    });
+  }
+
+  window.GoSXStudioInlineEditRuntime = { install: install, deriveKeys: deriveKeys };
+})();
