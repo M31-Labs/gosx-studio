@@ -43,7 +43,7 @@ import (
 //
 // Fonts are the fast follow: styleruntime's bindFontsIsland + $preview.theme.fontsCustom
 // already exist for the next panel slice.
-func RenderStylePanel(view map[string]any, formID, action string) gosx.Node {
+func RenderStylePanel(view map[string]any, formID, action, csrfToken string) gosx.Node {
 	palette := stylePaletteEntries(view)
 
 	// Empty or nil palette → render an inert section, no crash.
@@ -62,6 +62,16 @@ func RenderStylePanel(view map[string]any, formID, action string) gosx.Node {
 			gosx.Attr("name", AuthoringFieldOperation),
 			gosx.Attr("value", string(AuthoringOperationSaveAppearance)),
 		)),
+	}
+	// CSRF: authoringruntime reads the form's csrf_token field and forwards it as the
+	// X-CSRF-Token header, so a managed POST must carry it (blank token → field omitted,
+	// letting the host's own CSRF handling decide).
+	if csrfToken != "" {
+		formChildren = append(formChildren, gosx.El("input", gosx.Attrs(
+			gosx.Attr("type", "hidden"),
+			gosx.Attr("name", "csrf_token"),
+			gosx.Attr("value", csrfToken),
+		)))
 	}
 
 	// Color-token grid: one row per palette entry.

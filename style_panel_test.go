@@ -8,6 +8,7 @@ import (
 )
 
 const styleTestAction = "/admin/editor/__actions/authoring"
+const styleTestCSRF = "csrf-test-token"
 
 // palette helpers for the style panel tests.
 
@@ -68,7 +69,7 @@ func TestRenderStylePanelColorInputsPerToken(t *testing.T) {
 	view := map[string]any{
 		"palette": testPaletteAny(),
 	}
-	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction))
+	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction, styleTestCSRF))
 
 	for _, entry := range testPaletteAny() {
 		name := entry["name"].(string)
@@ -117,7 +118,7 @@ func TestRenderStylePanelColorMirror(t *testing.T) {
 	view := map[string]any{
 		"palette": testPaletteAny(),
 	}
-	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction))
+	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction, styleTestCSRF))
 
 	if !strings.Contains(html, `data-gosx-studio-inspector-color-mirror`) {
 		t.Fatalf("panel must render the read-only hex mirror with data-gosx-studio-inspector-color-mirror:\n%s", html)
@@ -130,7 +131,7 @@ func TestRenderStylePanelResetButton(t *testing.T) {
 	view := map[string]any{
 		"palette": testPaletteAny(),
 	}
-	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction))
+	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction, styleTestCSRF))
 
 	for _, entry := range testPaletteAny() {
 		fallback := entry["fallback"].(string)
@@ -151,7 +152,7 @@ func TestRenderStylePanelHiddenOperationInput(t *testing.T) {
 	view := map[string]any{
 		"palette": testPaletteAny(),
 	}
-	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction))
+	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction, styleTestCSRF))
 
 	if !strings.Contains(html, `name="gosx_studio_operation"`) {
 		t.Fatalf("panel must include hidden gosx_studio_operation input:\n%s", html)
@@ -168,7 +169,7 @@ func TestRenderStylePanelManagedFormMarker(t *testing.T) {
 	view := map[string]any{
 		"palette": testPaletteAny(),
 	}
-	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction))
+	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction, styleTestCSRF))
 
 	if !strings.Contains(html, `data-gosx-studio-authoring-managed="true"`) {
 		t.Fatalf("the form must carry data-gosx-studio-authoring-managed=\"true\" so the island runtime intercepts submit:\n%s", html)
@@ -181,7 +182,7 @@ func TestRenderStylePanelSectionDataAttrs(t *testing.T) {
 	view := map[string]any{
 		"palette": testPaletteAny(),
 	}
-	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction))
+	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction, styleTestCSRF))
 
 	if !strings.Contains(html, `data-gosx-studio-style-panel="true"`) {
 		t.Fatalf("outer section must carry data-gosx-studio-style-panel=\"true\":\n%s", html)
@@ -196,7 +197,7 @@ func TestRenderStylePanelSubmitAndCancelButtons(t *testing.T) {
 	view := map[string]any{
 		"palette": testPaletteAny(),
 	}
-	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction))
+	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction, styleTestCSRF))
 
 	if !strings.Contains(html, `type="submit"`) {
 		t.Fatalf("panel must include a submit button:\n%s", html)
@@ -215,7 +216,7 @@ func TestRenderStylePanelFormIDOnButtons(t *testing.T) {
 	view := map[string]any{
 		"palette": testPaletteAny(),
 	}
-	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction))
+	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction, styleTestCSRF))
 
 	// Both buttons must reference the form
 	count := strings.Count(html, `form="stylePaletteForm"`)
@@ -231,7 +232,7 @@ func TestRenderStylePanelFormIDOnButtons(t *testing.T) {
 func TestRenderStylePanelEmptyPaletteInert(t *testing.T) {
 	// nil palette
 	view := map[string]any{}
-	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction))
+	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction, styleTestCSRF))
 	if strings.Contains(html, `type="color"`) {
 		t.Fatalf("empty palette must not render any color inputs:\n%s", html)
 	}
@@ -240,7 +241,7 @@ func TestRenderStylePanelEmptyPaletteInert(t *testing.T) {
 	view2 := map[string]any{
 		"palette": []map[string]any{},
 	}
-	html2 := gosx.RenderHTML(RenderStylePanel(view2, "stylePaletteForm", styleTestAction))
+	html2 := gosx.RenderHTML(RenderStylePanel(view2, "stylePaletteForm", styleTestAction, styleTestCSRF))
 	if strings.Contains(html2, `type="color"`) {
 		t.Fatalf("empty palette slice must not render any color inputs:\n%s", html2)
 	}
@@ -252,7 +253,7 @@ func TestRenderStylePanelAcceptsStringPalette(t *testing.T) {
 	view := map[string]any{
 		"palette": testPaletteString(),
 	}
-	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction))
+	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction, styleTestCSRF))
 
 	for _, entry := range testPaletteString() {
 		cssVar := entry["cssVar"]
@@ -268,7 +269,7 @@ func TestRenderStylePanelNoPlatformCopy(t *testing.T) {
 	view := map[string]any{
 		"palette": testPaletteAny(),
 	}
-	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction))
+	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction, styleTestCSRF))
 	if strings.Contains(html, "GoSX Studio") {
 		t.Fatalf("panel must not emit visible platform copy:\n%s", html)
 	}
@@ -279,8 +280,23 @@ func TestRenderStylePanelNoPlatformCopy(t *testing.T) {
 // window.location.href.
 func TestRenderStylePanelFormAction(t *testing.T) {
 	view := map[string]any{"palette": testPaletteAny()}
-	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction))
+	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction, styleTestCSRF))
 	if !strings.Contains(html, `action="`+styleTestAction+`"`) {
 		t.Fatalf("the form must carry action=%q so the managed submit POSTs to the authoring route:\n%s", styleTestAction, html)
+	}
+}
+
+// TestRenderStylePanelCSRFField asserts a non-empty csrfToken renders a csrf_token
+// hidden input the authoring runtime forwards as X-CSRF-Token.
+func TestRenderStylePanelCSRFField(t *testing.T) {
+	view := map[string]any{"palette": testPaletteAny()}
+	html := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction, styleTestCSRF))
+	if !strings.Contains(html, `name="csrf_token"`) || !strings.Contains(html, `value="`+styleTestCSRF+`"`) {
+		t.Fatalf("a non-empty csrfToken must render a csrf_token field so the managed POST is accepted:\n%s", html)
+	}
+	// Blank token → no csrf_token field (host decides).
+	htmlBlank := gosx.RenderHTML(RenderStylePanel(view, "stylePaletteForm", styleTestAction, ""))
+	if strings.Contains(htmlBlank, `name="csrf_token"`) {
+		t.Fatalf("a blank csrfToken must omit the csrf_token field:\n%s", htmlBlank)
 	}
 }
