@@ -15,8 +15,9 @@
   //   install(root, opts)
   //     root : the overlay container element whose [contenteditable][data-studio-field]
   //            descendants are editable canvas surfaces.
-  //     opts.action     : POST target URL (see resolution order below).
-  //     opts.csrfToken  : CSRF token string (see resolution order below).
+  //     opts.action     : POST target URL — string or getter () => string (see resolution order below).
+  //     opts.csrfToken  : CSRF token — string or getter () => string. A getter is
+  //                       re-evaluated at each commit so a rotating token stays live (see resolution order below).
   //     opts.fetch      : injectable fetch (default window.fetch) — for tests.
   //     opts.onCommit   : optional callback(field, value) called just BEFORE the
   //                       POST so hosts can apply repaint-safe logic (e.g. muddy's
@@ -103,8 +104,9 @@
 
   // resolveAction resolves the POST target URL from the four-step priority chain.
   function resolveAction(root, optsAction) {
-    // Step 1: explicit opt.
-    var v = typeof optsAction === "string" ? optsAction.trim() : "";
+    // Step 1: explicit opt (string, or a getter () => string evaluated now).
+    var rawAction = typeof optsAction === "function" ? optsAction() : optsAction;
+    var v = typeof rawAction === "string" ? rawAction.trim() : "";
     if (v) return v;
     // Step 2: attribute on root.
     if (root && typeof root.getAttribute === "function") {
@@ -127,8 +129,10 @@
 
   // resolveCSRF resolves the CSRF token from the four-step priority chain.
   function resolveCSRF(root, optsCSRF) {
-    // Step 1: explicit opt.
-    var v = typeof optsCSRF === "string" ? optsCSRF.trim() : "";
+    // Step 1: explicit opt (string, or a getter () => string evaluated now so a
+    // host can re-read a rotating token at each commit, not just at install).
+    var rawCSRF = typeof optsCSRF === "function" ? optsCSRF() : optsCSRF;
+    var v = typeof rawCSRF === "string" ? rawCSRF.trim() : "";
     if (v) return v;
     // Step 2: attribute on root.
     if (root && typeof root.getAttribute === "function") {
