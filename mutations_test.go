@@ -319,3 +319,101 @@ func authoringFormInputsContain(inputs []map[string]string, name, value string) 
 	}
 	return false
 }
+
+// TestSaveAppearanceIsValidOperation asserts that AuthoringOperationSaveAppearance
+// is recognized as a valid operation kind (normalizes correctly, does not become "").
+func TestSaveAppearanceIsValidOperation(t *testing.T) {
+	if AuthoringOperationSaveAppearance == "" {
+		t.Fatal("AuthoringOperationSaveAppearance must not be empty")
+	}
+	if string(AuthoringOperationSaveAppearance) != "save-appearance" {
+		t.Fatalf("expected \"save-appearance\", got %q", AuthoringOperationSaveAppearance)
+	}
+	normalized := normalizeAuthoringOperationKind(AuthoringOperationSaveAppearance)
+	if normalized != AuthoringOperationSaveAppearance {
+		t.Fatalf("normalizeAuthoringOperationKind must preserve save-appearance, got %q", normalized)
+	}
+}
+
+// TestSaveAppearanceMutationFromFormRoundTripsColorFields asserts that a
+// save-appearance form submission exposes all submitted color fields to the
+// host adapter via AuthoringMutation.RawForm.
+//
+// This is the delivery contract for the host ApplyAuthoringMutation handler:
+// read color values from mutation.RawForm["colorAccent"], mutation.RawForm["colorCanvas"], etc.
+func TestSaveAppearanceMutationFromFormRoundTripsColorFields(t *testing.T) {
+	form := map[string]string{
+		AuthoringFieldOperation: "save-appearance",
+		"colorAccent":           "#b5651d",
+		"colorCanvas":           "#f8f5ef",
+		"colorInk":              "#1a1a1a",
+	}
+	mutation, validation := AuthoringMutationFromForm(form)
+	if !validation.OK() {
+		t.Fatalf("save-appearance must be valid, got: %#v", validation)
+	}
+	if mutation.Kind != AuthoringOperationSaveAppearance {
+		t.Fatalf("expected Kind=save-appearance, got %q", mutation.Kind)
+	}
+	// Host adapter reads color values from RawForm.
+	if mutation.RawForm == nil {
+		t.Fatal("mutation.RawForm must be populated for save-appearance so host can read color fields")
+	}
+	if mutation.RawForm["colorAccent"] != "#b5651d" {
+		t.Fatalf("expected RawForm[colorAccent]=#b5651d, got %q", mutation.RawForm["colorAccent"])
+	}
+	if mutation.RawForm["colorCanvas"] != "#f8f5ef" {
+		t.Fatalf("expected RawForm[colorCanvas]=#f8f5ef, got %q", mutation.RawForm["colorCanvas"])
+	}
+	if mutation.RawForm["colorInk"] != "#1a1a1a" {
+		t.Fatalf("expected RawForm[colorInk]=#1a1a1a, got %q", mutation.RawForm["colorInk"])
+	}
+}
+
+// TestSaveAppearanceMutationAdapterReceivesColorFields asserts that the authoring
+// action handler invokes the adapter with a mutation whose RawForm carries all
+// submitted color fields from the HTTP form.
+func TestSaveAppearanceMutationAdapterReceivesColorFields(t *testing.T) {
+	adapter := &stubAuthoringAdapter{result: AuthoringMutationResult{
+		Message:        "Palette saved.",
+		RefreshPreview: true,
+	}}
+
+	form := url.Values{}
+	form.Set(AuthoringFieldOperation, "save-appearance")
+	form.Set("colorAccent", "#b5651d")
+	form.Set("colorCanvas", "#f8f5ef")
+	form.Set("colorInk", "#1a1a1a")
+
+	req := httptest.NewRequest(http.MethodPost, "/gosx/action/authoring", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	rec := httptest.NewRecorder()
+
+	action.ServeHandler(rec, req, AuthoringActionHandler(adapter))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if adapter.calls != 1 {
+		t.Fatalf("expected 1 adapter call, got %d", adapter.calls)
+	}
+	if adapter.mutation.Kind != AuthoringOperationSaveAppearance {
+		t.Fatalf("adapter must receive save-appearance mutation, got %q", adapter.mutation.Kind)
+	}
+	// Host reads colors from RawForm
+	if adapter.mutation.RawForm["colorAccent"] != "#b5651d" {
+		t.Fatalf("adapter.mutation.RawForm must carry colorAccent, got %q", adapter.mutation.RawForm["colorAccent"])
+	}
+	if adapter.mutation.RawForm["colorCanvas"] != "#f8f5ef" {
+		t.Fatalf("adapter.mutation.RawForm must carry colorCanvas, got %q", adapter.mutation.RawForm["colorCanvas"])
+	}
+
+	var result action.Result
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || result.Message != "Palette saved." {
+		t.Fatalf("unexpected action result: %#v", result)
+	}
+}

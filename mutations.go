@@ -19,6 +19,13 @@ const (
 	AuthoringOperationDuplicateComponent AuthoringOperationKind = "duplicate-component"
 	AuthoringOperationDeleteComponent    AuthoringOperationKind = "delete-component"
 	AuthoringOperationUpdatePage         AuthoringOperationKind = "update-page"
+	// AuthoringOperationSaveAppearance persists brand color tokens (and future
+	// appearance fields) in a single save through the draft→publish pipeline.
+	// Because this operation carries N color fields with host-defined names
+	// rather than a single well-known binding/value pair, the host adapter must
+	// read all submitted color values from AuthoringMutation.RawForm (e.g.
+	// mutation.RawForm["colorAccent"], mutation.RawForm["colorCanvas"]).
+	AuthoringOperationSaveAppearance AuthoringOperationKind = "save-appearance"
 )
 
 const (
@@ -69,6 +76,12 @@ type AuthoringMutation struct {
 	HasPosition          bool
 	Visible              bool
 	HasVisible           bool
+	// RawForm carries the complete submitted form map for operations that use
+	// host-defined field names rather than standard authoring fields.
+	// For AuthoringOperationSaveAppearance the host adapter reads color values
+	// directly from RawForm (e.g. mutation.RawForm["colorAccent"]).
+	// For all other operations RawForm is nil.
+	RawForm map[string]string
 }
 
 type AuthoringValidation struct {
@@ -282,6 +295,11 @@ func AuthoringMutationFromForm(form map[string]string) (AuthoringMutation, Autho
 		}
 	}
 	mutation = mutation.Normalize()
+	// For save-appearance, populate RawForm with the complete submitted form so
+	// the host adapter can read all host-defined color/appearance fields.
+	if mutation.Kind == AuthoringOperationSaveAppearance {
+		mutation.RawForm = cloneStringMap(form)
+	}
 	for field, message := range mutation.Validate().FieldErrors {
 		validation.AddFieldError(field, message)
 	}
@@ -362,6 +380,10 @@ func (mutation AuthoringMutation) Validate() AuthoringValidation {
 		}
 	case AuthoringOperationDuplicateComponent, AuthoringOperationDeleteComponent:
 		requirePageComponent(&validation, mutation)
+	case AuthoringOperationSaveAppearance:
+		// save-appearance carries multiple host-defined appearance fields
+		// (color tokens, etc.). No required standard fields beyond the op kind.
+		// The host adapter reads values from mutation.RawForm.
 	case AuthoringOperationUpdatePage:
 		if mutation.PageKey == "" {
 			validation.AddFieldError(AuthoringFieldPageKey, "Choose a page.")
@@ -616,6 +638,8 @@ func normalizeAuthoringOperationKind(kind AuthoringOperationKind) AuthoringOpera
 		return AuthoringOperationDeleteComponent
 	case AuthoringOperationUpdatePage:
 		return AuthoringOperationUpdatePage
+	case AuthoringOperationSaveAppearance:
+		return AuthoringOperationSaveAppearance
 	default:
 		return ""
 	}
