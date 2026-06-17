@@ -109,23 +109,8 @@ func renderSiteMapEditableControlPanel(siteMapView map[string]any, options SiteM
 	formID := FirstNonEmpty(options.ControlFormID, defaultSiteMapControlFormID)
 	children := []gosx.Node{
 		renderSiteMapPanelHeader(workbenchMapString(control, "label"), workbenchMapString(control, "componentLabel"), workbenchMapString(control, "kindLabel")),
+		RenderInspectorControl(control, formID, inputName),
 	}
-	children = append(children, siteMapHiddenInputs(formID, siteMapInputViews(control, "formInputs"), inputName)...)
-	children = append(children,
-		gosx.El("label", nil,
-			gosx.El("span", nil, gosx.Text("Value")),
-			gosx.El("input", gosx.Attrs(
-				gosx.Attr("form", formID),
-				gosx.Attr("type", "text"),
-				gosx.Attr("name", inputName),
-				gosx.Attr("value", workbenchMapString(control, "value")),
-			)),
-		),
-		gosx.El("button", gosx.Attrs(
-			gosx.Attr("form", formID),
-			gosx.Attr("type", "submit"),
-		), gosx.Text(FirstNonEmpty(workbenchMapString(control, "actionLabel"), "Save field"))),
-	)
 	return gosx.El("section", gosx.Attrs(
 		gosx.Attr("class", FirstNonEmpty(options.ControlClass, options.PanelClass, "studio-site-map-page-edit studio-site-map-builder__panel")),
 		gosx.Attr("data-gosx-studio-editable-control", "true"),
