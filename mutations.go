@@ -26,6 +26,14 @@ const (
 	// read all submitted color values from AuthoringMutation.RawForm (e.g.
 	// mutation.RawForm["colorAccent"], mutation.RawForm["colorCanvas"]).
 	AuthoringOperationSaveAppearance AuthoringOperationKind = "save-appearance"
+	// AuthoringOperationSetStyle sets a single CSS property on one component for a
+	// given responsive breakpoint and element state. It is the typed spine of
+	// per-element visual styling: the style inspector and the canvas
+	// direct-manipulation overlay both emit set-style mutations. The property is
+	// validated against a curated allow-list and the value is sanitized
+	// server-side (see style_mutations.go), so the browser can never push an
+	// illegal or injecting declaration into a page.
+	AuthoringOperationSetStyle AuthoringOperationKind = "set-style"
 )
 
 const (
@@ -44,6 +52,10 @@ const (
 	AuthoringFieldBinding              = "gosx_studio_binding"
 	AuthoringFieldTargetRegion         = "gosx_studio_target_region"
 	AuthoringFieldValue                = "gosx_studio_value"
+	AuthoringFieldStyleProperty        = "gosx_studio_style_property"
+	AuthoringFieldStyleValue           = "gosx_studio_style_value"
+	AuthoringFieldBreakpoint           = "gosx_studio_breakpoint"
+	AuthoringFieldState                = "gosx_studio_state"
 	AuthoringFieldPosition             = "gosx_studio_position"
 	AuthoringFieldVisible              = "gosx_studio_visible"
 )
@@ -72,6 +84,10 @@ type AuthoringMutation struct {
 	Binding              string
 	TargetRegion         string
 	Value                string
+	StyleProperty        string
+	StyleValue           string
+	Breakpoint           string
+	State                string
 	Position             int
 	HasPosition          bool
 	Visible              bool
@@ -276,6 +292,10 @@ func AuthoringMutationFromForm(form map[string]string) (AuthoringMutation, Autho
 		Binding:              formValue(form, AuthoringFieldBinding),
 		TargetRegion:         formValue(form, AuthoringFieldTargetRegion),
 		Value:                formValue(form, AuthoringFieldValue),
+		StyleProperty:        formValue(form, AuthoringFieldStyleProperty),
+		StyleValue:           formValue(form, AuthoringFieldStyleValue),
+		Breakpoint:           formValue(form, AuthoringFieldBreakpoint),
+		State:                formValue(form, AuthoringFieldState),
 	}
 	validation := AuthoringValidation{Values: cloneStringMap(form)}
 	if position, ok, valid := parseAuthoringInt(formValue(form, AuthoringFieldPosition)); ok {
@@ -329,6 +349,14 @@ func (mutation AuthoringMutation) Normalize() AuthoringMutation {
 	mutation.Binding = strings.TrimSpace(mutation.Binding)
 	mutation.TargetRegion = strings.TrimSpace(mutation.TargetRegion)
 	mutation.Value = strings.TrimSpace(mutation.Value)
+	mutation.StyleProperty = strings.ToLower(strings.TrimSpace(mutation.StyleProperty))
+	mutation.StyleValue = strings.TrimSpace(mutation.StyleValue)
+	mutation.Breakpoint = strings.TrimSpace(mutation.Breakpoint)
+	mutation.State = strings.TrimSpace(mutation.State)
+	if mutation.Kind == AuthoringOperationSetStyle {
+		mutation.Breakpoint = normalizeStyleBreakpoint(mutation.Breakpoint)
+		mutation.State = normalizeStyleState(mutation.State)
+	}
 	if mutation.Position < 0 {
 		mutation.Position = 0
 	}
@@ -384,6 +412,8 @@ func (mutation AuthoringMutation) Validate() AuthoringValidation {
 		// save-appearance carries multiple host-defined appearance fields
 		// (color tokens, etc.). No required standard fields beyond the op kind.
 		// The host adapter reads values from mutation.RawForm.
+	case AuthoringOperationSetStyle:
+		validateStyleMutation(&validation, mutation)
 	case AuthoringOperationUpdatePage:
 		if mutation.PageKey == "" {
 			validation.AddFieldError(AuthoringFieldPageKey, "Choose a page.")
@@ -413,6 +443,10 @@ func (mutation AuthoringMutation) FormValues() map[string]string {
 	setFormValue(values, AuthoringFieldBinding, mutation.Binding)
 	setFormValue(values, AuthoringFieldTargetRegion, mutation.TargetRegion)
 	setFormValue(values, AuthoringFieldValue, mutation.Value)
+	setFormValue(values, AuthoringFieldStyleProperty, mutation.StyleProperty)
+	setFormValue(values, AuthoringFieldStyleValue, mutation.StyleValue)
+	setFormValue(values, AuthoringFieldBreakpoint, mutation.Breakpoint)
+	setFormValue(values, AuthoringFieldState, mutation.State)
 	if mutation.HasPosition {
 		values[AuthoringFieldPosition] = strconv.Itoa(mutation.Position)
 	}
@@ -440,6 +474,10 @@ func AuthoringMutationFormInputViews(mutation AuthoringMutation) []map[string]st
 		AuthoringFieldBinding,
 		AuthoringFieldTargetRegion,
 		AuthoringFieldValue,
+		AuthoringFieldStyleProperty,
+		AuthoringFieldStyleValue,
+		AuthoringFieldBreakpoint,
+		AuthoringFieldState,
 		AuthoringFieldPosition,
 		AuthoringFieldVisible,
 	}
@@ -475,6 +513,10 @@ func AuthoringMutationView(mutation AuthoringMutation) map[string]any {
 		"binding":              mutation.Binding,
 		"targetRegion":         mutation.TargetRegion,
 		"value":                mutation.Value,
+		"styleProperty":        mutation.StyleProperty,
+		"styleValue":           mutation.StyleValue,
+		"breakpoint":           mutation.Breakpoint,
+		"state":                mutation.State,
 		"position":             mutation.Position,
 		"hasPosition":          mutation.HasPosition,
 		"visible":              mutation.Visible,
@@ -501,6 +543,10 @@ func AuthoringFieldNamesView() map[string]string {
 		"binding":              AuthoringFieldBinding,
 		"targetRegion":         AuthoringFieldTargetRegion,
 		"value":                AuthoringFieldValue,
+		"styleProperty":        AuthoringFieldStyleProperty,
+		"styleValue":           AuthoringFieldStyleValue,
+		"breakpoint":           AuthoringFieldBreakpoint,
+		"state":                AuthoringFieldState,
 		"position":             AuthoringFieldPosition,
 		"visible":              AuthoringFieldVisible,
 	}
@@ -640,6 +686,8 @@ func normalizeAuthoringOperationKind(kind AuthoringOperationKind) AuthoringOpera
 		return AuthoringOperationUpdatePage
 	case AuthoringOperationSaveAppearance:
 		return AuthoringOperationSaveAppearance
+	case AuthoringOperationSetStyle:
+		return AuthoringOperationSetStyle
 	default:
 		return ""
 	}
