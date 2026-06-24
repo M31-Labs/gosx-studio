@@ -1,6 +1,7 @@
 package showcase3d
 
 import (
+	_ "embed"
 	"strings"
 
 	studio "m31labs.dev/gosx-studio"
@@ -9,7 +10,46 @@ import (
 const (
 	FeatureKey = "showcase-3d"
 	PluginName = "Showcase 3D"
+
+	// IslandFeatureFlagKey gates per-tenant enablement of the plugin island,
+	// following the built-in "-runtime-islands" convention.
+	IslandFeatureFlagKey = "showcase-3d-runtime-islands"
+	// IslandScriptName is the served filename / dedupe key for the plugin island.
+	IslandScriptName = "showcase3d-runtime.js"
 )
+
+//go:embed island_runtime.js
+var islandRuntimeJS []byte
+
+// IslandRuntimeScript returns the plugin's client island IIFE (publishes
+// window.GoSXShowcase3DRuntime).
+func IslandRuntimeScript() []byte { return islandRuntimeJS }
+
+// Island returns the plugin's client runtime island for the Plugin v2 island
+// channel. Registering it via studio.PluginRegistry bundles it into the served
+// engine script and exposes it at its own route.
+func Island() studio.PluginIsland {
+	return studio.PluginIsland{
+		FeatureFlagKey: IslandFeatureFlagKey,
+		ScriptName:     IslandScriptName,
+		Bundle:         IslandRuntimeScript,
+	}
+}
+
+// Plugin returns the full studio.Plugin: the editor palette template, the
+// feature surface, and the client runtime island. Hosts register it for palette
+// templates via CompositionLibrary.RegisterPlugin and for the island via
+// studio.PluginRegistry.Register.
+func Plugin() studio.Plugin {
+	return studio.Plugin{
+		Key:       FeatureKey,
+		Label:     PluginName,
+		Summary:   "AI-generated 3D piece assets with Studio placement controls and public pop-out viewing.",
+		Templates: []studio.ComponentTemplate{ComponentTemplate()},
+		Feature:   Feature(),
+		Islands:   []studio.PluginIsland{Island()},
+	}
+}
 
 type AssetSource string
 

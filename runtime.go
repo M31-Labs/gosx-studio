@@ -31,7 +31,23 @@ var runtimeFS embed.FS
 // ~/.hyphae/spaces/m31labs-gosx/plans/gosx-vm-unification-and-editor-bridge-burn-down.md
 // Phase 3 Section E for the burn-down history.
 func EngineRuntimeScript() []byte {
-	slices := [][]byte{
+	return concatRuntimeSlices(builtinRuntimeSlices())
+}
+
+// EngineRuntimeScriptWithPlugins returns the built-in island bundle followed by
+// every client island contributed by plugins registered in reg, in registration
+// order. With a nil or empty registry the output is byte-identical to
+// EngineRuntimeScript(), so non-plugin hosts are unaffected. A plugin-aware host
+// serves this instead of EngineRuntimeScript() and mounts reg.IslandRoutes().
+func EngineRuntimeScriptWithPlugins(reg *PluginRegistry) []byte {
+	return concatRuntimeSlices(append(builtinRuntimeSlices(), reg.IslandBundles()...))
+}
+
+// builtinRuntimeSlices returns the ordered built-in island bundles. Extracted so
+// EngineRuntimeScript and EngineRuntimeScriptWithPlugins share one source of
+// truth for the built-in set and its order.
+func builtinRuntimeSlices() [][]byte {
+	return [][]byte{
 		fieldruntime.Bundle(),
 		selectionruntime.Bundle(),
 		brandruntime.Bundle(),
@@ -44,6 +60,11 @@ func EngineRuntimeScript() []byte {
 		inspectorruntime.Bundle(),
 		inlineeditruntime.Bundle(),
 	}
+}
+
+// concatRuntimeSlices joins non-empty island bundles, each terminated by a
+// newline (the historical engine-bundle framing).
+func concatRuntimeSlices(slices [][]byte) []byte {
 	total := 0
 	for _, slice := range slices {
 		if len(slice) > 0 {
@@ -67,6 +88,14 @@ func Stylesheet() []byte {
 
 func EngineRuntimeHandler() http.Handler {
 	return ScriptHandler("studio-engines.js", EngineRuntimeScript())
+}
+
+// EngineRuntimeHandlerWithPlugins serves the engine bundle including the islands
+// contributed by plugins registered in reg. A plugin-aware host mounts this in
+// place of EngineRuntimeHandler() and also mounts reg.IslandRoutes() so each
+// island is additionally reachable on its own URL.
+func EngineRuntimeHandlerWithPlugins(reg *PluginRegistry) http.Handler {
+	return ScriptHandler("studio-engines.js", EngineRuntimeScriptWithPlugins(reg))
 }
 
 // PreviewSubscriberScript returns the JS bundle the storefront mounts
