@@ -30,7 +30,7 @@ func TestBuildStyleControlViewFullShape(t *testing.T) {
 		return ""
 	}
 
-	view := BuildStyleControlView(sections, specs, lookup, "/action", "csrf-tok")
+	view := BuildStyleControlView(sections, specs, lookup, "home", "/action", "csrf-tok")
 
 	if view["hasControls"] != true {
 		t.Fatal("expected hasControls true")
@@ -129,7 +129,7 @@ func TestBuildStyleControlViewFullShape(t *testing.T) {
 func TestBuildStyleControlViewEmptyWithoutSections(t *testing.T) {
 	view := BuildStyleControlView(nil, []StyleControlSpec{
 		{Property: "text-align", Label: "Alignment", Widget: "segment"},
-	}, nil, "/a", "")
+	}, nil, "home", "/a", "")
 	if view["hasControls"] != false {
 		t.Fatal("no sections must yield hasControls false")
 	}
@@ -147,7 +147,7 @@ func TestBuildStyleControlViewSkipsBlankKey(t *testing.T) {
 	specs := []StyleControlSpec{
 		{Property: "color", Label: "Color", Widget: "number"},
 	}
-	view := BuildStyleControlView(sections, specs, nil, "/a", "")
+	view := BuildStyleControlView(sections, specs, nil, "home", "/a", "")
 	groups, _ := view["groups"].([]map[string]any)
 	if len(groups) != 1 || groups[0]["sectionKey"] != "hero" {
 		t.Fatalf("blank-key section must be skipped: %v", groups)
@@ -157,7 +157,7 @@ func TestBuildStyleControlViewSkipsBlankKey(t *testing.T) {
 func TestBuildStyleControlViewNoCsrfWhenEmpty(t *testing.T) {
 	sections := []StyleSection{{Key: "s1", Label: "S1"}}
 	specs := []StyleControlSpec{{Property: "color", Label: "Color", Widget: "number"}}
-	view := BuildStyleControlView(sections, specs, nil, "/a", "")
+	view := BuildStyleControlView(sections, specs, nil, "home", "/a", "")
 	shells, _ := view["shells"].([]map[string]any)
 	if len(shells) == 0 {
 		t.Fatal("expected at least one shell")
@@ -198,7 +198,7 @@ func TestBuildSectionConfigViewFullShape(t *testing.T) {
 		},
 	}
 
-	view := BuildSectionConfigView(sections, "/action", "csrf-x")
+	view := BuildSectionConfigView(sections, "home", "/action", "csrf-x")
 
 	if view["hasControls"] != true {
 		t.Fatal("expected hasControls true")
@@ -266,7 +266,7 @@ func TestBuildSectionConfigViewFullShape(t *testing.T) {
 }
 
 func TestBuildSectionConfigViewEmptyWhenNoSections(t *testing.T) {
-	view := BuildSectionConfigView(nil, "/a", "")
+	view := BuildSectionConfigView(nil, "home", "/a", "")
 	if view["hasControls"] != false {
 		t.Fatal("empty sections must yield hasControls false")
 	}
@@ -280,7 +280,7 @@ func TestBuildSectionConfigViewSkipsBlankKey(t *testing.T) {
 	sections := []ConfigSection{
 		{Key: "", Label: "bad", Specs: []ConfigControlSpec{{Field: "x", Label: "X", Widget: "text"}}},
 	}
-	view := BuildSectionConfigView(sections, "/a", "")
+	view := BuildSectionConfigView(sections, "home", "/a", "")
 	if view["hasControls"] != false {
 		t.Fatal("blank key section must be skipped")
 	}

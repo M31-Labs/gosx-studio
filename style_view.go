@@ -56,7 +56,7 @@ type StyleValueLookup func(sectionKey, property string) string
 //
 // page.gsx contract (frozen — do not change keys):
 //
-//	shells[i]: formID, action, componentKey, property, breakpoint, state, csrf, hasCsrf
+//	shells[i]: formID, action, pageKey, componentKey, property, breakpoint, state, csrf, hasCsrf
 //	groups[i]: sectionKey, inspectorFor, label, controls[]
 //	controls[j]: formID, property, label, value, unit, isSwatch, isSegment, isNumber, options[]
 //	options[k]: value, label, checked, swatchStyle
@@ -64,7 +64,7 @@ func BuildStyleControlView(
 	sections []StyleSection,
 	specs []StyleControlSpec,
 	valueLookup StyleValueLookup,
-	action, csrfToken string,
+	pageKey, action, csrfToken string,
 ) map[string]any {
 	hasCsrf := strings.TrimSpace(csrfToken) != ""
 	shells := make([]map[string]any, 0)
@@ -105,6 +105,7 @@ func BuildStyleControlView(
 			shells = append(shells, map[string]any{
 				"formID":       formID,
 				"action":       action,
+				"pageKey":      pageKey,
 				"componentKey": key,
 				"property":     spec.Property,
 				"breakpoint":   StyleBreakpointBase,
@@ -165,13 +166,13 @@ type ConfigSection struct {
 //
 // page.gsx contract (frozen — do not change keys):
 //
-//	shells[i]: formID, action, binding, csrf, hasCsrf
+//	shells[i]: formID, action, pageKey, componentKey, controlKey, binding, csrf, hasCsrf
 //	groups[i]: sectionKey, inspectorFor, label, controls[]
 //	controls[j]: formID, label, value, isSelect, isNumber, isText, options[]
 //	options[k]: value, label, checked
 func BuildSectionConfigView(
 	sections []ConfigSection,
-	action, csrfToken string,
+	pageKey, action, csrfToken string,
 ) map[string]any {
 	empty := map[string]any{
 		"hasControls": false,
@@ -212,11 +213,14 @@ func BuildSectionConfigView(
 				"options":  options,
 			})
 			shells = append(shells, map[string]any{
-				"formID":  formID,
-				"action":  action,
-				"binding": SectionFieldBinding(key, spec.Field),
-				"csrf":    csrfToken,
-				"hasCsrf": hasCsrf,
+				"formID":       formID,
+				"action":       action,
+				"pageKey":      pageKey,
+				"componentKey": key,
+				"controlKey":   spec.Field,
+				"binding":      SectionFieldBinding(key, spec.Field),
+				"csrf":         csrfToken,
+				"hasCsrf":      hasCsrf,
 			})
 		}
 		groups = append(groups, map[string]any{
