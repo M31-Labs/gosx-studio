@@ -37,6 +37,40 @@ func TestFeatureFlagKey(t *testing.T) {
 	}
 }
 
+func TestDOMContractConstants(t *testing.T) {
+	checks := map[string]string{
+		"RowAttr":       RowAttr,
+		"OrderAttr":     OrderAttr,
+		"IndexAttr":     IndexAttr,
+		"HandleAttr":    HandleAttr,
+		"MoveAttr":      MoveAttr,
+		"AddBlockAttr":  AddBlockAttr,
+		"VisibleAttr":   VisibleAttr,
+		"PillAttr":      PillAttr,
+		"SelectedClass": SelectedClass,
+		"ReorderEvent":  ReorderEvent,
+		"SelectEvent":   SelectEvent,
+	}
+	want := map[string]string{
+		"RowAttr":       "data-block-studio-block",
+		"OrderAttr":     "data-block-studio-order",
+		"IndexAttr":     "data-block-studio-index",
+		"HandleAttr":    "data-block-studio-handle",
+		"MoveAttr":      "data-block-studio-move",
+		"AddBlockAttr":  "data-editor-add-block",
+		"VisibleAttr":   "data-editor-block-visible",
+		"PillAttr":      "data-editor-block-pill",
+		"SelectedClass": "is-selected",
+		"ReorderEvent":  "blockstudio:reorder",
+		"SelectEvent":   "blockstudio:select",
+	}
+	for name, got := range checks {
+		if got != want[name] {
+			t.Fatalf("%s = %q, want %q", name, got, want[name])
+		}
+	}
+}
+
 func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 	shim := string(BridgeShim())
 	if shim == "" {
@@ -90,8 +124,8 @@ func TestIslandRuntimeJSPublishesRowsGlobal(t *testing.T) {
 	// DOM contract — the block-list query selector. If muddy-noni renames
 	// data-block-studio-block, this test fails and the slice author surfaces
 	// the drift before parity tests start lying.
-	if !strings.Contains(body, "data-block-studio-block") {
-		t.Fatalf("IslandRuntimeJS() rows must query data-block-studio-block")
+	if !strings.Contains(body, RowAttr) {
+		t.Fatalf("IslandRuntimeJS() rows must query %s", RowAttr)
 	}
 }
 
@@ -154,14 +188,14 @@ func TestIslandRuntimeJSPublishesRenumberGlobal(t *testing.T) {
 	// these silently breaks the reorder fan-out.
 	for _, contract := range []string{
 		// Order-input attribute the legacy reads + writes.
-		"data-block-studio-order",
+		OrderAttr,
 		// Move-button disabled state — the up/down buttons sit on every row
 		// and disable at the list ends.
-		"data-block-studio-move",
+		MoveAttr,
 		// Index attribute that records the row's position after renumbering.
-		"data-block-studio-index",
+		IndexAttr,
 		// CustomEvent name the form's reorder listener watches.
-		"blockstudio:reorder",
+		ReorderEvent,
 		// Default source string when caller passes no source argument.
 		"block-layout-engine",
 	} {
@@ -184,12 +218,12 @@ func TestIslandRuntimeJSPublishesSelectRowGlobal(t *testing.T) {
 	}
 	// CustomEvent contract — the selection commandbar + inspector form watch
 	// for blockstudio:select.
-	if !strings.Contains(body, "blockstudio:select") {
-		t.Fatalf("IslandRuntimeJS() selectRow must dispatch %q", "blockstudio:select")
+	if !strings.Contains(body, SelectEvent) {
+		t.Fatalf("IslandRuntimeJS() selectRow must dispatch %q", SelectEvent)
 	}
 	// CSS class used to highlight the selected row in the editor.
-	if !strings.Contains(body, "is-selected") {
-		t.Fatalf("IslandRuntimeJS() selectRow must toggle is-selected class")
+	if !strings.Contains(body, SelectedClass) {
+		t.Fatalf("IslandRuntimeJS() selectRow must toggle %s class", SelectedClass)
 	}
 }
 
@@ -229,9 +263,9 @@ func TestIslandRuntimeJSPublishesUpdateBlockLibraryStateGlobal(t *testing.T) {
 	// silently breaks the library-button sync after a visibility toggle.
 	for _, contract := range []string{
 		// Source-of-truth attribute for the library button -> block-key map.
-		"data-editor-add-block",
+		AddBlockAttr,
 		// Visibility checkbox the helper reads to decide button state.
-		"data-editor-block-visible",
+		VisibleAttr,
 		// Base-class attribute the legacy reads to compose the final
 		// className (button + base + button--ghost is-active / button--secondary).
 		"data-editor-button-base",
@@ -266,7 +300,7 @@ func TestIslandRuntimeJSPublishesUpdateVisibilityStateGlobal(t *testing.T) {
 		// text + pill labels users see in the editor.
 		"editor-block--hidden",
 		"data-editor-block-status",
-		"data-editor-block-pill",
+		PillAttr,
 		"status--ready",
 		// Slice 6 transitional cleanup (Section G.3) — the cross-frame
 		// mutation now rides on $preview.block.<key>.visible. The signal
@@ -341,8 +375,8 @@ func TestIslandRuntimeJSPublishesBindLibraryGlobal(t *testing.T) {
 	for _, contract := range []string{
 		// DOM contracts the click handler queries against.
 		"data-editor-workbench",
-		"data-editor-add-block",
-		"data-editor-block-visible",
+		AddBlockAttr,
+		VisibleAttr,
 		// Idempotency marker (camelCase dataset key form).
 		"gosxStudioBlockLibraryIslandBound",
 	} {
@@ -375,7 +409,7 @@ func TestIslandRuntimeJSPublishesBindVisibilityGlobal(t *testing.T) {
 	}
 	for _, contract := range []string{
 		// DOM contract the change handler queries against.
-		"data-editor-block-visible",
+		VisibleAttr,
 		// Idempotency marker (camelCase dataset key form).
 		"gosxStudioBlockVisibilityIslandBound",
 	} {
@@ -411,8 +445,8 @@ func TestIslandRuntimeJSPublishesBindListGlobal(t *testing.T) {
 	}
 	for _, contract := range []string{
 		// DOM contracts the click handler queries against.
-		"data-block-studio-block",
-		"data-block-studio-move",
+		RowAttr,
+		MoveAttr,
 		// Idempotency marker (camelCase dataset key form).
 		"gosxStudioBlockListIslandBound",
 		// Initial renumber pass — preserves the legacy boot-time
@@ -452,8 +486,8 @@ func TestIslandRuntimeJSPublishesBindHandleDragGlobal(t *testing.T) {
 	}
 	for _, contract := range []string{
 		// DOM contracts the pointer chain queries against.
-		"data-block-studio-handle",
-		"data-block-studio-block",
+		HandleAttr,
+		RowAttr,
 		// Pointer event names — NOT HTML5 drag events.
 		"pointerdown",
 		"pointermove",
