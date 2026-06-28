@@ -14,6 +14,8 @@ func TestCanvasInlineEditScriptContract(t *testing.T) {
 		"window.GoSXStudioCanvasInlineEditRuntime",
 		"window.__muddyCanvasInlineEdit",
 		"GoSXStudioInlineEditRuntime",
+		"__gosxStudioCanvasInlineEditPendingInstall",
+		"return false",
 		"persistRepaintSafe",
 		"data-gosx-canvas-bundle",
 	} {
@@ -41,6 +43,7 @@ func TestCanvasDefaultInlineInstallerScriptContract(t *testing.T) {
 		"GoSXStudioCanvasInlineEditRuntime",
 		"data-studio-site-map-canvas-default",
 		"data-gosx-canvas-html",
+		"installed === false",
 	} {
 		if !strings.Contains(body, check) {
 			t.Fatalf("CanvasDefaultInlineInstallerScript() missing %q", check)

@@ -49,6 +49,8 @@
   var HTML_KEY_ATTR = "data-gosx-html-key";
   // The painter mounts each surface in [data-gosx-canvas-html="<id>"].
   var CANVAS_HTML_ATTR = "data-gosx-canvas-html";
+  var PENDING_INSTALL = "__gosxStudioCanvasInlineEditPendingInstall";
+  var RETRY_LIMIT = 120;
 
   // csrfToken resolves the session CSRF token the authoring action requires on
   // unsafe (POST) requests. The gosx session middleware (session.Protect) rejects
@@ -299,13 +301,38 @@
   // POST. CanvasBoard repaint-safe bundle surgery is injected via onCommit so the
   // engine remains host-agnostic.
   //
-  // Fail-safe: if the engine is absent (script load order problem), this is a no-op
-  // rather than throwing — consistent with the previous guard pattern in the call sites.
+  function retryInstall(overlay, opts) {
+    var state = overlay[PENDING_INSTALL];
+    if (state && state.timer) {
+      state.opts = opts || {};
+      return;
+    }
+    state = { tries: 0, opts: opts || {}, timer: null };
+    overlay[PENDING_INSTALL] = state;
+    state.timer = setInterval(function () {
+      state.tries += 1;
+      if (install(overlay, state.opts) === true || state.tries >= RETRY_LIMIT) {
+        clearInterval(state.timer);
+        overlay[PENDING_INSTALL] = null;
+      }
+    }, 250);
+  }
+
+  // Fail-safe: if the engine is absent (script load order problem), schedule a
+  // bounded retry and report false so callers know no listener was attached yet.
   function install(overlay, opts) {
-    if (!overlay || typeof overlay.addEventListener !== "function") return;
+    if (!overlay || typeof overlay.addEventListener !== "function") return false;
     opts = opts || {};
     var rt = (typeof window !== "undefined") ? window.GoSXStudioInlineEditRuntime : null;
-    if (!rt || typeof rt.install !== "function") return; // engine missing — fail safe
+    if (!rt || typeof rt.install !== "function") {
+      retryInstall(overlay, opts);
+      return false;
+    }
+    var pending = overlay[PENDING_INSTALL];
+    if (pending && pending.timer) {
+      clearInterval(pending.timer);
+      overlay[PENDING_INSTALL] = null;
+    }
     rt.install(overlay, {
       action: opts.action || opts.route || undefined,
       // Pass the getter (not its result) so the engine re-reads the live token at
@@ -320,6 +347,7 @@
         persistRepaintSafe(overlay, el);
       },
     });
+    return true;
   }
 
   var api = { install: install, deriveKeys: deriveKeys, persist: persist, persistRepaintSafe: persistRepaintSafe, csrfToken: csrfToken };

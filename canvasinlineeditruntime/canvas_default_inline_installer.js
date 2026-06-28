@@ -23,8 +23,9 @@
     for (var j = 0; j < layers.length; j++) {
       var layer = layers[j];
       if (!layer || layer[INSTALLED_FLAG]) continue;
+      var installed = api.install(layer);
+      if (installed === false) continue;
       layer[INSTALLED_FLAG] = true;
-      api.install(layer);
     }
   }
 
