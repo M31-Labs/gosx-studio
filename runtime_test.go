@@ -24,7 +24,14 @@ func TestStylesheetHandlerServesStudioChromeTokens(t *testing.T) {
 	if ct := rec.Header().Get("Content-Type"); !strings.Contains(ct, "text/css") {
 		t.Fatalf("stylesheet content type = %q", ct)
 	}
-	for _, check := range []string{"--size-studio-max", "--studio-stage-height", ".gosx-studio", "data-gosx-studio-authoring-selected"} {
+	for _, check := range []string{
+		"--size-studio-max",
+		"--studio-stage-height",
+		".gosx-studio",
+		"data-gosx-studio-authoring-selected",
+		`[data-studio-site-filter="site"]`,
+		`a[data-studio-site-group]:not([data-studio-site-group="site"])`,
+	} {
 		if !strings.Contains(rec.Body.String(), check) {
 			t.Fatalf("stylesheet missing %q: %s", check, rec.Body.String())
 		}

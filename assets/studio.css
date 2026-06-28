@@ -23,3 +23,18 @@ body:has(.editor-page),
 [data-gosx-studio-authoring-state="saved"] [data-gosx-studio-save-state] {
   color: var(--color-success, var(--color-accent, currentColor));
 }
+
+[data-studio-site-filter="site"]
+  .studio-page-list
+  a[data-studio-site-group]:not([data-studio-site-group="site"]),
+[data-studio-site-filter="content"]
+  .studio-page-list
+  a[data-studio-site-group]:not([data-studio-site-group="content"]),
+[data-studio-site-filter="store"]
+  .studio-page-list
+  a[data-studio-site-group]:not([data-studio-site-group="store"]),
+[data-studio-site-filter="tools"]
+  .studio-page-list
+  a[data-studio-site-group]:not([data-studio-site-group="tools"]) {
+  display: none;
+}
