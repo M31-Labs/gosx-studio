@@ -1,6 +1,7 @@
 package studio
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -300,6 +301,18 @@ func TestPreviewSubscriberScriptIsNonEmpty(t *testing.T) {
 	}
 }
 
+func TestStudioRuntimeScriptsAreNonEmpty(t *testing.T) {
+	for name, script := range map[string][]byte{
+		"workbench": WorkbenchRuntimeScript(),
+		"command":   CommandRuntimeScript(),
+		"state":     StateRuntimeScript(),
+	} {
+		if len(script) == 0 {
+			t.Fatalf("%s runtime script must be non-empty", name)
+		}
+	}
+}
+
 func TestPreviewSubscriberHandlerServesSubscriberScript(t *testing.T) {
 	rec := httptest.NewRecorder()
 	PreviewSubscriberHandler().ServeHTTP(rec, httptest.NewRequest("GET", PreviewSubscriberPath, nil))
@@ -315,6 +328,44 @@ func TestPreviewSubscriberHandlerServesSubscriberScript(t *testing.T) {
 	}
 	if strings.Contains(body, "__gosx_preview_runtime_island_mount") {
 		t.Fatalf("preview subscriber must not contain editor-side island writer globals")
+	}
+}
+
+func TestStudioRuntimeHandlersServeJavaScript(t *testing.T) {
+	for name, test := range map[string]struct {
+		path    string
+		handler func() http.Handler
+		check   string
+	}{
+		"workbench": {
+			path:    WorkbenchRuntimePath,
+			handler: WorkbenchRuntimeHandler,
+			check:   "data-studio-workbench",
+		},
+		"command": {
+			path:    CommandRuntimePath,
+			handler: CommandRuntimeHandler,
+			check:   "gosxstudio:command",
+		},
+		"state": {
+			path:    StateRuntimePath,
+			handler: StateRuntimeHandler,
+			check:   "data-gosx-studio-save-state",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			test.handler().ServeHTTP(rec, httptest.NewRequest("GET", test.path, nil))
+			if rec.Code != 200 {
+				t.Fatalf("%s runtime status = %d", name, rec.Code)
+			}
+			if ct := rec.Header().Get("Content-Type"); !strings.Contains(ct, "text/javascript") {
+				t.Fatalf("%s runtime content type = %q", name, ct)
+			}
+			if !strings.Contains(rec.Body.String(), test.check) {
+				t.Fatalf("%s runtime body missing %q", name, test.check)
+			}
+		})
 	}
 }
 

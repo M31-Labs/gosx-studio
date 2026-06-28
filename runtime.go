@@ -21,7 +21,7 @@ import (
 	"m31labs.dev/gosx-studio/workbenchruntime"
 )
 
-//go:embed assets/studio.css
+//go:embed assets/studio.css assets/workbench_runtime.js assets/command_palette.js assets/state_runtime.js
 var runtimeFS embed.FS
 
 // EngineRuntimeScript returns the concatenated island runtime bundles for
@@ -117,6 +117,24 @@ func PreviewSubscriberScript() []byte {
 	return previewruntime.PreviewSubscriberScript()
 }
 
+// WorkbenchRuntimeScript returns the legacy Studio workbench chrome runtime.
+// It remains separate from EngineRuntimeScript because existing hosts mount it
+// through WorkbenchRuntimePath while backend admin/editor ownership moves into
+// this module.
+func WorkbenchRuntimeScript() []byte {
+	return readRuntime("assets/workbench_runtime.js")
+}
+
+// CommandRuntimeScript returns the Studio command palette runtime.
+func CommandRuntimeScript() []byte {
+	return readRuntime("assets/command_palette.js")
+}
+
+// StateRuntimeScript returns the Studio save/state indicator runtime.
+func StateRuntimeScript() []byte {
+	return readRuntime("assets/state_runtime.js")
+}
+
 // AuthoringRuntimeScript returns the browser runtime that reacts to successful
 // Studio authoring action results. It is included in EngineRuntimeScript for
 // hosts that serve the Studio engine bundle, and is exposed separately for
@@ -137,6 +155,18 @@ func SiteMapRuntimeScript() []byte {
 // a <script defer> tag emitted by the preview-mode bootstrap.
 func PreviewSubscriberHandler() http.Handler {
 	return ScriptHandler("preview-subscriber.js", PreviewSubscriberScript())
+}
+
+func WorkbenchRuntimeHandler() http.Handler {
+	return ScriptHandler("workbench-runtime.js", WorkbenchRuntimeScript())
+}
+
+func CommandRuntimeHandler() http.Handler {
+	return ScriptHandler("command-palette.js", CommandRuntimeScript())
+}
+
+func StateRuntimeHandler() http.Handler {
+	return ScriptHandler("state-runtime.js", StateRuntimeScript())
 }
 
 func StylesheetHandler() http.Handler {
