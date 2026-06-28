@@ -70,6 +70,11 @@ type WorkbenchViewportControlsOptions struct {
 	Label string
 }
 
+type WorkbenchCanvasToolsOptions struct {
+	Class string
+	Label string
+}
+
 type WorkbenchCommandPaletteOptions struct {
 	Class       string
 	Launcher    string
@@ -245,6 +250,36 @@ func RenderWorkbenchViewportControls(view map[string]any, options WorkbenchViewp
 		gosx.Attr("data-studio-viewport-current", current),
 		gosx.Attr("data-gosx-studio-viewport-controls-renderer", "gosx-studio"),
 	), gosx.Fragment(nodes...))
+}
+
+func RenderWorkbenchCanvasTools(view map[string]any, options WorkbenchCanvasToolsOptions) gosx.Node {
+	return gosx.El("div", gosx.Attrs(
+		gosx.Attr("class", FirstNonEmpty(options.Class, "studio-canvas-tools")),
+		gosx.Attr("role", "toolbar"),
+		gosx.Attr("aria-label", FirstNonEmpty(options.Label, "Canvas tools")),
+		gosx.Attr("data-gosx-studio-canvas-tools-renderer", "gosx-studio"),
+	),
+		gosx.El("button", gosx.Attrs(
+			gosx.Attr("type", "button"),
+			gosx.Attr("data-studio-rail-toggle", "left"),
+			gosx.Attr("aria-pressed", "true"),
+		), gosx.Text(FirstNonEmpty(workbenchViewString(view, "leftRailLabel"), "Layers"))),
+		gosx.El("button", gosx.Attrs(
+			gosx.Attr("type", "button"),
+			gosx.Attr("data-studio-rail-toggle", "right"),
+			gosx.Attr("aria-pressed", "true"),
+		), gosx.Text(FirstNonEmpty(workbenchViewString(view, "rightRailLabel"), "Inspector"))),
+		gosx.El("button", gosx.Attrs(
+			gosx.Attr("type", "button"),
+			gosx.Attr("data-studio-activity-toggle", "true"),
+			gosx.Attr("aria-pressed", "true"),
+		), gosx.Text(FirstNonEmpty(workbenchViewString(view, "activityLabel"), "Activity"))),
+		gosx.El("button", gosx.Attrs(
+			gosx.Attr("type", "button"),
+			gosx.Attr("data-studio-focus-toggle", "true"),
+			gosx.Attr("aria-pressed", "false"),
+		), gosx.Text(FirstNonEmpty(workbenchViewString(view, "focusLabel"), "Focus"))),
+	)
 }
 
 func RenderWorkbenchCommandPalette(view map[string]any, options WorkbenchCommandPaletteOptions) gosx.Node {

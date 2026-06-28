@@ -226,6 +226,51 @@ func TestRenderWorkbenchViewportControlsHonorsCustomViewportsAndClass(t *testing
 	}
 }
 
+func TestRenderWorkbenchCanvasToolsUsesDefaultShellView(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site"}, WorkbenchShellViewOptions{})
+	html := gosx.RenderHTML(RenderWorkbenchCanvasTools(view, WorkbenchCanvasToolsOptions{}))
+	for _, want := range []string{
+		`class="studio-canvas-tools"`,
+		`role="toolbar"`,
+		`aria-label="Canvas tools"`,
+		`data-gosx-studio-canvas-tools-renderer="gosx-studio"`,
+		`type="button" data-studio-rail-toggle="left" aria-pressed="true">Layers</button>`,
+		`type="button" data-studio-rail-toggle="right" aria-pressed="true">Inspector</button>`,
+		`type="button" data-studio-activity-toggle="true" aria-pressed="true">Activity</button>`,
+		`type="button" data-studio-focus-toggle="true" aria-pressed="false">Focus</button>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in canvas tools html: %s", want, html)
+		}
+	}
+}
+
+func TestRenderWorkbenchCanvasToolsHonorsShellLabelsAndClass(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site"}, WorkbenchShellViewOptions{
+		LeftRailLabel:  "Pages",
+		RightRailLabel: "Fields",
+		ActivityLabel:  "Timeline",
+		FocusLabel:     "Inspect",
+	})
+	html := gosx.RenderHTML(RenderWorkbenchCanvasTools(view, WorkbenchCanvasToolsOptions{
+		Class: "custom-canvas-tools",
+		Label: "Editor tools",
+	}))
+	for _, want := range []string{
+		`class="custom-canvas-tools"`,
+		`aria-label="Editor tools"`,
+		`data-gosx-studio-canvas-tools-renderer="gosx-studio"`,
+		`data-studio-rail-toggle="left" aria-pressed="true">Pages</button>`,
+		`data-studio-rail-toggle="right" aria-pressed="true">Fields</button>`,
+		`data-studio-activity-toggle="true" aria-pressed="true">Timeline</button>`,
+		`data-studio-focus-toggle="true" aria-pressed="false">Inspect</button>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in custom canvas tools html: %s", want, html)
+		}
+	}
+}
+
 func TestRenderWorkbenchToolbarHonorsDisabledActions(t *testing.T) {
 	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site", PreviewURL: "/"}, WorkbenchShellViewOptions{})
 	html := gosx.RenderHTML(RenderWorkbenchToolbar(view, WorkbenchToolbarOptions{
