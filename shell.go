@@ -13,13 +13,15 @@ import (
 )
 
 const (
-	RuntimeRoot             = "/_gosx/studio"
-	StylesheetPath          = RuntimeRoot + "/studio.css"
-	EngineRuntimePath       = RuntimeRoot + "/studio-engines.js"
-	WorkbenchRuntimePath    = RuntimeRoot + "/workbench-runtime.js"
-	CommandRuntimePath      = RuntimeRoot + "/command-palette.js"
-	StateRuntimePath        = RuntimeRoot + "/state-runtime.js"
-	PreviewSubscriberPath   = RuntimeRoot + "/preview-subscriber.js"
+	RuntimeRoot                      = "/_gosx/studio"
+	StylesheetPath                   = RuntimeRoot + "/studio.css"
+	EngineRuntimePath                = RuntimeRoot + "/studio-engines.js"
+	WorkbenchRuntimePath             = RuntimeRoot + "/workbench-runtime.js"
+	CommandRuntimePath               = RuntimeRoot + "/command-palette.js"
+	StateRuntimePath                 = RuntimeRoot + "/state-runtime.js"
+	PreviewSubscriberPath            = RuntimeRoot + "/preview-subscriber.js"
+	CanvasInlineEditPath             = RuntimeRoot + "/canvas-inline-edit.js"
+	CanvasDefaultInlineInstallerPath = RuntimeRoot + "/canvas-default-inline-installer.js"
 
 	CanvasEngineName      = "GoSXStudioCanvas"
 	SiteMapEngineName     = "GoSXStudioSiteMap"
@@ -141,7 +143,7 @@ func DefaultShellConfig() ShellConfig {
 			{Key: "schedule", Label: "Schedule", Method: "POST"},
 			{Key: "restore", Label: "Restore", Method: "POST"},
 		},
-		Permissions:  PermissionConfig{CanEdit: true, CanPublish: true, CanManage: true},
+		Permissions: PermissionConfig{CanEdit: true, CanPublish: true, CanManage: true},
 		FeatureFlags: map[string]bool{
 			"brand-media-picker": true,
 			"publish-review":     true,

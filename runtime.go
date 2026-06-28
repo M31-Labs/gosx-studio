@@ -11,6 +11,7 @@ import (
 	"m31labs.dev/gosx-studio/authoringruntime"
 	"m31labs.dev/gosx-studio/blocklayoutruntime"
 	"m31labs.dev/gosx-studio/brandruntime"
+	"m31labs.dev/gosx-studio/canvasinlineeditruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/inlineeditruntime"
 	"m31labs.dev/gosx-studio/inspectorruntime"
@@ -91,6 +92,27 @@ func CommandRuntimeHandler() http.Handler {
 
 func StateRuntimeHandler() http.Handler {
 	return ScriptHandler("state-runtime.js", StateRuntimeScript())
+}
+
+// CanvasInlineEditScript returns the CanvasBoard inline-edit bridge. The bridge
+// delegates commit behavior to GoSXStudioInlineEditRuntime and owns only the
+// CanvasBoard repaint-safe source-of-truth refresh.
+func CanvasInlineEditScript() []byte {
+	return canvasinlineeditruntime.CanvasInlineEditScript()
+}
+
+// CanvasDefaultInlineInstallerScript returns the default CanvasBoard inline-edit
+// installer that scopes installation to the marked default editor CanvasBoard.
+func CanvasDefaultInlineInstallerScript() []byte {
+	return canvasinlineeditruntime.CanvasDefaultInlineInstallerScript()
+}
+
+func CanvasInlineEditHandler() http.Handler {
+	return ScriptHandler("canvas-inline-edit.js", CanvasInlineEditScript())
+}
+
+func CanvasDefaultInlineInstallerHandler() http.Handler {
+	return ScriptHandler("canvas-default-inline-installer.js", CanvasDefaultInlineInstallerScript())
 }
 
 // PreviewSubscriberScript returns the JS bundle the storefront mounts

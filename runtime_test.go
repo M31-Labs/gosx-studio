@@ -84,6 +84,63 @@ func TestLegacyRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
 	}
 }
 
+func TestCanvasInlineRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
+	for name, tt := range map[string]struct {
+		path   string
+		script []byte
+		checks []string
+		serve  func() *httptest.ResponseRecorder
+	}{
+		"canvas-inline-edit": {
+			path:   CanvasInlineEditPath,
+			script: CanvasInlineEditScript(),
+			checks: []string{
+				"window.GoSXStudioCanvasInlineEditRuntime",
+				"window.__muddyCanvasInlineEdit",
+				"persistRepaintSafe",
+			},
+			serve: func() *httptest.ResponseRecorder {
+				rec := httptest.NewRecorder()
+				CanvasInlineEditHandler().ServeHTTP(rec, httptest.NewRequest("GET", CanvasInlineEditPath, nil))
+				return rec
+			},
+		},
+		"canvas-default-inline-installer": {
+			path:   CanvasDefaultInlineInstallerPath,
+			script: CanvasDefaultInlineInstallerScript(),
+			checks: []string{
+				"window.GoSXStudioCanvasDefaultInlineInstallerRuntime",
+				"window.__muddyCanvasDefaultInlineInstaller",
+				"data-studio-site-map-canvas-default",
+			},
+			serve: func() *httptest.ResponseRecorder {
+				rec := httptest.NewRecorder()
+				CanvasDefaultInlineInstallerHandler().ServeHTTP(rec, httptest.NewRequest("GET", CanvasDefaultInlineInstallerPath, nil))
+				return rec
+			},
+		},
+	} {
+		if len(tt.script) == 0 {
+			t.Fatalf("%s runtime script is empty", name)
+		}
+		rec := tt.serve()
+		if rec.Code != 200 {
+			t.Fatalf("%s runtime status = %d", name, rec.Code)
+		}
+		if ct := rec.Header().Get("Content-Type"); ct != "text/javascript; charset=utf-8" {
+			t.Fatalf("%s runtime content type = %q", name, ct)
+		}
+		if rec.Body.String() != string(tt.script) {
+			t.Fatalf("%s runtime handler body does not match script", name)
+		}
+		for _, check := range tt.checks {
+			if !strings.Contains(rec.Body.String(), check) {
+				t.Fatalf("%s runtime handler body missing %q", name, check)
+			}
+		}
+	}
+}
+
 func TestEngineRuntimeIncludesFieldRuntimeIslandBundle(t *testing.T) {
 	// Phase 3 slice-1 GoSXStudioFieldRuntime island contract. The engine
 	// runtime asset must include the island-runtime JS (publishes the
