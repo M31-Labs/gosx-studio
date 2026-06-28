@@ -124,6 +124,58 @@ func TestRenderWorkbenchCommandPaletteUsesShellViewCommands(t *testing.T) {
 	}
 }
 
+func TestRenderWorkbenchZoomControlsUsesDefaultShellView(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site"}, WorkbenchShellViewOptions{
+		Zoom: "100",
+	})
+	html := gosx.RenderHTML(RenderWorkbenchZoomControls(view, WorkbenchZoomControlsOptions{}))
+	for _, want := range []string{
+		`class="studio-zoombar"`,
+		`role="toolbar"`,
+		`aria-label="Canvas zoom"`,
+		`data-studio-zoom-island="true"`,
+		`data-studio-zoom-current="100"`,
+		`data-gosx-studio-zoom-controls-renderer="gosx-studio"`,
+		`type="button" data-studio-zoom="fit" aria-pressed="false">Fit</button>`,
+		`type="button" data-studio-zoom="75" aria-pressed="false">75%</button>`,
+		`type="button" data-studio-zoom="100" aria-pressed="true">100%</button>`,
+		`type="button" data-studio-zoom="125" aria-pressed="false">125%</button>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in zoom controls html: %s", want, html)
+		}
+	}
+}
+
+func TestRenderWorkbenchZoomControlsHonorsCustomLevelsAndClass(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site"}, WorkbenchShellViewOptions{
+		Zoom: "fit",
+		ZoomLevels: []WorkbenchZoomLevel{
+			{Key: "fit", Label: "Fit"},
+			{Key: "200", Label: "200%", Active: true},
+		},
+	})
+	html := gosx.RenderHTML(RenderWorkbenchZoomControls(view, WorkbenchZoomControlsOptions{
+		Class: "custom-zoombar",
+		Label: "Preview zoom",
+	}))
+	for _, want := range []string{
+		`class="custom-zoombar"`,
+		`aria-label="Preview zoom"`,
+		`data-studio-zoom-current="200"`,
+		`data-gosx-studio-zoom-controls-renderer="gosx-studio"`,
+		`data-studio-zoom="fit" aria-pressed="false">Fit</button>`,
+		`data-studio-zoom="200" aria-pressed="true">200%</button>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in custom zoom controls html: %s", want, html)
+		}
+	}
+	if strings.Contains(html, `data-studio-zoom="100"`) {
+		t.Fatalf("custom zoom controls should not render default levels: %s", html)
+	}
+}
+
 func TestRenderWorkbenchToolbarHonorsDisabledActions(t *testing.T) {
 	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site", PreviewURL: "/"}, WorkbenchShellViewOptions{})
 	html := gosx.RenderHTML(RenderWorkbenchToolbar(view, WorkbenchToolbarOptions{

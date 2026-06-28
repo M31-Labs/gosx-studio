@@ -581,13 +581,19 @@
 
   // syncZoom(form, zoom) — mirrors syncWorkbenchZoom at
   // studio-engines.js:421. Sets data-studio-canvas-zoom on the
-  // [data-studio-canvas] element, emits gosxstudio:workbench-zoom-change,
-  // refreshes the canvas via a resize event.
+  // [data-studio-canvas] element, syncs zoom toolbar state, emits
+  // gosxstudio:workbench-zoom-change, refreshes the canvas via a resize event.
   function syncZoomIsland(form, zoom) {
     if (!form) return;
     zoom = zoom || "fit";
     var canvas = form.querySelector("[data-studio-canvas]");
     if (canvas) canvas.setAttribute("data-studio-canvas-zoom", zoom);
+    Array.prototype.forEach.call(form.querySelectorAll("[data-studio-zoom-island]"), function (root) {
+      root.setAttribute("data-studio-zoom-current", zoom);
+    });
+    Array.prototype.forEach.call(form.querySelectorAll("button[data-studio-zoom], [role='button'][data-studio-zoom]"), function (button) {
+      button.setAttribute("aria-pressed", button.getAttribute("data-studio-zoom") === zoom ? "true" : "false");
+    });
     emitWorkbenchChange("zoom-change", form, { zoom: zoom });
     refreshWorkbenchCanvas();
   }

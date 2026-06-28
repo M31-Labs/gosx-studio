@@ -60,6 +60,11 @@ type WorkbenchMetricStripOptions struct {
 	Label string
 }
 
+type WorkbenchZoomControlsOptions struct {
+	Class string
+	Label string
+}
+
 type WorkbenchCommandPaletteOptions struct {
 	Class       string
 	Launcher    string
@@ -170,6 +175,44 @@ func RenderWorkbenchMetricStrip(view map[string]any, options WorkbenchMetricStri
 	return gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", FirstNonEmpty(options.Class, "gosx-studio-context-strip")),
 		gosx.Attr("aria-label", FirstNonEmpty(options.Label, workbenchViewString(view, "metricLabel"), "Workspace details")),
+	), gosx.Fragment(nodes...))
+}
+
+func RenderWorkbenchZoomControls(view map[string]any, options WorkbenchZoomControlsOptions) gosx.Node {
+	current := FirstNonEmpty(workbenchViewString(view, "zoom"), "fit")
+	levels := workbenchViewMapList(view, "zoomLevels")
+	for _, level := range levels {
+		if workbenchMapBool(level, "pressed") {
+			if key := workbenchMapString(level, "key"); key != "" {
+				current = key
+				break
+			}
+		}
+	}
+	nodes := make([]gosx.Node, 0, len(levels))
+	for _, level := range levels {
+		key := workbenchMapString(level, "key")
+		label := workbenchMapString(level, "label")
+		if key == "" || label == "" {
+			continue
+		}
+		pressed := workbenchMapBool(level, "pressed")
+		if key == current {
+			pressed = true
+		}
+		nodes = append(nodes, gosx.El("button", gosx.Attrs(
+			gosx.Attr("type", "button"),
+			gosx.Attr("data-studio-zoom", key),
+			gosx.Attr("aria-pressed", BoolAttr(pressed)),
+		), gosx.Text(label)))
+	}
+	return gosx.El("div", gosx.Attrs(
+		gosx.Attr("class", FirstNonEmpty(options.Class, "studio-zoombar")),
+		gosx.Attr("role", "toolbar"),
+		gosx.Attr("aria-label", FirstNonEmpty(options.Label, "Canvas zoom")),
+		gosx.Attr("data-studio-zoom-island", "true"),
+		gosx.Attr("data-studio-zoom-current", current),
+		gosx.Attr("data-gosx-studio-zoom-controls-renderer", "gosx-studio"),
 	), gosx.Fragment(nodes...))
 }
 

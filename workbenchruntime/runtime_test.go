@@ -1,6 +1,9 @@
 package workbenchruntime
 
 import (
+	"bytes"
+	"encoding/json"
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -326,8 +329,8 @@ func TestIslandRuntimeJSPublishesSetStyleStateGlobal(t *testing.T) {
 func TestIslandRuntimeJSPublishesSyncZoomGlobal(t *testing.T) {
 	// Method 8/15: syncZoom(form, zoom) — legacy syncWorkbenchZoom at
 	// the legacy bundle:421. Sets data-studio-canvas-zoom on the
-	// [data-studio-canvas] element, emits gosxstudio:workbench-zoom-change,
-	// refreshes the canvas via a resize event.
+	// [data-studio-canvas] element, syncs zoom toolbar state, emits
+	// gosxstudio:workbench-zoom-change, refreshes the canvas via a resize event.
 	body := string(IslandRuntimeJS())
 	want := "window." + IslandGlobals.SyncZoom + " "
 	if !strings.Contains(body, want) {
@@ -337,6 +340,10 @@ func TestIslandRuntimeJSPublishesSyncZoomGlobal(t *testing.T) {
 		// DOM contracts the helper queries / writes.
 		"data-studio-canvas",
 		"data-studio-canvas-zoom",
+		"data-studio-zoom-island",
+		"data-studio-zoom-current",
+		"button[data-studio-zoom], [role='button'][data-studio-zoom]",
+		"aria-pressed",
 		// Event name dispatched on zoom change.
 		"workbench-zoom-change",
 		// Default zoom when none provided.
@@ -345,6 +352,229 @@ func TestIslandRuntimeJSPublishesSyncZoomGlobal(t *testing.T) {
 		if !strings.Contains(body, contract) {
 			t.Fatalf("IslandRuntimeJS() syncZoom must preserve %q contract", contract)
 		}
+	}
+}
+
+func TestIslandRuntimeJSSyncZoomMutatesDOMAndEmitsEvent(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node executable is required for executable IslandRuntimeJS DOM coverage")
+	}
+
+	runtimeJS, err := json.Marshal(string(IslandRuntimeJS()))
+	if err != nil {
+		t.Fatalf("marshal IslandRuntimeJS(): %v", err)
+	}
+
+	script := `
+const runtimeSource = ` + string(runtimeJS) + `;
+
+class TestEventTarget {
+  constructor() {
+    this.listeners = new Map();
+  }
+
+  addEventListener(type, listener) {
+    const listeners = this.listeners.get(type) || [];
+    listeners.push(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  dispatchEvent(event) {
+    event.target = event.target || this;
+    const listeners = this.listeners.get(event.type) || [];
+    for (const listener of listeners) listener.call(this, event);
+    return true;
+  }
+}
+
+class TestEvent {
+  constructor(type, options = {}) {
+    this.type = type;
+    this.bubbles = Boolean(options.bubbles);
+  }
+}
+
+class TestCustomEvent extends TestEvent {
+  constructor(type, options = {}) {
+    super(type, options);
+    this.detail = options.detail || null;
+  }
+}
+
+class TestElement extends TestEventTarget {
+  constructor(tagName) {
+    super();
+    this.tagName = tagName.toUpperCase();
+    this.attributes = new Map();
+    this.children = [];
+    this.parentElement = null;
+  }
+
+  appendChild(child) {
+    child.parentElement = this;
+    this.children.push(child);
+    return child;
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(name, String(value));
+  }
+
+  getAttribute(name) {
+    return this.attributes.has(name) ? this.attributes.get(name) : null;
+  }
+
+  hasAttribute(name) {
+    return this.attributes.has(name);
+  }
+
+  matches(selector) {
+    return selector.split(",").some((part) => matchesSingleSelector(this, part.trim()));
+  }
+
+  querySelector(selector) {
+    return this.querySelectorAll(selector)[0] || null;
+  }
+
+  querySelectorAll(selector) {
+    const found = [];
+    const visit = (node) => {
+      for (const child of node.children) {
+        if (child.matches(selector)) found.push(child);
+        visit(child);
+      }
+    };
+    visit(this);
+    return found;
+  }
+
+  closest(selector) {
+    let node = this;
+    while (node) {
+      if (node.matches(selector)) return node;
+      node = node.parentElement;
+    }
+    return null;
+  }
+}
+
+class TestDocument extends TestEventTarget {
+  constructor() {
+    super();
+    this.body = new TestElement("body");
+  }
+
+  createElement(tagName) {
+    return new TestElement(tagName);
+  }
+
+  querySelector(selector) {
+    return this.body.querySelector(selector);
+  }
+
+  querySelectorAll(selector) {
+    return this.body.querySelectorAll(selector);
+  }
+}
+
+function matchesSingleSelector(element, selector) {
+  if (!selector) return false;
+  let rest = selector;
+  const tag = rest.match(/^[a-zA-Z][a-zA-Z0-9-]*/);
+  if (tag) {
+    if (element.tagName.toLowerCase() !== tag[0].toLowerCase()) return false;
+    rest = rest.slice(tag[0].length);
+  }
+  const attrPattern = /\[([^\]=]+)(?:=(['"]?)(.*?)\2)?\]/g;
+  let match;
+  let sawAttribute = false;
+  while ((match = attrPattern.exec(rest)) !== null) {
+    sawAttribute = true;
+    const actual = element.getAttribute(match[1]);
+    if (actual === null) return false;
+    if (match[3] !== undefined && actual !== match[3]) return false;
+  }
+  const consumedAttrs = rest.replace(attrPattern, "");
+  return consumedAttrs === "" && (Boolean(tag) || sawAttribute);
+}
+
+function assertEqual(actual, expected, message) {
+  if (actual !== expected) {
+    throw new Error(message + ": got " + JSON.stringify(actual) + ", want " + JSON.stringify(expected));
+  }
+}
+
+const document = new TestDocument();
+const rafCallbacks = [];
+const window = new TestEventTarget();
+window.document = document;
+window.requestAnimationFrame = (callback) => {
+  rafCallbacks.push(callback);
+  return rafCallbacks.length;
+};
+window.setTimeout = (callback) => {
+  rafCallbacks.push(callback);
+  return rafCallbacks.length;
+};
+globalThis.window = window;
+globalThis.document = document;
+globalThis.Event = TestEvent;
+globalThis.CustomEvent = TestCustomEvent;
+
+eval(runtimeSource);
+
+const form = document.createElement("form");
+const canvas = document.createElement("section");
+canvas.setAttribute("data-studio-canvas", "true");
+canvas.setAttribute("data-studio-canvas-zoom", "100");
+const zoomRoot = document.createElement("div");
+zoomRoot.setAttribute("data-studio-zoom-island", "true");
+zoomRoot.setAttribute("data-studio-zoom-current", "100");
+const previousButton = document.createElement("button");
+previousButton.setAttribute("data-studio-zoom", "100");
+previousButton.setAttribute("aria-pressed", "true");
+const matchingButton = document.createElement("button");
+matchingButton.setAttribute("data-studio-zoom", "125");
+matchingButton.setAttribute("aria-pressed", "false");
+
+form.appendChild(canvas);
+form.appendChild(zoomRoot);
+zoomRoot.appendChild(previousButton);
+zoomRoot.appendChild(matchingButton);
+document.body.appendChild(form);
+
+let zoomEvent = null;
+let resizeEvents = 0;
+document.addEventListener("gosxstudio:workbench-zoom-change", (event) => {
+  zoomEvent = event;
+});
+window.addEventListener("resize", () => {
+  resizeEvents++;
+});
+
+window.__gosx_workbench_runtime_island_syncZoom(form, "125");
+
+assertEqual(canvas.getAttribute("data-studio-canvas-zoom"), "125", "canvas zoom attribute");
+assertEqual(zoomRoot.getAttribute("data-studio-zoom-current"), "125", "zoom island current attribute");
+assertEqual(matchingButton.getAttribute("aria-pressed"), "true", "matching zoom button aria-pressed");
+assertEqual(previousButton.getAttribute("aria-pressed"), "false", "previous zoom button aria-pressed");
+if (!zoomEvent) throw new Error("expected gosxstudio:workbench-zoom-change event");
+assertEqual(zoomEvent.detail.zoom, "125", "zoom event detail.zoom");
+assertEqual(zoomEvent.detail.form, form, "zoom event detail.form");
+assertEqual(rafCallbacks.length, 1, "scheduled resize animation frame");
+assertEqual(resizeEvents, 0, "resize should be deferred until the frame callback runs");
+for (const callback of rafCallbacks.splice(0)) callback();
+assertEqual(resizeEvents, 1, "resize event count after flushing the frame callback");
+`
+
+	cmd := exec.Command(node)
+	cmd.Stdin = strings.NewReader(script)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("node DOM syncZoom check failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
 	}
 }
 
