@@ -21,7 +21,7 @@ import (
 	"m31labs.dev/gosx-studio/workbenchruntime"
 )
 
-//go:embed assets/studio.css
+//go:embed assets/studio.css assets/workbench_runtime.js assets/command_palette.js assets/state_runtime.js
 var runtimeFS embed.FS
 
 // EngineRuntimeScript returns the concatenated island runtime bundles for
@@ -65,8 +65,32 @@ func Stylesheet() []byte {
 	return readRuntime("assets/studio.css")
 }
 
+func WorkbenchRuntimeScript() []byte {
+	return readRuntime("assets/workbench_runtime.js")
+}
+
+func CommandRuntimeScript() []byte {
+	return readRuntime("assets/command_palette.js")
+}
+
+func StateRuntimeScript() []byte {
+	return readRuntime("assets/state_runtime.js")
+}
+
 func EngineRuntimeHandler() http.Handler {
 	return ScriptHandler("studio-engines.js", EngineRuntimeScript())
+}
+
+func WorkbenchRuntimeHandler() http.Handler {
+	return ScriptHandler("workbench-runtime.js", WorkbenchRuntimeScript())
+}
+
+func CommandRuntimeHandler() http.Handler {
+	return ScriptHandler("command-palette.js", CommandRuntimeScript())
+}
+
+func StateRuntimeHandler() http.Handler {
+	return ScriptHandler("state-runtime.js", StateRuntimeScript())
 }
 
 // PreviewSubscriberScript returns the JS bundle the storefront mounts

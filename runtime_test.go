@@ -31,6 +31,59 @@ func TestStylesheetHandlerServesStudioChromeTokens(t *testing.T) {
 	}
 }
 
+func TestLegacyRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
+	for name, tt := range map[string]struct {
+		path    string
+		script  []byte
+		handler func() *httptest.ResponseRecorder
+	}{
+		"workbench": {
+			path:   WorkbenchRuntimePath,
+			script: WorkbenchRuntimeScript(),
+			handler: func() *httptest.ResponseRecorder {
+				rec := httptest.NewRecorder()
+				WorkbenchRuntimeHandler().ServeHTTP(rec, httptest.NewRequest("GET", WorkbenchRuntimePath, nil))
+				return rec
+			},
+		},
+		"command": {
+			path:   CommandRuntimePath,
+			script: CommandRuntimeScript(),
+			handler: func() *httptest.ResponseRecorder {
+				rec := httptest.NewRecorder()
+				CommandRuntimeHandler().ServeHTTP(rec, httptest.NewRequest("GET", CommandRuntimePath, nil))
+				return rec
+			},
+		},
+		"state": {
+			path:   StateRuntimePath,
+			script: StateRuntimeScript(),
+			handler: func() *httptest.ResponseRecorder {
+				rec := httptest.NewRecorder()
+				StateRuntimeHandler().ServeHTTP(rec, httptest.NewRequest("GET", StateRuntimePath, nil))
+				return rec
+			},
+		},
+	} {
+		if len(tt.script) == 0 {
+			t.Fatalf("%s runtime script is empty", name)
+		}
+		rec := tt.handler()
+		if rec.Code != 200 {
+			t.Fatalf("%s runtime status = %d", name, rec.Code)
+		}
+		if ct := rec.Header().Get("Content-Type"); ct != "text/javascript; charset=utf-8" {
+			t.Fatalf("%s runtime content type = %q", name, ct)
+		}
+		if rec.Body.Len() == 0 {
+			t.Fatalf("%s runtime handler body is empty for %s", name, tt.path)
+		}
+		if rec.Body.String() != string(tt.script) {
+			t.Fatalf("%s runtime handler body does not match script", name)
+		}
+	}
+}
+
 func TestEngineRuntimeIncludesFieldRuntimeIslandBundle(t *testing.T) {
 	// Phase 3 slice-1 GoSXStudioFieldRuntime island contract. The engine
 	// runtime asset must include the island-runtime JS (publishes the
