@@ -75,6 +75,28 @@ type WorkbenchCanvasToolsOptions struct {
 	Label string
 }
 
+type WorkbenchCanvasBarOptions struct {
+	Class            string
+	TitleClass       string
+	KickerClass      string
+	Kicker           string
+	RouteLabel       string
+	BreadcrumbClass  string
+	BreadcrumbLabel  string
+	BreadcrumbRoot   string
+	SelectionLabel   string
+	SelectionDataKey string
+	Controls         []gosx.Node
+}
+
+type WorkbenchCanvasStatusOptions struct {
+	Class            string
+	RouteLabel       string
+	ViewportLabel    string
+	SelectionLabel   string
+	SelectionDataKey string
+}
+
 type WorkbenchCommandPaletteOptions struct {
 	Class       string
 	Launcher    string
@@ -279,6 +301,45 @@ func RenderWorkbenchCanvasTools(view map[string]any, options WorkbenchCanvasTool
 			gosx.Attr("data-studio-focus-toggle", "true"),
 			gosx.Attr("aria-pressed", "false"),
 		), gosx.Text(FirstNonEmpty(workbenchViewString(view, "focusLabel"), "Focus"))),
+	)
+}
+
+func RenderWorkbenchCanvasBar(view map[string]any, options WorkbenchCanvasBarOptions) gosx.Node {
+	routeLabel := FirstNonEmpty(options.RouteLabel, workbenchViewString(view, "routeLabel"), "Preview")
+	selectionLabel := FirstNonEmpty(options.SelectionLabel, workbenchViewString(view, "selectionLabel"), "No selection")
+	titleAttrs := []any{}
+	if strings.TrimSpace(options.TitleClass) != "" {
+		titleAttrs = append(titleAttrs, gosx.Attr("class", strings.TrimSpace(options.TitleClass)))
+	}
+	children := []gosx.Node{
+		gosx.El("div", gosx.Attrs(titleAttrs...),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", FirstNonEmpty(options.KickerClass, "kicker"))), gosx.Text(FirstNonEmpty(options.Kicker, "Canvas"))),
+			gosx.El("strong", nil, gosx.Text(routeLabel)),
+		),
+		gosx.El("nav", gosx.Attrs(
+			gosx.Attr("class", FirstNonEmpty(options.BreadcrumbClass, "studio-breadcrumbs")),
+			gosx.Attr("aria-label", FirstNonEmpty(options.BreadcrumbLabel, "Canvas selection")),
+		),
+			gosx.El("span", nil, gosx.Text(FirstNonEmpty(options.BreadcrumbRoot, "Site"))),
+			gosx.El("span", nil, gosx.Text(routeLabel)),
+			gosx.El("output", gosx.Attrs(gosx.Attr(FirstNonEmpty(options.SelectionDataKey, "data-studio-selection-label"), "true")), gosx.Text(selectionLabel)),
+		),
+	}
+	children = append(children, options.Controls...)
+	return gosx.El("div", gosx.Attrs(
+		gosx.Attr("class", FirstNonEmpty(options.Class, "studio-canvas-bar")),
+		gosx.Attr("data-gosx-studio-canvas-bar-renderer", "gosx-studio"),
+	), gosx.Fragment(children...))
+}
+
+func RenderWorkbenchCanvasStatus(view map[string]any, options WorkbenchCanvasStatusOptions) gosx.Node {
+	return gosx.El("div", gosx.Attrs(
+		gosx.Attr("class", FirstNonEmpty(options.Class, "studio-canvas-status")),
+		gosx.Attr("data-gosx-studio-canvas-status-renderer", "gosx-studio"),
+	),
+		gosx.El("span", nil, gosx.Text(FirstNonEmpty(options.RouteLabel, workbenchViewString(view, "routeLabel"), "Preview"))),
+		gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-viewport-label", "true")), gosx.Text(FirstNonEmpty(options.ViewportLabel, workbenchViewString(view, "viewportLabel")))),
+		gosx.El("output", gosx.Attrs(gosx.Attr(FirstNonEmpty(options.SelectionDataKey, "data-studio-selection-label"), "true")), gosx.Text(FirstNonEmpty(options.SelectionLabel, workbenchViewString(view, "selectionLabel"), "No selection"))),
 	)
 }
 
