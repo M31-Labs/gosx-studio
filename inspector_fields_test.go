@@ -106,6 +106,41 @@ func TestRenderInspectorFieldListPreservesRepresentativeControls(t *testing.T) {
 	}
 }
 
+func TestRenderInspectorFieldTextareaPreservesExactValueWhitespace(t *testing.T) {
+	wantValue := "\n  .hero {\n    color: red;\n  }\n\n"
+	field := map[string]any{
+		"isArea": true,
+		"id":     "customCss",
+		"label":  "Custom CSS",
+		"value":  wantValue,
+		"controlAttrs": map[string]any{
+			"id":   "customCss",
+			"name": "customCss",
+			"rows": 7,
+		},
+	}
+
+	html := gosx.RenderHTML(RenderInspectorFieldRow(field, InspectorFieldRowOptions{}))
+	textareaStart := strings.Index(html, "<textarea")
+	if textareaStart < 0 {
+		t.Fatalf("rendered field row missing textarea:\n%s", html)
+	}
+	bodyStart := strings.Index(html[textareaStart:], ">")
+	if bodyStart < 0 {
+		t.Fatalf("rendered textarea missing body start:\n%s", html)
+	}
+	bodyStart += textareaStart + 1
+	bodyEnd := strings.Index(html[bodyStart:], "</textarea>")
+	if bodyEnd < 0 {
+		t.Fatalf("rendered textarea missing close tag:\n%s", html)
+	}
+	bodyEnd += bodyStart
+
+	if got := html[bodyStart:bodyEnd]; got != wantValue {
+		t.Fatalf("rendered textarea value mismatch:\n got: %q\nwant: %q\nhtml: %s", got, wantValue, html)
+	}
+}
+
 func TestRenderInspectorFieldRowRendersCardActions(t *testing.T) {
 	field := map[string]any{
 		"isCard":    true,

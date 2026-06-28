@@ -1,6 +1,7 @@
 package studio
 
 import (
+	"fmt"
 	"sort"
 
 	"m31labs.dev/gosx"
@@ -65,7 +66,7 @@ func renderInspectorFieldControl(field map[string]any) gosx.Node {
 	attrs := gosx.Attrs(inspectorFieldMapAttrs(workbenchViewMap(field, "controlAttrs"))...)
 	switch {
 	case workbenchMapBool(field, "isArea"):
-		return gosx.El("textarea", attrs, gosx.Text(workbenchMapString(field, "value")))
+		return gosx.El("textarea", attrs, gosx.Text(inspectorFieldRawString(field, "value")))
 	case workbenchMapBool(field, "isSelect"):
 		optionNodes := []gosx.Node{}
 		for _, option := range siteMapMapList(field, "options") {
@@ -119,4 +120,20 @@ func inspectorFieldMapAttrs(values map[string]any) []any {
 
 func appendInspectorFieldAttrs(attrs []any, values map[string]any) []any {
 	return append(attrs, inspectorFieldMapAttrs(values)...)
+}
+
+func inspectorFieldRawString(values map[string]any, key string) string {
+	if values == nil {
+		return ""
+	}
+	value, ok := values[key]
+	if !ok || value == nil {
+		return ""
+	}
+	switch typed := value.(type) {
+	case string:
+		return typed
+	default:
+		return fmt.Sprint(typed)
+	}
 }
