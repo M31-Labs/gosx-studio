@@ -65,6 +65,11 @@ type WorkbenchZoomControlsOptions struct {
 	Label string
 }
 
+type WorkbenchViewportControlsOptions struct {
+	Class string
+	Label string
+}
+
 type WorkbenchCommandPaletteOptions struct {
 	Class       string
 	Launcher    string
@@ -213,6 +218,32 @@ func RenderWorkbenchZoomControls(view map[string]any, options WorkbenchZoomContr
 		gosx.Attr("data-studio-zoom-island", "true"),
 		gosx.Attr("data-studio-zoom-current", current),
 		gosx.Attr("data-gosx-studio-zoom-controls-renderer", "gosx-studio"),
+	), gosx.Fragment(nodes...))
+}
+
+func RenderWorkbenchViewportControls(view map[string]any, options WorkbenchViewportControlsOptions) gosx.Node {
+	current := FirstNonEmpty(workbenchViewString(view, "viewportKey"), "desktop")
+	viewports := workbenchViewMapList(view, "viewports")
+	nodes := make([]gosx.Node, 0, len(viewports))
+	for _, viewport := range viewports {
+		key := workbenchMapString(viewport, "key")
+		label := workbenchMapString(viewport, "label")
+		if key == "" || label == "" {
+			continue
+		}
+		nodes = append(nodes, gosx.El("button", gosx.Attrs(
+			gosx.Attr("type", "button"),
+			gosx.Attr("data-studio-viewport", key),
+			gosx.Attr("data-studio-viewport-width", workbenchMapString(viewport, "width")),
+			gosx.Attr("aria-pressed", BoolAttr(key == current)),
+		), gosx.Text(label)))
+	}
+	return gosx.El("div", gosx.Attrs(
+		gosx.Attr("class", FirstNonEmpty(options.Class, "studio-viewport-switcher")),
+		gosx.Attr("role", "toolbar"),
+		gosx.Attr("aria-label", FirstNonEmpty(options.Label, "Preview viewport")),
+		gosx.Attr("data-studio-viewport-current", current),
+		gosx.Attr("data-gosx-studio-viewport-controls-renderer", "gosx-studio"),
 	), gosx.Fragment(nodes...))
 }
 

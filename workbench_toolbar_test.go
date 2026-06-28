@@ -176,6 +176,56 @@ func TestRenderWorkbenchZoomControlsHonorsCustomLevelsAndClass(t *testing.T) {
 	}
 }
 
+func TestRenderWorkbenchViewportControlsUsesDefaultShellView(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site"}, WorkbenchShellViewOptions{
+		ViewportKey: "tablet",
+	})
+	html := gosx.RenderHTML(RenderWorkbenchViewportControls(view, WorkbenchViewportControlsOptions{}))
+	for _, want := range []string{
+		`class="studio-viewport-switcher"`,
+		`role="toolbar"`,
+		`aria-label="Preview viewport"`,
+		`data-studio-viewport-current="tablet"`,
+		`data-gosx-studio-viewport-controls-renderer="gosx-studio"`,
+		`type="button" data-studio-viewport="desktop" data-studio-viewport-width="100%" aria-pressed="false">Desktop</button>`,
+		`type="button" data-studio-viewport="tablet" data-studio-viewport-width="48rem" aria-pressed="true">Tablet</button>`,
+		`type="button" data-studio-viewport="mobile" data-studio-viewport-width="24rem" aria-pressed="false">Mobile</button>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in viewport controls html: %s", want, html)
+		}
+	}
+}
+
+func TestRenderWorkbenchViewportControlsHonorsCustomViewportsAndClass(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{
+		Title: "Client Site",
+		Viewports: []Viewport{
+			NewViewport("desktop", "Desktop", "100%", false),
+			NewViewport("wide", "Wide", "72rem", true),
+		},
+	}, WorkbenchShellViewOptions{})
+	html := gosx.RenderHTML(RenderWorkbenchViewportControls(view, WorkbenchViewportControlsOptions{
+		Class: "custom-viewportbar",
+		Label: "Preview size",
+	}))
+	for _, want := range []string{
+		`class="custom-viewportbar"`,
+		`aria-label="Preview size"`,
+		`data-studio-viewport-current="wide"`,
+		`data-gosx-studio-viewport-controls-renderer="gosx-studio"`,
+		`data-studio-viewport="desktop" data-studio-viewport-width="100%" aria-pressed="false">Desktop</button>`,
+		`data-studio-viewport="wide" data-studio-viewport-width="72rem" aria-pressed="true">Wide</button>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in custom viewport controls html: %s", want, html)
+		}
+	}
+	if strings.Contains(html, `data-studio-viewport="mobile"`) {
+		t.Fatalf("custom viewport controls should not render default viewports: %s", html)
+	}
+}
+
 func TestRenderWorkbenchToolbarHonorsDisabledActions(t *testing.T) {
 	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site", PreviewURL: "/"}, WorkbenchShellViewOptions{})
 	html := gosx.RenderHTML(RenderWorkbenchToolbar(view, WorkbenchToolbarOptions{

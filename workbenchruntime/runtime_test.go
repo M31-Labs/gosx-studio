@@ -227,6 +227,9 @@ func TestIslandRuntimeJSPublishesSyncViewportGlobal(t *testing.T) {
 		"data-studio-viewport-island",
 		// Viewport label readout selector.
 		"data-studio-viewport-label",
+		// Viewport controls current-state and pressed-state selectors.
+		"data-studio-viewport-current",
+		"button[data-studio-viewport], [role='button'][data-studio-viewport]",
 		// Event name dispatched on viewport change.
 		"workbench-viewport-change",
 		// Default viewport when none provided.
@@ -235,6 +238,195 @@ func TestIslandRuntimeJSPublishesSyncViewportGlobal(t *testing.T) {
 		if !strings.Contains(body, contract) {
 			t.Fatalf("IslandRuntimeJS() syncViewport must preserve %q contract", contract)
 		}
+	}
+}
+
+func TestIslandRuntimeJSSyncViewportUpdatesDOMState(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node not available")
+	}
+	runtimeSource, err := json.Marshal(string(IslandRuntimeJS()))
+	if err != nil {
+		t.Fatalf("marshal runtime source: %v", err)
+	}
+	script := `
+const runtimeSource = ` + string(runtimeSource) + `;
+
+class TestEvent {
+  constructor(type) { this.type = type; }
+}
+
+class TestCustomEvent extends TestEvent {
+  constructor(type, options) {
+    super(type);
+    this.detail = options && options.detail ? options.detail : {};
+  }
+}
+
+class TestEventTarget {
+  constructor() { this.listeners = {}; }
+  addEventListener(type, listener) {
+    (this.listeners[type] || (this.listeners[type] = [])).push(listener);
+  }
+  dispatchEvent(event) {
+    const listeners = this.listeners[event.type] || [];
+    for (const listener of listeners) listener(event);
+    return true;
+  }
+}
+
+class TestElement extends TestEventTarget {
+  constructor(tagName) {
+    super();
+    this.tagName = tagName.toUpperCase();
+    this.attributes = {};
+    this.children = [];
+    this.textContent = "";
+  }
+  setAttribute(name, value) { this.attributes[name] = String(value); }
+  getAttribute(name) {
+    return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null;
+  }
+  appendChild(child) {
+    child.parentNode = this;
+    this.children.push(child);
+    return child;
+  }
+  querySelector(selector) {
+    return this.querySelectorAll(selector)[0] || null;
+  }
+  querySelectorAll(selector) {
+    const selectors = selector.split(",").map((item) => item.trim()).filter(Boolean);
+    const results = [];
+    const visit = (node) => {
+      for (const child of node.children) {
+        if (selectors.some((single) => matchesSingleSelector(child, single))) results.push(child);
+        visit(child);
+      }
+    };
+    visit(this);
+    return results;
+  }
+}
+
+class TestDocument extends TestEventTarget {
+  constructor() {
+    super();
+    this.body = new TestElement("body");
+  }
+  createElement(tagName) { return new TestElement(tagName); }
+}
+
+function matchesSingleSelector(element, selector) {
+  if (!selector) return false;
+  let rest = selector;
+  const tag = rest.match(/^[a-zA-Z][a-zA-Z0-9-]*/);
+  if (tag) {
+    if (element.tagName.toLowerCase() !== tag[0].toLowerCase()) return false;
+    rest = rest.slice(tag[0].length);
+  }
+  const classPattern = /\.([a-zA-Z0-9_-]+)/g;
+  let classMatch;
+  while ((classMatch = classPattern.exec(rest)) !== null) {
+    const classes = (element.getAttribute("class") || "").split(/\s+/);
+    if (classes.indexOf(classMatch[1]) === -1) return false;
+  }
+  rest = rest.replace(classPattern, "");
+  const attrPattern = /\[([^\]=]+)(?:=(['"]?)(.*?)\2)?\]/g;
+  let match;
+  let sawAttribute = false;
+  while ((match = attrPattern.exec(rest)) !== null) {
+    sawAttribute = true;
+    const actual = element.getAttribute(match[1]);
+    if (actual === null) return false;
+    if (match[3] !== undefined && actual !== match[3]) return false;
+  }
+  const consumedAttrs = rest.replace(attrPattern, "");
+  return consumedAttrs === "" && (Boolean(tag) || sawAttribute || selector.indexOf(".") === 0);
+}
+
+function assertEqual(actual, expected, message) {
+  if (actual !== expected) {
+    throw new Error(message + ": got " + JSON.stringify(actual) + ", want " + JSON.stringify(expected));
+  }
+}
+
+const document = new TestDocument();
+const rafCallbacks = [];
+const window = new TestEventTarget();
+window.document = document;
+window.requestAnimationFrame = (callback) => {
+  rafCallbacks.push(callback);
+  return rafCallbacks.length;
+};
+window.setTimeout = (callback) => {
+  rafCallbacks.push(callback);
+  return rafCallbacks.length;
+};
+globalThis.window = window;
+globalThis.document = document;
+globalThis.Event = TestEvent;
+globalThis.CustomEvent = TestCustomEvent;
+
+eval(runtimeSource);
+
+const form = document.createElement("form");
+const shell = document.createElement("section");
+shell.setAttribute("class", "editor-preview-shell");
+shell.setAttribute("data-studio-preview-viewport", "desktop");
+const viewportRoot = document.createElement("div");
+viewportRoot.setAttribute("data-studio-viewport-current", "desktop");
+const previousButton = document.createElement("button");
+previousButton.setAttribute("data-studio-viewport", "desktop");
+previousButton.setAttribute("aria-pressed", "true");
+const matchingButton = document.createElement("button");
+matchingButton.setAttribute("data-studio-viewport", "tablet");
+matchingButton.setAttribute("aria-pressed", "false");
+const label = document.createElement("span");
+label.setAttribute("data-studio-viewport-label", "true");
+label.textContent = "Desktop";
+
+form.appendChild(shell);
+form.appendChild(viewportRoot);
+viewportRoot.appendChild(previousButton);
+viewportRoot.appendChild(matchingButton);
+form.appendChild(label);
+document.body.appendChild(form);
+
+let viewportEvent = null;
+let resizeEvents = 0;
+document.addEventListener("gosxstudio:workbench-viewport-change", (event) => {
+  viewportEvent = event;
+});
+window.addEventListener("resize", () => {
+  resizeEvents++;
+});
+
+window.__gosx_workbench_runtime_island_syncViewport(form, "tablet");
+
+assertEqual(form.getAttribute("data-studio-breakpoint"), "tablet", "form breakpoint");
+assertEqual(shell.getAttribute("data-studio-preview-viewport"), "tablet", "preview shell viewport");
+assertEqual(viewportRoot.getAttribute("data-studio-viewport-current"), "tablet", "viewport controls current attribute");
+assertEqual(matchingButton.getAttribute("aria-pressed"), "true", "matching viewport button aria-pressed");
+assertEqual(previousButton.getAttribute("aria-pressed"), "false", "previous viewport button aria-pressed");
+assertEqual(label.textContent, "Tablet", "viewport label text");
+if (!viewportEvent) throw new Error("expected gosxstudio:workbench-viewport-change event");
+assertEqual(viewportEvent.detail.viewport, "tablet", "viewport event detail.viewport");
+assertEqual(viewportEvent.detail.form, form, "viewport event detail.form");
+assertEqual(rafCallbacks.length, 1, "scheduled resize animation frame");
+assertEqual(resizeEvents, 0, "resize should be deferred until the frame callback runs");
+for (const callback of rafCallbacks.splice(0)) callback();
+assertEqual(resizeEvents, 1, "resize event count after flushing the frame callback");
+`
+
+	cmd := exec.Command(node)
+	cmd.Stdin = strings.NewReader(script)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("node DOM syncViewport check failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
 	}
 }
 

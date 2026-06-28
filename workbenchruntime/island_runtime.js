@@ -505,6 +505,12 @@
       shell.setAttribute("data-studio-preview-viewport", viewport);
     }
     form.setAttribute("data-studio-breakpoint", viewport);
+    Array.prototype.forEach.call(form.querySelectorAll("[data-studio-viewport-current]"), function (root) {
+      root.setAttribute("data-studio-viewport-current", viewport);
+    });
+    Array.prototype.forEach.call(form.querySelectorAll("button[data-studio-viewport], [role='button'][data-studio-viewport]"), function (button) {
+      button.setAttribute("aria-pressed", button.getAttribute("data-studio-viewport") === viewport ? "true" : "false");
+    });
     Array.prototype.forEach.call(form.querySelectorAll("[data-studio-viewport-label]"), function (node) {
       node.textContent = workbenchViewportLabels[viewport] || viewport.charAt(0).toUpperCase() + viewport.slice(1);
     });

@@ -144,6 +144,7 @@ func WorkbenchShellView(source WorkbenchShellSource, options WorkbenchShellViewO
 		"zoom":               zoom,
 		"viewportKey":        viewportKey,
 		"viewportLabel":      viewportLabel,
+		"viewports":          shellViewportViews(source.Viewports),
 		"previewURL":         previewURL,
 		"previewTitle":       FirstNonEmpty(options.PreviewTitle, source.Title+" preview", "Preview"),
 		"previewFrameTitle":  FirstNonEmpty(options.PreviewFrameTitle, source.Title+" preview", "Preview"),
