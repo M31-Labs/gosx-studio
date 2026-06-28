@@ -119,6 +119,21 @@ func TestCanvasInlineRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
 				return rec
 			},
 		},
+		"canvas-contextual-panel": {
+			path:   CanvasContextualPanelPath,
+			script: CanvasContextualPanelScript(),
+			checks: []string{
+				"window.GoSXStudioCanvasContextualPanelRuntime",
+				"window.__muddyCanvasContextualPanel",
+				"GoSXStudioCanvasInlineEditRuntime",
+				"render: render",
+			},
+			serve: func() *httptest.ResponseRecorder {
+				rec := httptest.NewRecorder()
+				CanvasContextualPanelHandler().ServeHTTP(rec, httptest.NewRequest("GET", CanvasContextualPanelPath, nil))
+				return rec
+			},
+		},
 	} {
 		if len(tt.script) == 0 {
 			t.Fatalf("%s runtime script is empty", name)

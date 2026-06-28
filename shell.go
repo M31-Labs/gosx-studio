@@ -21,6 +21,7 @@ const (
 	StateRuntimePath                 = RuntimeRoot + "/state-runtime.js"
 	PreviewSubscriberPath            = RuntimeRoot + "/preview-subscriber.js"
 	CanvasInlineEditPath             = RuntimeRoot + "/canvas-inline-edit.js"
+	CanvasContextualPanelPath        = RuntimeRoot + "/canvas-contextual-panel.js"
 	CanvasDefaultInlineInstallerPath = RuntimeRoot + "/canvas-default-inline-installer.js"
 
 	CanvasEngineName      = "GoSXStudioCanvas"

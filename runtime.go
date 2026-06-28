@@ -11,6 +11,7 @@ import (
 	"m31labs.dev/gosx-studio/authoringruntime"
 	"m31labs.dev/gosx-studio/blocklayoutruntime"
 	"m31labs.dev/gosx-studio/brandruntime"
+	"m31labs.dev/gosx-studio/canvascontextualpanelruntime"
 	"m31labs.dev/gosx-studio/canvasinlineeditruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/inlineeditruntime"
@@ -107,12 +108,23 @@ func CanvasDefaultInlineInstallerScript() []byte {
 	return canvasinlineeditruntime.CanvasDefaultInlineInstallerScript()
 }
 
+// CanvasContextualPanelScript returns the CanvasBoard contextual inspector
+// panel. The panel persists field edits through the Studio Canvas inline-edit
+// runtime API and keeps a temporary Muddy compatibility alias.
+func CanvasContextualPanelScript() []byte {
+	return canvascontextualpanelruntime.CanvasContextualPanelScript()
+}
+
 func CanvasInlineEditHandler() http.Handler {
 	return ScriptHandler("canvas-inline-edit.js", CanvasInlineEditScript())
 }
 
 func CanvasDefaultInlineInstallerHandler() http.Handler {
 	return ScriptHandler("canvas-default-inline-installer.js", CanvasDefaultInlineInstallerScript())
+}
+
+func CanvasContextualPanelHandler() http.Handler {
+	return ScriptHandler("canvas-contextual-panel.js", CanvasContextualPanelScript())
 }
 
 // PreviewSubscriberScript returns the JS bundle the storefront mounts
