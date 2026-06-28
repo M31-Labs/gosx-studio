@@ -13,6 +13,7 @@ import (
 	"m31labs.dev/gosx-studio/brandruntime"
 	"m31labs.dev/gosx-studio/canvascontextualpanelruntime"
 	"m31labs.dev/gosx-studio/canvasinlineeditruntime"
+	"m31labs.dev/gosx-studio/canvasselectionbridgeruntime"
 	"m31labs.dev/gosx-studio/canvaswasmfreeruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/inlineeditruntime"
@@ -116,6 +117,14 @@ func CanvasContextualPanelScript() []byte {
 	return canvascontextualpanelruntime.CanvasContextualPanelScript()
 }
 
+// CanvasSelectionBridgeScript returns the opt-in full-WASM CanvasBoard
+// selection bridge. It publishes window.GoSXStudioCanvasSelectionBridgeRuntime
+// and keeps window.__muddyCanvasSelectionBridge as a temporary compatibility
+// alias for legacy e2e/status hooks.
+func CanvasSelectionBridgeScript() []byte {
+	return canvasselectionbridgeruntime.CanvasSelectionBridgeScript()
+}
+
 // Canvas2DPainterScript returns the WASM-free Canvas2D painter. It publishes
 // window.GoSXStudioCanvas2DPainterRuntime and keeps
 // window.__muddyCanvas2DPainter as a temporary compatibility alias.
@@ -140,6 +149,10 @@ func CanvasDefaultInlineInstallerHandler() http.Handler {
 
 func CanvasContextualPanelHandler() http.Handler {
 	return ScriptHandler("canvas-contextual-panel.js", CanvasContextualPanelScript())
+}
+
+func CanvasSelectionBridgeHandler() http.Handler {
+	return ScriptHandler("canvas-selection-bridge.js", CanvasSelectionBridgeScript())
 }
 
 func Canvas2DPainterHandler() http.Handler {

@@ -17,8 +17,9 @@ import {
 //   - Canvas pick → gosx canvasBoardApplyPick writes $surface.event.selectedID
 //     = the picked workspace node key (gosx-studio sitemap_canvas.go: id == key),
 //     and store.Set fans out to JS subscribers via __gosx_notify_shared_signal.
-//   - The muddy selection bridge (internal/gosxstudio/canvas_selection_bridge.js,
-//     mounted ONLY under MUDDY_SITEMAP_CANVAS=1) reads that signal and calls
+//   - The Studio-owned selection bridge
+//     (canvasselectionbridgeruntime/canvas_selection_bridge.js, mounted ONLY
+//     under MUDDY_SITEMAP_CANVAS=1) reads that signal and calls
 //     window.GoSXStudioSiteMapRuntime.setState(boardRoot, { selectedNode: key }),
 //     the SAME call a DOM-board node click makes (gosx-studio
 //     sitemapruntime/island_runtime.js handleClick → setState).

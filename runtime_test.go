@@ -105,6 +105,22 @@ func TestCanvasInlineRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
 				return rec
 			},
 		},
+		"canvas-selection-bridge": {
+			path:   CanvasSelectionBridgePath,
+			script: CanvasSelectionBridgeScript(),
+			checks: []string{
+				"window.GoSXStudioCanvasSelectionBridgeRuntime",
+				"window.__muddyCanvasSelectionBridge",
+				"$surface.event.selectedID",
+				"$surface.event.selectedIDs",
+				"GoSXStudioSiteMapRuntime",
+			},
+			serve: func() *httptest.ResponseRecorder {
+				rec := httptest.NewRecorder()
+				CanvasSelectionBridgeHandler().ServeHTTP(rec, httptest.NewRequest("GET", CanvasSelectionBridgePath, nil))
+				return rec
+			},
+		},
 		"canvas2d-painter": {
 			path:   Canvas2DPainterPath,
 			script: Canvas2DPainterScript(),
