@@ -21,6 +21,8 @@ const (
 	StateRuntimePath                 = RuntimeRoot + "/state-runtime.js"
 	PreviewSubscriberPath            = RuntimeRoot + "/preview-subscriber.js"
 	CanvasInlineEditPath             = RuntimeRoot + "/canvas-inline-edit.js"
+	Canvas2DPainterPath              = RuntimeRoot + "/canvas2d-painter.js"
+	CanvasWASMFreeClientPath         = RuntimeRoot + "/canvas-wasm-free-client.js"
 	CanvasContextualPanelPath        = RuntimeRoot + "/canvas-contextual-panel.js"
 	CanvasDefaultInlineInstallerPath = RuntimeRoot + "/canvas-default-inline-installer.js"
 

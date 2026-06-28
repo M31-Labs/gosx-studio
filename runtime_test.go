@@ -105,6 +105,35 @@ func TestCanvasInlineRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
 				return rec
 			},
 		},
+		"canvas2d-painter": {
+			path:   Canvas2DPainterPath,
+			script: Canvas2DPainterScript(),
+			checks: []string{
+				"window.GoSXStudioCanvas2DPainterRuntime",
+				"window.__muddyCanvas2DPainter",
+				"paint: paintCanvasBundle",
+			},
+			serve: func() *httptest.ResponseRecorder {
+				rec := httptest.NewRecorder()
+				Canvas2DPainterHandler().ServeHTTP(rec, httptest.NewRequest("GET", Canvas2DPainterPath, nil))
+				return rec
+			},
+		},
+		"canvas-wasm-free-client": {
+			path:   CanvasWASMFreeClientPath,
+			script: CanvasWASMFreeClientScript(),
+			checks: []string{
+				"window.GoSXStudioCanvasWASMFreeClientRuntime",
+				"window.__muddyCanvasWasmFreeClient",
+				"canvas.__gosxStudioCanvasWASMFree",
+				"data-gosx-canvas-wasm-free-client",
+			},
+			serve: func() *httptest.ResponseRecorder {
+				rec := httptest.NewRecorder()
+				CanvasWASMFreeClientHandler().ServeHTTP(rec, httptest.NewRequest("GET", CanvasWASMFreeClientPath, nil))
+				return rec
+			},
+		},
 		"canvas-default-inline-installer": {
 			path:   CanvasDefaultInlineInstallerPath,
 			script: CanvasDefaultInlineInstallerScript(),

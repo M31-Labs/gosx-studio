@@ -231,9 +231,9 @@ func RenderSiteMapCanvasEngine(siteMapView map[string]any, options SiteMapCanvas
 // `[data-gosx-surface-kind]:not([data-gosx-engine-bytecode])`
 // (client/js/bootstrap-src/26b-feature-engines-prefix.js), so a canvas without
 // that attribute is invisible to the WASM hydration path. Instead it carries
-// data-gosx-canvas-wasm-free="true", the marker the muddy WASM-free client keys
-// on to own painting + interaction. Width/Height default to the same 1280x720
-// the WASM board uses so the inline bundle's framebuffer matches.
+// data-gosx-canvas-wasm-free="true", the marker the Studio-owned WASM-free
+// client keys on to own painting + interaction. Width/Height default to the
+// same 1280x720 the WASM board uses so the inline bundle's framebuffer matches.
 func siteMapCanvasWASMFreeCanvas(background string, width, height int, canvasClass string) gosx.Node {
 	w, h := width, height
 	if w == 0 && h == 0 {

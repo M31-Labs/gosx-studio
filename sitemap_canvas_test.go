@@ -504,12 +504,12 @@ func TestRenderSiteMapCanvasEngineEmitsCanvas2DSurface(t *testing.T) {
 }
 
 // TestRenderSiteMapCanvasEngineWASMFreeOmitsSurfaceKind locks the WASM-free
-// decoupling: with WASMFree=true the engine emits a muddy-owned <canvas> that
+// decoupling: with WASMFree=true the engine emits a host-rendered <canvas> that
 // carries data-gosx-canvas-wasm-free but DELIBERATELY OMITS data-gosx-surface-kind
 // (and the data-gosx-engine-* hydration attributes), so the gosx client
 // bootstrap's canvas discovery never WASM-hydrates it. The SAME server-precomputed
-// inline RenderBundle must still ship next to the canvas so a WASM-free client can
-// paint it.
+// inline RenderBundle must still ship next to the canvas so the Studio-owned
+// WASM-free client can paint it.
 func TestRenderSiteMapCanvasEngineWASMFreeOmitsSurfaceKind(t *testing.T) {
 	html := gosx.RenderHTML(RenderSiteMapCanvasEngine(siteMapCanvasTestView(), SiteMapCanvasOptions{
 		Enabled:  true,

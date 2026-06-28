@@ -13,6 +13,7 @@ import (
 	"m31labs.dev/gosx-studio/brandruntime"
 	"m31labs.dev/gosx-studio/canvascontextualpanelruntime"
 	"m31labs.dev/gosx-studio/canvasinlineeditruntime"
+	"m31labs.dev/gosx-studio/canvaswasmfreeruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/inlineeditruntime"
 	"m31labs.dev/gosx-studio/inspectorruntime"
@@ -115,6 +116,20 @@ func CanvasContextualPanelScript() []byte {
 	return canvascontextualpanelruntime.CanvasContextualPanelScript()
 }
 
+// Canvas2DPainterScript returns the WASM-free Canvas2D painter. It publishes
+// window.GoSXStudioCanvas2DPainterRuntime and keeps
+// window.__muddyCanvas2DPainter as a temporary compatibility alias.
+func Canvas2DPainterScript() []byte {
+	return canvaswasmfreeruntime.Canvas2DPainterScript()
+}
+
+// CanvasWASMFreeClientScript returns the WASM-free CanvasBoard browser client.
+// It publishes window.GoSXStudioCanvasWASMFreeClientRuntime and keeps
+// window.__muddyCanvasWasmFreeClient as a temporary compatibility alias.
+func CanvasWASMFreeClientScript() []byte {
+	return canvaswasmfreeruntime.CanvasWASMFreeClientScript()
+}
+
 func CanvasInlineEditHandler() http.Handler {
 	return ScriptHandler("canvas-inline-edit.js", CanvasInlineEditScript())
 }
@@ -125,6 +140,14 @@ func CanvasDefaultInlineInstallerHandler() http.Handler {
 
 func CanvasContextualPanelHandler() http.Handler {
 	return ScriptHandler("canvas-contextual-panel.js", CanvasContextualPanelScript())
+}
+
+func Canvas2DPainterHandler() http.Handler {
+	return ScriptHandler("canvas2d-painter.js", Canvas2DPainterScript())
+}
+
+func CanvasWASMFreeClientHandler() http.Handler {
+	return ScriptHandler("canvas-wasm-free-client.js", CanvasWASMFreeClientScript())
 }
 
 // PreviewSubscriberScript returns the JS bundle the storefront mounts
