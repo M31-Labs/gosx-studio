@@ -120,6 +120,62 @@ func TestShellConfigNormalizesHostOverrides(t *testing.T) {
 	}
 }
 
+func TestShellConfigEngineLooksUpDefaultEngines(t *testing.T) {
+	config := DefaultShellConfig()
+
+	checks := map[string]struct {
+		name    string
+		mountID string
+	}{
+		"canvas":        {name: CanvasEngineName, mountID: "gosx-studio-canvas-engine"},
+		"site-map":      {name: SiteMapEngineName, mountID: "gosx-studio-site-map-engine"},
+		"flow-designer": {name: FlowDesignerName, mountID: "gosx-studio-flow-engine"},
+		"block-layout":  {name: BlockLayoutEngineName, mountID: "gosx-studio-block-layout-engine"},
+		"showcase-3d":   {name: Showcase3DEngineName, mountID: "gosx-studio-showcase-3d-engine"},
+	}
+	for key, want := range checks {
+		engine, ok := config.Engine(" " + key + " ")
+		if !ok {
+			t.Fatalf("missing default engine %q", key)
+		}
+		if engine.Key != key || engine.Name != want.name || engine.MountID != want.mountID {
+			t.Fatalf("%s engine = %#v", key, engine)
+		}
+		if len(engine.Capabilities) == 0 {
+			t.Fatalf("%s engine missing capabilities", key)
+		}
+	}
+}
+
+func TestEngineHostViewProjectsNormalizedEngine(t *testing.T) {
+	view := EngineHostView(EngineConfig{
+		Key:          " canvas ",
+		Name:         " GoSXStudioCanvas ",
+		MountID:      " gosx-studio-canvas-engine ",
+		Capabilities: []string{" canvas ", "", " pointer ", " keyboard ", " text-input ", " animation "},
+	}, " studio-canvas-engine-host ")
+
+	if view["key"] != "canvas" {
+		t.Fatalf("key = %v", view["key"])
+	}
+	if view["name"] != "GoSXStudioCanvas" {
+		t.Fatalf("name = %v", view["name"])
+	}
+	if view["mountId"] != "gosx-studio-canvas-engine" {
+		t.Fatalf("mountId = %v", view["mountId"])
+	}
+	if view["capabilities"] != "canvas pointer keyboard text-input animation" {
+		t.Fatalf("capabilities = %v", view["capabilities"])
+	}
+	if view["class"] != "studio-canvas-engine-host" {
+		t.Fatalf("class = %v", view["class"])
+	}
+
+	if _, ok := EngineHostView(EngineConfig{Key: "x", Name: "X", MountID: "x"}, " ")["class"]; ok {
+		t.Fatalf("blank class should be omitted")
+	}
+}
+
 func TestStudioRuntimePathsArePublicContracts(t *testing.T) {
 	if RuntimeRoot != "/_gosx/studio" {
 		t.Fatalf("runtime root = %q", RuntimeRoot)

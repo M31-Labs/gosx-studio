@@ -205,12 +205,39 @@ func (config ShellConfig) Resource(key string) (ResourceConfig, bool) {
 	return ResourceConfig{}, false
 }
 
+func (config ShellConfig) Engine(key string) (EngineConfig, bool) {
+	key = strings.TrimSpace(key)
+	for _, engine := range config.Normalize().Engines {
+		if engine.Key == key {
+			return engine, true
+		}
+	}
+	return EngineConfig{}, false
+}
+
 func (config ShellConfig) Adapter(kind ResourceKind) (ResourceAdapter, bool) {
 	return ResourceAdapterByKind(config.Normalize().Adapters, kind)
 }
 
 func (config ShellConfig) FeatureEnabled(key string) bool {
 	return config.Normalize().FeatureFlags[strings.TrimSpace(key)]
+}
+
+func EngineHostView(engine EngineConfig, className string) map[string]any {
+	engine.Key = strings.TrimSpace(engine.Key)
+	engine.Name = strings.TrimSpace(engine.Name)
+	engine.MountID = strings.TrimSpace(engine.MountID)
+	engine.Capabilities = normalizeShellStringList(engine.Capabilities)
+	out := map[string]any{
+		"key":          engine.Key,
+		"name":         engine.Name,
+		"mountId":      engine.MountID,
+		"capabilities": strings.Join(engine.Capabilities, " "),
+	}
+	if className = strings.TrimSpace(className); className != "" {
+		out["class"] = className
+	}
+	return out
 }
 
 func normalizeModes(values []ModeConfig, defaults []ModeConfig) []ModeConfig {
