@@ -450,17 +450,6 @@
       return detail.result || null;
     }
 
-    function dockKindLabel(detail) {
-      if (!detail || !detail.field) return "Block";
-      var editable = detail.editable || "";
-      if (editable === "media" || editable === "image") return "Media field";
-      if (editable === "source") return "Source field";
-      if (editable === "flow") return "Flow field";
-      if (editable === "url" || editable === "link") return "Link field";
-      if (editable === "text") return "Text field";
-      return "Field";
-    }
-
     function updatePreviewDockPosition(frame) {
       var dock = frame && frame.__gosxStudioPreviewDock;
       var target = frame && frame.__gosxStudioPreviewDockTarget;
@@ -549,25 +538,8 @@
       if (!dock || !target) return;
       frame.__gosxStudioPreviewDock = dock;
       frame.__gosxStudioPreviewDockTarget = target;
-      dock.hidden = false;
-      dock.setAttribute("data-gosx-studio-preview-field", detail.field || "");
-      dock.setAttribute("data-gosx-studio-preview-block", detail.blockKey || detail.nodeID || "");
-      dock.setAttribute("data-gosx-studio-preview-block-label", detail.blockLabel || "");
-      dock.setAttribute("data-gosx-studio-preview-action-label", detail.action || "");
-      dock.setAttribute("data-gosx-studio-preview-action-href", detail.actionHref || "");
-      dock.setAttribute("data-gosx-studio-preview-action-formaction", detail.actionFormAction || "");
-      dock.querySelector("[data-gosx-studio-preview-dock-label]").textContent = detail.label || detail.field || detail.blockKey || "Preview selection";
-      var breadcrumb = dock.querySelector("[data-gosx-studio-preview-breadcrumb]");
-      if (breadcrumb) {
-        breadcrumb.hidden = !detail.blockLabel || !detail.field;
-        breadcrumb.textContent = detail.blockLabel && detail.field ? detail.blockLabel + " / " + (detail.label || detail.field) : "";
-      }
-      dock.querySelector("[data-gosx-studio-preview-dock-kind]").textContent = dockKindLabel(detail);
-      var action = dock.querySelector('[data-gosx-studio-preview-command="field-action"]');
-      if (action) {
-        action.textContent = detail.action || (detail.editable === "text" ? "Edit text" : detail.editable === "media" || detail.editable === "image" ? "Media" : detail.editable === "flow" ? "Flow" : detail.editable === "source" ? "Source" : "Open");
-        action.disabled = !detail.field && !detail.action && !detail.actionHref && !detail.actionFormAction;
-      }
+      var payload = { form: form, frame: frame, dock: dock, selection: { field: detail.field || "", editable: detail.editable || "", label: detail.label || "", blockLabel: detail.blockLabel || "", action: detail.action || "", actionHref: detail.actionHref || "", actionFormAction: detail.actionFormAction || "", blockKey: detail.blockKey || "", nodeID: detail.nodeID || "" } };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-sync", { bubbles: true, detail: payload }));
       updatePreviewFieldNavigation(frame, dock, target, detail);
       syncPreviewFieldMap(frame, target, detail);
       updatePreviewDockPosition(frame);

@@ -423,6 +423,48 @@ func TestWorkbenchRuntimeDelegatesPreviewDockFieldNavigationUIToPreviewRuntime(t
 	}
 }
 
+func TestWorkbenchRuntimeDelegatesPreviewDockShowContentToPreviewRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	body := jsFunctionBody(t, script, "syncPreviewDock")
+	for _, check := range []string{
+		`function syncPreviewDock(frame, target, detail)`,
+		`var dock = previewDockForFrame(frame);`,
+		`frame.__gosxStudioPreviewDock = dock;`,
+		`frame.__gosxStudioPreviewDockTarget = target;`,
+		`var payload = { form: form, frame: frame, dock: dock, selection: { field: detail.field || "", editable: detail.editable || "", label: detail.label || "", blockLabel: detail.blockLabel || "", action: detail.action || "", actionHref: detail.actionHref || "", actionFormAction: detail.actionFormAction || "", blockKey: detail.blockKey || "", nodeID: detail.nodeID || "" } };`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-sync", { bubbles: true, detail: payload }))`,
+		`updatePreviewFieldNavigation(frame, dock, target, detail);`,
+		`syncPreviewFieldMap(frame, target, detail);`,
+		`updatePreviewDockPosition(frame);`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing preview dock show/content delegation fragment %q", check)
+		}
+	}
+	for _, forbidden := range []string{
+		`dock.hidden = false`,
+		`dock.setAttribute("data-gosx-studio-preview-field"`,
+		`dock.setAttribute("data-gosx-studio-preview-block"`,
+		`dock.setAttribute("data-gosx-studio-preview-block-label"`,
+		`dock.setAttribute("data-gosx-studio-preview-action-label"`,
+		`dock.setAttribute("data-gosx-studio-preview-action-href"`,
+		`dock.setAttribute("data-gosx-studio-preview-action-formaction"`,
+		`dock.querySelector("[data-gosx-studio-preview-dock-label]").textContent`,
+		`breadcrumb.hidden`,
+		`breadcrumb.textContent`,
+		`dockKindLabel(detail)`,
+		`action.textContent`,
+		`action.disabled`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("syncPreviewDock should delegate concrete preview dock show/content mutation; found %q in:\n%s", forbidden, body)
+		}
+	}
+	if strings.Contains(script, `function dockKindLabel`) {
+		t.Fatal("workbench runtime should not keep dockKindLabel after delegating preview dock content rendering")
+	}
+}
+
 func TestWorkbenchRuntimeDelegatesPreviewFieldActionIntentToSelectionRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{

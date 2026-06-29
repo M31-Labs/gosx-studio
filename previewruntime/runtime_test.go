@@ -511,6 +511,47 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockHide(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockShowContent(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-dock-sync"`,
+		`setEditorPreviewResult(detail, syncEditorPreviewDock(detail.dock, detail.selection))`,
+		`function editorPreviewDockKindLabel(selection)`,
+		`if (!selection || !selection.field) return "Block"`,
+		`if (editable === "media" || editable === "image") return "Media field"`,
+		`if (editable === "source") return "Source field"`,
+		`if (editable === "flow") return "Flow field"`,
+		`if (editable === "url" || editable === "link") return "Link field"`,
+		`if (editable === "text") return "Text field"`,
+		`function syncEditorPreviewDock(dock, selection)`,
+		`dock.hidden = false`,
+		`dock.setAttribute("data-gosx-studio-preview-field", selection.field || "")`,
+		`dock.setAttribute("data-gosx-studio-preview-block", selection.blockKey || selection.nodeID || "")`,
+		`dock.setAttribute("data-gosx-studio-preview-block-label", selection.blockLabel || "")`,
+		`dock.setAttribute("data-gosx-studio-preview-action-label", selection.action || "")`,
+		`dock.setAttribute("data-gosx-studio-preview-action-href", selection.actionHref || "")`,
+		`dock.setAttribute("data-gosx-studio-preview-action-formaction", selection.actionFormAction || "")`,
+		`var label = dock.querySelector("[data-gosx-studio-preview-dock-label]")`,
+		`if (label) label.textContent = selection.label || selection.field || selection.blockKey || "Preview selection"`,
+		`breadcrumb.hidden = !selection.blockLabel || !selection.field`,
+		`breadcrumb.textContent = selection.blockLabel && selection.field ? selection.blockLabel + " / " + (selection.label || selection.field) : ""`,
+		`if (kind) kind.textContent = editorPreviewDockKindLabel(selection)`,
+		`action.textContent = selection.action || (selection.editable === "text" ? "Edit text" : selection.editable === "media" || selection.editable === "image" ? "Media" : selection.editable === "flow" ? "Flow" : selection.editable === "source" ? "Source" : "Open")`,
+		`action.disabled = !selection.field && !selection.action && !selection.actionHref && !selection.actionFormAction`,
+		`return { handled: true }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview dock show/content fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-sync`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock sync control events")
+	}
+}
+
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockFieldNavigationUI(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {

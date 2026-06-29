@@ -209,6 +209,44 @@
     return { handled: true, count: docks.length };
   }
 
+  function editorPreviewDockKindLabel(selection) {
+    if (!selection || !selection.field) return "Block";
+    var editable = selection.editable || "";
+    if (editable === "media" || editable === "image") return "Media field";
+    if (editable === "source") return "Source field";
+    if (editable === "flow") return "Flow field";
+    if (editable === "url" || editable === "link") return "Link field";
+    if (editable === "text") return "Text field";
+    return "Field";
+  }
+
+  function syncEditorPreviewDock(dock, selection) {
+    if (!dock || !dock.setAttribute) return { handled: false };
+    selection = selection || {};
+    dock.hidden = false;
+    dock.setAttribute("data-gosx-studio-preview-field", selection.field || "");
+    dock.setAttribute("data-gosx-studio-preview-block", selection.blockKey || selection.nodeID || "");
+    dock.setAttribute("data-gosx-studio-preview-block-label", selection.blockLabel || "");
+    dock.setAttribute("data-gosx-studio-preview-action-label", selection.action || "");
+    dock.setAttribute("data-gosx-studio-preview-action-href", selection.actionHref || "");
+    dock.setAttribute("data-gosx-studio-preview-action-formaction", selection.actionFormAction || "");
+    var label = dock.querySelector("[data-gosx-studio-preview-dock-label]");
+    if (label) label.textContent = selection.label || selection.field || selection.blockKey || "Preview selection";
+    var breadcrumb = dock.querySelector("[data-gosx-studio-preview-breadcrumb]");
+    if (breadcrumb) {
+      breadcrumb.hidden = !selection.blockLabel || !selection.field;
+      breadcrumb.textContent = selection.blockLabel && selection.field ? selection.blockLabel + " / " + (selection.label || selection.field) : "";
+    }
+    var kind = dock.querySelector("[data-gosx-studio-preview-dock-kind]");
+    if (kind) kind.textContent = editorPreviewDockKindLabel(selection);
+    var action = dock.querySelector('[data-gosx-studio-preview-command="field-action"]');
+    if (action) {
+      action.textContent = selection.action || (selection.editable === "text" ? "Edit text" : selection.editable === "media" || selection.editable === "image" ? "Media" : selection.editable === "flow" ? "Flow" : selection.editable === "source" ? "Source" : "Open");
+      action.disabled = !selection.field && !selection.action && !selection.actionHref && !selection.actionFormAction;
+    }
+    return { handled: true };
+  }
+
   function syncEditorPreviewDockFieldNavigation(dock, count, index) {
     if (!dock || !dock.setAttribute) return { handled: false, count: 0, index: -1 };
     count = Number.isFinite(Number(count)) ? Number(count) : 0;
@@ -440,6 +478,10 @@
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, hideEditorPreviewDocks(form));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-dock-sync", function (event) {
+      var detail = event.detail || {};
+      setEditorPreviewResult(detail, syncEditorPreviewDock(detail.dock, detail.selection));
     });
     doc.addEventListener("gosxstudio:editor-preview-dock-field-navigation-sync", function (event) {
       var detail = event.detail || {};
