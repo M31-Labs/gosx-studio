@@ -94,3 +94,29 @@ func TestRenderBackendResourceIndexEmptyStates(t *testing.T) {
 		t.Fatalf("empty card index missing empty state:\n%s", cardHTML)
 	}
 }
+
+func TestRenderBackendResourceIndexContentOmitsPageWrapper(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendResourceIndexContent(BackendResourceIndexProps{
+		Kicker:  "CMS",
+		Title:   "Categories",
+		Summary: "Storefront taxonomy for grouping products and shaping headless commerce queries.",
+		Empty:   "No categories yet.",
+		Table: &BackendResourceTable{
+			Headers: []string{"Category", "Slug", "Status", "Updated", ""},
+		},
+	}))
+
+	for _, fragment := range []string{
+		`<section class="admin-heading"><p class="kicker">CMS</p><h1>Categories</h1><p>Storefront taxonomy for grouping products and shaping headless commerce queries.</p></section>`,
+		`<section class="panel"><table class="data-table">`,
+		`<thead><tr><th>Category</th><th>Slug</th><th>Status</th><th>Updated</th><th></th></tr></thead>`,
+		`<p class="empty">No categories yet.</p>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("resource index content missing %q:\n%s", fragment, html)
+		}
+	}
+	if strings.Contains(html, `data-gosx-studio-backend-resource-index-renderer="gosx-studio"`) {
+		t.Fatalf("resource index content should not render its own page wrapper:\n%s", html)
+	}
+}

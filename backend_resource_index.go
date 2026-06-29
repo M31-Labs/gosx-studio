@@ -62,6 +62,12 @@ func RenderBackendResourceIndex(props BackendResourceIndexProps) gosx.Node {
 		gosx.Attr("class", className),
 		gosx.Attr("data-gosx-studio-backend-resource-index-renderer", "gosx-studio"),
 	),
+		RenderBackendResourceIndexContent(props),
+	)
+}
+
+func RenderBackendResourceIndexContent(props BackendResourceIndexProps) gosx.Node {
+	return gosx.Fragment(
 		gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-heading")),
 			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(props.Kicker)),
 			gosx.El("h1", nil, gosx.Text(props.Title)),
@@ -117,10 +123,14 @@ func renderBackendResourceTableCell(cell BackendResourceTableCell) gosx.Node {
 		return renderBackendResourceLink(cell.Link)
 	}
 	if cell.Primary != "" || cell.Secondary != "" {
-		return gosx.Fragment(
-			gosx.El("strong", nil, gosx.Text(cell.Primary)),
-			gosx.El("span", nil, gosx.Text(cell.Secondary)),
-		)
+		nodes := []gosx.Node{}
+		if cell.Primary != "" {
+			nodes = append(nodes, gosx.El("strong", nil, gosx.Text(cell.Primary)))
+		}
+		if cell.Secondary != "" {
+			nodes = append(nodes, gosx.El("span", nil, gosx.Text(cell.Secondary)))
+		}
+		return gosx.Fragment(nodes...)
 	}
 	if cell.StatusClass != "" {
 		return gosx.El("span", gosx.Attrs(gosx.Attr("class", cell.StatusClass)), gosx.Text(cell.Text))
