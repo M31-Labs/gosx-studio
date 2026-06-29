@@ -276,6 +276,77 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 	)
 }
 
+func TestRenderBackendEditorWorkbenchDefaultChrome(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{
+		Title:      "Website editor",
+		SaveAction: "/admin/editor/__actions/save",
+		Canvas: CanvasSurface{
+			RouteLabel:     "Home",
+			SelectionLabel: "Hero selected",
+			Zoom:           "100",
+		},
+		Modes: []Mode{NewMode("home", "Home", true)},
+		Metrics: []Metric{{
+			Key:   "sections",
+			Label: "sections",
+			Value: "4",
+		}},
+		Viewports: []Viewport{
+			NewViewport("desktop", "Desktop", "100%", false),
+			NewViewport("tablet", "Tablet", "48rem", true),
+		},
+	}, WorkbenchShellViewOptions{
+		LeftRailLabel:  "Pages",
+		RightRailLabel: "Fields",
+		ActivityLabel:  "Timeline",
+		FocusLabel:     "Inspect",
+		CSRFToken:      "csrf-token",
+	})
+
+	html := gosx.RenderHTML(RenderBackendEditorWorkbench(BackendEditorWorkbenchProps{
+		View:         view,
+		AuthoringURL: "/admin/editor/__actions/authoring",
+		LeftRail:     []gosx.Node{gosx.El("section", gosx.Attrs(gosx.Attr("data-site-navigator", "true")), gosx.Text("Pages"))},
+		Board:        []gosx.Node{gosx.El("section", gosx.Attrs(gosx.Attr("data-site-map-engine", "true")), gosx.Text("Site map"))},
+		RightRail:    []gosx.Node{gosx.El("section", gosx.Attrs(gosx.Attr("data-inspector", "true")), gosx.Text("Inspector"))},
+	}))
+
+	for _, fragment := range []string{
+		`class="editor-toolbar"`,
+		`class="button-row" data-gosx-studio-toolbar-actions="true"`,
+		`class="studio-modebar"`,
+		`class="studio-context-strip"`,
+		`class="studio-command-palette"`,
+		`class="editor-save-status"`,
+		`class="editor-save-state"`,
+		`class="editor-save-detail"`,
+		`class="editor-save-time"`,
+		`class="editor-save-count"`,
+		`data-gosx-studio-save-button="true"`,
+		`class="studio-canvas-bar"`,
+		`data-gosx-studio-canvas-bar-renderer="gosx-studio"`,
+		`class="studio-canvas-tools"`,
+		`data-gosx-studio-canvas-tools-renderer="gosx-studio"`,
+		`class="studio-viewport-switcher"`,
+		`data-gosx-studio-viewport-controls-renderer="gosx-studio"`,
+		`class="studio-zoombar"`,
+		`data-gosx-studio-zoom-controls-renderer="gosx-studio"`,
+		`class="studio-canvas-status"`,
+		`data-gosx-studio-canvas-status-renderer="gosx-studio"`,
+		`data-studio-mode-control="home"`,
+		`data-studio-metric="sections"`,
+		`data-studio-command-palette="true"`,
+		`data-studio-rail-toggle="left" aria-pressed="true">Pages</button>`,
+		`data-studio-viewport-current="tablet"`,
+		`data-studio-zoom-current="100"`,
+		`<output data-studio-selection-label="true">Hero selected</output>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("backend editor default chrome missing %q:\n%s", fragment, html)
+		}
+	}
+}
+
 func TestRenderBackendEditorWorkbenchSlotHelpers(t *testing.T) {
 	left := gosx.RenderHTML(RenderBackendEditorLeftRail(gosx.El("span", nil, gosx.Text("left"))))
 	board := gosx.RenderHTML(RenderBackendEditorBoard(gosx.El("span", nil, gosx.Text("board"))))

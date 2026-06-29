@@ -65,23 +65,82 @@ type BackendEditorWorkbenchPanelStackProps struct {
 }
 
 func RenderBackendEditorWorkbench(props BackendEditorWorkbenchProps) gosx.Node {
+	toolbar := props.Toolbar
+	if workbenchNodeEmpty(toolbar) {
+		toolbar = RenderBackendEditorWorkbenchToolbar(props.View)
+	}
+	canvasBar := props.CanvasBar
+	if workbenchNodeEmpty(canvasBar) {
+		canvasBar = RenderBackendEditorWorkbenchCanvasBar(props.View)
+	}
+	canvasStatus := props.CanvasStatus
+	if workbenchNodeEmpty(canvasStatus) {
+		canvasStatus = RenderBackendEditorWorkbenchCanvasStatus(props.View)
+	}
+
 	options := WorkbenchFrameOptions{
 		AuthoringURL:   props.AuthoringURL,
 		ResizableRails: true,
-		Toolbar:        props.Toolbar,
+		Toolbar:        toolbar,
 		LeftRail:       []gosx.Node{RenderBackendEditorLeftRail(props.LeftRail...)},
 		Board:          []gosx.Node{RenderBackendEditorBoard(props.Board...)},
 		RightRail:      []gosx.Node{RenderBackendEditorRightRail(props.RightRail...)},
 	}
-	if !workbenchNodeEmpty(props.CanvasBar) {
-		options.CanvasBar = []gosx.Node{props.CanvasBar}
+	if !workbenchNodeEmpty(canvasBar) {
+		options.CanvasBar = []gosx.Node{canvasBar}
 	}
-	if !workbenchNodeEmpty(props.CanvasStatus) {
-		options.CanvasStatus = []gosx.Node{props.CanvasStatus}
+	if !workbenchNodeEmpty(canvasStatus) {
+		options.CanvasStatus = []gosx.Node{canvasStatus}
 	}
 	return gosx.El("div", gosx.Attrs(gosx.Attr("data-gosx-studio-frame-slot", "true")),
 		RenderWorkbenchFrame(props.View, options),
 	)
+}
+
+func RenderBackendEditorWorkbenchToolbar(view map[string]any) gosx.Node {
+	return RenderWorkbenchToolbar(view, WorkbenchToolbarOptions{
+		Class:        "editor-toolbar",
+		ActionsClass: "button-row",
+		Controls: []gosx.Node{
+			RenderWorkbenchModebar(view, WorkbenchModebarOptions{Class: "studio-modebar"}),
+			RenderWorkbenchMetricStrip(view, WorkbenchMetricStripOptions{Class: "studio-context-strip"}),
+		},
+		CommandPaletteNode: RenderWorkbenchCommandPalette(view, WorkbenchCommandPaletteOptions{Class: "studio-command-palette"}),
+		SaveStatusNode: RenderWorkbenchSaveStatus(WorkbenchSaveStatusOptions{
+			Class:           "editor-save-status",
+			StateClass:      "editor-save-state",
+			DetailClass:     "editor-save-detail",
+			LastSavedClass:  "editor-save-time",
+			DirtyCountClass: "editor-save-count",
+		}),
+	})
+}
+
+func RenderBackendEditorWorkbenchZoomControls(view map[string]any) gosx.Node {
+	return RenderWorkbenchZoomControls(view, WorkbenchZoomControlsOptions{Class: "studio-zoombar"})
+}
+
+func RenderBackendEditorWorkbenchCanvasTools(view map[string]any) gosx.Node {
+	return RenderWorkbenchCanvasTools(view, WorkbenchCanvasToolsOptions{Class: "studio-canvas-tools"})
+}
+
+func RenderBackendEditorWorkbenchViewportControls(view map[string]any) gosx.Node {
+	return RenderWorkbenchViewportControls(view, WorkbenchViewportControlsOptions{Class: "studio-viewport-switcher"})
+}
+
+func RenderBackendEditorWorkbenchCanvasBar(view map[string]any) gosx.Node {
+	return RenderWorkbenchCanvasBar(view, WorkbenchCanvasBarOptions{
+		Class: "studio-canvas-bar",
+		Controls: []gosx.Node{
+			RenderBackendEditorWorkbenchCanvasTools(view),
+			RenderBackendEditorWorkbenchViewportControls(view),
+			RenderBackendEditorWorkbenchZoomControls(view),
+		},
+	})
+}
+
+func RenderBackendEditorWorkbenchCanvasStatus(view map[string]any) gosx.Node {
+	return RenderWorkbenchCanvasStatus(view, WorkbenchCanvasStatusOptions{Class: "studio-canvas-status"})
 }
 
 func RenderBackendEditorWorkbenchContent(props BackendEditorWorkbenchContentProps) gosx.Node {
