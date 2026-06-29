@@ -121,3 +121,59 @@ func TestRenderRevisionHistoryPanelEmpty(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderRevisionHistoryPanelStandaloneForms(t *testing.T) {
+	view := map[string]any{
+		"class":       "panel",
+		"headerClass": "panel__header",
+		"title":       "Version history",
+		"empty":       "No previous versions yet.",
+		"hasItems":    true,
+		"csrfToken":   "csrf-token",
+		"hiddenInputs": []map[string]string{
+			{"name": "id", "value": "page_1"},
+		},
+		"items": []map[string]any{{
+			"key":            "rev_1",
+			"title":          "Saved draft",
+			"actionLabel":    "Saved",
+			"createdMachine": "2026-05-24T12:00:00Z",
+			"createdLabel":   "May 24, 2026",
+			"summary":        "Homepage copy updated.",
+			"hasSummary":     true,
+			"restoreAction":  "/admin/pages/page_1/__actions/restoreRevision",
+			"confirm":        "Restore this page version? The current page will be saved in history first.",
+			"buttonLabel":    "Restore this version",
+			"hiddenInputs": []map[string]string{
+				{"name": "revisionId", "value": "rev_1"},
+			},
+		}},
+	}
+
+	html := gosx.RenderHTML(RenderRevisionHistoryPanel(view, RevisionHistoryPanelOptions{StandaloneForms: true}))
+
+	for _, fragment := range []string{
+		`<section class="panel" data-panel-key="" data-studio-revision-history="true" data-gosx-studio-revision-history-renderer="gosx-studio">`,
+		`<ul class="field-list field-list--stacked">`,
+		`<li data-studio-revision="rev_1">`,
+		`<form class="inline-form" method="post" action="/admin/pages/page_1/__actions/restoreRevision">`,
+		`<input type="hidden" name="csrf_token" value="csrf-token" />`,
+		`<input type="hidden" name="id" value="page_1" />`,
+		`<input type="hidden" name="revisionId" value="rev_1" />`,
+		`<button class="button button--secondary" type="submit" data-admin-confirm="Restore this page version? The current page will be saved in history first.">Restore this version</button>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("standalone revision history missing %q:\n%s", fragment, html)
+		}
+	}
+	for _, notWant := range []string{
+		`form="websiteEditorForm"`,
+		`formaction=`,
+		`formmethod=`,
+		`data-studio-submit-action="restoreRevision"`,
+	} {
+		if strings.Contains(html, notWant) {
+			t.Fatalf("standalone revision history must not include %q:\n%s", notWant, html)
+		}
+	}
+}
