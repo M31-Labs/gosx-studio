@@ -2,6 +2,25 @@ package studio
 
 import "m31labs.dev/gosx"
 
+type SiteNavigatorItem struct {
+	Key     string
+	Group   string
+	Label   string
+	Href    string
+	Class   string
+	Summary string
+}
+
+type SiteNavigatorProps struct {
+	Mode     string
+	Kicker   string
+	Title    string
+	Label    string
+	Empty    string
+	HasItems bool
+	Items    []SiteNavigatorItem
+}
+
 type SiteNavigatorPanelOptions struct {
 	RootAttrs map[string]any
 }
