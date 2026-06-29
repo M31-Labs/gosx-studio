@@ -189,6 +189,37 @@
     };
   }
 
+  function runEditorPreviewFieldNavigation(detail, event) {
+    detail = detail || {};
+    var frame = detail.frame;
+    var direction = Number(detail.direction) || 0;
+    var reason = detail.reason || "field-navigation";
+    var host = detail.host || {};
+    var dock = frame && frame.__gosxStudioPreviewDock;
+    var target = frame && frame.__gosxStudioPreviewDockTarget;
+    if (!dock || dock.hidden || !target) return { handled: false, navigated: false };
+    editorPreviewHostCall(host, "finishInlineTextEdit", false, frame, true, "field-navigation");
+    var selection = editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {};
+    var state = editorPreviewFieldNavigationState(frame, target, selection);
+    if (!state.count) return { handled: false, navigated: false, state: state };
+    var currentIndex = state.index >= 0 ? state.index : (direction > 0 ? -1 : 0);
+    var nextIndex = (currentIndex + direction + state.count) % state.count;
+    var nextTarget = state.fields[nextIndex];
+    var nextDetail = editorPreviewHostCall(host, "previewSelectionDetail", {}, nextTarget) || {};
+    if (!nextTarget || !nextDetail.field) return { handled: false, navigated: false, state: state };
+    if (!editorPreviewHostCall(host, "applyPreviewSelection", false, frame, nextTarget, nextDetail, { reveal: true, reason: reason })) {
+      return { handled: false, navigated: false, state: state, detail: nextDetail };
+    }
+    var navigation = {
+      direction: direction > 0 ? "next" : "previous",
+      fieldIndex: nextIndex + 1,
+      fieldCount: state.count,
+      reason: reason
+    };
+    editorPreviewHostCall(host, "dispatchPreviewFieldNavigation", null, nextDetail, navigation);
+    return { handled: true, navigated: true, detail: nextDetail, navigation: navigation, state: state };
+  }
+
   function clearEditorPreviewFieldMap(frame) {
     var frameDoc = editorPreviewFrameDocument(frame);
     if (!frameDoc) return { handled: false, count: 0 };
@@ -728,7 +759,13 @@
       var intent = editorPreviewKeyboardIntent(event);
       if (!intent) return;
       if (intent.action === "prev-field" || intent.action === "next-field") {
-        if (editorPreviewHostCall(host, "navigatePreviewField", false, frame, intent.action === "next-field" ? 1 : -1, intent.reason)) {
+        var result = runEditorPreviewFieldNavigation({
+          frame: frame,
+          direction: intent.action === "next-field" ? 1 : -1,
+          reason: intent.reason,
+          host: host
+        }, event);
+        if (result && result.navigated) {
           event.preventDefault();
           event.stopPropagation();
         }
@@ -936,6 +973,10 @@
     doc.addEventListener("gosxstudio:editor-preview-field-navigation-state", function (event) {
       var detail = event.detail || {};
       setEditorPreviewResult(detail, editorPreviewFieldNavigationState(detail.frame, detail.target, detail.selection || detail.detail || {}));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-field-navigation-run", function (event) {
+      var detail = event.detail || {};
+      setEditorPreviewResult(detail, runEditorPreviewFieldNavigation(detail, event));
     });
     doc.addEventListener("gosxstudio:editor-preview-selection-clear-sync", function (event) {
       var detail = event.detail || {};

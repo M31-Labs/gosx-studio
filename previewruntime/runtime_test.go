@@ -657,7 +657,11 @@ func TestPreviewRuntimeIslandJSHandsPreviewDocumentEventsToHost(t *testing.T) {
 		`editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: false, reason: "focus" })`,
 		`editorPreviewHostCall(host, "handleInlineTextInput", false, frame, event)`,
 		`editorPreviewHostCall(host, "handleInlineTextKeyEvent", false, frame, event)`,
-		`editorPreviewHostCall(host, "navigatePreviewField", false, frame, intent.action === "next-field" ? 1 : -1, intent.reason)`,
+		`var result = runEditorPreviewFieldNavigation({`,
+		`direction: intent.action === "next-field" ? 1 : -1,`,
+		`reason: intent.reason,`,
+		`host: host`,
+		`if (result && result.navigated)`,
 		`editorPreviewHostCall(host, "startInlineTextFromSelection", false, frame, intent.reason)`,
 		`editorPreviewHostCall(host, "handleInlineTextPaste", false, frame, event)`,
 		`editorPreviewHostCall(host, "handleInlineTextBlur", false, frame, event)`,
@@ -668,6 +672,9 @@ func TestPreviewRuntimeIslandJSHandsPreviewDocumentEventsToHost(t *testing.T) {
 		if !strings.Contains(body, fragment) {
 			t.Fatalf("IslandRuntimeJS() missing editor preview document host handoff fragment %q", fragment)
 		}
+	}
+	if strings.Contains(body, `editorPreviewHostCall(host, "navigatePreviewField"`) {
+		t.Fatalf("IslandRuntimeJS() should run preview field navigation locally, found old host callback")
 	}
 }
 
@@ -741,6 +748,48 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldNavigationState(t *testing.
 	}
 	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-navigation-state`) {
 		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview field-navigation state control events")
+	}
+}
+
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldNavigationRun(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`function runEditorPreviewFieldNavigation(detail, event)`,
+		`var frame = detail.frame`,
+		`var direction = Number(detail.direction) || 0`,
+		`var reason = detail.reason || "field-navigation"`,
+		`var host = detail.host || {}`,
+		`var dock = frame && frame.__gosxStudioPreviewDock`,
+		`var target = frame && frame.__gosxStudioPreviewDockTarget`,
+		`if (!dock || dock.hidden || !target) return { handled: false, navigated: false }`,
+		`editorPreviewHostCall(host, "finishInlineTextEdit", false, frame, true, "field-navigation")`,
+		`var selection = editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {}`,
+		`var state = editorPreviewFieldNavigationState(frame, target, selection)`,
+		`if (!state.count) return { handled: false, navigated: false, state: state }`,
+		`var currentIndex = state.index >= 0 ? state.index : (direction > 0 ? -1 : 0)`,
+		`var nextIndex = (currentIndex + direction + state.count) % state.count`,
+		`var nextTarget = state.fields[nextIndex]`,
+		`var nextDetail = editorPreviewHostCall(host, "previewSelectionDetail", {}, nextTarget) || {}`,
+		`if (!nextTarget || !nextDetail.field) return { handled: false, navigated: false, state: state }`,
+		`editorPreviewHostCall(host, "applyPreviewSelection", false, frame, nextTarget, nextDetail, { reveal: true, reason: reason })`,
+		`direction: direction > 0 ? "next" : "previous"`,
+		`fieldIndex: nextIndex + 1`,
+		`fieldCount: state.count`,
+		`reason: reason`,
+		`editorPreviewHostCall(host, "dispatchPreviewFieldNavigation", null, nextDetail, navigation)`,
+		`return { handled: true, navigated: true, detail: nextDetail, navigation: navigation, state: state }`,
+		`doc.addEventListener("gosxstudio:editor-preview-field-navigation-run"`,
+		`setEditorPreviewResult(detail, runEditorPreviewFieldNavigation(detail, event))`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview field-navigation run fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-navigation-run`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview field-navigation run events")
 	}
 }
 

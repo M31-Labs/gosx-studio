@@ -235,9 +235,10 @@ func TestWorkbenchRuntimeDelegatesPreviewDocumentBindingToPreviewRuntime(t *test
 		`host: {`,
 		`previewSelectionDetail: previewSelectionDetail,`,
 		`applyPreviewSelection: applyPreviewSelection,`,
+		`finishInlineTextEdit: finishInlineTextEdit,`,
+		`dispatchPreviewFieldNavigation: dispatchPreviewFieldNavigation,`,
 		`startInlineTextFromDetail: startInlineTextFromDetail,`,
 		`startInlineTextFromSelection: startInlineTextFromSelection,`,
-		`navigatePreviewField: navigatePreviewField,`,
 		`handleInlineTextInput: handleInlineTextInput,`,
 		`handleInlineTextKeyEvent: handleInlineTextKeyEvent,`,
 		`handleInlineTextPaste: handleInlineTextPaste,`,
@@ -623,11 +624,6 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldNavigationTelemetryToSelectionRunt
 		`if (payload.result) return payload.result;`,
 		`var runtime = window.GoSXStudioSelectionRuntime;`,
 		`runtime.bind(document.body || document);`,
-		`dispatchPreviewFieldNavigation(nextDetail, {`,
-		`direction: direction > 0 ? "next" : "previous"`,
-		`fieldIndex: nextIndex + 1`,
-		`fieldCount: state.count`,
-		`reason: reason || "field-navigation"`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing preview field navigation delegation fragment %q", check)
@@ -636,11 +632,16 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldNavigationTelemetryToSelectionRunt
 
 	navigateBody := jsFunctionBody(t, script, "navigatePreviewField")
 	for _, check := range []string{
-		`var state = previewFieldNavigationState(frame, target, detail);`,
-		`var nextIndex = (currentIndex + direction + state.count) % state.count;`,
-		`if (!applyPreviewSelection(frame, nextTarget, nextDetail, { reveal: true, reason: reason || "field-navigation" })) return false;`,
-		`dispatchPreviewFieldNavigation(nextDetail, {`,
-		`return true;`,
+		`form: form,`,
+		`frame: frame,`,
+		`direction: direction,`,
+		`reason: reason || "field-navigation",`,
+		`finishInlineTextEdit: finishInlineTextEdit,`,
+		`previewSelectionDetail: previewSelectionDetail,`,
+		`applyPreviewSelection: applyPreviewSelection,`,
+		`dispatchPreviewFieldNavigation: dispatchPreviewFieldNavigation`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-navigation-run", { bubbles: true, detail: payload }))`,
+		`return !!(payload.result && payload.result.navigated);`,
 	} {
 		if !strings.Contains(navigateBody, check) {
 			t.Fatalf("navigatePreviewField missing field navigation boundary fragment %q in:\n%s", check, navigateBody)
@@ -649,6 +650,10 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldNavigationTelemetryToSelectionRunt
 	for _, forbidden := range []string{
 		`emitEditorOperation("preview_field_navigate"`,
 		`emit(form, "gosxstudio:preview-field-navigate"`,
+		`previewFieldNavigationState(`,
+		`% state.count`,
+		`applyPreviewSelection(frame, nextTarget`,
+		`dispatchPreviewFieldNavigation(nextDetail`,
 	} {
 		if strings.Contains(navigateBody, forbidden) {
 			t.Fatalf("navigatePreviewField should delegate preview field navigation telemetry; found %q in:\n%s", forbidden, navigateBody)
@@ -668,19 +673,9 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldMapMarkersToPreviewRuntime(t *test
 
 func TestWorkbenchRuntimeDelegatesPreviewFieldNavigationStateToPreviewRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
-	body := jsFunctionBody(t, script, "previewFieldNavigationState")
-	for _, check := range []string{
-		`function previewFieldNavigationState(frame, target, detail)`,
-		`var payload = { form: form, frame: frame, target: target, selection: detail || {} };`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-navigation-state", { bubbles: true, detail: payload }))`,
-		`return payload.result || { fields: [], count: 0, index: -1, current: detail && detail.field ? detail.field : "" };`,
-	} {
-		if !strings.Contains(script, check) {
-			t.Fatalf("workbench runtime missing preview field-navigation state delegation fragment %q", check)
-		}
-	}
-
 	for _, forbidden := range []string{
+		`function previewFieldNavigationState`,
+		`gosxstudio:editor-preview-field-navigation-state`,
 		`function fieldKeyForTarget`,
 		`function fieldNavigationScope`,
 		`function previewFieldNodesForSelection`,
@@ -690,9 +685,6 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldNavigationStateToPreviewRuntime(t 
 	} {
 		if strings.Contains(script, forbidden) {
 			t.Fatalf("workbench runtime should delegate preview field-navigation state calculation; found %q", forbidden)
-		}
-		if strings.Contains(body, forbidden) {
-			t.Fatalf("previewFieldNavigationState should only dispatch state calculation; found %q in:\n%s", forbidden, body)
 		}
 	}
 }

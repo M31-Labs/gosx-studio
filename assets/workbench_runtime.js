@@ -285,12 +285,6 @@
       return detail.result || null;
     }
 
-    function previewFieldNavigationState(frame, target, detail) {
-      var payload = { form: form, frame: frame, target: target, selection: detail || {} };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-navigation-state", { bubbles: true, detail: payload }));
-      return payload.result || { fields: [], count: 0, index: -1, current: detail && detail.field ? detail.field : "" };
-    }
-
     function previewDockDetail(dock) {
       var detail = { form: form, dock: dock };
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-detail-resolve", { bubbles: true, detail: detail }));
@@ -411,26 +405,20 @@
     }
 
     function navigatePreviewField(frame, direction, reason) {
-      var dock = frame && frame.__gosxStudioPreviewDock;
-      var target = frame && frame.__gosxStudioPreviewDockTarget;
-      if (!dock || dock.hidden || !target) return false;
-      finishInlineTextEdit(frame, true, "field-navigation");
-      var detail = previewSelectionDetail(target);
-      var state = previewFieldNavigationState(frame, target, detail);
-      if (!state.count) return false;
-      var currentIndex = state.index >= 0 ? state.index : (direction > 0 ? -1 : 0);
-      var nextIndex = (currentIndex + direction + state.count) % state.count;
-      var nextTarget = state.fields[nextIndex];
-      var nextDetail = previewSelectionDetail(nextTarget);
-      if (!nextTarget || !nextDetail.field) return false;
-      if (!applyPreviewSelection(frame, nextTarget, nextDetail, { reveal: true, reason: reason || "field-navigation" })) return false;
-      dispatchPreviewFieldNavigation(nextDetail, {
-        direction: direction > 0 ? "next" : "previous",
-        fieldIndex: nextIndex + 1,
-        fieldCount: state.count,
-        reason: reason || "field-navigation"
-      });
-      return true;
+      var payload = {
+        form: form,
+        frame: frame,
+        direction: direction,
+        reason: reason || "field-navigation",
+        host: {
+          finishInlineTextEdit: finishInlineTextEdit,
+          previewSelectionDetail: previewSelectionDetail,
+          applyPreviewSelection: applyPreviewSelection,
+          dispatchPreviewFieldNavigation: dispatchPreviewFieldNavigation
+        }
+      };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-navigation-run", { bubbles: true, detail: payload }));
+      return !!(payload.result && payload.result.navigated);
     }
 
     function dispatchPreviewFieldNavigation(detail, navigation) {
@@ -776,9 +764,10 @@
         host: {
           previewSelectionDetail: previewSelectionDetail,
           applyPreviewSelection: applyPreviewSelection,
+          finishInlineTextEdit: finishInlineTextEdit,
+          dispatchPreviewFieldNavigation: dispatchPreviewFieldNavigation,
           startInlineTextFromDetail: startInlineTextFromDetail,
           startInlineTextFromSelection: startInlineTextFromSelection,
-          navigatePreviewField: navigatePreviewField,
           handleInlineTextInput: handleInlineTextInput,
           handleInlineTextKeyEvent: handleInlineTextKeyEvent,
           handleInlineTextPaste: handleInlineTextPaste,
