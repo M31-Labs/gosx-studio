@@ -109,6 +109,41 @@
     return queryAll(frameDoc, editorPreviewPatchSelector(source));
   }
 
+  function editorPreviewFieldKey(target) {
+    if (!target || !target.getAttribute) return "";
+    return target.getAttribute("data-studio-field") || target.getAttribute("data-editor-preview") || target.getAttribute("data-studio-field-source") || "";
+  }
+
+  function clearEditorPreviewFieldMap(frame) {
+    var frameDoc = editorPreviewFrameDocument(frame);
+    if (!frameDoc) return { handled: false, count: 0 };
+    var count = 0;
+    queryAll(frameDoc, "[data-gosx-studio-preview-field-scope], [data-gosx-studio-preview-field-current]").forEach(function (target) {
+      target.removeAttribute("data-gosx-studio-preview-field-scope");
+      target.removeAttribute("data-gosx-studio-preview-field-current");
+      target.removeAttribute("data-gosx-studio-preview-field-position");
+      target.removeAttribute("data-gosx-studio-preview-field-total");
+      count += 1;
+    });
+    return { handled: true, count: count };
+  }
+
+  function syncEditorPreviewFieldMap(frame, fields, current, count) {
+    var result = clearEditorPreviewFieldMap(frame);
+    fields = Array.isArray(fields) ? fields : [];
+    count = Number.isFinite(Number(count)) ? Number(count) : fields.length;
+    fields.forEach(function (candidate, index) {
+      if (!candidate || !candidate.setAttribute) return;
+      candidate.setAttribute("data-gosx-studio-preview-field-scope", "true");
+      candidate.setAttribute("data-gosx-studio-preview-field-position", String(index + 1));
+      candidate.setAttribute("data-gosx-studio-preview-field-total", String(count));
+      if (editorPreviewFieldKey(candidate) === current) {
+        candidate.setAttribute("data-gosx-studio-preview-field-current", "true");
+      }
+    });
+    return { handled: true, count: fields.length, cleared: result.count || 0 };
+  }
+
   function updateEditorPreviewPatchTarget(target, field) {
     if (!target || !field) return;
     var value = field.value == null ? "" : String(field.value);
@@ -288,6 +323,14 @@
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, detail.patch));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-field-map-clear", function (event) {
+      var detail = event.detail || {};
+      setEditorPreviewResult(detail, clearEditorPreviewFieldMap(detail.frame));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-field-map-sync", function (event) {
+      var detail = event.detail || {};
+      setEditorPreviewResult(detail, syncEditorPreviewFieldMap(detail.frame, detail.fields, detail.current, detail.count));
     });
   }
 

@@ -361,14 +361,9 @@
     }
 
     function clearPreviewFieldMap(frame) {
-      var doc = frameDocument(frame);
-      if (!doc) return;
-      queryAll(doc, "[data-gosx-studio-preview-field-scope], [data-gosx-studio-preview-field-current]").forEach(function (target) {
-        target.removeAttribute("data-gosx-studio-preview-field-scope");
-        target.removeAttribute("data-gosx-studio-preview-field-current");
-        target.removeAttribute("data-gosx-studio-preview-field-position");
-        target.removeAttribute("data-gosx-studio-preview-field-total");
-      });
+      var detail = { form: form, frame: frame };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-map-clear", { bubbles: true, detail: detail }));
+      return detail.result || null;
     }
 
     function clearPreviewSelections() {
@@ -547,17 +542,10 @@
     }
 
     function syncPreviewFieldMap(frame, target, detail) {
-      clearPreviewFieldMap(frame);
       var state = previewFieldNavigationState(frame, target, detail);
       var current = detail && detail.field ? detail.field : fieldKeyForTarget(target);
-      state.fields.forEach(function (candidate, index) {
-        candidate.setAttribute("data-gosx-studio-preview-field-scope", "true");
-        candidate.setAttribute("data-gosx-studio-preview-field-position", String(index + 1));
-        candidate.setAttribute("data-gosx-studio-preview-field-total", String(state.count));
-        if (fieldKeyForTarget(candidate) === current) {
-          candidate.setAttribute("data-gosx-studio-preview-field-current", "true");
-        }
-      });
+      var payload = { form: form, frame: frame, fields: state.fields, current: current, count: state.count };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-map-sync", { bubbles: true, detail: payload }));
       return state;
     }
 

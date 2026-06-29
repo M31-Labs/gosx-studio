@@ -382,6 +382,43 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewPatchTransport(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldMapMarkers(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-field-map-clear"`,
+		`doc.addEventListener("gosxstudio:editor-preview-field-map-sync"`,
+		`setEditorPreviewResult(detail, clearEditorPreviewFieldMap(detail.frame))`,
+		`setEditorPreviewResult(detail, syncEditorPreviewFieldMap(detail.frame, detail.fields, detail.current, detail.count))`,
+		`function editorPreviewFieldKey(target)`,
+		`target.getAttribute("data-studio-field") || target.getAttribute("data-editor-preview") || target.getAttribute("data-studio-field-source")`,
+		`function clearEditorPreviewFieldMap(frame)`,
+		`var frameDoc = editorPreviewFrameDocument(frame)`,
+		`queryAll(frameDoc, "[data-gosx-studio-preview-field-scope], [data-gosx-studio-preview-field-current]").forEach(function (target)`,
+		`target.removeAttribute("data-gosx-studio-preview-field-scope")`,
+		`target.removeAttribute("data-gosx-studio-preview-field-current")`,
+		`target.removeAttribute("data-gosx-studio-preview-field-position")`,
+		`target.removeAttribute("data-gosx-studio-preview-field-total")`,
+		`function syncEditorPreviewFieldMap(frame, fields, current, count)`,
+		`var result = clearEditorPreviewFieldMap(frame)`,
+		`fields = Array.isArray(fields) ? fields : []`,
+		`candidate.setAttribute("data-gosx-studio-preview-field-scope", "true")`,
+		`candidate.setAttribute("data-gosx-studio-preview-field-position", String(index + 1))`,
+		`candidate.setAttribute("data-gosx-studio-preview-field-total", String(count))`,
+		`candidate.setAttribute("data-gosx-studio-preview-field-current", "true")`,
+		`return { handled: true, count: fields.length, cleared: result.count || 0 }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview field-map marker fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-map`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview field-map control events")
+	}
+}
+
 func TestSubscriberRuntimeScriptPublishesObservers(t *testing.T) {
 	// The preview-side subscriber registers observers for each
 	// $preview.* signal family. This test guards against drift between

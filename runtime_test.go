@@ -340,6 +340,49 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldNavigationTelemetryToSelectionRunt
 	}
 }
 
+func TestWorkbenchRuntimeDelegatesPreviewFieldMapMarkersToPreviewRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`function clearPreviewFieldMap(frame)`,
+		`var detail = { form: form, frame: frame };`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-map-clear", { bubbles: true, detail: detail }))`,
+		`return detail.result || null;`,
+		`function syncPreviewFieldMap(frame, target, detail)`,
+		`var state = previewFieldNavigationState(frame, target, detail);`,
+		`var current = detail && detail.field ? detail.field : fieldKeyForTarget(target);`,
+		`var payload = { form: form, frame: frame, fields: state.fields, current: current, count: state.count };`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-map-sync", { bubbles: true, detail: payload }))`,
+		`return state;`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing preview field-map delegation fragment %q", check)
+		}
+	}
+
+	for _, body := range []struct {
+		name string
+		body string
+	}{
+		{name: "clearPreviewFieldMap", body: jsFunctionBody(t, script, "clearPreviewFieldMap")},
+		{name: "syncPreviewFieldMap", body: jsFunctionBody(t, script, "syncPreviewFieldMap")},
+	} {
+		for _, forbidden := range []string{
+			`setAttribute("data-gosx-studio-preview-field-scope"`,
+			`setAttribute("data-gosx-studio-preview-field-current"`,
+			`setAttribute("data-gosx-studio-preview-field-position"`,
+			`setAttribute("data-gosx-studio-preview-field-total"`,
+			`removeAttribute("data-gosx-studio-preview-field-scope"`,
+			`removeAttribute("data-gosx-studio-preview-field-current"`,
+			`removeAttribute("data-gosx-studio-preview-field-position"`,
+			`removeAttribute("data-gosx-studio-preview-field-total"`,
+		} {
+			if strings.Contains(body.body, forbidden) {
+				t.Fatalf("%s should delegate preview field-map marker mutation; found %q in:\n%s", body.name, forbidden, body.body)
+			}
+		}
+	}
+}
+
 func TestWorkbenchRuntimeDelegatesPreviewFieldActionIntentToSelectionRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
