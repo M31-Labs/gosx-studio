@@ -517,9 +517,31 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldActionIntentToSelectionRuntime(t *
 		`window.location.href = intent.href || "";`,
 		`if (fieldSourceNode) revealInspectorSelection(fieldSourceNode, inspectorControl(fieldSourceNode));`,
 		`emitPreviewDockAction(action, detail);`,
+		`function submitPreviewFieldAction(detail)`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-action-submit", { bubbles: true, detail: payload }))`,
+		`field: detail.field || ""`,
+		`editable: detail.editable || ""`,
+		`label: detail.label || ""`,
+		`action: detail.action || ""`,
+		`actionHref: detail.actionHref || ""`,
+		`actionFormAction: detail.actionFormAction || ""`,
+		`if (payload.result) return !!payload.result;`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing preview field-action intent delegation fragment %q", check)
+		}
+	}
+
+	for _, forbidden := range []string{
+		`function isFormSubmitControl`,
+		`function fieldActionSubmitter`,
+		`form.requestSubmit`,
+		`document.createElement("button")`,
+		`form.dataset.gosxStudioPendingAction`,
+		`form.submit()`,
+	} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should delegate concrete field-action submit mechanics; found %q", forbidden)
 		}
 	}
 

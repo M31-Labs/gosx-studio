@@ -304,6 +304,53 @@ func TestSelectionRuntimeIslandOwnsPreviewFieldActionResolve(t *testing.T) {
 	}
 }
 
+func TestSelectionRuntimeIslandOwnsPreviewFieldActionSubmit(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, contract := range []string{
+		`form.addEventListener("gosxstudio:preview-field-action-submit", submitPreviewFieldAction);`,
+		`function isFormSubmitControl(node)`,
+		`function fieldActionSubmitter(source, formAction)`,
+		`function submitPreviewFieldAction(event)`,
+		`var envelope = event.detail || {};`,
+		`envelope.result = false;`,
+		`var source = fieldSource(envelope.field || "");`,
+		`var submitter = fieldActionSubmitter(source, envelope.actionFormAction || "");`,
+		`var action = envelope.actionFormAction || (submitter && (submitter.getAttribute("data-studio-field-action-formaction") || submitter.getAttribute("formaction"))) || "";`,
+		`var confirmMessage = (submitter && submitter.getAttribute("data-admin-confirm")) || (source && source.getAttribute("data-admin-confirm")) || "";`,
+		`if (confirmMessage && !window.confirm(confirmMessage)) return;`,
+		`form.dataset.gosxStudioPendingAction = action;`,
+		`form.dataset.gosxStudioPendingActionLabel = envelope.action || envelope.label || "Field action";`,
+		`if (submitter && form.requestSubmit)`,
+		`form.requestSubmit(submitter);`,
+		`var button = document.createElement("button");`,
+		`button.type = "submit";`,
+		`button.hidden = true;`,
+		`button.setAttribute("formaction", action);`,
+		`form.requestSubmit(button);`,
+		`form.setAttribute("action", action);`,
+		`form.submit();`,
+		`if (!submitter || !submitter.click) return;`,
+		`submitter.click();`,
+		`envelope.result = true;`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() missing preview field-action submit contract %q", contract)
+		}
+	}
+
+	handlerBody := jsFunctionBody(t, body, "submitPreviewFieldAction")
+	for _, forbidden := range []string{
+		`form.dispatchEvent`,
+		`gosxstudio:preview-action`,
+		`gosxstudio:selection-action`,
+		`gosxstudio:editor-operation`,
+	} {
+		if strings.Contains(handlerBody, forbidden) {
+			t.Fatalf("preview field-action submit should only execute the submit envelope; found %q in:\n%s", forbidden, handlerBody)
+		}
+	}
+}
+
 func TestSelectionRuntimeIslandOwnsPreviewDockActionResolve(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	for _, contract := range []string{

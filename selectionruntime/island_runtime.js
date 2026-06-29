@@ -563,6 +563,66 @@
       };
     }
 
+    function isFormSubmitControl(node) {
+      if (!node) return false;
+      var tag = String(node.tagName || "").toLowerCase();
+      var type = String(node.getAttribute("type") || "submit").toLowerCase();
+      if (tag === "button") return type !== "button" && type !== "reset";
+      if (tag === "input") return type === "submit" || type === "image";
+      return false;
+    }
+
+    function fieldActionSubmitter(source, formAction) {
+      if (!source || !source.querySelector) return null;
+      var selector = "button[type='submit'], input[type='submit'], button[formaction], input[formaction], button[data-studio-field-action-formaction], input[data-studio-field-action-formaction]";
+      var submitters = Array.prototype.slice.call(source.querySelectorAll(selector));
+      if (!formAction) return submitters[0] || null;
+      for (var i = 0; i < submitters.length; i += 1) {
+        var candidate = submitters[i];
+        if (!isFormSubmitControl(candidate)) continue;
+        if ((candidate.getAttribute("data-studio-field-action-formaction") || candidate.getAttribute("formaction") || "") === formAction) return candidate;
+      }
+      return submitters.filter(isFormSubmitControl)[0] || null;
+    }
+
+    function submitPreviewFieldAction(event) {
+      var envelope = event.detail || {};
+      envelope.result = false;
+      var source = fieldSource(envelope.field || "");
+      var submitter = fieldActionSubmitter(source, envelope.actionFormAction || "");
+      var action = envelope.actionFormAction || (submitter && (submitter.getAttribute("data-studio-field-action-formaction") || submitter.getAttribute("formaction"))) || "";
+      if (!action) return;
+      var confirmMessage = (submitter && submitter.getAttribute("data-admin-confirm")) || (source && source.getAttribute("data-admin-confirm")) || "";
+      if (confirmMessage && !window.confirm(confirmMessage)) return;
+      form.dataset.gosxStudioPendingAction = action;
+      form.dataset.gosxStudioPendingActionLabel = envelope.action || envelope.label || "Field action";
+      try {
+        if (submitter && form.requestSubmit) {
+          form.requestSubmit(submitter);
+        } else if (form.requestSubmit) {
+          var button = document.createElement("button");
+          button.type = "submit";
+          button.hidden = true;
+          button.setAttribute("formaction", action);
+          form.appendChild(button);
+          form.requestSubmit(button);
+          form.removeChild(button);
+        } else {
+          form.setAttribute("action", action);
+          form.submit();
+        }
+        envelope.result = true;
+      } catch (error) {
+        if (!submitter || !submitter.click) return;
+        try {
+          submitter.click();
+          envelope.result = true;
+        } catch (clickError) {
+          envelope.result = false;
+        }
+      }
+    }
+
     function resolvePreviewDockAction(event) {
       var envelope = event.detail || {};
       var action = envelope.action || "";
@@ -1088,6 +1148,7 @@
     form.addEventListener("gosxstudio:preview-selection-clear", clearPreviewSelectionState);
     form.addEventListener("gosxstudio:preview-field-navigation-commit", emitPreviewFieldNavigation);
     form.addEventListener("gosxstudio:preview-field-action-resolve", resolvePreviewFieldAction);
+    form.addEventListener("gosxstudio:preview-field-action-submit", submitPreviewFieldAction);
     form.addEventListener("gosxstudio:preview-dock-action-resolve", resolvePreviewDockAction);
 
     bindCommandPaletteCommands();
