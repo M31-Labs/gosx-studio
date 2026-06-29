@@ -674,37 +674,8 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldNavigationTelemetryToSelectionRunt
 
 func TestWorkbenchRuntimeDelegatesPreviewFieldMapMarkersToPreviewRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
-	for _, check := range []string{
-		`function clearPreviewFieldMap(frame)`,
-		`var detail = { form: form, frame: frame };`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-map-clear", { bubbles: true, detail: detail }))`,
-		`return detail.result || null;`,
-	} {
-		if !strings.Contains(script, check) {
-			t.Fatalf("workbench runtime missing preview field-map delegation fragment %q", check)
-		}
-	}
-
-	for _, body := range []struct {
-		name string
-		body string
-	}{
-		{name: "clearPreviewFieldMap", body: jsFunctionBody(t, script, "clearPreviewFieldMap")},
-	} {
-		for _, forbidden := range []string{
-			`setAttribute("data-gosx-studio-preview-field-scope"`,
-			`setAttribute("data-gosx-studio-preview-field-current"`,
-			`setAttribute("data-gosx-studio-preview-field-position"`,
-			`setAttribute("data-gosx-studio-preview-field-total"`,
-			`removeAttribute("data-gosx-studio-preview-field-scope"`,
-			`removeAttribute("data-gosx-studio-preview-field-current"`,
-			`removeAttribute("data-gosx-studio-preview-field-position"`,
-			`removeAttribute("data-gosx-studio-preview-field-total"`,
-		} {
-			if strings.Contains(body.body, forbidden) {
-				t.Fatalf("%s should delegate preview field-map marker mutation; found %q in:\n%s", body.name, forbidden, body.body)
-			}
-		}
+	if strings.Contains(script, `function clearPreviewFieldMap`) {
+		t.Fatal("workbench runtime should not own preview field-map clear orchestration after PreviewRuntime selection-clear migration")
 	}
 	if strings.Contains(script, `function syncPreviewFieldMap`) {
 		t.Fatal("workbench runtime should not own preview field-map selection sync after PreviewRuntime dock selection-sync migration")
@@ -964,15 +935,11 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 		`dispatchPreviewSelectionClear("preview-dock");`,
 		`dispatchPreviewSelectionClear("keyboard-escape");`,
 		`function clearPreviewSelections()`,
-		`function hidePreviewDocks()`,
-		`finishInlineTextEdit(frame, true, "clear-selection");`,
-		`function clearPreviewSelectionMarker(frame)`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-marker-clear", { bubbles: true, detail: detail }))`,
-		`clearPreviewSelectionMarker(frame);`,
-		`function clearPreviewSelectionChrome()`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-chrome-clear", { bubbles: true, detail: detail }))`,
-		`clearPreviewSelectionChrome();`,
-		`hidePreviewDocks();`,
+		`host: {
+          finishInlineTextEdit: finishInlineTextEdit
+        }`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-clear-sync", { bubbles: true, detail: detail }))`,
+		`return detail.result || null;`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing preview selection clear boundary fragment %q", check)
@@ -989,6 +956,16 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 
 	clearBody := jsFunctionBody(t, script, "clearPreviewSelections")
 	for _, forbidden := range []string{
+		`previewFrames().forEach`,
+		`finishInlineTextEdit(frame, true, "clear-selection");`,
+		`clearPreviewFieldMap`,
+		`clearPreviewSelectionMarker`,
+		`clearPreviewSelectionChrome`,
+		`hidePreviewDocks`,
+		`gosxstudio:editor-preview-field-map-clear`,
+		`gosxstudio:editor-preview-selection-marker-clear`,
+		`gosxstudio:editor-preview-selection-chrome-clear`,
+		`gosxstudio:editor-preview-dock-hide`,
 		`setAttribute("data-gosx-studio-preview-selected"`,
 		`removeAttribute("data-gosx-studio-preview-selected"`,
 		`setAttribute("data-gosx-studio-preview-selection"`,
@@ -1028,18 +1005,9 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 
 func TestWorkbenchRuntimeDelegatesPreviewDockHideToPreviewRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
-	body := jsFunctionBody(t, script, "hidePreviewDocks")
-	for _, check := range []string{
-		`function hidePreviewDocks()`,
-		`var detail = { form: form };`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-hide", { bubbles: true, detail: detail }))`,
-		`return detail.result || null;`,
-	} {
-		if !strings.Contains(script, check) {
-			t.Fatalf("workbench runtime missing preview dock hide delegation fragment %q", check)
-		}
-	}
 	for _, forbidden := range []string{
+		`function hidePreviewDocks()`,
+		`gosxstudio:editor-preview-dock-hide`,
 		`dock.hidden = true`,
 		`removeAttribute("data-gosx-studio-preview-field"`,
 		`removeAttribute("data-gosx-studio-preview-block"`,
@@ -1050,8 +1018,8 @@ func TestWorkbenchRuntimeDelegatesPreviewDockHideToPreviewRuntime(t *testing.T) 
 		`removeAttribute("data-gosx-studio-preview-field-count"`,
 		`removeAttribute("data-gosx-studio-preview-field-index"`,
 	} {
-		if strings.Contains(body, forbidden) {
-			t.Fatalf("hidePreviewDocks should delegate concrete preview dock hide/reset mutation; found %q in:\n%s", forbidden, body)
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should leave preview dock hide/reset to PreviewRuntime; found %q", forbidden)
 		}
 	}
 }

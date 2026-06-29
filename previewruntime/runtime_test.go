@@ -5,6 +5,19 @@ import (
 	"testing"
 )
 
+func islandJSFunctionBody(t *testing.T, script, name string) string {
+	t.Helper()
+	start := strings.Index(script, "function "+name+"(")
+	if start < 0 {
+		t.Fatalf("script missing function %s", name)
+	}
+	next := strings.Index(script[start+len("function "+name+"("):], "\n  function ")
+	if next < 0 {
+		return script[start:]
+	}
+	return script[start : start+len("function "+name+"(")+next]
+}
+
 // The previewruntime package is the Go-side surface for the Phase 3 slice-6
 // architectural burn-down of GoSXStudioPreviewRuntime. It owns:
 //  1. The feature-flag key consumers add to studio.ShellConfig.FeatureFlags
@@ -728,6 +741,60 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldNavigationState(t *testing.
 	}
 	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-navigation-state`) {
 		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview field-navigation state control events")
+	}
+}
+
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionClearSync(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-selection-clear-sync"`,
+		`var form = editorPreviewForm(detail, event)`,
+		`setEditorPreviewResult(detail, clearEditorPreviewSelections(form, detail.host))`,
+		`function clearEditorPreviewSelections(form, host)`,
+		`if (!form) return { handled: false, frames: 0, fieldMaps: 0, markers: 0, chrome: null, docks: null }`,
+		`var frames = editorPreviewFrames(form)`,
+		`editorPreviewHostCall(host, "finishInlineTextEdit", null, frame, true, "clear-selection")`,
+		`var fieldMap = clearEditorPreviewFieldMap(frame)`,
+		`var marker = clearEditorPreviewSelectionMarker(frame)`,
+		`fieldMaps += fieldMap && fieldMap.count ? fieldMap.count : 0`,
+		`markers += marker && marker.count ? marker.count : 0`,
+		`var chrome = clearEditorPreviewSelectionChrome(form)`,
+		`var docks = hideEditorPreviewDocks(form)`,
+		`return { handled: true, frames: frames.length, fieldMaps: fieldMaps, markers: markers, chrome: chrome, docks: docks }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview selection clear-sync fragment %q", fragment)
+		}
+	}
+
+	clearBody := islandJSFunctionBody(t, body, "clearEditorPreviewSelections")
+	for _, ordered := range [][]string{
+		{
+			`var frames = editorPreviewFrames(form)`,
+			`editorPreviewHostCall(host, "finishInlineTextEdit", null, frame, true, "clear-selection")`,
+			`var fieldMap = clearEditorPreviewFieldMap(frame)`,
+			`var marker = clearEditorPreviewSelectionMarker(frame)`,
+			`var chrome = clearEditorPreviewSelectionChrome(form)`,
+			`var docks = hideEditorPreviewDocks(form)`,
+		},
+	} {
+		last := -1
+		for _, fragment := range ordered {
+			index := strings.Index(clearBody, fragment)
+			if index < 0 {
+				t.Fatalf("clearEditorPreviewSelections missing order fragment %q in:\n%s", fragment, clearBody)
+			}
+			if index < last {
+				t.Fatalf("clearEditorPreviewSelections has out-of-order fragment %q in:\n%s", fragment, clearBody)
+			}
+			last = index
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-clear-sync`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview selection clear-sync control events")
 	}
 }
 

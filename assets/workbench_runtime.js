@@ -271,27 +271,9 @@
       return {};
     }
 
-    function clearPreviewFieldMap(frame) {
-      var detail = { form: form, frame: frame };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-map-clear", { bubbles: true, detail: detail }));
-      return detail.result || null;
-    }
-
-    function clearPreviewSelectionMarker(frame) {
-      var detail = { form: form, frame: frame };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-marker-clear", { bubbles: true, detail: detail }));
-      return detail.result || null;
-    }
-
     function applyPreviewSelectionMarker(frame, selectedTargets) {
       var detail = { form: form, frame: frame, targets: selectedTargets || [], clear: true };
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-marker-apply", { bubbles: true, detail: detail }));
-      return detail.result || null;
-    }
-
-    function clearPreviewSelectionChrome() {
-      var detail = { form: form };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-chrome-clear", { bubbles: true, detail: detail }));
       return detail.result || null;
     }
 
@@ -302,20 +284,13 @@
     }
 
     function clearPreviewSelections() {
-      previewFrames().forEach(function (frame) {
-        finishInlineTextEdit(frame, true, "clear-selection");
-      });
-      previewFrames().forEach(function (frame) {
-        clearPreviewFieldMap(frame);
-        clearPreviewSelectionMarker(frame);
-      });
-      clearPreviewSelectionChrome();
-      hidePreviewDocks();
-    }
-
-    function hidePreviewDocks() {
-      var detail = { form: form };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-hide", { bubbles: true, detail: detail }));
+      var detail = {
+        form: form,
+        host: {
+          finishInlineTextEdit: finishInlineTextEdit
+        }
+      };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-clear-sync", { bubbles: true, detail: detail }));
       return detail.result || null;
     }
 

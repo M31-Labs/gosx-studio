@@ -284,6 +284,25 @@
     return { handled: true, count: docks.length };
   }
 
+  function clearEditorPreviewSelections(form, host) {
+    if (!form) return { handled: false, frames: 0, fieldMaps: 0, markers: 0, chrome: null, docks: null };
+    var frames = editorPreviewFrames(form);
+    var fieldMaps = 0;
+    var markers = 0;
+    frames.forEach(function (frame) {
+      editorPreviewHostCall(host, "finishInlineTextEdit", null, frame, true, "clear-selection");
+    });
+    frames.forEach(function (frame) {
+      var fieldMap = clearEditorPreviewFieldMap(frame);
+      var marker = clearEditorPreviewSelectionMarker(frame);
+      fieldMaps += fieldMap && fieldMap.count ? fieldMap.count : 0;
+      markers += marker && marker.count ? marker.count : 0;
+    });
+    var chrome = clearEditorPreviewSelectionChrome(form);
+    var docks = hideEditorPreviewDocks(form);
+    return { handled: true, frames: frames.length, fieldMaps: fieldMaps, markers: markers, chrome: chrome, docks: docks };
+  }
+
   function normalizeEditorPreviewDock(dock) {
     if (!dock || !dock.setAttribute || !dock.querySelector) return { handled: false, commands: 0 };
     if (!dock.hasAttribute("data-gosx-studio-preview-dock")) {
@@ -892,6 +911,11 @@
     doc.addEventListener("gosxstudio:editor-preview-field-navigation-state", function (event) {
       var detail = event.detail || {};
       setEditorPreviewResult(detail, editorPreviewFieldNavigationState(detail.frame, detail.target, detail.selection || detail.detail || {}));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-selection-clear-sync", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      setEditorPreviewResult(detail, clearEditorPreviewSelections(form, detail.host));
     });
     doc.addEventListener("gosxstudio:editor-preview-selection-marker-clear", function (event) {
       var detail = event.detail || {};
