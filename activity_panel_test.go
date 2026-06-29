@@ -171,6 +171,68 @@ func TestRenderActivityPanelStructuredCommentsAndProposals(t *testing.T) {
 	}
 }
 
+func TestRenderActivityPanelStructuredActionsCanSubmit(t *testing.T) {
+	view := activityPanelTestView(false, false)
+	comments := workbenchViewMap(view, "comments")
+	comments["countLabel"] = "1 open"
+	comments["comments"] = []map[string]any{
+		{
+			"id":                   "comment-hero-headline",
+			"body":                 "The lead is accurate, but it could feel warmer.",
+			"actorID":              "agent-studio",
+			"targetLabel":          "hero / headline",
+			"blockID":              "hero",
+			"field":                "headline",
+			"status":               "open",
+			"statusLabel":          "Open",
+			"canResolve":           true,
+			"canReopen":            true,
+			"resolveEvent":         "studio.resolveComment",
+			"reopenEvent":          "studio.reopenComment",
+			"formID":               "editor-workbench",
+			"decisionAction":       "/admin/editor/__actions/activityComment",
+			"decisionInputName":    "activityCommentDecision",
+			"resolveDecisionValue": "resolve:comment-hero-headline",
+			"reopenDecisionValue":  "reopen:comment-hero-headline",
+		},
+	}
+	proposals := workbenchViewMap(view, "proposals")
+	proposals["countLabel"] = "1 pending"
+	proposals["proposals"] = []map[string]any{
+		{
+			"id":                  "proposal-home-lead",
+			"title":               "Warm up the homepage lead",
+			"summary":             "Make the hero copy more inviting before publish.",
+			"actorID":             "agent-studio",
+			"status":              "pending",
+			"statusLabel":         "Pending",
+			"operationCount":      2,
+			"canAccept":           true,
+			"canReject":           true,
+			"acceptEvent":         "studio.acceptSuggestion",
+			"rejectEvent":         "studio.rejectSuggestion",
+			"formID":              "editor-workbench",
+			"decisionAction":      "/admin/editor/__actions/activityProposal",
+			"decisionInputName":   "activityProposalDecision",
+			"acceptDecisionValue": "accept:proposal-home-lead",
+			"rejectDecisionValue": "reject:proposal-home-lead",
+		},
+	}
+
+	html := gosx.RenderHTML(RenderActivityPanel(view, ActivityPanelOptions{}))
+
+	for _, fragment := range []string{
+		`<button type="submit" class="studio-comments__resolve" data-studio-comment-action="resolve" data-studio-comment-id="comment-hero-headline" data-studio-comment-event="studio.resolveComment" form="editor-workbench" formaction="/admin/editor/__actions/activityComment" formmethod="post" name="activityCommentDecision" value="resolve:comment-hero-headline">Resolve</button>`,
+		`<button type="submit" class="studio-comments__reopen" data-studio-comment-action="reopen" data-studio-comment-id="comment-hero-headline" data-studio-comment-event="studio.reopenComment" form="editor-workbench" formaction="/admin/editor/__actions/activityComment" formmethod="post" name="activityCommentDecision" value="reopen:comment-hero-headline">Reopen</button>`,
+		`<button type="submit" class="studio-proposals__accept" data-studio-proposal-action="accept" data-studio-proposal-id="proposal-home-lead" data-studio-proposal-event="studio.acceptSuggestion" form="editor-workbench" formaction="/admin/editor/__actions/activityProposal" formmethod="post" name="activityProposalDecision" value="accept:proposal-home-lead">Accept</button>`,
+		`<button type="submit" class="studio-proposals__reject" data-studio-proposal-action="reject" data-studio-proposal-id="proposal-home-lead" data-studio-proposal-event="studio.rejectSuggestion" form="editor-workbench" formaction="/admin/editor/__actions/activityProposal" formmethod="post" name="activityProposalDecision" value="reject:proposal-home-lead">Reject</button>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("submit-capable activity panel missing %q:\n%s", fragment, html)
+		}
+	}
+}
+
 func activityPanelTestView(hasHealth, hasPerformance bool) map[string]any {
 	return map[string]any{
 		"class":         "studio-activity-drawer",

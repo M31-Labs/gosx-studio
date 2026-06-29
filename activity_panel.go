@@ -314,24 +314,62 @@ func renderActivityCommentCard(className string, comment map[string]any) gosx.No
 func renderActivityCommentActions(className string, comment map[string]any) gosx.Node {
 	children := []gosx.Node{}
 	if workbenchMapBool(comment, "canResolve") {
-		children = append(children, gosx.El("button", gosx.Attrs(
-			gosx.Attr("type", "button"),
-			gosx.Attr("class", className+"__resolve"),
-			gosx.Attr("data-studio-comment-action", "resolve"),
-			gosx.Attr("data-studio-comment-id", workbenchMapString(comment, "id")),
-			gosx.Attr("data-studio-comment-event", workbenchMapString(comment, "resolveEvent")),
-		), gosx.Text("Resolve")))
+		attrs := activityDecisionButtonAttrs(comment, activityDecisionButtonOptions{
+			ClassName:  className + "__resolve",
+			DataPrefix: "comment",
+			DataAction: "resolve",
+			IDKey:      "id",
+			EventKey:   "resolveEvent",
+			ValueKey:   "resolveDecisionValue",
+		})
+		children = append(children, gosx.El("button", gosx.Attrs(attrs...), gosx.Text("Resolve")))
 	}
 	if workbenchMapBool(comment, "canReopen") {
-		children = append(children, gosx.El("button", gosx.Attrs(
-			gosx.Attr("type", "button"),
-			gosx.Attr("class", className+"__reopen"),
-			gosx.Attr("data-studio-comment-action", "reopen"),
-			gosx.Attr("data-studio-comment-id", workbenchMapString(comment, "id")),
-			gosx.Attr("data-studio-comment-event", workbenchMapString(comment, "reopenEvent")),
-		), gosx.Text("Reopen")))
+		attrs := activityDecisionButtonAttrs(comment, activityDecisionButtonOptions{
+			ClassName:  className + "__reopen",
+			DataPrefix: "comment",
+			DataAction: "reopen",
+			IDKey:      "id",
+			EventKey:   "reopenEvent",
+			ValueKey:   "reopenDecisionValue",
+		})
+		children = append(children, gosx.El("button", gosx.Attrs(attrs...), gosx.Text("Reopen")))
 	}
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", className+"__actions")), gosx.Fragment(children...))
+}
+
+type activityDecisionButtonOptions struct {
+	ClassName  string
+	DataPrefix string
+	DataAction string
+	IDKey      string
+	EventKey   string
+	ValueKey   string
+}
+
+func activityDecisionButtonAttrs(item map[string]any, options activityDecisionButtonOptions) []any {
+	attrs := []any{
+		gosx.Attr("type", "button"),
+		gosx.Attr("class", options.ClassName),
+		gosx.Attr("data-studio-"+options.DataPrefix+"-action", options.DataAction),
+		gosx.Attr("data-studio-"+options.DataPrefix+"-id", workbenchMapString(item, options.IDKey)),
+		gosx.Attr("data-studio-"+options.DataPrefix+"-event", workbenchMapString(item, options.EventKey)),
+	}
+	formID := workbenchMapString(item, "formID")
+	action := workbenchMapString(item, "decisionAction")
+	name := workbenchMapString(item, "decisionInputName")
+	value := workbenchMapString(item, options.ValueKey)
+	if formID == "" || action == "" || name == "" || value == "" {
+		return attrs
+	}
+	attrs[0] = gosx.Attr("type", "submit")
+	return append(attrs,
+		gosx.Attr("form", formID),
+		gosx.Attr("formaction", action),
+		gosx.Attr("formmethod", "post"),
+		gosx.Attr("name", name),
+		gosx.Attr("value", value),
+	)
 }
 
 func renderActivityProposalCard(className string, proposal map[string]any) gosx.Node {
@@ -376,22 +414,26 @@ func renderActivityProposalCard(className string, proposal map[string]any) gosx.
 func renderActivityProposalActions(className string, proposal map[string]any) gosx.Node {
 	children := []gosx.Node{}
 	if workbenchMapBool(proposal, "canAccept") {
-		children = append(children, gosx.El("button", gosx.Attrs(
-			gosx.Attr("type", "button"),
-			gosx.Attr("class", className+"__accept"),
-			gosx.Attr("data-studio-proposal-action", "accept"),
-			gosx.Attr("data-studio-proposal-id", workbenchMapString(proposal, "id")),
-			gosx.Attr("data-studio-proposal-event", workbenchMapString(proposal, "acceptEvent")),
-		), gosx.Text("Accept")))
+		attrs := activityDecisionButtonAttrs(proposal, activityDecisionButtonOptions{
+			ClassName:  className + "__accept",
+			DataPrefix: "proposal",
+			DataAction: "accept",
+			IDKey:      "id",
+			EventKey:   "acceptEvent",
+			ValueKey:   "acceptDecisionValue",
+		})
+		children = append(children, gosx.El("button", gosx.Attrs(attrs...), gosx.Text("Accept")))
 	}
 	if workbenchMapBool(proposal, "canReject") {
-		children = append(children, gosx.El("button", gosx.Attrs(
-			gosx.Attr("type", "button"),
-			gosx.Attr("class", className+"__reject"),
-			gosx.Attr("data-studio-proposal-action", "reject"),
-			gosx.Attr("data-studio-proposal-id", workbenchMapString(proposal, "id")),
-			gosx.Attr("data-studio-proposal-event", workbenchMapString(proposal, "rejectEvent")),
-		), gosx.Text("Reject")))
+		attrs := activityDecisionButtonAttrs(proposal, activityDecisionButtonOptions{
+			ClassName:  className + "__reject",
+			DataPrefix: "proposal",
+			DataAction: "reject",
+			IDKey:      "id",
+			EventKey:   "rejectEvent",
+			ValueKey:   "rejectDecisionValue",
+		})
+		children = append(children, gosx.El("button", gosx.Attrs(attrs...), gosx.Text("Reject")))
 	}
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", className+"__actions")), gosx.Fragment(children...))
 }
