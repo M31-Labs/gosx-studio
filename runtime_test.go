@@ -462,6 +462,8 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldNavigationTelemetryToSelectionRunt
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
 		`function dispatchPreviewFieldNavigation(detail, navigation)`,
+		`detail: detail || {}`,
+		`navigation: navigation || {}`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-navigation-commit", { bubbles: true, detail: payload }))`,
 		`if (payload.result) return payload.result;`,
 		`var runtime = window.GoSXStudioSelectionRuntime;`,
@@ -709,6 +711,7 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldActionIntentToSelectionRuntime(t *
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
 		`function dispatchPreviewFieldActionResolve(detail)`,
+		`detail: detail || {}`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-action-resolve", { bubbles: true, detail: payload }))`,
 		`if (payload.result) return payload.result;`,
 		`var runtime = window.GoSXStudioSelectionRuntime;`,
@@ -721,12 +724,6 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldActionIntentToSelectionRuntime(t *
 		`emitPreviewDockAction(action, detail);`,
 		`function submitPreviewFieldAction(detail)`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-action-submit", { bubbles: true, detail: payload }))`,
-		`field: detail.field || ""`,
-		`editable: detail.editable || ""`,
-		`label: detail.label || ""`,
-		`action: detail.action || ""`,
-		`actionHref: detail.actionHref || ""`,
-		`actionFormAction: detail.actionFormAction || ""`,
 		`if (payload.result) return !!payload.result;`,
 	} {
 		if !strings.Contains(script, check) {
@@ -763,20 +760,12 @@ func TestWorkbenchRuntimeDelegatesPreviewDockContentStyleIntentToSelectionRuntim
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
 		`function dispatchPreviewDockActionResolve(action, detail)`,
-		`function previewDockActionResolvePayload(action, detail)`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-dock-action-resolve", { bubbles: true, detail: payload }))`,
 		`if (payload.result) return payload.result;`,
 		`var runtime = window.GoSXStudioSelectionRuntime;`,
 		`runtime.bind(document.body || document);`,
 		`action: action || ""`,
-		`field: detail.field || ""`,
-		`editable: detail.editable || ""`,
-		`label: detail.label || ""`,
-		`blockKey: detail.blockKey || ""`,
-		`blockLabel: detail.blockLabel || ""`,
-		`actionLabel: detail.action || ""`,
-		`actionHref: detail.actionHref || ""`,
-		`actionFormAction: detail.actionFormAction || ""`,
+		`detail: detail || {}`,
 		`var dockIntent = dispatchPreviewDockActionResolve(action, detail) || { mode: action, reveal: action === "content" && !!detail.field };`,
 		`if (dockIntent.mode) setMode(dockIntent.mode, { scroll: true, reason: "preview-dock" });`,
 		`if (dockIntent.reveal) {`,
@@ -909,7 +898,15 @@ func TestWorkbenchRuntimeLeavesPreviewDockSelectionActionTelemetryToSelectionRun
 	body := jsFunctionBody(t, script, "emitPreviewDockAction")
 	for _, check := range []string{
 		`emit(form, "gosxstudio:preview-action", {`,
-		`action: action`,
+		`action: action || ""`,
+		`detail: detail || {}`,
+		`reason: "preview-dock"`,
+	} {
+		if !strings.Contains(body, check) {
+			t.Fatalf("emitPreviewDockAction missing preview action contract %q in:\n%s", check, body)
+		}
+	}
+	for _, forbidden := range []string{
 		`field: detail.field || ""`,
 		`editable: detail.editable || ""`,
 		`label: detail.label || ""`,
@@ -918,10 +915,9 @@ func TestWorkbenchRuntimeLeavesPreviewDockSelectionActionTelemetryToSelectionRun
 		`actionLabel: detail.action || ""`,
 		`actionHref: detail.actionHref || ""`,
 		`actionFormAction: detail.actionFormAction || ""`,
-		`reason: "preview-dock"`,
 	} {
-		if !strings.Contains(body, check) {
-			t.Fatalf("emitPreviewDockAction missing preview action contract %q in:\n%s", check, body)
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("emitPreviewDockAction should leave preview action envelope normalization to selection runtime; found %q in:\n%s", forbidden, body)
 		}
 	}
 	if strings.Contains(body, `emitEditorOperation("preview_action"`) {

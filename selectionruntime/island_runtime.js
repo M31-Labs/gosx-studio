@@ -595,8 +595,56 @@
       };
     }
 
+    function previewFieldActionEnvelope(detail) {
+      detail = detail || {};
+      return {
+        field: detail.field || "",
+        editable: detail.editable || "",
+        label: detail.label || "",
+        blockKey: detail.blockKey || "",
+        action: detail.action || "",
+        actionHref: detail.actionHref || "",
+        actionFormAction: detail.actionFormAction || ""
+      };
+    }
+
+    function previewDockActionEnvelope(action, detail) {
+      detail = detail || {};
+      return {
+        action: action || "",
+        field: detail.field || "",
+        editable: detail.editable || "",
+        label: detail.label || "",
+        blockKey: detail.blockKey || "",
+        blockLabel: detail.blockLabel || "",
+        actionLabel: detail.actionLabel || detail.action || "",
+        actionHref: detail.actionHref || "",
+        actionFormAction: detail.actionFormAction || ""
+      };
+    }
+
+    function previewFieldNavigationEnvelope(detail, navigation) {
+      detail = detail || {};
+      navigation = navigation || {};
+      return {
+        detail: {
+          field: detail.field || "",
+          editable: detail.editable || "",
+          label: detail.label || "",
+          blockKey: detail.blockKey || ""
+        },
+        navigation: {
+          direction: navigation.direction || "",
+          fieldIndex: navigation.fieldIndex || 0,
+          fieldCount: navigation.fieldCount || 0,
+          reason: navigation.reason || "field-navigation"
+        }
+      };
+    }
+
     function resolvePreviewFieldAction(event) {
       var envelope = event.detail || {};
+      var detail = previewFieldActionEnvelope(envelope.detail || envelope);
       var field = envelope.field || "";
       var editable = envelope.editable || "";
       var label = envelope.label || "";
@@ -604,6 +652,13 @@
       var action = envelope.action || "";
       var actionHref = envelope.actionHref || "";
       var actionFormAction = envelope.actionFormAction || "";
+      field = detail.field;
+      editable = detail.editable;
+      label = detail.label;
+      blockKey = detail.blockKey;
+      action = detail.action;
+      actionHref = detail.actionHref;
+      actionFormAction = detail.actionFormAction;
       envelope.result = {
         inlineText: editable === "text",
         submit: !!actionFormAction,
@@ -644,15 +699,16 @@
 
     function submitPreviewFieldAction(event) {
       var envelope = event.detail || {};
+      var detail = previewFieldActionEnvelope(envelope.detail || envelope);
       envelope.result = false;
-      var source = fieldSource(envelope.field || "");
-      var submitter = fieldActionSubmitter(source, envelope.actionFormAction || "");
-      var action = envelope.actionFormAction || (submitter && (submitter.getAttribute("data-studio-field-action-formaction") || submitter.getAttribute("formaction"))) || "";
+      var source = fieldSource(detail.field || "");
+      var submitter = fieldActionSubmitter(source, detail.actionFormAction || "");
+      var action = detail.actionFormAction || (submitter && (submitter.getAttribute("data-studio-field-action-formaction") || submitter.getAttribute("formaction"))) || "";
       if (!action) return;
       var confirmMessage = (submitter && submitter.getAttribute("data-admin-confirm")) || (source && source.getAttribute("data-admin-confirm")) || "";
       if (confirmMessage && !window.confirm(confirmMessage)) return;
       form.dataset.gosxStudioPendingAction = action;
-      form.dataset.gosxStudioPendingActionLabel = envelope.action || envelope.label || "Field action";
+      form.dataset.gosxStudioPendingActionLabel = detail.action || detail.label || "Field action";
       try {
         if (submitter && form.requestSubmit) {
           form.requestSubmit(submitter);
@@ -682,15 +738,16 @@
 
     function resolvePreviewDockAction(event) {
       var envelope = event.detail || {};
-      var action = envelope.action || "";
-      var field = envelope.field || "";
-      var editable = envelope.editable || "";
-      var label = envelope.label || "";
-      var blockKey = envelope.blockKey || "";
-      var blockLabel = envelope.blockLabel || "";
-      var actionLabel = envelope.actionLabel || "";
-      var actionHref = envelope.actionHref || "";
-      var actionFormAction = envelope.actionFormAction || "";
+      var detail = previewDockActionEnvelope(envelope.action || "", envelope.detail || envelope);
+      var action = detail.action || "";
+      var field = detail.field || "";
+      var editable = detail.editable || "";
+      var label = detail.label || "";
+      var blockKey = detail.blockKey || "";
+      var blockLabel = detail.blockLabel || "";
+      var actionLabel = detail.actionLabel || "";
+      var actionHref = detail.actionHref || "";
+      var actionFormAction = detail.actionFormAction || "";
       envelope.result = {
         mode: action === "content" ? "content" : action === "style" ? "style" : "",
         reveal: action === "content" && !!field,
@@ -804,8 +861,9 @@
 
     function emitPreviewFieldNavigation(event) {
       var envelope = event.detail || {};
-      var detail = envelope.detail || {};
-      var navigation = envelope.navigation || {};
+      var normalized = previewFieldNavigationEnvelope(envelope.detail || envelope, envelope.navigation || {});
+      var detail = normalized.detail;
+      var navigation = normalized.navigation;
       var field = detail.field || "";
       var editable = detail.editable || "";
       var label = detail.label || "";
@@ -947,7 +1005,9 @@
     }
 
     function mirrorPreviewActionSelection(event) {
-      var detail = event.detail || {};
+      var envelope = event.detail || {};
+      var detail = previewDockActionEnvelope(envelope.action || "", envelope.detail || envelope);
+      var reason = envelope.reason || "preview-dock";
       selectionOperationCounter += 1;
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-operation", {
         bubbles: true,
@@ -956,7 +1016,7 @@
           kind: "preview_action",
           source: "gosx-studio",
           mutation: false,
-          reason: detail.reason || "preview-dock",
+          reason: reason,
           target: {
             field: detail.field || "",
             editable: detail.editable || "",

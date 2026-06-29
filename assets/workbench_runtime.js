@@ -443,31 +443,16 @@
     }
 
     function emitPreviewDockAction(action, detail) {
-      detail = detail || {};
       emit(form, "gosxstudio:preview-action", {
-        action: action,
-        field: detail.field || "",
-        editable: detail.editable || "",
-        label: detail.label || "",
-        blockLabel: detail.blockLabel || "",
-        blockKey: detail.blockKey || "",
-        actionLabel: detail.action || "",
-        actionHref: detail.actionHref || "",
-        actionFormAction: detail.actionFormAction || "",
+        action: action || "",
+        detail: detail || {},
         reason: "preview-dock"
       });
     }
 
     function dispatchPreviewFieldActionResolve(detail) {
-      detail = detail || {};
       var payload = {
-        field: detail.field || "",
-        editable: detail.editable || "",
-        label: detail.label || "",
-        blockKey: detail.blockKey || "",
-        action: detail.action || "",
-        actionHref: detail.actionHref || "",
-        actionFormAction: detail.actionFormAction || ""
+        detail: detail || {}
       };
       form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-action-resolve", { bubbles: true, detail: payload }));
       if (payload.result) return payload.result;
@@ -475,13 +460,7 @@
       if (runtime && typeof runtime.bind === "function") {
         runtime.bind(document.body || document);
         payload = {
-          field: detail.field || "",
-          editable: detail.editable || "",
-          label: detail.label || "",
-          blockKey: detail.blockKey || "",
-          action: detail.action || "",
-          actionHref: detail.actionHref || "",
-          actionFormAction: detail.actionFormAction || ""
+          detail: detail || {}
         };
         form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-action-resolve", { bubbles: true, detail: payload }));
         if (payload.result) return payload.result;
@@ -489,29 +468,20 @@
       return null;
     }
 
-    function previewDockActionResolvePayload(action, detail) {
-      detail = detail || {};
-      return {
-        action: action || "",
-        field: detail.field || "",
-        editable: detail.editable || "",
-        label: detail.label || "",
-        blockKey: detail.blockKey || "",
-        blockLabel: detail.blockLabel || "",
-        actionLabel: detail.action || "",
-        actionHref: detail.actionHref || "",
-        actionFormAction: detail.actionFormAction || ""
-      };
-    }
-
     function dispatchPreviewDockActionResolve(action, detail) {
-      var payload = previewDockActionResolvePayload(action, detail);
+      var payload = {
+        action: action || "",
+        detail: detail || {}
+      };
       form.dispatchEvent(new CustomEvent("gosxstudio:preview-dock-action-resolve", { bubbles: true, detail: payload }));
       if (payload.result) return payload.result;
       var runtime = window.GoSXStudioSelectionRuntime;
       if (runtime && typeof runtime.bind === "function") {
         runtime.bind(document.body || document);
-        payload = previewDockActionResolvePayload(action, detail);
+        payload = {
+          action: action || "",
+          detail: detail || {}
+        };
         form.dispatchEvent(new CustomEvent("gosxstudio:preview-dock-action-resolve", { bubbles: true, detail: payload }));
         if (payload.result) return payload.result;
       }
@@ -519,14 +489,8 @@
     }
 
     function submitPreviewFieldAction(detail) {
-      detail = detail || {};
       var payload = {
-        field: detail.field || "",
-        editable: detail.editable || "",
-        label: detail.label || "",
-        action: detail.action || "",
-        actionHref: detail.actionHref || "",
-        actionFormAction: detail.actionFormAction || ""
+        detail: detail || {}
       };
       form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-action-submit", { bubbles: true, detail: payload }));
       if (payload.result) return !!payload.result;
@@ -534,12 +498,7 @@
       if (runtime && typeof runtime.bind === "function") {
         runtime.bind(document.body || document);
         payload = {
-          field: detail.field || "",
-          editable: detail.editable || "",
-          label: detail.label || "",
-          action: detail.action || "",
-          actionHref: detail.actionHref || "",
-          actionFormAction: detail.actionFormAction || ""
+          detail: detail || {}
         };
         form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-action-submit", { bubbles: true, detail: payload }));
         if (payload.result) return !!payload.result;
@@ -571,21 +530,9 @@
     }
 
     function dispatchPreviewFieldNavigation(detail, navigation) {
-      detail = detail || {};
-      navigation = navigation || {};
       var payload = {
-        detail: {
-          field: detail.field || "",
-          editable: detail.editable || "",
-          label: detail.label || "",
-          blockKey: detail.blockKey || ""
-        },
-        navigation: {
-          direction: navigation.direction || "",
-          fieldIndex: navigation.fieldIndex || 0,
-          fieldCount: navigation.fieldCount || 0,
-          reason: navigation.reason || "field-navigation"
-        }
+        detail: detail || {},
+        navigation: navigation || {}
       };
       form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-navigation-commit", { bubbles: true, detail: payload }));
       if (payload.result) return payload.result;
@@ -593,18 +540,8 @@
       if (runtime && typeof runtime.bind === "function") {
         runtime.bind(document.body || document);
         payload = {
-          detail: {
-            field: detail.field || "",
-            editable: detail.editable || "",
-            label: detail.label || "",
-            blockKey: detail.blockKey || ""
-          },
-          navigation: {
-            direction: navigation.direction || "",
-            fieldIndex: navigation.fieldIndex || 0,
-            fieldCount: navigation.fieldCount || 0,
-            reason: navigation.reason || "field-navigation"
-          }
+          detail: detail || {},
+          navigation: navigation || {}
         };
         form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-navigation-commit", { bubbles: true, detail: payload }));
         if (payload.result) return payload.result;
