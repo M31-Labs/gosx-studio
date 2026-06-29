@@ -81,6 +81,58 @@ func TestRenderHomeLayersPanelSegmentsNonEmpty(t *testing.T) {
 	}
 }
 
+func TestRenderHomeLayersPanelFullWithPickerSlot(t *testing.T) {
+	view := map[string]any{
+		"class":          "studio-nav-panel studio-nav-panel--layers",
+		"listClass":      "home-section-list editor-block-list",
+		"kicker":         "Home",
+		"title":          "Layers",
+		"mode":           "home",
+		"blockStudioKey": "homepage",
+		"hasItems":       true,
+		"items": []map[string]any{{
+			"statusLabel": "Visible",
+			"rowAttrs": map[string]any{
+				"class":                   "home-section-card is-active",
+				BlockLayoutRowAttr:        "hero",
+				"data-studio-block-label": "Hero",
+			},
+			"keyInputAttrs":   map[string]any{"type": "hidden", "name": "home_sections[0][key]", "value": "hero"},
+			"orderInputAttrs": map[string]any{"type": "hidden", "name": "home_sections[0][order]", "value": "0"},
+			"handleAttrs":     map[string]any{"type": "button", "aria-label": "Drag Hero"},
+			"statusAttrs":     map[string]any{"class": "status-pill"},
+			"preview": map[string]any{
+				"visualClass": "editor-block__visual editor-block__visual--hero",
+				"kicker":      "Hero",
+				"title":       "Thrown by hand",
+				"body":        "Small batches",
+			},
+			"visibilityAttrs":    map[string]any{"type": "checkbox", "name": "home_sections[0][enabled]", "checked": true},
+			"hiddenEnabledAttrs": map[string]any{"type": "hidden", "name": "home_sections[0][enabled]", "value": "off"},
+			"upButtonAttrs":      map[string]any{"type": "button", BlockLayoutMoveAttr: "up"},
+			"downButtonAttrs":    map[string]any{"type": "button", BlockLayoutMoveAttr: "down"},
+		}},
+	}
+
+	html := gosx.RenderHTML(RenderHomeLayersPanel(view, HomeLayersPanelOptions{
+		PickerNode: gosx.El("div", gosx.Attrs(gosx.Attr("data-studio-home-layer-picker", "true")), gosx.Text("Picker")),
+	}))
+
+	for _, fragment := range []string{
+		`<section class="studio-nav-panel studio-nav-panel--layers" data-studio-mode-panel="home" data-studio-engine-source="gosx" data-gosx-studio-home-layers-panel-renderer="gosx-studio">`,
+		`<header class="studio-panel-heading"><div><p class="kicker">Home</p><h2>Layers</h2></div><div data-studio-home-layer-picker="true">Picker</div></header>`,
+		`<div class="home-section-list editor-block-list" data-block-studio="homepage">`,
+		`data-block-studio-block="hero"`,
+		`data-studio-block-label="Hero"`,
+		`data-block-studio-move="up"`,
+		`data-block-studio-move="down"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("rendered full home layers panel missing %q:\n%s", fragment, html)
+		}
+	}
+}
+
 func TestRenderHomeLayersPanelSegmentsEmpty(t *testing.T) {
 	view := map[string]any{
 		"class":     "studio-nav-panel studio-nav-panel--layers",

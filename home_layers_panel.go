@@ -7,7 +7,8 @@ import (
 )
 
 type HomeLayersPanelOptions struct {
-	RootAttrs map[string]any
+	RootAttrs  map[string]any
+	PickerNode gosx.Node
 }
 
 type HomeLayersPanelSegments struct {
@@ -28,7 +29,14 @@ func RenderHomeLayersPanelSegments(view map[string]any, options HomeLayersPanelO
 	}
 }
 
-func renderHomeLayersPanelRootOpen(view map[string]any, options HomeLayersPanelOptions) gosx.Node {
+func RenderHomeLayersPanel(view map[string]any, options HomeLayersPanelOptions) gosx.Node {
+	return gosx.El("section", gosx.Attrs(homeLayersPanelRootAttrs(view, options)...),
+		renderHomeLayersPanelHeader(view, options.PickerNode),
+		renderHomeLayersPanelBody(view),
+	)
+}
+
+func homeLayersPanelRootAttrs(view map[string]any, options HomeLayersPanelOptions) []any {
 	attrs := []any{
 		gosx.Attr("class", workbenchMapString(view, "class")),
 		gosx.Attr("data-studio-mode-panel", workbenchMapString(view, "mode")),
@@ -36,16 +44,26 @@ func renderHomeLayersPanelRootOpen(view map[string]any, options HomeLayersPanelO
 		gosx.Attr("data-gosx-studio-home-layers-panel-renderer", "gosx-studio"),
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, options.RootAttrs)
+	return attrs
+}
+
+func renderHomeLayersPanelRootOpen(view map[string]any, options HomeLayersPanelOptions) gosx.Node {
+	attrs := homeLayersPanelRootAttrs(view, options)
 	return renderBlockLayoutEngineOpenTag("section", attrs)
 }
 
-func renderHomeLayersPanelHeaderOpen(view map[string]any) gosx.Node {
-	html := gosx.RenderHTML(gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-panel-heading")),
+func renderHomeLayersPanelHeader(view map[string]any, pickerNode gosx.Node) gosx.Node {
+	return gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-panel-heading")),
 		gosx.El("div", nil,
 			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchMapString(view, "kicker"))),
 			gosx.El("h2", nil, gosx.Text(workbenchMapString(view, "title"))),
 		),
-	))
+		pickerNode,
+	)
+}
+
+func renderHomeLayersPanelHeaderOpen(view map[string]any) gosx.Node {
+	html := gosx.RenderHTML(renderHomeLayersPanelHeader(view, gosx.Fragment()))
 	return gosx.RawHTML(strings.TrimSuffix(html, "</header>"))
 }
 
