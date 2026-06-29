@@ -77,6 +77,7 @@
     hover: "Hover",
     focus: "Focus"
   };
+  var selectionOperationCounter = 0;
 
   function frame(callback) {
     if (window.requestAnimationFrame) {
@@ -607,6 +608,58 @@
       envelope.result = { cleared: true };
     }
 
+    function emitPreviewFieldNavigation(event) {
+      var envelope = event.detail || {};
+      var detail = envelope.detail || {};
+      var navigation = envelope.navigation || {};
+      var field = detail.field || "";
+      var editable = detail.editable || "";
+      var label = detail.label || "";
+      var blockKey = detail.blockKey || "";
+      var direction = navigation.direction || "";
+      var fieldIndex = navigation.fieldIndex || 0;
+      var fieldCount = navigation.fieldCount || 0;
+      var reason = navigation.reason || "field-navigation";
+      selectionOperationCounter += 1;
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-operation", {
+        bubbles: true,
+        detail: {
+          id: "studio-op-" + Date.now() + "-" + selectionOperationCounter,
+          kind: "preview_field_navigate",
+          source: "gosx-studio",
+          reason: reason,
+          mutation: false,
+          target: {
+            field: field,
+            editable: editable,
+            blockKey: blockKey,
+            selection: form.getAttribute("data-studio-selection") || field,
+            kind: form.getAttribute("data-studio-selection-kind") || "preview-field"
+          },
+          payload: {
+            direction: direction,
+            fieldIndex: fieldIndex,
+            fieldCount: fieldCount,
+            label: label
+          }
+        }
+      }));
+      form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-navigate", {
+        bubbles: true,
+        detail: {
+          field: field,
+          editable: editable,
+          label: label,
+          blockKey: blockKey,
+          direction: direction,
+          fieldIndex: fieldIndex,
+          fieldCount: fieldCount,
+          reason: reason
+        }
+      }));
+      envelope.result = { emitted: true };
+    }
+
     function revealFieldControl(source, control) {
       var reduced = selectionReducedMotion();
       setMode("home", true);
@@ -888,6 +941,7 @@
     form.addEventListener("gosxstudio:preview-action", mirrorPreviewActionSelection);
     form.addEventListener("gosxstudio:preview-selection-apply", applyPreviewSelectionState);
     form.addEventListener("gosxstudio:preview-selection-clear", clearPreviewSelectionState);
+    form.addEventListener("gosxstudio:preview-field-navigation-commit", emitPreviewFieldNavigation);
 
     bindCommandPaletteCommands();
     if (form.getAttribute("data-studio-mode") === "advanced") ensureWorkspaceSelection();

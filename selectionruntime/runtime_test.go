@@ -163,6 +163,56 @@ func TestSelectionRuntimeIslandMirrorsPreviewActionSelectionTelemetry(t *testing
 	}
 }
 
+func TestSelectionRuntimeIslandOwnsPreviewFieldNavigationTelemetry(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, contract := range []string{
+		`form.addEventListener("gosxstudio:preview-field-navigation-commit", emitPreviewFieldNavigation);`,
+		`function emitPreviewFieldNavigation(event)`,
+		`var detail = envelope.detail || {};`,
+		`var navigation = envelope.navigation || {};`,
+		`selectionOperationCounter += 1;`,
+		`id: "studio-op-" + Date.now() + "-" + selectionOperationCounter`,
+		`kind: "preview_field_navigate"`,
+		`source: "gosx-studio"`,
+		`mutation: false`,
+		`selection: form.getAttribute("data-studio-selection") || field`,
+		`kind: form.getAttribute("data-studio-selection-kind") || "preview-field"`,
+		`payload: {`,
+		`direction: direction`,
+		`fieldIndex: fieldIndex`,
+		`fieldCount: fieldCount`,
+		`label: label`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-navigate", {`,
+		`field: field`,
+		`editable: editable`,
+		`blockKey: blockKey`,
+		`reason: reason`,
+		`envelope.result = { emitted: true };`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() missing preview field navigation telemetry contract %q", contract)
+		}
+	}
+
+	handlerBody := jsFunctionBody(t, body, "emitPreviewFieldNavigation")
+	for _, contract := range []string{
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-operation", {`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-navigate", {`,
+		`field: field`,
+		`editable: editable`,
+		`label: label`,
+		`blockKey: blockKey`,
+		`direction: direction`,
+		`fieldIndex: fieldIndex`,
+		`fieldCount: fieldCount`,
+		`reason: reason`,
+	} {
+		if !strings.Contains(handlerBody, contract) {
+			t.Fatalf("preview field navigation handler missing public telemetry fragment %q in:\n%s", contract, handlerBody)
+		}
+	}
+}
+
 func TestSelectionRuntimeIslandOwnsPreviewSelectionApply(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	for _, contract := range []string{

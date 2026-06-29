@@ -707,34 +707,55 @@
       var nextDetail = previewSelectionDetail(nextTarget);
       if (!nextTarget || !nextDetail.field) return false;
       if (!applyPreviewSelection(frame, nextTarget, nextDetail, { reveal: true, reason: reason || "field-navigation" })) return false;
-      emitEditorOperation("preview_field_navigate", {
-        mutation: false,
-        reason: reason || "field-navigation",
-        target: {
-          field: nextDetail.field || "",
-          editable: nextDetail.editable || "",
-          blockKey: nextDetail.blockKey || "",
-          selection: form.getAttribute("data-studio-selection") || nextDetail.field || "",
-          kind: form.getAttribute("data-studio-selection-kind") || "preview-field"
-        },
-        payload: {
-          direction: direction > 0 ? "next" : "previous",
-          fieldIndex: nextIndex + 1,
-          fieldCount: state.count,
-          label: nextDetail.label || ""
-        }
-      });
-      emit(form, "gosxstudio:preview-field-navigate", {
-        field: nextDetail.field || "",
-        editable: nextDetail.editable || "",
-        label: nextDetail.label || "",
-        blockKey: nextDetail.blockKey || "",
+      dispatchPreviewFieldNavigation(nextDetail, {
         direction: direction > 0 ? "next" : "previous",
         fieldIndex: nextIndex + 1,
         fieldCount: state.count,
         reason: reason || "field-navigation"
       });
       return true;
+    }
+
+    function dispatchPreviewFieldNavigation(detail, navigation) {
+      detail = detail || {};
+      navigation = navigation || {};
+      var payload = {
+        detail: {
+          field: detail.field || "",
+          editable: detail.editable || "",
+          label: detail.label || "",
+          blockKey: detail.blockKey || ""
+        },
+        navigation: {
+          direction: navigation.direction || "",
+          fieldIndex: navigation.fieldIndex || 0,
+          fieldCount: navigation.fieldCount || 0,
+          reason: navigation.reason || "field-navigation"
+        }
+      };
+      form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-navigation-commit", { bubbles: true, detail: payload }));
+      if (payload.result) return payload.result;
+      var runtime = window.GoSXStudioSelectionRuntime;
+      if (runtime && typeof runtime.bind === "function") {
+        runtime.bind(document.body || document);
+        payload = {
+          detail: {
+            field: detail.field || "",
+            editable: detail.editable || "",
+            label: detail.label || "",
+            blockKey: detail.blockKey || ""
+          },
+          navigation: {
+            direction: navigation.direction || "",
+            fieldIndex: navigation.fieldIndex || 0,
+            fieldCount: navigation.fieldCount || 0,
+            reason: navigation.reason || "field-navigation"
+          }
+        };
+        form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-navigation-commit", { bubbles: true, detail: payload }));
+        if (payload.result) return payload.result;
+      }
+      return null;
     }
 
     function runPreviewDockAction(frame, action) {

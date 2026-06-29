@@ -235,6 +235,47 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 	}
 }
 
+func TestWorkbenchRuntimeDelegatesPreviewFieldNavigationTelemetryToSelectionRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`function dispatchPreviewFieldNavigation(detail, navigation)`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-navigation-commit", { bubbles: true, detail: payload }))`,
+		`if (payload.result) return payload.result;`,
+		`var runtime = window.GoSXStudioSelectionRuntime;`,
+		`runtime.bind(document.body || document);`,
+		`dispatchPreviewFieldNavigation(nextDetail, {`,
+		`direction: direction > 0 ? "next" : "previous"`,
+		`fieldIndex: nextIndex + 1`,
+		`fieldCount: state.count`,
+		`reason: reason || "field-navigation"`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing preview field navigation delegation fragment %q", check)
+		}
+	}
+
+	navigateBody := jsFunctionBody(t, script, "navigatePreviewField")
+	for _, check := range []string{
+		`var state = previewFieldNavigationState(frame, target, detail);`,
+		`var nextIndex = (currentIndex + direction + state.count) % state.count;`,
+		`if (!applyPreviewSelection(frame, nextTarget, nextDetail, { reveal: true, reason: reason || "field-navigation" })) return false;`,
+		`dispatchPreviewFieldNavigation(nextDetail, {`,
+		`return true;`,
+	} {
+		if !strings.Contains(navigateBody, check) {
+			t.Fatalf("navigatePreviewField missing field navigation boundary fragment %q in:\n%s", check, navigateBody)
+		}
+	}
+	for _, forbidden := range []string{
+		`emitEditorOperation("preview_field_navigate"`,
+		`emit(form, "gosxstudio:preview-field-navigate"`,
+	} {
+		if strings.Contains(navigateBody, forbidden) {
+			t.Fatalf("navigatePreviewField should delegate preview field navigation telemetry; found %q in:\n%s", forbidden, navigateBody)
+		}
+	}
+}
+
 func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
