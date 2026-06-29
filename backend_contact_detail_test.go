@@ -73,3 +73,119 @@ func TestRenderBackendContactDetailSplitNodes(t *testing.T) {
 		t.Fatalf("content renderer should not render its own page wrapper:\n%s", content)
 	}
 }
+
+func TestRenderBackendContactStatusAndReplyForms(t *testing.T) {
+	actions := BackendContactActions{
+		ContactID:          "contact_123",
+		CSRFToken:          "csrf-token",
+		Status:             "responded",
+		ReplySubject:       "Re: Bowl <available>",
+		ReplyMessage:       "Yes, it is available.",
+		ReplyEmailReady:    true,
+		ReplyEmailDisabled: false,
+		Paths: BackendContactActionPaths{
+			SaveStatus: "/save-status",
+			SaveReply:  "/save-reply",
+		},
+		ReplyAction: BackendContactReplyActionState{
+			Submitted: true,
+			Message:   "Reply message is required.",
+			FieldErrors: map[string]string{
+				"replyMessage": "Write a reply before saving.",
+			},
+		},
+	}
+
+	statusHTML := gosx.RenderHTML(RenderBackendContactStatusForm(actions))
+	replyHTML := gosx.RenderHTML(RenderBackendContactReplyForm(actions))
+
+	for _, fragment := range []string{
+		`<form class="panel admin-form admin-form--single" method="post" action="/save-status"><input type="hidden" name="csrf_token" value="csrf-token" /><input type="hidden" name="id" value="contact_123" />`,
+		`<label for="status">Status</label><select id="status" name="status"><option value="new">New</option><option value="responded" selected>Responded</option><option value="archived">Archived</option></select>`,
+		`<button class="button button--primary" type="submit">Save status</button><a class="button button--secondary" href="/admin/contacts" data-gosx-link="true">Back to contacts</a>`,
+	} {
+		if !strings.Contains(statusHTML, fragment) {
+			t.Fatalf("status form html missing %q:\n%s", fragment, statusHTML)
+		}
+	}
+	for _, fragment := range []string{
+		`<form class="panel admin-form admin-form--single" method="post" action="/save-reply"><input type="hidden" name="csrf_token" value="csrf-token" /><input type="hidden" name="id" value="contact_123" />`,
+		`<div class="panel__header"><h2>Follow up</h2><span class="status status--ready">Email ready</span></div>`,
+		`<p class="form-status form-status--error">Reply message is required.</p>`,
+		`<input id="replySubject" name="replySubject" value="Re: Bowl &lt;available&gt;" />`,
+		`<textarea id="replyMessage" name="replyMessage" rows="7">Yes, it is available.</textarea><p class="form-error">Write a reply before saving.</p>`,
+		`<div class="check-row"><label><input type="checkbox" name="sendEmail" checked /> Send email</label></div><button class="button button--primary" type="submit">Save follow-up</button>`,
+	} {
+		if !strings.Contains(replyHTML, fragment) {
+			t.Fatalf("reply form html missing %q:\n%s", fragment, replyHTML)
+		}
+	}
+	if strings.Contains(replyHTML, `Record only`) {
+		t.Fatalf("email-ready reply form should not show record-only status:\n%s", replyHTML)
+	}
+}
+
+func TestRenderBackendContactReplyFormRecordOnly(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendContactReplyForm(BackendContactActions{
+		ReplyEmailDisabled: true,
+		Paths:              BackendContactActionPaths{SaveReply: "/save-reply"},
+	}))
+
+	for _, fragment := range []string{
+		`<div class="panel__header"><h2>Follow up</h2><span class="status status--request">Record only</span></div>`,
+		`<input type="checkbox" name="sendEmail" /> Send email`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("record-only reply form missing %q:\n%s", fragment, html)
+		}
+	}
+	if strings.Contains(html, `Email ready`) || strings.Contains(html, `form-status form-status--error`) {
+		t.Fatalf("record-only reply form should omit email-ready and unsubmitted error:\n%s", html)
+	}
+}
+
+func TestRenderBackendContactDetailPageOwnsActionForms(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendContactDetailPage(BackendContactDetailProps{
+		Kicker:  "CMS",
+		Title:   "Contact",
+		Summary: "Ari Blue",
+		Message: BackendContactMessage{
+			Name:        "Ari Blue",
+			Email:       "ari@example.com",
+			Message:     "Can I reserve the bowl?",
+			StatusLabel: "New",
+			StatusClass: "status status--new",
+		},
+		Actions: BackendContactActions{
+			ContactID:       "contact_123",
+			CSRFToken:       "csrf-token",
+			Status:          "new",
+			ReplyMessage:    "Draft reply",
+			ReplyEmailReady: true,
+			Paths: BackendContactActionPaths{
+				SaveStatus: "/save-status",
+				SaveReply:  "/save-reply",
+			},
+		},
+		Submission: BackendContactSubmission{
+			Created: BackendContactTime{Label: "Jun 27, 2026 8:00 AM", Machine: "2026-06-27T08:00:00Z"},
+			Updated: BackendContactTime{Label: "Jun 27, 2026 8:00 AM", Machine: "2026-06-27T08:00:00Z"},
+		},
+	}))
+
+	for _, fragment := range []string{
+		`<div class="admin-page" data-gosx-studio-backend-contact-detail-renderer="gosx-studio">`,
+		`<section class="admin-heading"><p class="kicker">CMS</p><h1>Contact</h1><p>Ari Blue</p></section>`,
+		`<section class="admin-grid"><div class="panel"><div class="panel__header"><h2>Message</h2>`,
+		`<form class="panel admin-form admin-form--single" method="post" action="/save-status">`,
+		`<form class="panel admin-form admin-form--single" method="post" action="/save-reply">`,
+		`<section class="panel"><div class="panel__header"><h2>Submission</h2>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("contact detail page html missing %q:\n%s", fragment, html)
+		}
+	}
+	if strings.Contains(html, `Follow-up history`) {
+		t.Fatalf("page should omit empty reply history:\n%s", html)
+	}
+}
