@@ -124,6 +124,7 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
         "the full-WASM canvas entrypoints (__gosx_render_canvas / __gosx_canvas_event / __gosx_canvas_set_backend) must be ABSENT in wasm-free mode",
       ).toBe(true);
 
+      await canvas.scrollIntoViewIfNeeded();
       const box = await canvas.boundingBox();
       expect(box, "canvas should have a layout box").not.toBeNull();
       expect(box!.width, "canvas CSS width > 0").toBeGreaterThan(0);
@@ -250,6 +251,7 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
       // so the marquee box coordinates match the live view.
       const rectsForMarquee = await pollForRects(page);
       expect(rectsForMarquee.length, "rects should resolve before marquee").toBeGreaterThanOrEqual(2);
+      await canvas.scrollIntoViewIfNeeded();
       const boxM = (await canvas.boundingBox())!;
       const pair = closestPair(rectsForMarquee);
       const targetIds = [pair.a.id, pair.b.id];
@@ -282,6 +284,7 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
       // reason, and compute the nav plan from the live geometry.
       const rectsForNav = await pollForRects(page);
       expect(rectsForNav.length, "rects should resolve before nav").toBeGreaterThanOrEqual(2);
+      await canvas.scrollIntoViewIfNeeded();
       const boxN = (await canvas.boundingBox())!;
       const navPlan = chooseNavTarget(rectsForNav);
       expect(navPlan, `need a node with a computable spatial neighbor for nav; rects=${rectsForNav.length}`).not.toBeNull();
