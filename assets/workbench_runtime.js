@@ -327,16 +327,7 @@
 
     function normalizePreviewDock(frame, dock) {
       if (!dock) return null;
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-normalize", { bubbles: true, detail: { form: form, frame: frame, dock: dock } }));
-      if (!dock.__gosxStudioPreviewDockHandler) {
-        dock.__gosxStudioPreviewDockHandler = true;
-        dock.addEventListener("click", function (event) {
-          var button = event.target && event.target.closest ? event.target.closest("[data-gosx-studio-preview-command], [data-studio-preview-action]") : null;
-          if (!button || !dock.contains(button)) return;
-          event.preventDefault();
-          runPreviewDockAction(frame, button.getAttribute("data-gosx-studio-preview-command") || button.getAttribute("data-studio-preview-action") || "");
-        });
-      }
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-bind", { bubbles: true, detail: { form: form, frame: frame, dock: dock, host: { runPreviewDockAction: runPreviewDockAction } } }));
       return dock;
     }
 

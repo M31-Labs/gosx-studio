@@ -297,6 +297,30 @@
     return { handled: true, commands: actions.length };
   }
 
+  function bindEditorPreviewDock(form, frame, dock, host) {
+    var normalize = normalizeEditorPreviewDock(dock);
+    if (!dock || !dock.addEventListener) {
+      return { handled: false, bound: false, commands: normalize.commands || 0 };
+    }
+    dock.__gosxStudioPreviewDockFrame = frame;
+    dock.__gosxStudioPreviewDockHost = host;
+    if (!dock.__gosxStudioPreviewDockHandler) {
+      dock.__gosxStudioPreviewDockHandler = true;
+      dock.addEventListener("click", function (event) {
+        var button = event.target && event.target.closest ? event.target.closest("[data-gosx-studio-preview-command], [data-studio-preview-action]") : null;
+        if (!button || !dock.contains(button)) return;
+        event.preventDefault();
+        var command = button.getAttribute("data-gosx-studio-preview-command") || button.getAttribute("data-studio-preview-action") || "";
+        var actionHost = dock.__gosxStudioPreviewDockHost || host;
+        if (actionHost && typeof actionHost.runPreviewDockAction === "function") {
+          actionHost.runPreviewDockAction(dock.__gosxStudioPreviewDockFrame || frame, command);
+        }
+      });
+      return { handled: true, bound: true, commands: normalize.commands || 0 };
+    }
+    return { handled: true, bound: false, commands: normalize.commands || 0 };
+  }
+
   function editorPreviewDockKindLabel(selection) {
     if (!selection || !selection.field) return "Block";
     var editable = selection.editable || "";
@@ -869,6 +893,11 @@
     doc.addEventListener("gosxstudio:editor-preview-dock-normalize", function (event) {
       var detail = event.detail || {};
       setEditorPreviewResult(detail, normalizeEditorPreviewDock(detail.dock));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-dock-bind", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      setEditorPreviewResult(detail, bindEditorPreviewDock(form, detail.frame, detail.dock, detail.host));
     });
     doc.addEventListener("gosxstudio:editor-preview-dock-selection-resolve", function (event) {
       var detail = event.detail || {};

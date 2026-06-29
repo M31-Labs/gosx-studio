@@ -851,6 +851,41 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockNormalization(t *testing.T) 
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockBinding(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-dock-bind"`,
+		`setEditorPreviewResult(detail, bindEditorPreviewDock(form, detail.frame, detail.dock, detail.host))`,
+		`function bindEditorPreviewDock(form, frame, dock, host)`,
+		`var normalize = normalizeEditorPreviewDock(dock)`,
+		`if (!dock || !dock.addEventListener)`,
+		`return { handled: false, bound: false, commands: normalize.commands || 0 }`,
+		`dock.__gosxStudioPreviewDockFrame = frame`,
+		`dock.__gosxStudioPreviewDockHost = host`,
+		`if (!dock.__gosxStudioPreviewDockHandler)`,
+		`dock.__gosxStudioPreviewDockHandler = true`,
+		`dock.addEventListener("click", function (event)`,
+		`event.target.closest ? event.target.closest("[data-gosx-studio-preview-command], [data-studio-preview-action]")`,
+		`if (!button || !dock.contains(button)) return`,
+		`event.preventDefault()`,
+		`var command = button.getAttribute("data-gosx-studio-preview-command") || button.getAttribute("data-studio-preview-action") || ""`,
+		`if (actionHost && typeof actionHost.runPreviewDockAction === "function")`,
+		`actionHost.runPreviewDockAction(dock.__gosxStudioPreviewDockFrame || frame, command)`,
+		`return { handled: true, bound: true, commands: normalize.commands || 0 }`,
+		`return { handled: true, bound: false, commands: normalize.commands || 0 }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview dock binding fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-bind`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock bind control events")
+	}
+}
+
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockShowContent(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {
