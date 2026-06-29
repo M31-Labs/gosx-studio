@@ -1017,60 +1017,6 @@
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, detail.patch));
     });
-    doc.addEventListener("gosxstudio:editor-preview-selection-marker-clear", function (event) {
-      var detail = event.detail || {};
-      setEditorPreviewResult(detail, clearEditorPreviewSelectionMarker(detail.frame));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-selection-marker-apply", function (event) {
-      var detail = event.detail || {};
-      setEditorPreviewResult(detail, applyEditorPreviewSelectionMarker(detail.frame, detail.targets, detail.clear));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-selection-chrome-clear", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      setEditorPreviewResult(detail, clearEditorPreviewSelectionChrome(form));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-selection-chrome-apply", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      setEditorPreviewResult(detail, applyEditorPreviewSelectionChrome(form, detail.frame, detail.selection));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-dock-hide", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      setEditorPreviewResult(detail, hideEditorPreviewDocks(form));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-dock-normalize", function (event) {
-      var detail = event.detail || {};
-      setEditorPreviewResult(detail, normalizeEditorPreviewDock(detail.dock));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-dock-bind", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      setEditorPreviewResult(detail, bindEditorPreviewDock(form, detail.frame, detail.dock, detail.host));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-dock-selection-resolve", function (event) {
-      var detail = event.detail || {};
-      detail.result = editorPreviewDockSelection(detail.selection || detail.detail || {}, detail.applied || detail.selectionResult || {});
-    });
-    doc.addEventListener("gosxstudio:editor-preview-dock-sync", function (event) {
-      var detail = event.detail || {};
-      setEditorPreviewResult(detail, syncEditorPreviewDock(detail.dock, detail.selection));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-dock-selection-sync", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      setEditorPreviewResult(detail, syncEditorPreviewDockSelection(form, detail.frame, detail.target, detail.selection, detail.host));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-dock-detail-resolve", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      setEditorPreviewResult(detail, editorPreviewDockDetail(form, detail.dock));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-dock-field-navigation-sync", function (event) {
-      var detail = event.detail || {};
-      setEditorPreviewResult(detail, syncEditorPreviewDockFieldNavigation(detail.dock, detail.count, detail.index));
-    });
   }
 
   bindEditorPreviewChromeEvents();

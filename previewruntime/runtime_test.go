@@ -18,6 +18,18 @@ func islandJSFunctionBody(t *testing.T, script, name string) string {
 	return script[start : start+len("function "+name+"(")+next]
 }
 
+func assertRetiredEditorPreviewRuntimeEventAbsent(t *testing.T, script, eventName string) {
+	t.Helper()
+	for _, forbidden := range []string{
+		`doc.addEventListener("` + eventName + `"`,
+		`dispatchEvent(new CustomEvent("` + eventName,
+	} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("IslandRuntimeJS() must not use retired event boundary %q; found %q", eventName, forbidden)
+		}
+	}
+}
+
 // The previewruntime package is the Go-side surface for the Phase 3 slice-6
 // architectural burn-down of GoSXStudioPreviewRuntime. It owns:
 //  1. The feature-flag key consumers add to studio.ShellConfig.FeatureFlags
@@ -1014,10 +1026,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionMarkers(t *testing.T) {
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-selection-marker-clear"`,
-		`doc.addEventListener("gosxstudio:editor-preview-selection-marker-apply"`,
-		`setEditorPreviewResult(detail, clearEditorPreviewSelectionMarker(detail.frame))`,
-		`setEditorPreviewResult(detail, applyEditorPreviewSelectionMarker(detail.frame, detail.targets, detail.clear))`,
 		`function clearEditorPreviewSelectionMarker(frame)`,
 		`var frameDoc = editorPreviewFrameDocument(frame)`,
 		`queryAll(frameDoc, "[data-gosx-studio-preview-selected]").forEach(function (target)`,
@@ -1033,9 +1041,8 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionMarkers(t *testing.T) {
 			t.Fatalf("IslandRuntimeJS() missing editor preview selected-marker fragment %q", fragment)
 		}
 	}
-	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-marker`) {
-		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview selected-marker control events")
-	}
+	assertRetiredEditorPreviewRuntimeEventAbsent(t, body, "gosxstudio:editor-preview-selection-marker-clear")
+	assertRetiredEditorPreviewRuntimeEventAbsent(t, body, "gosxstudio:editor-preview-selection-marker-apply")
 }
 
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionChrome(t *testing.T) {
@@ -1044,11 +1051,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionChrome(t *testing.T) {
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-selection-chrome-clear"`,
-		`doc.addEventListener("gosxstudio:editor-preview-selection-chrome-apply"`,
-		`var form = editorPreviewForm(detail, event)`,
-		`setEditorPreviewResult(detail, clearEditorPreviewSelectionChrome(form))`,
-		`setEditorPreviewResult(detail, applyEditorPreviewSelectionChrome(form, detail.frame, detail.selection))`,
 		`function clearEditorPreviewSelectionChrome(form)`,
 		`var shells = editorPreviewShells(form)`,
 		`var frames = editorPreviewFrames(form)`,
@@ -1064,9 +1066,8 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionChrome(t *testing.T) {
 			t.Fatalf("IslandRuntimeJS() missing editor preview selection chrome fragment %q", fragment)
 		}
 	}
-	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-chrome`) {
-		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview selection chrome control events")
-	}
+	assertRetiredEditorPreviewRuntimeEventAbsent(t, body, "gosxstudio:editor-preview-selection-chrome-clear")
+	assertRetiredEditorPreviewRuntimeEventAbsent(t, body, "gosxstudio:editor-preview-selection-chrome-apply")
 }
 
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockHide(t *testing.T) {
@@ -1075,9 +1076,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockHide(t *testing.T) {
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-dock-hide"`,
-		`var form = editorPreviewForm(detail, event)`,
-		`setEditorPreviewResult(detail, hideEditorPreviewDocks(form))`,
 		`function hideEditorPreviewDocks(form)`,
 		`var docks = queryAll(form, "[data-gosx-studio-preview-dock]")`,
 		`dock.hidden = true`,
@@ -1095,9 +1093,7 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockHide(t *testing.T) {
 			t.Fatalf("IslandRuntimeJS() missing editor preview dock hide/reset fragment %q", fragment)
 		}
 	}
-	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-hide`) {
-		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock hide control events")
-	}
+	assertRetiredEditorPreviewRuntimeEventAbsent(t, body, "gosxstudio:editor-preview-dock-hide")
 }
 
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockNormalization(t *testing.T) {
@@ -1106,8 +1102,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockNormalization(t *testing.T) 
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-dock-normalize"`,
-		`setEditorPreviewResult(detail, normalizeEditorPreviewDock(detail.dock))`,
 		`function normalizeEditorPreviewDock(dock)`,
 		`if (!dock || !dock.setAttribute || !dock.querySelector) return { handled: false, commands: 0 }`,
 		`dock.setAttribute("data-gosx-studio-preview-dock", "true")`,
@@ -1123,9 +1117,7 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockNormalization(t *testing.T) 
 			t.Fatalf("IslandRuntimeJS() missing editor preview dock normalization fragment %q", fragment)
 		}
 	}
-	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-normalize`) {
-		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock normalize control events")
-	}
+	assertRetiredEditorPreviewRuntimeEventAbsent(t, body, "gosxstudio:editor-preview-dock-normalize")
 }
 
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockBinding(t *testing.T) {
@@ -1134,8 +1126,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockBinding(t *testing.T) {
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-dock-bind"`,
-		`setEditorPreviewResult(detail, bindEditorPreviewDock(form, detail.frame, detail.dock, detail.host))`,
 		`function bindEditorPreviewDock(form, frame, dock, host)`,
 		`var normalize = normalizeEditorPreviewDock(dock)`,
 		`if (!dock || !dock.addEventListener)`,
@@ -1157,9 +1147,7 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockBinding(t *testing.T) {
 			t.Fatalf("IslandRuntimeJS() missing editor preview dock binding fragment %q", fragment)
 		}
 	}
-	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-bind`) {
-		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock bind control events")
-	}
+	assertRetiredEditorPreviewRuntimeEventAbsent(t, body, "gosxstudio:editor-preview-dock-bind")
 	if strings.Contains(body, `runPreviewDockAction`) {
 		t.Fatalf("IslandRuntimeJS() dock binding should not call Workbench runPreviewDockAction")
 	}
@@ -1223,8 +1211,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockShowContent(t *testing.T) {
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-dock-sync"`,
-		`setEditorPreviewResult(detail, syncEditorPreviewDock(detail.dock, detail.selection))`,
 		`function editorPreviewDockKindLabel(selection)`,
 		`if (!selection || !selection.field) return "Block"`,
 		`if (editable === "media" || editable === "image") return "Media field"`,
@@ -1244,8 +1230,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockShowContent(t *testing.T) {
 		`actionFormAction: applied.actionFormAction || selection.actionFormAction || ""`,
 		`blockKey: applied.blockKey || selection.blockKey || ""`,
 		`nodeID: applied.nodeID || selection.nodeID || ""`,
-		`doc.addEventListener("gosxstudio:editor-preview-dock-selection-resolve"`,
-		`detail.result = editorPreviewDockSelection(detail.selection || detail.detail || {}, detail.applied || detail.selectionResult || {})`,
 		`function syncEditorPreviewDock(dock, selection)`,
 		`selection = editorPreviewDockSelection(selection);`,
 		`dock.hidden = false`,
@@ -1268,9 +1252,8 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockShowContent(t *testing.T) {
 			t.Fatalf("IslandRuntimeJS() missing editor preview dock show/content fragment %q", fragment)
 		}
 	}
-	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-sync`) {
-		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock sync control events")
-	}
+	assertRetiredEditorPreviewRuntimeEventAbsent(t, body, "gosxstudio:editor-preview-dock-selection-resolve")
+	assertRetiredEditorPreviewRuntimeEventAbsent(t, body, "gosxstudio:editor-preview-dock-sync")
 }
 
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockSelectionSync(t *testing.T) {
@@ -1279,9 +1262,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockSelectionSync(t *testing.T) 
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-dock-selection-sync"`,
-		`var form = editorPreviewForm(detail, event)`,
-		`setEditorPreviewResult(detail, syncEditorPreviewDockSelection(form, detail.frame, detail.target, detail.selection, detail.host))`,
 		`function editorPreviewDockForFrame(frame)`,
 		`var shell = editorPreviewShellForFrame(frame)`,
 		`dock: shell.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]")`,
@@ -1306,9 +1286,7 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockSelectionSync(t *testing.T) 
 			t.Fatalf("IslandRuntimeJS() missing editor preview dock selection sync fragment %q", fragment)
 		}
 	}
-	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-selection-sync`) {
-		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock selection-sync control events")
-	}
+	assertRetiredEditorPreviewRuntimeEventAbsent(t, body, "gosxstudio:editor-preview-dock-selection-sync")
 }
 
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockDetailExtraction(t *testing.T) {
@@ -1331,17 +1309,12 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockDetailExtraction(t *testing.
 		`actionHref: dock.getAttribute("data-gosx-studio-preview-action-href") || ""`,
 		`actionFormAction: dock.getAttribute("data-gosx-studio-preview-action-formaction") || ""`,
 		`editable: form ? form.getAttribute("data-studio-field-editable") || "" : ""`,
-		`doc.addEventListener("gosxstudio:editor-preview-dock-detail-resolve"`,
-		`var form = editorPreviewForm(detail, event)`,
-		`setEditorPreviewResult(detail, editorPreviewDockDetail(form, detail.dock))`,
 	} {
 		if !strings.Contains(body, fragment) {
 			t.Fatalf("IslandRuntimeJS() missing editor preview dock detail extraction fragment %q", fragment)
 		}
 	}
-	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-detail-resolve`) {
-		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock detail control events")
-	}
+	assertRetiredEditorPreviewRuntimeEventAbsent(t, body, "gosxstudio:editor-preview-dock-detail-resolve")
 }
 
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockFieldNavigationUI(t *testing.T) {
@@ -1350,8 +1323,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockFieldNavigationUI(t *testing
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-dock-field-navigation-sync"`,
-		`setEditorPreviewResult(detail, syncEditorPreviewDockFieldNavigation(detail.dock, detail.count, detail.index))`,
 		`function syncEditorPreviewDockFieldNavigation(dock, count, index)`,
 		`if (!dock || !dock.setAttribute) return { handled: false, count: 0, index: -1 }`,
 		`dock.setAttribute("data-gosx-studio-preview-field-count", String(count))`,
@@ -1370,9 +1341,7 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockFieldNavigationUI(t *testing
 			t.Fatalf("IslandRuntimeJS() missing editor preview dock field-navigation UI fragment %q", fragment)
 		}
 	}
-	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-field-navigation-sync`) {
-		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock field-navigation control events")
-	}
+	assertRetiredEditorPreviewRuntimeEventAbsent(t, body, "gosxstudio:editor-preview-dock-field-navigation-sync")
 }
 
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockPosition(t *testing.T) {

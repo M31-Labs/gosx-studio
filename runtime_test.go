@@ -1043,6 +1043,18 @@ func TestWorkbenchRuntimeDoesNotUseRetiredPreviewRuntimeBridgeEvents(t *testing.
 		`gosxstudio:editor-preview-selection-clear-sync`,
 		`gosxstudio:editor-preview-selection-apply-sync`,
 		`gosxstudio:editor-preview-dock-action-run`,
+		`gosxstudio:editor-preview-selection-marker-clear`,
+		`gosxstudio:editor-preview-selection-marker-apply`,
+		`gosxstudio:editor-preview-selection-chrome-clear`,
+		`gosxstudio:editor-preview-selection-chrome-apply`,
+		`gosxstudio:editor-preview-dock-hide`,
+		`gosxstudio:editor-preview-dock-normalize`,
+		`gosxstudio:editor-preview-dock-bind`,
+		`gosxstudio:editor-preview-dock-selection-resolve`,
+		`gosxstudio:editor-preview-dock-sync`,
+		`gosxstudio:editor-preview-dock-selection-sync`,
+		`gosxstudio:editor-preview-dock-detail-resolve`,
+		`gosxstudio:editor-preview-dock-field-navigation-sync`,
 	} {
 		if strings.Contains(script, retired) {
 			t.Fatalf("workbench runtime should call private PreviewRuntime helpers instead of retired event %q", retired)
