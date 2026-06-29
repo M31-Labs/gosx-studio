@@ -6,6 +6,7 @@ import (
 	"m31labs.dev/gosx-studio/blocklayoutruntime"
 	"m31labs.dev/gosx-studio/brandruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
+	"m31labs.dev/gosx-studio/inlineeditruntime"
 	"m31labs.dev/gosx-studio/previewruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
 	"m31labs.dev/gosx-studio/styleruntime"
@@ -48,6 +49,7 @@ func TestDefaultShellConfigOwnsReusableStudioChrome(t *testing.T) {
 		styleruntime.FeatureFlagKey,
 		workbenchruntime.FeatureFlagKey,
 		previewruntime.FeatureFlagKey,
+		inlineeditruntime.FeatureFlagKey,
 	} {
 		if _, ok := config.FeatureFlags[flag]; !ok {
 			t.Fatalf("default shell config must register %q flag (got %#v)", flag, config.FeatureFlags)
