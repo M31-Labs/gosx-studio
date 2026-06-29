@@ -454,22 +454,10 @@
       var dock = frame && frame.__gosxStudioPreviewDock;
       var target = frame && frame.__gosxStudioPreviewDockTarget;
       var shell = previewShellForFrame(frame);
-      if (!dock || !target || !shell || dock.hidden) return;
-      var frameRect = frame.getBoundingClientRect();
-      var shellRect = shell.getBoundingClientRect();
-      var targetRect = target.getBoundingClientRect();
-      var left = frameRect.left - shellRect.left + targetRect.left + (targetRect.width / 2);
-      var top = frameRect.top - shellRect.top + targetRect.top;
-      var maxLeft = Math.max(8, shellRect.width - 8);
-      left = clamp(left, 8, maxLeft);
-      if (top < 52) {
-        dock.setAttribute("data-gosx-studio-preview-dock-placement", "bottom");
-        dock.style.top = Math.round(frameRect.top - shellRect.top + targetRect.bottom + 10) + "px";
-      } else {
-        dock.setAttribute("data-gosx-studio-preview-dock-placement", "top");
-        dock.style.top = Math.round(top - 10) + "px";
-      }
-      dock.style.left = Math.round(left) + "px";
+      if (!dock || !target || dock.hidden) return null;
+      var detail = { form: form, frame: frame, dock: dock, target: target, shell: shell };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-position-sync", { bubbles: true, detail: detail }));
+      return detail.result || null;
     }
 
     function fieldKeyForTarget(target) {

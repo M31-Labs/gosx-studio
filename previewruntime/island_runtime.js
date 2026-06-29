@@ -58,6 +58,10 @@
     return Array.prototype.slice.call(root.querySelectorAll(selector));
   }
 
+  function editorPreviewClamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
   function attrValue(value) {
     return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   }
@@ -78,6 +82,10 @@
 
   function editorPreviewFrames(form) {
     return queryAll(form, ".editor-preview-frame, [data-studio-preview-frame]");
+  }
+
+  function editorPreviewShellForFrame(frame) {
+    return frame && frame.closest ? frame.closest("[data-gosx-studio-preview], [data-studio-preview-shell], [data-studio-canvas]") : null;
   }
 
   function editorPreviewFrameDocument(frame) {
@@ -266,6 +274,23 @@
       button.setAttribute("aria-label", (action === "prev-field" ? "Previous" : "Next") + " editable field");
     });
     return { handled: true, count: count, index: index };
+  }
+
+  function syncEditorPreviewDockPosition(frame, dock, target, shell) {
+    shell = shell || editorPreviewShellForFrame(frame);
+    if (!frame || !dock || !target || !shell || dock.hidden) return { handled: false, placement: "" };
+    var frameRect = frame.getBoundingClientRect();
+    var shellRect = shell.getBoundingClientRect();
+    var targetRect = target.getBoundingClientRect();
+    var left = frameRect.left - shellRect.left + targetRect.left + (targetRect.width / 2);
+    var top = frameRect.top - shellRect.top + targetRect.top;
+    var maxLeft = Math.max(8, shellRect.width - 8);
+    left = editorPreviewClamp(left, 8, maxLeft);
+    var placement = top < 52 ? "bottom" : "top";
+    dock.setAttribute("data-gosx-studio-preview-dock-placement", placement);
+    dock.style.top = Math.round(placement === "bottom" ? frameRect.top - shellRect.top + targetRect.bottom + 10 : top - 10) + "px";
+    dock.style.left = Math.round(left) + "px";
+    return { handled: true, placement: placement };
   }
 
   function updateEditorPreviewPatchTarget(target, field) {
@@ -486,6 +511,10 @@
     doc.addEventListener("gosxstudio:editor-preview-dock-field-navigation-sync", function (event) {
       var detail = event.detail || {};
       setEditorPreviewResult(detail, syncEditorPreviewDockFieldNavigation(detail.dock, detail.count, detail.index));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-dock-position-sync", function (event) {
+      var detail = event.detail || {};
+      setEditorPreviewResult(detail, syncEditorPreviewDockPosition(detail.frame, detail.dock, detail.target, detail.shell));
     });
   }
 

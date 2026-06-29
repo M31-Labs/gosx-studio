@@ -423,6 +423,34 @@ func TestWorkbenchRuntimeDelegatesPreviewDockFieldNavigationUIToPreviewRuntime(t
 	}
 }
 
+func TestWorkbenchRuntimeDelegatesPreviewDockPositionToPreviewRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	body := jsFunctionBody(t, script, "updatePreviewDockPosition")
+	for _, check := range []string{
+		`function updatePreviewDockPosition(frame)`,
+		`var dock = frame && frame.__gosxStudioPreviewDock;`,
+		`var target = frame && frame.__gosxStudioPreviewDockTarget;`,
+		`var shell = previewShellForFrame(frame);`,
+		`var detail = { form: form, frame: frame, dock: dock, target: target, shell: shell };`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-position-sync", { bubbles: true, detail: detail }))`,
+		`return detail.result || null;`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing preview dock position delegation fragment %q", check)
+		}
+	}
+	for _, forbidden := range []string{
+		`getBoundingClientRect`,
+		`data-gosx-studio-preview-dock-placement`,
+		`dock.style.top`,
+		`dock.style.left`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("updatePreviewDockPosition should delegate concrete preview dock positioning mutation; found %q in:\n%s", forbidden, body)
+		}
+	}
+}
+
 func TestWorkbenchRuntimeDelegatesPreviewDockShowContentToPreviewRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	body := jsFunctionBody(t, script, "syncPreviewDock")

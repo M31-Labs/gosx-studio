@@ -583,6 +583,43 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockFieldNavigationUI(t *testing
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockPosition(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-dock-position-sync"`,
+		`setEditorPreviewResult(detail, syncEditorPreviewDockPosition(detail.frame, detail.dock, detail.target, detail.shell))`,
+		`function editorPreviewShellForFrame(frame)`,
+		`return frame && frame.closest ? frame.closest("[data-gosx-studio-preview], [data-studio-preview-shell], [data-studio-canvas]") : null`,
+		`function editorPreviewClamp(value, min, max)`,
+		`return Math.min(max, Math.max(min, value))`,
+		`function syncEditorPreviewDockPosition(frame, dock, target, shell)`,
+		`shell = shell || editorPreviewShellForFrame(frame)`,
+		`if (!frame || !dock || !target || !shell || dock.hidden) return { handled: false, placement: "" }`,
+		`var frameRect = frame.getBoundingClientRect()`,
+		`var shellRect = shell.getBoundingClientRect()`,
+		`var targetRect = target.getBoundingClientRect()`,
+		`var left = frameRect.left - shellRect.left + targetRect.left + (targetRect.width / 2)`,
+		`var top = frameRect.top - shellRect.top + targetRect.top`,
+		`var maxLeft = Math.max(8, shellRect.width - 8)`,
+		`left = editorPreviewClamp(left, 8, maxLeft)`,
+		`var placement = top < 52 ? "bottom" : "top"`,
+		`dock.setAttribute("data-gosx-studio-preview-dock-placement", placement)`,
+		`dock.style.top = Math.round(placement === "bottom" ? frameRect.top - shellRect.top + targetRect.bottom + 10 : top - 10) + "px"`,
+		`dock.style.left = Math.round(left) + "px"`,
+		`return { handled: true, placement: placement }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview dock position fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-position-sync`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock position control events")
+	}
+}
+
 func TestSubscriberRuntimeScriptPublishesObservers(t *testing.T) {
 	// The preview-side subscriber registers observers for each
 	// $preview.* signal family. This test guards against drift between
