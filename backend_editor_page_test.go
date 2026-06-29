@@ -1,0 +1,134 @@
+package studio
+
+import (
+	"strings"
+	"testing"
+
+	"m31labs.dev/gosx"
+)
+
+func TestRenderBackendEditorPagePreservesEditorShellContract(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendEditorPage(BackendEditorPageProps{
+		Media: []BackendEditorMediaAsset{{
+			URL:      "/media/hero.jpg",
+			Filename: "hero.jpg",
+			Alt:      "Hero alt",
+		}},
+		SaveStatus: BackendEditorActionStatus{
+			OK:      true,
+			Message: "Saved.",
+		},
+		AuthoringStatus: BackendEditorActionStatus{
+			Submitted: true,
+			Message:   "Authoring failed.",
+		},
+		PublishStatus: BackendEditorActionStatus{
+			OK:      true,
+			Message: "Published.",
+		},
+		PublishFlowStatus: BackendEditorActionStatus{
+			Submitted: true,
+			Message:   "Flow failed.",
+		},
+		RestoreStatus: BackendEditorActionStatus{
+			Submitted: true,
+			Message:   "Restore failed.",
+		},
+		RevisionRestored: true,
+		WorkbenchShell: gosx.El("section", gosx.Attrs(gosx.Attr("data-workbench", "true")),
+			gosx.Text("workbench"),
+		),
+		SupportNodes: []gosx.Node{
+			gosx.El("form", gosx.Attrs(gosx.Attr("data-site-map-authoring", "true"))),
+			gosx.El("form", gosx.Attrs(gosx.Attr("data-style-palette", "true"))),
+			gosx.El("div", gosx.Attrs(gosx.Attr("data-engine-hosts", "true"))),
+		},
+		Scripts: BackendEditorScripts{
+			WorkbenchRuntime: "/_gosx/studio/workbench-runtime.js",
+			CommandRuntime:   "/_gosx/studio/command-palette.js",
+			StateRuntime:     "/_gosx/studio/state-runtime.js",
+			EngineRuntime:    "/_gosx/studio/studio-engines.js",
+		},
+	}))
+
+	for _, fragment := range []string{
+		`<div class="admin-page editor-page" data-gosx-studio-backend-editor-renderer="gosx-studio">`,
+		`<datalist id="editor-media-urls"><option value="/media/hero.jpg" label="hero.jpg" data-media-alt="Hero alt">hero.jpg</option></datalist>`,
+		`<p class="form-status form-status--ok">Saved.</p>`,
+		`<p class="form-status form-status--error">Authoring failed.</p>`,
+		`<p class="form-status form-status--ok">Published.</p>`,
+		`<p class="form-status form-status--error">Flow failed.</p>`,
+		`<p class="form-status form-status--error">Restore failed.</p>`,
+		`<p class="form-status form-status--ok">Editor settings restored.</p>`,
+		`<section data-workbench="true">workbench</section>`,
+		`<form data-site-map-authoring="true"></form>`,
+		`<form data-style-palette="true"></form>`,
+		`<div data-engine-hosts="true"></div>`,
+		`<script src="/_gosx/studio/workbench-runtime.js" defer data-gosx-studio-workbench-runtime="true"></script>`,
+		`<script src="/_gosx/studio/command-palette.js" defer data-gosx-studio-command-runtime="true"></script>`,
+		`<script src="/_gosx/studio/state-runtime.js" defer data-gosx-studio-state-runtime="true"></script>`,
+		`<script src="/_gosx/studio/studio-engines.js" defer data-gosx-studio-engine-runtime="true"></script>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("editor page renderer missing %q:\n%s", fragment, html)
+		}
+	}
+
+	assertOrder(t, html,
+		`<datalist id="editor-media-urls">`,
+		`<p class="form-status form-status--ok">Saved.</p>`,
+		`<section data-workbench="true">workbench</section>`,
+		`<form data-site-map-authoring="true"></form>`,
+		`<form data-style-palette="true"></form>`,
+		`<div data-engine-hosts="true"></div>`,
+		`data-gosx-studio-workbench-runtime="true"`,
+		`data-gosx-studio-command-runtime="true"`,
+		`data-gosx-studio-state-runtime="true"`,
+		`data-gosx-studio-engine-runtime="true"`,
+	)
+}
+
+func TestRenderBackendEditorPageDefaultsAndSplitNodes(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendEditorPage(BackendEditorPageProps{}))
+	if !strings.Contains(html, `<div class="admin-page editor-page" data-gosx-studio-backend-editor-renderer="gosx-studio">`) {
+		t.Fatalf("editor page default wrapper missing:\n%s", html)
+	}
+	if !strings.Contains(html, `<datalist id="editor-media-urls"></datalist>`) {
+		t.Fatalf("editor page default datalist missing:\n%s", html)
+	}
+	if strings.Contains(html, `form-status`) {
+		t.Fatalf("editor page default statuses should be empty:\n%s", html)
+	}
+
+	statuses := gosx.RenderHTML(RenderBackendEditorStatuses(BackendEditorPageProps{}))
+	if statuses != "" {
+		t.Fatalf("empty editor statuses should render empty, got %q", statuses)
+	}
+
+	scripts := gosx.RenderHTML(RenderBackendEditorRuntimeScripts(BackendEditorScripts{}))
+	for _, fragment := range []string{
+		`data-gosx-studio-workbench-runtime="true"`,
+		`data-gosx-studio-command-runtime="true"`,
+		`data-gosx-studio-state-runtime="true"`,
+		`data-gosx-studio-engine-runtime="true"`,
+	} {
+		if !strings.Contains(scripts, fragment) {
+			t.Fatalf("empty script renderer missing %q:\n%s", fragment, scripts)
+		}
+	}
+}
+
+func assertOrder(t *testing.T, html string, fragments ...string) {
+	t.Helper()
+	last := -1
+	for _, fragment := range fragments {
+		next := strings.Index(html, fragment)
+		if next < 0 {
+			t.Fatalf("missing ordered fragment %q:\n%s", fragment, html)
+		}
+		if next <= last {
+			t.Fatalf("fragment %q rendered out of order:\n%s", fragment, html)
+		}
+		last = next
+	}
+}
