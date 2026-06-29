@@ -378,6 +378,18 @@
       return detail.result || null;
     }
 
+    function clearPreviewSelectionChrome() {
+      var detail = { form: form };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-chrome-clear", { bubbles: true, detail: detail }));
+      return detail.result || null;
+    }
+
+    function applyPreviewSelectionChrome(frame, selection) {
+      var detail = { form: form, frame: frame, selection: selection || "" };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-chrome-apply", { bubbles: true, detail: detail }));
+      return detail.result || null;
+    }
+
     function clearPreviewSelections() {
       previewFrames().forEach(function (frame) {
         finishInlineTextEdit(frame, true, "clear-selection");
@@ -386,12 +398,7 @@
         clearPreviewFieldMap(frame);
         clearPreviewSelectionMarker(frame);
       });
-      previewShells().forEach(function (shell) {
-        shell.removeAttribute("data-gosx-studio-preview-selection");
-      });
-      previewFrames().forEach(function (frame) {
-        frame.removeAttribute("data-studio-preview-selection");
-      });
+      clearPreviewSelectionChrome();
       hidePreviewDocks();
     }
 
@@ -905,10 +912,7 @@
       var result = dispatchPreviewSelectionApply(detail, options);
       if (!result) return false;
       var selectedEditable = result.editable || detail.editable || inferInspectorEditable(source, control) || "";
-      previewShells().forEach(function (shell) {
-        shell.setAttribute("data-gosx-studio-preview-selection", detail.field || detail.blockKey || detail.nodeID || "");
-      });
-      frame.setAttribute("data-studio-preview-selection", detail.field || detail.blockKey || detail.nodeID || "");
+      applyPreviewSelectionChrome(frame, detail.field || detail.blockKey || detail.nodeID || "");
       syncPreviewDock(frame, selectedTargets[0] || target, {
         field: result.field || detail.field || "",
         editable: selectedEditable,

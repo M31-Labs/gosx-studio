@@ -165,6 +165,33 @@
     return { handled: true, count: targets.length, cleared: result.count || 0 };
   }
 
+  function clearEditorPreviewSelectionChrome(form) {
+    if (!form) return { handled: false, shells: 0, frames: 0 };
+    var shells = editorPreviewShells(form);
+    var frames = editorPreviewFrames(form);
+    shells.forEach(function (shell) {
+      shell.removeAttribute("data-gosx-studio-preview-selection");
+    });
+    frames.forEach(function (frame) {
+      frame.removeAttribute("data-studio-preview-selection");
+    });
+    return { handled: true, shells: shells.length, frames: frames.length };
+  }
+
+  function applyEditorPreviewSelectionChrome(form, frame, selection) {
+    if (!form) return { handled: false, shells: 0, frames: 0 };
+    selection = selection || "";
+    var shells = editorPreviewShells(form);
+    shells.forEach(function (shell) {
+      shell.setAttribute("data-gosx-studio-preview-selection", selection);
+    });
+    if (frame && frame.setAttribute) {
+      frame.setAttribute("data-studio-preview-selection", selection);
+      return { handled: true, shells: shells.length, frames: 1 };
+    }
+    return { handled: true, shells: shells.length, frames: 0 };
+  }
+
   function updateEditorPreviewPatchTarget(target, field) {
     if (!target || !field) return;
     var value = field.value == null ? "" : String(field.value);
@@ -360,6 +387,16 @@
     doc.addEventListener("gosxstudio:editor-preview-selection-marker-apply", function (event) {
       var detail = event.detail || {};
       setEditorPreviewResult(detail, applyEditorPreviewSelectionMarker(detail.frame, detail.targets, detail.clear));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-selection-chrome-clear", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      setEditorPreviewResult(detail, clearEditorPreviewSelectionChrome(form));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-selection-chrome-apply", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      setEditorPreviewResult(detail, applyEditorPreviewSelectionChrome(form, detail.frame, detail.selection));
     });
   }
 

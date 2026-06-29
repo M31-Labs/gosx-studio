@@ -449,6 +449,37 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionMarkers(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionChrome(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-selection-chrome-clear"`,
+		`doc.addEventListener("gosxstudio:editor-preview-selection-chrome-apply"`,
+		`var form = editorPreviewForm(detail, event)`,
+		`setEditorPreviewResult(detail, clearEditorPreviewSelectionChrome(form))`,
+		`setEditorPreviewResult(detail, applyEditorPreviewSelectionChrome(form, detail.frame, detail.selection))`,
+		`function clearEditorPreviewSelectionChrome(form)`,
+		`var shells = editorPreviewShells(form)`,
+		`var frames = editorPreviewFrames(form)`,
+		`shell.removeAttribute("data-gosx-studio-preview-selection")`,
+		`frame.removeAttribute("data-studio-preview-selection")`,
+		`return { handled: true, shells: shells.length, frames: frames.length }`,
+		`function applyEditorPreviewSelectionChrome(form, frame, selection)`,
+		`shell.setAttribute("data-gosx-studio-preview-selection", selection)`,
+		`frame.setAttribute("data-studio-preview-selection", selection)`,
+		`return { handled: true, shells: shells.length, frames: 1 }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview selection chrome fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-chrome`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview selection chrome control events")
+	}
+}
+
 func TestSubscriberRuntimeScriptPublishesObservers(t *testing.T) {
 	// The preview-side subscriber registers observers for each
 	// $preview.* signal family. This test guards against drift between

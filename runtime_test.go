@@ -265,6 +265,9 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`function applyPreviewSelectionMarker(frame, selectedTargets)`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-marker-apply", { bubbles: true, detail: detail }))`,
 		`applyPreviewSelectionMarker(frame, selectedTargets);`,
+		`function applyPreviewSelectionChrome(frame, selection)`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-chrome-apply", { bubbles: true, detail: detail }))`,
+		`applyPreviewSelectionChrome(frame, detail.field || detail.blockKey || detail.nodeID || "");`,
 		`syncPreviewDock(frame, selectedTargets[0] || target, {`,
 		`if (options.reveal && source) revealInspectorSelection(source, control);`,
 	} {
@@ -294,6 +297,10 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`setReadout("[data-studio-field-selection-label]"`,
 		`setAttribute("data-gosx-studio-preview-selected"`,
 		`removeAttribute("data-gosx-studio-preview-selected"`,
+		`setAttribute("data-gosx-studio-preview-selection"`,
+		`setAttribute("data-studio-preview-selection"`,
+		`removeAttribute("data-gosx-studio-preview-selection"`,
+		`removeAttribute("data-studio-preview-selection"`,
 		`emit(form, "gosxstudio:preview-select"`,
 		`emitEditorOperation("select_preview"`,
 	} {
@@ -477,8 +484,9 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 		`function clearPreviewSelectionMarker(frame)`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-marker-clear", { bubbles: true, detail: detail }))`,
 		`clearPreviewSelectionMarker(frame);`,
-		`shell.removeAttribute("data-gosx-studio-preview-selection");`,
-		`frame.removeAttribute("data-studio-preview-selection");`,
+		`function clearPreviewSelectionChrome()`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-chrome-clear", { bubbles: true, detail: detail }))`,
+		`clearPreviewSelectionChrome();`,
 		`hidePreviewDocks();`,
 	} {
 		if !strings.Contains(script, check) {
@@ -498,6 +506,10 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 	for _, forbidden := range []string{
 		`setAttribute("data-gosx-studio-preview-selected"`,
 		`removeAttribute("data-gosx-studio-preview-selected"`,
+		`setAttribute("data-gosx-studio-preview-selection"`,
+		`setAttribute("data-studio-preview-selection"`,
+		`removeAttribute("data-gosx-studio-preview-selection"`,
+		`removeAttribute("data-studio-preview-selection"`,
 	} {
 		if strings.Contains(clearBody, forbidden) {
 			t.Fatalf("clearPreviewSelections should delegate concrete preview selected-marker mutation; found %q in:\n%s", forbidden, clearBody)
