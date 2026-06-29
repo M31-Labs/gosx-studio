@@ -912,8 +912,6 @@
       var result = dispatchPreviewSelectionApply(detail, options);
       if (!result) return false;
       var selectedEditable = result.editable || detail.editable || inferInspectorEditable(source, control) || "";
-      var selectionKey = result.selectionKey || detail.blockKey || detail.nodeID || detail.field || "";
-      var kind = result.kind || (detail.field ? "preview-field" : "preview");
       previewShells().forEach(function (shell) {
         shell.setAttribute("data-gosx-studio-preview-selection", detail.field || detail.blockKey || detail.nodeID || "");
       });
@@ -930,25 +928,6 @@
         nodeID: result.nodeID || detail.nodeID || ""
       });
       if (options.reveal && source) revealInspectorSelection(source, control);
-      emitEditorOperation("select_preview", {
-        mutation: false,
-        reason: options.reason || "preview",
-        target: {
-          field: result.field || detail.field || "",
-          editable: selectedEditable,
-          blockKey: result.blockKey || detail.blockKey || "",
-          nodeID: result.nodeID || detail.nodeID || "",
-          selection: selectionKey,
-          kind: kind
-        },
-        payload: {
-          label: result.label || detail.label || "",
-          blockLabel: result.blockLabel || detail.blockLabel || "",
-          action: result.action || "",
-          actionHref: result.actionHref || "",
-          actionFormAction: result.actionFormAction || ""
-        }
-      });
       return true;
     }
 

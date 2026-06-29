@@ -220,7 +220,6 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`candidate.setAttribute("data-gosx-studio-preview-selected", "true");`,
 		`syncPreviewDock(frame, selectedTargets[0] || target, {`,
 		`if (options.reveal && source) revealInspectorSelection(source, control);`,
-		`emitEditorOperation("select_preview", {`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing preview selection delegation fragment %q", check)
@@ -247,6 +246,7 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`setReadout("[data-studio-selection-status]"`,
 		`setReadout("[data-studio-field-selection-label]"`,
 		`emit(form, "gosxstudio:preview-select"`,
+		`emitEditorOperation("select_preview"`,
 	} {
 		if strings.Contains(applyBody, forbidden) {
 			t.Fatalf("applyPreviewSelection should delegate editor preview selection state; found %q in:\n%s", forbidden, applyBody)

@@ -620,6 +620,32 @@
       updateStyleScope();
       writeSharedSignal("$selection.fieldFocus", { field: result.field, editable: result.editable, label: result.label || fieldLabel(result.field) });
       envelope.result = result;
+      selectionOperationCounter += 1;
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-operation", {
+        bubbles: true,
+        detail: {
+          id: "studio-op-" + Date.now() + "-" + selectionOperationCounter,
+          kind: "select_preview",
+          source: "gosx-studio",
+          mutation: false,
+          reason: options.reason || "preview",
+          target: {
+            field: result.field || detail.field || "",
+            editable: result.editable || detail.editable || "",
+            blockKey: result.blockKey || detail.blockKey || "",
+            nodeID: result.nodeID || detail.nodeID || "",
+            selection: result.selectionKey || detail.blockKey || detail.nodeID || detail.field || "",
+            kind: result.kind || (detail.field ? "preview-field" : "preview")
+          },
+          payload: {
+            label: result.label || detail.label || "",
+            blockLabel: result.blockLabel || detail.blockLabel || "",
+            action: result.action || "",
+            actionHref: result.actionHref || "",
+            actionFormAction: result.actionFormAction || ""
+          }
+        }
+      }));
       form.dispatchEvent(new CustomEvent("gosxstudio:preview-select", {
         bubbles: true,
         detail: {
