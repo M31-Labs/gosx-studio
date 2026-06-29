@@ -846,7 +846,7 @@
         return;
       }
       if (intent.action !== "inline-text") return;
-      if (editorPreviewHostCall(host, "startInlineTextFromSelection", false, frame, intent.reason)) {
+      if (startEditorPreviewInlineTextFromSelection(form, frame, host, intent.reason)) {
         event.preventDefault();
         event.stopPropagation();
       }
@@ -860,6 +860,13 @@
     frameDoc.addEventListener("scroll", repositionDock, true);
     if (frame.contentWindow) frame.contentWindow.addEventListener("resize", repositionDock);
     return { handled: true, bound: true };
+  }
+
+  function startEditorPreviewInlineTextFromSelection(form, frame, host, reason) {
+    var dock = frame && frame.__gosxStudioPreviewDock;
+    if (!dock || dock.hidden) return false;
+    var detail = editorPreviewDockDetail(form, dock);
+    return editorPreviewHostCall(host, "startInlineTextFromDetail", false, frame, detail, reason || "keyboard");
   }
 
   function bindEditorPreviewFrameDocument(form, frame, host) {

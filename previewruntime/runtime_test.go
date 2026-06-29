@@ -668,7 +668,7 @@ func TestPreviewRuntimeIslandJSHandsPreviewDocumentEventsToHost(t *testing.T) {
 		`reason: intent.reason,`,
 		`host: host`,
 		`if (result && result.navigated)`,
-		`editorPreviewHostCall(host, "startInlineTextFromSelection", false, frame, intent.reason)`,
+		`startEditorPreviewInlineTextFromSelection(form, frame, host, intent.reason)`,
 		`editorPreviewHostCall(host, "handleInlineTextPaste", false, frame, event)`,
 		`editorPreviewHostCall(host, "handleInlineTextBlur", false, frame, event)`,
 		`editorPreviewHostCall(host, "updatePreviewDockPosition", null, frame)`,
@@ -681,6 +681,48 @@ func TestPreviewRuntimeIslandJSHandsPreviewDocumentEventsToHost(t *testing.T) {
 	}
 	if strings.Contains(body, `editorPreviewHostCall(host, "navigatePreviewField"`) {
 		t.Fatalf("IslandRuntimeJS() should run preview field navigation locally, found old host callback")
+	}
+	if strings.Contains(body, `editorPreviewHostCall(host, "startInlineTextFromSelection"`) {
+		t.Fatalf("IslandRuntimeJS() should extract selected inline-text detail locally, found old host callback")
+	}
+}
+
+func TestPreviewRuntimeIslandJSStartsKeyboardInlineTextFromSelectedDockDetail(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	helper := islandJSFunctionBody(t, body, "startEditorPreviewInlineTextFromSelection")
+	for _, fragment := range []string{
+		`function startEditorPreviewInlineTextFromSelection(form, frame, host, reason)`,
+		`var dock = frame && frame.__gosxStudioPreviewDock`,
+		`if (!dock || dock.hidden) return false`,
+		`var detail = editorPreviewDockDetail(form, dock)`,
+		`return editorPreviewHostCall(host, "startInlineTextFromDetail", false, frame, detail, reason || "keyboard")`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing selected dock inline-text fragment %q", fragment)
+		}
+	}
+	for _, forbidden := range []string{
+		`startInlineTextFromSelection`,
+		`event.preventDefault()`,
+		`event.stopPropagation()`,
+	} {
+		if strings.Contains(helper, forbidden) {
+			t.Fatalf("selected dock inline-text helper should only extract detail and call host; found %q in:\n%s", forbidden, helper)
+		}
+	}
+	keyboardBody := islandJSFunctionBody(t, body, "bindEditorPreviewDocument")
+	for _, fragment := range []string{
+		`if (intent.action !== "inline-text") return`,
+		`if (startEditorPreviewInlineTextFromSelection(form, frame, host, intent.reason))`,
+		`event.preventDefault()`,
+		`event.stopPropagation()`,
+	} {
+		if !strings.Contains(keyboardBody, fragment) {
+			t.Fatalf("keyboard inline-text handler should gate event cancellation on helper success, missing %q in:\n%s", fragment, keyboardBody)
+		}
 	}
 }
 

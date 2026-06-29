@@ -283,12 +283,6 @@
       return detail.result || null;
     }
 
-    function previewDockDetail(dock) {
-      var detail = { form: form, dock: dock };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-detail-resolve", { bubbles: true, detail: detail }));
-      return detail.result || {};
-    }
-
     function emitPreviewDockAction(action, detail) {
       emit(form, "gosxstudio:preview-action", {
         action: action || "",
@@ -665,7 +659,6 @@
     function startInlineTextEdit(frame, detail, reason) {
       var runtime = previewInlineTextRuntime("startPreviewTextSession");
       if (!runtime) return false;
-      detail = detail || (frame && frame.__gosxStudioPreviewDock ? previewDockDetail(frame.__gosxStudioPreviewDock) : {});
       return runtime.startPreviewTextSession(frame, detail, reason || "preview-dock", previewInlineTextHost(frame));
     }
 
@@ -674,12 +667,6 @@
       if (!startInlineTextEdit(frame, detail, reason || "preview-dock")) return false;
       emitPreviewDockAction("field-action", detail);
       return true;
-    }
-
-    function startInlineTextFromSelection(frame, reason) {
-      var dock = frame && frame.__gosxStudioPreviewDock;
-      if (!dock || dock.hidden) return false;
-      return startInlineTextFromDetail(frame, previewDockDetail(dock), reason || "keyboard");
     }
 
     function finishInlineTextEdit(frame, commit, reason) {
@@ -736,7 +723,6 @@
         finishInlineTextEdit: finishInlineTextEdit,
         dispatchPreviewFieldNavigation: dispatchPreviewFieldNavigation,
         startInlineTextFromDetail: startInlineTextFromDetail,
-        startInlineTextFromSelection: startInlineTextFromSelection,
         handleInlineTextInput: handleInlineTextInput,
         handleInlineTextKeyEvent: handleInlineTextKeyEvent,
         handleInlineTextPaste: handleInlineTextPaste,
