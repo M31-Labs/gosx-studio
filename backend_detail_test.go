@@ -63,6 +63,44 @@ func TestRenderBackendDetailRendersImagePreviewAndExtraNode(t *testing.T) {
 	}
 }
 
+func TestRenderBackendDetailPreviewRendersCustomLeadNode(t *testing.T) {
+	lead := gosx.El("span", gosx.Attrs(gosx.Attr("class", "media-card__file")), gosx.Text("font/woff2"))
+	html := gosx.RenderHTML(RenderBackendDetailPreview(BackendDetailPreview{
+		Lead:    &lead,
+		Primary: "brand.woff2",
+		Statuses: []BackendDetailStatus{
+			{Label: "Active"},
+			{Label: "font/woff2"},
+		},
+	}))
+
+	want := `<div class="edit-preview"><span class="media-card__file">font/woff2</span><div><span class="status">Active</span><span class="status">font/woff2</span><strong>brand.woff2</strong></div></div>`
+	if !strings.Contains(html, want) {
+		t.Fatalf("detail preview html missing custom lead node %q:\n%s", want, html)
+	}
+	if strings.Contains(html, `<img`) {
+		t.Fatalf("custom lead preview should not render an image:\n%s", html)
+	}
+}
+
+func TestRenderBackendDetailPreviewTextOnlySuppressesLeadAndImage(t *testing.T) {
+	lead := gosx.El("span", gosx.Attrs(gosx.Attr("class", "media-card__file")), gosx.Text("font/woff2"))
+	html := gosx.RenderHTML(RenderBackendDetailPreview(BackendDetailPreview{
+		TextOnly: true,
+		Lead:     &lead,
+		Image:    BackendDetailPreviewImage{Src: "/media/cup.jpg", Alt: "Cup"},
+		Primary:  "Text preview",
+	}))
+
+	want := `<div class="edit-preview edit-preview--text"><div><strong>Text preview</strong></div></div>`
+	if !strings.Contains(html, want) {
+		t.Fatalf("text-only preview html changed; missing %q:\n%s", want, html)
+	}
+	if strings.Contains(html, `media-card__file`) || strings.Contains(html, `<img`) {
+		t.Fatalf("text-only preview should suppress lead and image:\n%s", html)
+	}
+}
+
 func TestRenderBackendDetailSplitNodes(t *testing.T) {
 	heading := gosx.RenderHTML(RenderBackendDetailHeading(BackendDetailProps{
 		Kicker:  "CMS",

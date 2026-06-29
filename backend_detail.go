@@ -13,6 +13,7 @@ type BackendDetailProps struct {
 type BackendDetailPreview struct {
 	Class    string
 	TextOnly bool
+	Lead     *gosx.Node
 	Image    BackendDetailPreviewImage
 	Primary  string
 	Statuses []BackendDetailStatus
@@ -74,7 +75,9 @@ func RenderBackendDetailPreview(preview BackendDetailPreview) gosx.Node {
 		}
 	}
 	children := make([]gosx.Node, 0, 2)
-	if preview.Image.Src != "" && !preview.TextOnly {
+	if preview.Lead != nil && !preview.TextOnly {
+		children = append(children, *preview.Lead)
+	} else if preview.Image.Src != "" && !preview.TextOnly {
 		children = append(children, gosx.El("img", gosx.Attrs(
 			gosx.Attr("src", preview.Image.Src),
 			gosx.Attr("alt", preview.Image.Alt),
