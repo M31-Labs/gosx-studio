@@ -531,7 +531,8 @@ func appendWorkbenchNode(nodes []gosx.Node, node gosx.Node) []gosx.Node {
 }
 
 func workbenchNodeEmpty(node gosx.Node) bool {
-	return gosx.RenderHTML(node) == "<></>"
+	html := gosx.RenderHTML(node)
+	return html == "" || html == "<></>"
 }
 
 func workbenchViewString(view map[string]any, key string) string {

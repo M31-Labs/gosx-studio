@@ -32,6 +32,10 @@ type BlockLayoutEngineOptions struct {
 
 	EngineRuntime BlockLayoutEngineRuntime
 	EngineHost    BlockLayoutEngineHostOptions
+
+	EngineHostNode gosx.Node
+	LayersNode     gosx.Node
+	LibraryNode    gosx.Node
 }
 
 type BlockLayoutEngineSegments struct {
@@ -66,6 +70,26 @@ func RenderBlockLayoutEngineSegments(view map[string]any, options BlockLayoutEng
 		LibraryClose: gosx.RawHTML("</div>"),
 		RootClose:    gosx.RawHTML("</section>"),
 	}
+}
+
+func RenderBlockLayoutEngine(view map[string]any, options BlockLayoutEngineOptions) gosx.Node {
+	segments := RenderBlockLayoutEngineSegments(view, options)
+	engineHost := segments.EngineHost
+	if !workbenchNodeEmpty(options.EngineHostNode) {
+		engineHost = options.EngineHostNode
+	}
+	return gosx.Fragment(
+		segments.RootOpen,
+		segments.Header,
+		engineHost,
+		segments.LayersOpen,
+		options.LayersNode,
+		segments.LayersClose,
+		segments.LibraryOpen,
+		options.LibraryNode,
+		segments.LibraryClose,
+		segments.RootClose,
+	)
 }
 
 func renderBlockLayoutEngineRootOpen(options BlockLayoutEngineOptions) gosx.Node {

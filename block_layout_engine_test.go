@@ -58,6 +58,102 @@ func TestRenderBlockLayoutEngineSegmentsOwnsFrameChrome(t *testing.T) {
 	}
 }
 
+func TestRenderBlockLayoutEngineWrapsSlotsInsideRoot(t *testing.T) {
+	view := map[string]any{
+		"kicker":     "Home",
+		"title":      "Sections",
+		"countLabel": "2 sections",
+	}
+
+	html := gosx.RenderHTML(RenderBlockLayoutEngine(view, BlockLayoutEngineOptions{
+		LayersNode:  gosx.El("div", gosx.Attrs(gosx.Attr("data-test-layers-slot", "true")), gosx.Text("layers")),
+		LibraryNode: gosx.El("aside", gosx.Attrs(gosx.Attr("data-test-library-slot", "true")), gosx.Text("library")),
+	}))
+
+	for _, fragment := range []string{
+		`<section class="studio-block-layout-engine"`,
+		`data-studio-block-layout-panel="true"`,
+		`data-studio-engine-source="gosx"`,
+		`data-gosx-studio-block-layout-engine-renderer="gosx-studio"`,
+		`<header class="studio-block-layout-engine__chrome">`,
+		`<h2>Sections</h2>`,
+		`id="gosx-studio-block-layout-engine"`,
+		`data-studio-block-layout-engine-surface="true"`,
+		`class="studio-block-layout-engine__layers" data-studio-block-layout-layers="true"><div data-test-layers-slot="true">layers</div></div>`,
+		`class="studio-block-layout-engine__library" data-studio-block-layout-library="true"><aside data-test-library-slot="true">library</aside></div>`,
+		`</section>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("block-layout engine missing %q:\n%s", fragment, html)
+		}
+	}
+	if strings.Index(html, `<section`) > strings.Index(html, `<header`) ||
+		strings.Index(html, `<header`) > strings.Index(html, `id="gosx-studio-block-layout-engine"`) ||
+		strings.Index(html, `id="gosx-studio-block-layout-engine"`) > strings.Index(html, `data-test-layers-slot`) ||
+		strings.Index(html, `data-test-layers-slot`) > strings.Index(html, `data-test-library-slot`) {
+		t.Fatalf("block-layout engine did not preserve root/header/host/layers/library order:\n%s", html)
+	}
+}
+
+func TestRenderBlockLayoutEngineUsesExplicitEngineHostNode(t *testing.T) {
+	t.Run("empty explicit host falls back to default", func(t *testing.T) {
+		html := gosx.RenderHTML(RenderBlockLayoutEngine(map[string]any{"countLabel": "1 section"}, BlockLayoutEngineOptions{
+			EngineHostNode: gosx.Fragment(),
+			LayersNode:     gosx.El("div", gosx.Attrs(gosx.Attr("data-test-layers-slot", "true"))),
+			LibraryNode:    gosx.El("div", gosx.Attrs(gosx.Attr("data-test-library-slot", "true"))),
+		}))
+
+		for _, fragment := range []string{
+			`data-gosx-studio-block-layout-engine-renderer="gosx-studio"`,
+			`id="gosx-studio-block-layout-engine"`,
+			`data-gosx-engine="GoSXStudioBlockLayout"`,
+			`data-studio-block-layout-layers="true"`,
+			`data-test-layers-slot="true"`,
+			`data-studio-block-layout-library="true"`,
+			`data-test-library-slot="true"`,
+		} {
+			if !strings.Contains(html, fragment) {
+				t.Fatalf("block-layout engine fallback missing %q:\n%s", fragment, html)
+			}
+		}
+		if strings.Contains(html, `data-route-rendered-engine-host="true"`) {
+			t.Fatalf("block-layout engine should not render an empty explicit host:\n%s", html)
+		}
+	})
+
+	t.Run("non-empty explicit host overrides default", func(t *testing.T) {
+		html := gosx.RenderHTML(RenderBlockLayoutEngine(map[string]any{"countLabel": "1 section"}, BlockLayoutEngineOptions{
+			EngineHostNode: gosx.El("surface", gosx.Attrs(
+				gosx.Attr("id", "route-block-layout-host"),
+				gosx.Attr("data-route-rendered-engine-host", "true"),
+			)),
+			LayersNode:  gosx.El("div", gosx.Attrs(gosx.Attr("data-test-layers-slot", "true"))),
+			LibraryNode: gosx.El("div", gosx.Attrs(gosx.Attr("data-test-library-slot", "true"))),
+		}))
+
+		for _, fragment := range []string{
+			`data-gosx-studio-block-layout-engine-renderer="gosx-studio"`,
+			`<surface id="route-block-layout-host" data-route-rendered-engine-host="true"></surface>`,
+			`data-studio-block-layout-layers="true"`,
+			`data-test-layers-slot="true"`,
+			`data-studio-block-layout-library="true"`,
+			`data-test-library-slot="true"`,
+		} {
+			if !strings.Contains(html, fragment) {
+				t.Fatalf("block-layout engine override missing %q:\n%s", fragment, html)
+			}
+		}
+		for _, blocked := range []string{
+			`id="gosx-studio-block-layout-engine"`,
+			`data-gosx-engine="GoSXStudioBlockLayout"`,
+		} {
+			if strings.Contains(html, blocked) {
+				t.Fatalf("block-layout engine should use explicit host node instead of fallback %q:\n%s", blocked, html)
+			}
+		}
+	})
+}
+
 func TestBlockLayoutEngineHostFromMapNormalizesCapabilities(t *testing.T) {
 	host := BlockLayoutEngineHostFromMap(map[string]any{
 		"key":          " blocks ",
