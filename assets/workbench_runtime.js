@@ -393,13 +393,6 @@
       hidePreviewDocks();
     }
 
-    function clearInspectorSelection() {
-      queryAll(form, "[data-gosx-studio-inspector-selected]").forEach(function (target) {
-        target.removeAttribute("data-gosx-studio-inspector-selected");
-        if (target.classList) target.classList.remove("is-studio-field-active", "is-preview-selected");
-      });
-    }
-
     function previewShellForFrame(frame) {
       return frame && frame.closest ? (frame.closest("[data-gosx-studio-preview], [data-studio-preview-shell], [data-studio-canvas]") || frame.parentElement) : null;
     }
@@ -756,17 +749,7 @@
       var detail = previewDockDetail(dock);
       if (action === "clear") {
         clearPreviewSelections();
-        clearInspectorSelection();
-        form.removeAttribute("data-studio-selection");
-        form.removeAttribute("data-studio-selection-kind");
-        form.removeAttribute("data-studio-field-selection");
-        form.removeAttribute("data-studio-field-editable");
-        form.removeAttribute("data-studio-field-action-label");
-        form.removeAttribute("data-studio-field-action-href");
-        form.removeAttribute("data-studio-field-action-formaction");
-        setReadout("[data-studio-selection-label]", "No selection");
-        setReadout("[data-studio-selection-status]", "No selection");
-        setReadout("[data-studio-field-selection-label]", "Block");
+        dispatchPreviewSelectionClear("preview-dock");
         emitPreviewDockAction(action, detail);
         return true;
       }
@@ -809,18 +792,6 @@
       return true;
     }
 
-    function markInspectorSelection(source) {
-      if (!source) return null;
-      var row = source.closest ? source.closest(".field-row, [data-studio-field-row]") : null;
-      var control = inspectorControl(source);
-      [source, row, control].forEach(function (target) {
-        if (!target) return;
-        target.setAttribute("data-gosx-studio-inspector-selected", "true");
-        if (target.classList) target.classList.add(target === row ? "is-studio-field-active" : "is-preview-selected");
-      });
-      return control || source;
-    }
-
     function revealInspectorSelection(source, control) {
       if (!source) return;
       if (form.querySelector('[data-studio-mode-control="content"], [data-studio-mode-panel="content"]')) {
@@ -851,6 +822,24 @@
         if (payload.result) return payload.result;
       }
       return null;
+    }
+
+    function dispatchPreviewSelectionClear(reason) {
+      var payload = {
+        reason: reason || ""
+      };
+      form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-clear", { bubbles: true, detail: payload }));
+      if (payload.result) return true;
+      var runtime = window.GoSXStudioSelectionRuntime;
+      if (runtime && typeof runtime.bind === "function") {
+        runtime.bind(document.body || document);
+        payload = {
+          reason: reason || ""
+        };
+        form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-clear", { bubbles: true, detail: payload }));
+        if (payload.result) return true;
+      }
+      return false;
     }
 
     function applyPreviewSelection(frame, target, detail, options) {
@@ -1677,7 +1666,7 @@
         setFocus(false, "keyboard");
       } else if (event.key === "Escape" && form.querySelector("[data-gosx-studio-preview-dock]:not([hidden])")) {
         clearPreviewSelections();
-        clearInspectorSelection();
+        dispatchPreviewSelectionClear("keyboard-escape");
       }
     });
 

@@ -235,6 +235,62 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 	}
 }
 
+func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`function dispatchPreviewSelectionClear(reason)`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-clear", { bubbles: true, detail: payload }))`,
+		`if (payload.result) return true;`,
+		`var runtime = window.GoSXStudioSelectionRuntime;`,
+		`runtime.bind(document.body || document);`,
+		`dispatchPreviewSelectionClear("preview-dock");`,
+		`dispatchPreviewSelectionClear("keyboard-escape");`,
+		`function clearPreviewSelections()`,
+		`function hidePreviewDocks()`,
+		`finishInlineTextEdit(frame, true, "clear-selection");`,
+		`target.removeAttribute("data-gosx-studio-preview-selected");`,
+		`shell.removeAttribute("data-gosx-studio-preview-selection");`,
+		`frame.removeAttribute("data-studio-preview-selection");`,
+		`hidePreviewDocks();`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing preview selection clear boundary fragment %q", check)
+		}
+	}
+	for _, forbidden := range []string{
+		`function clearInspectorSelection`,
+		`function markInspectorSelection`,
+	} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should not own preview inspector selection helper %q", forbidden)
+		}
+	}
+
+	dockBody := jsFunctionBody(t, script, "runPreviewDockAction")
+	clearIdx := strings.Index(dockBody, `clearPreviewSelections();`)
+	delegateIdx := strings.Index(dockBody, `dispatchPreviewSelectionClear("preview-dock");`)
+	if clearIdx < 0 || delegateIdx < 0 || clearIdx > delegateIdx {
+		t.Fatalf("preview dock clear should clear iframe/dock state before delegating editor selection clear:\n%s", dockBody)
+	}
+	for _, forbidden := range []string{
+		`clearInspectorSelection();`,
+		`form.removeAttribute("data-studio-selection");`,
+		`form.removeAttribute("data-studio-selection-kind");`,
+		`form.removeAttribute("data-studio-field-selection");`,
+		`form.removeAttribute("data-studio-field-editable");`,
+		`form.removeAttribute("data-studio-field-action-label");`,
+		`form.removeAttribute("data-studio-field-action-href");`,
+		`form.removeAttribute("data-studio-field-action-formaction");`,
+		`setReadout("[data-studio-selection-label]", "No selection");`,
+		`setReadout("[data-studio-selection-status]", "No selection");`,
+		`setReadout("[data-studio-field-selection-label]", "Block");`,
+	} {
+		if strings.Contains(dockBody, forbidden) {
+			t.Fatalf("preview dock clear should delegate editor preview selection state; found %q in:\n%s", forbidden, dockBody)
+		}
+	}
+}
+
 func TestWorkbenchRuntimeLeavesSelectionActionsToSelectionRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, forbidden := range []string{

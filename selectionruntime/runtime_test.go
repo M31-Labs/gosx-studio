@@ -155,6 +155,37 @@ func TestSelectionRuntimeIslandOwnsPreviewSelectionApply(t *testing.T) {
 	}
 }
 
+func TestSelectionRuntimeIslandOwnsPreviewSelectionClear(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, contract := range []string{
+		`form.addEventListener("gosxstudio:preview-selection-clear", clearPreviewSelectionState);`,
+		`function clearPreviewSelectionState(event)`,
+		`clearPreviewInspectorSelection();`,
+		`target.removeAttribute("data-gosx-studio-inspector-selected");`,
+		`target.classList.remove("is-studio-field-active", "is-preview-selected");`,
+		`form.removeAttribute("data-studio-selection");`,
+		`form.removeAttribute("data-studio-selection-kind");`,
+		`form.removeAttribute("data-studio-field-selection");`,
+		`form.removeAttribute("data-studio-field-editable");`,
+		`form.removeAttribute("data-studio-field-action-label");`,
+		`form.removeAttribute("data-studio-field-action-href");`,
+		`form.removeAttribute("data-studio-field-action-formaction");`,
+		`setSelectionReadout("No selection");`,
+		`updateSelectionStatus(null);`,
+		`readout.textContent = "Block";`,
+		`updateFieldActionLabels();`,
+		`updateStyleScope();`,
+		`writeSharedSignal("$selection.fieldFocus", { field: "", editable: "", label: "" });`,
+		`writeSharedSignal("$selection.block", { key: "", label: "" });`,
+		`writeSharedSignal("$selection.workspaceTarget", { scope: "", key: "", label: "" });`,
+		`envelope.result = { cleared: true };`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() missing preview-selection clear contract %q", contract)
+		}
+	}
+}
+
 func TestBridgeShimAutoMountsOnDocumentReady(t *testing.T) {
 	// Pre-2026-05-27 the deleted studio-engines.js bundle auto-mounted every
 	// runtime contract at DOMContentLoaded via its top-level init() function.

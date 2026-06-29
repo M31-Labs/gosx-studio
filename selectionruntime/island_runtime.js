@@ -586,6 +586,27 @@
       }));
     }
 
+    function clearPreviewSelectionState(event) {
+      var envelope = event.detail || {};
+      clearPreviewInspectorSelection();
+      form.removeAttribute("data-studio-selection");
+      form.removeAttribute("data-studio-selection-kind");
+      form.removeAttribute("data-studio-workspace-selection");
+      updateWorkspaceSelectionLinks("");
+      syncHomeLayerPicker("");
+      clearFieldFocus();
+      setSelectionReadout("No selection");
+      updateSelectionStatus(null);
+      Array.prototype.forEach.call(form.querySelectorAll("[data-studio-field-selection-label]"), function (readout) {
+        readout.textContent = "Block";
+      });
+      updateFieldActionLabels();
+      updateStyleScope();
+      writeSharedSignal("$selection.block", { key: "", label: "" });
+      writeSharedSignal("$selection.workspaceTarget", { scope: "", key: "", label: "" });
+      envelope.result = { cleared: true };
+    }
+
     function revealFieldControl(source, control) {
       var reduced = selectionReducedMotion();
       setMode("home", true);
@@ -855,6 +876,7 @@
       }
     });
     form.addEventListener("gosxstudio:preview-selection-apply", applyPreviewSelectionState);
+    form.addEventListener("gosxstudio:preview-selection-clear", clearPreviewSelectionState);
 
     bindCommandPaletteCommands();
     if (form.getAttribute("data-studio-mode") === "advanced") ensureWorkspaceSelection();
