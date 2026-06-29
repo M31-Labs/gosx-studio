@@ -294,6 +294,51 @@ func TestIslandRuntimeJSPublishesCycleFieldGlobal(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewChromeEvents(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-status-set"`,
+		`doc.addEventListener("gosxstudio:editor-preview-route-sync"`,
+		`doc.addEventListener("gosxstudio:editor-preview-refresh-now"`,
+		`doc.addEventListener("gosxstudio:editor-preview-refresh-schedule"`,
+		`detail.form && detail.form.querySelectorAll`,
+		`closest("form[data-studio-workbench], form[data-editor-workbench]")`,
+		`"[data-gosx-studio-preview], [data-studio-preview-shell], [data-studio-canvas]"`,
+		`".editor-preview-frame, [data-studio-preview-frame]"`,
+		`"[data-studio-preview-status]"`,
+		`"[data-studio-open-preview]"`,
+		`"[data-studio-selected-flow-route]"`,
+		`shell.setAttribute("data-gosx-studio-preview-state", state || "")`,
+		`shell.setAttribute("data-gosx-studio-preview-reason", reason || "")`,
+		`frame.setAttribute("data-studio-preview-state", state || "")`,
+		`shell.setAttribute("data-gosx-studio-preview-url", route)`,
+		`frame.setAttribute("data-studio-preview-src", route)`,
+		`link.setAttribute("href", route)`,
+		`node.textContent = route`,
+		`emitEditorPreview(form, "gosxstudio:preview-route"`,
+		`emitEditorPreview(form, "gosxstudio:preview-refresh"`,
+		`next.searchParams.set("_gosx_preview", String(Date.now()))`,
+		`next.searchParams.set("_gosx_preview_reason", reason)`,
+		`frame.setAttribute("src", cacheBustPreviewURL(base, reason))`,
+		`setEditorPreviewStatus(form, "loading", "Refreshing preview", reason)`,
+		`window.setTimeout(function () {`,
+		`}, 180)`,
+		`typeof WeakMap !== "undefined" ? new WeakMap() : null`,
+		`form.__gosxStudioEditorPreviewRefreshTimer`,
+		`detail.result = result`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview chrome fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview chrome control events")
+	}
+}
+
 func TestSubscriberRuntimeScriptPublishesObservers(t *testing.T) {
 	// The preview-side subscriber registers observers for each
 	// $preview.* signal family. This test guards against drift between

@@ -158,6 +158,42 @@ func TestWorkbenchRuntimeDoesNotTransportNoFieldPreviewPatches(t *testing.T) {
 	}
 }
 
+func TestWorkbenchRuntimeDelegatesEditorPreviewChromeToPreviewRuntimeEvents(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`function setPreviewStatus(state, label, reason)`,
+		`{ form: form, state: state, label: label, reason: reason || "" }`,
+		`gosxstudio:editor-preview-status-set`,
+		`function syncPreviewRoute(route, reason)`,
+		`{ form: form, route: route || "", reason: reason || "" }`,
+		`gosxstudio:editor-preview-route-sync`,
+		`function refreshPreviewNow(reason, route)`,
+		`{ form: form, route: route || "", reason: reason || "refresh" }`,
+		`gosxstudio:editor-preview-refresh-now`,
+		`function schedulePreviewRefresh(reason, route)`,
+		`gosxstudio:editor-preview-refresh-schedule`,
+		`return detail.result || null;`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing editor preview chrome delegation fragment %q", check)
+		}
+	}
+	for _, forbidden := range []string{
+		`shell.setAttribute("data-gosx-studio-preview-url"`,
+		`link.setAttribute("href", route)`,
+		`next.searchParams.set("_gosx_preview"`,
+		`frame.setAttribute("src", cacheBustURL`,
+		`function cacheBustURL`,
+		`function openLinks`,
+		`queryAll(form, "[data-studio-selected-flow-route]")`,
+		`queryAll(shell, "[data-studio-preview-status]")`,
+	} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should delegate editor preview chrome ownership; found %q", forbidden)
+		}
+	}
+}
+
 func TestWorkbenchRuntimeSkipsMirroredFieldsDuringPreviewLoadSync(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{

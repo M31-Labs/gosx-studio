@@ -53,6 +53,148 @@
     }
   }
 
+  function queryAll(root, selector) {
+    if (!root || !root.querySelectorAll) return [];
+    return Array.prototype.slice.call(root.querySelectorAll(selector));
+  }
+
+  function closestWorkbenchForm(node) {
+    return node && node.closest ? node.closest("form[data-studio-workbench], form[data-editor-workbench]") : null;
+  }
+
+  function editorPreviewForm(detail, event) {
+    detail = detail || {};
+    if (detail.form && detail.form.querySelectorAll) return detail.form;
+    return closestWorkbenchForm(event && event.target) || doc.querySelector("form[data-studio-workbench], form[data-editor-workbench]");
+  }
+
+  function editorPreviewShells(form) {
+    return queryAll(form, "[data-gosx-studio-preview], [data-studio-preview-shell], [data-studio-canvas]");
+  }
+
+  function editorPreviewFrames(form) {
+    return queryAll(form, ".editor-preview-frame, [data-studio-preview-frame]");
+  }
+
+  function editorPreviewURL(frame) {
+    return frame.getAttribute("data-studio-preview-src") || frame.getAttribute("src") || "";
+  }
+
+  function cacheBustPreviewURL(url, reason) {
+    try {
+      var next = new URL(url || window.location.href, window.location.href);
+      next.searchParams.set("_gosx_preview", String(Date.now()));
+      if (reason) next.searchParams.set("_gosx_preview_reason", reason);
+      return next.pathname + next.search + next.hash;
+    } catch (error) {
+      return url || "";
+    }
+  }
+
+  function emitEditorPreview(form, name, detail) {
+    form.dispatchEvent(new CustomEvent(name, { bubbles: true, detail: detail || {} }));
+  }
+
+  function setEditorPreviewResult(detail, result) {
+    if (detail) detail.result = result;
+    return result;
+  }
+
+  function setEditorPreviewStatus(form, state, label, reason) {
+    if (!form) return { handled: false };
+    editorPreviewShells(form).forEach(function (shell) {
+      shell.setAttribute("data-gosx-studio-preview-state", state || "");
+      shell.setAttribute("data-gosx-studio-preview-reason", reason || "");
+      queryAll(shell, "[data-studio-preview-status]").forEach(function (node) {
+        node.textContent = label || "";
+      });
+    });
+    editorPreviewFrames(form).forEach(function (frame) {
+      frame.setAttribute("data-studio-preview-state", state || "");
+    });
+    return { handled: true };
+  }
+
+  function syncEditorPreviewRoute(form, route, reason) {
+    route = route || "";
+    if (!form || !route) return { handled: false };
+    editorPreviewShells(form).forEach(function (shell) {
+      shell.setAttribute("data-gosx-studio-preview-url", route);
+    });
+    editorPreviewFrames(form).forEach(function (frame) {
+      frame.setAttribute("data-studio-preview-src", route);
+    });
+    queryAll(form, "[data-studio-open-preview]").forEach(function (link) {
+      if (link.getAttribute("aria-disabled") === "true") return;
+      link.setAttribute("href", route);
+    });
+    queryAll(form, "[data-studio-selected-flow-route]").forEach(function (node) {
+      node.textContent = route;
+    });
+    emitEditorPreview(form, "gosxstudio:preview-route", { route: route, reason: reason || "" });
+    return { handled: true };
+  }
+
+  function refreshEditorPreviewNow(form, reason, route) {
+    if (!form) return { handled: false };
+    reason = reason || "refresh";
+    route = route || "";
+    if (route) syncEditorPreviewRoute(form, route, reason);
+    var frames = editorPreviewFrames(form);
+    if (!frames.length) return { handled: false };
+    setEditorPreviewStatus(form, "loading", "Refreshing preview", reason);
+    frames.forEach(function (frame) {
+      var base = route || editorPreviewURL(frame) || frame.getAttribute("src") || "/";
+      frame.setAttribute("src", cacheBustPreviewURL(base, reason));
+    });
+    emitEditorPreview(form, "gosxstudio:preview-refresh", { route: route, reason: reason });
+    return { handled: true };
+  }
+
+  var editorPreviewRefreshTimers = typeof WeakMap !== "undefined" ? new WeakMap() : null;
+  function editorPreviewRefreshTimer(form) {
+    return editorPreviewRefreshTimers ? editorPreviewRefreshTimers.get(form) : form.__gosxStudioEditorPreviewRefreshTimer;
+  }
+
+  function setEditorPreviewRefreshTimer(form, timer) {
+    if (editorPreviewRefreshTimers) editorPreviewRefreshTimers.set(form, timer);
+    else form.__gosxStudioEditorPreviewRefreshTimer = timer;
+  }
+
+  function scheduleEditorPreviewRefresh(form, reason, route) {
+    if (!form) return { handled: false };
+    window.clearTimeout(editorPreviewRefreshTimer(form));
+    setEditorPreviewRefreshTimer(form, window.setTimeout(function () {
+      refreshEditorPreviewNow(form, reason, route);
+    }, 180));
+    return { handled: true };
+  }
+
+  function bindEditorPreviewChromeEvents() {
+    doc.addEventListener("gosxstudio:editor-preview-status-set", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      setEditorPreviewResult(detail, setEditorPreviewStatus(form, detail.state, detail.label, detail.reason));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-route-sync", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      setEditorPreviewResult(detail, syncEditorPreviewRoute(form, detail.route, detail.reason));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-refresh-now", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      setEditorPreviewResult(detail, refreshEditorPreviewNow(form, detail.reason, detail.route));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-refresh-schedule", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      setEditorPreviewResult(detail, scheduleEditorPreviewRefresh(form, detail.reason, detail.route));
+    });
+  }
+
+  bindEditorPreviewChromeEvents();
+
   // monotonicCounter — used by requestInlineEdit / cycleField to mint a
   // unique request id every call. The subscriber side observes the id
   // change (not the value content) so repeated identical detail payloads

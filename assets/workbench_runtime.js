@@ -208,7 +208,6 @@
     form.__gosxStudioWorkbenchRuntime = { version: 1 };
     var stage = form.querySelector("[data-studio-layout]");
     var saveLayout = frameTask(function () { writeLayout(form); });
-    var previewRefreshTimer = 0;
     var operationCounter = 0;
     var refresh = frameTask(function () {
       emit(form, "gosxstudio:workbench-layout", {
@@ -984,69 +983,27 @@
     }
 
     function setPreviewStatus(state, label, reason) {
-      previewShells().forEach(function (shell) {
-        shell.setAttribute("data-gosx-studio-preview-state", state);
-        shell.setAttribute("data-gosx-studio-preview-reason", reason || "");
-        queryAll(shell, "[data-studio-preview-status]").forEach(function (node) {
-          node.textContent = label;
-        });
-      });
-      previewFrames().forEach(function (frame) {
-        frame.setAttribute("data-studio-preview-state", state);
-      });
-    }
-
-    function cacheBustURL(url, reason) {
-      try {
-        var next = new URL(url || window.location.href, window.location.href);
-        next.searchParams.set("_gosx_preview", String(Date.now()));
-        if (reason) next.searchParams.set("_gosx_preview_reason", reason);
-        return next.pathname + next.search + next.hash;
-      } catch (error) {
-        return url || "";
-      }
-    }
-
-    function openLinks() {
-      return queryAll(form, "[data-studio-open-preview]");
+      var detail = { form: form, state: state, label: label, reason: reason || "" };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-status-set", { bubbles: true, detail: detail }));
+      return detail.result || null;
     }
 
     function syncPreviewRoute(route, reason) {
-      route = route || "";
-      if (!route) return;
-      previewShells().forEach(function (shell) {
-        shell.setAttribute("data-gosx-studio-preview-url", route);
-      });
-      previewFrames().forEach(function (frame) {
-        frame.setAttribute("data-studio-preview-src", route);
-      });
-      openLinks().forEach(function (link) {
-        if (link.getAttribute("aria-disabled") === "true") return;
-        link.setAttribute("href", route);
-      });
-      queryAll(form, "[data-studio-selected-flow-route]").forEach(function (node) {
-        node.textContent = route;
-      });
-      emit(form, "gosxstudio:preview-route", { route: route, reason: reason || "" });
+      var detail = { form: form, route: route || "", reason: reason || "" };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-route-sync", { bubbles: true, detail: detail }));
+      return detail.result || null;
     }
 
     function refreshPreviewNow(reason, route) {
-      if (route) syncPreviewRoute(route, reason);
-      var frames = previewFrames();
-      if (!frames.length) return;
-      setPreviewStatus("loading", "Refreshing preview", reason || "refresh");
-      frames.forEach(function (frame) {
-        var base = route || previewURL(frame) || frame.getAttribute("src") || "/";
-        frame.setAttribute("src", cacheBustURL(base, reason || "refresh"));
-      });
-      emit(form, "gosxstudio:preview-refresh", { route: route || "", reason: reason || "refresh" });
+      var detail = { form: form, route: route || "", reason: reason || "refresh" };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-refresh-now", { bubbles: true, detail: detail }));
+      return detail.result || null;
     }
 
     function schedulePreviewRefresh(reason, route) {
-      window.clearTimeout(previewRefreshTimer);
-      previewRefreshTimer = window.setTimeout(function () {
-        refreshPreviewNow(reason, route);
-      }, 180);
+      var detail = { form: form, route: route || "", reason: reason || "refresh" };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-refresh-schedule", { bubbles: true, detail: detail }));
+      return detail.result || null;
     }
 
     function fieldPatch(field) {
