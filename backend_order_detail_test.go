@@ -120,3 +120,112 @@ func TestRenderBackendOrderDetailSplitNodesAndEmptyStates(t *testing.T) {
 		t.Fatalf("summary should omit empty optional phone/tracking rows:\n%s", summary)
 	}
 }
+
+func TestRenderBackendOrderDetailActionsAndNotesForms(t *testing.T) {
+	actions := BackendOrderActions{
+		OrderID:   "order_123",
+		CSRFToken: "csrf-token",
+		Paths: BackendOrderActionPaths{
+			MarkPaid:        "/mark-paid",
+			Cancel:          "/cancel",
+			MarkRefund:      "/refund",
+			SaveFulfillment: "/fulfillment",
+			SaveNotes:       "/notes",
+		},
+		CanMarkPaid:       true,
+		CanCancel:         true,
+		CanRefund:         true,
+		RefundNote:        "Refund <reason>",
+		TrackingReference: "TRACK123",
+		FulfillmentNote:   "Packed carefully",
+		FulfillmentOptions: []BackendOrderFulfillmentOption{
+			{Value: "pending", Label: "Pending"},
+			{Value: "shipped", Label: "Shipped", Selected: true},
+		},
+	}
+	actionsHTML := gosx.RenderHTML(RenderBackendOrderDetailActions(actions))
+	notesHTML := gosx.RenderHTML(RenderBackendOrderDetailNotes(BackendOrderNotes{
+		OrderID:   actions.OrderID,
+		CSRFToken: actions.CSRFToken,
+		Action:    actions.Paths.SaveNotes,
+		Notes:     "Customer prefers pickup",
+	}))
+
+	for _, fragment := range []string{
+		`<div class="panel"><div class="panel__header"><h2>Actions</h2><a href="/admin/orders" data-gosx-link="true">Back to orders</a></div>`,
+		`<form class="inline-form" method="post" action="/mark-paid"><input type="hidden" name="csrf_token" value="csrf-token" /><input type="hidden" name="id" value="order_123" /><button class="button button--primary" type="submit" data-admin-confirm="Mark this order paid and mark the item sold?">Mark paid</button></form>`,
+		`<form class="inline-form" method="post" action="/cancel"><input type="hidden" name="csrf_token" value="csrf-token" /><input type="hidden" name="id" value="order_123" /><button class="button button--secondary" type="submit" data-admin-confirm="Cancel this order and release reserved inventory?">Cancel and release</button></form>`,
+		`<form class="admin-form admin-form--single" method="post" action="/refund"><input type="hidden" name="csrf_token" value="csrf-token" /><input type="hidden" name="id" value="order_123" /><div class="field-row"><label for="refundNote">Refund note</label><textarea id="refundNote" name="refundNote" rows="3">Refund &lt;reason&gt;</textarea></div><button class="button button--secondary" type="submit" data-admin-confirm="Record this order as refunded?">Record refund</button></form>`,
+		`<form class="admin-form admin-form--single" method="post" action="/fulfillment"><input type="hidden" name="csrf_token" value="csrf-token" /><input type="hidden" name="id" value="order_123" /><div class="field-row"><label for="fulfillmentStatus">Fulfillment</label><select id="fulfillmentStatus" name="fulfillmentStatus"><option value="pending">Pending</option><option value="shipped" selected>Shipped</option></select></div><div class="field-row"><label for="trackingReference">Tracking/reference</label><input id="trackingReference" name="trackingReference" value="TRACK123" /></div><div class="field-row"><label for="fulfillmentNote">Fulfillment note</label><textarea id="fulfillmentNote" name="fulfillmentNote" rows="3">Packed carefully</textarea></div><button class="button button--secondary" type="submit">Save fulfillment</button></form>`,
+	} {
+		if !strings.Contains(actionsHTML, fragment) {
+			t.Fatalf("actions html missing %q:\n%s", fragment, actionsHTML)
+		}
+	}
+	for _, fragment := range []string{
+		`<section class="panel"><div class="panel__header"><h2>Notes</h2></div><form class="admin-form admin-form--single" method="post" action="/notes">`,
+		`<input type="hidden" name="csrf_token" value="csrf-token" /><input type="hidden" name="id" value="order_123" />`,
+		`<textarea id="notes" name="notes" rows="5">Customer prefers pickup</textarea>`,
+		`<button class="button button--primary" type="submit">Save notes</button>`,
+	} {
+		if !strings.Contains(notesHTML, fragment) {
+			t.Fatalf("notes html missing %q:\n%s", fragment, notesHTML)
+		}
+	}
+}
+
+func TestRenderBackendOrderDetailPageOwnsActionsAndNotes(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendOrderDetailPage(BackendOrderDetailProps{
+		Kicker:  "CMS",
+		Title:   "Order",
+		Summary: "order_123",
+		SummaryPanel: BackendOrderSummary{
+			CustomerName:     "Ari Blue",
+			Email:            "ari@example.com",
+			Subtotal:         "$120.00",
+			Shipping:         "$8.00",
+			Total:            "$128.00",
+			StatusLabel:      "Reserved",
+			FulfillmentLabel: "Pending",
+		},
+		Actions: BackendOrderActions{
+			OrderID:   "order_123",
+			CSRFToken: "csrf-token",
+			Paths: BackendOrderActionPaths{
+				SaveFulfillment: "/fulfillment",
+				SaveNotes:       "/notes",
+			},
+			FulfillmentOptions: []BackendOrderFulfillmentOption{{Value: "pending", Label: "Pending", Selected: true}},
+		},
+		Notes: BackendOrderNotes{
+			OrderID:   "order_123",
+			CSRFToken: "csrf-token",
+			Action:    "/notes",
+			Notes:     "Internal note",
+		},
+	}))
+
+	for _, fragment := range []string{
+		`<div class="admin-page" data-gosx-studio-backend-order-detail-renderer="gosx-studio">`,
+		`<section class="admin-grid"><div class="panel"><div class="panel__header"><h2>Summary</h2>`,
+		`<h2>Actions</h2><a href="/admin/orders" data-gosx-link="true">Back to orders</a>`,
+		`<h2>Items</h2>`,
+		`<h2>Notes</h2>`,
+		`<h2>Payment references</h2>`,
+		`<section class="admin-grid"><div class="panel"><div class="panel__header"><h2>Timeline</h2>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("page html missing %q:\n%s", fragment, html)
+		}
+	}
+	for _, hidden := range []string{
+		`Mark paid`,
+		`Cancel and release`,
+		`Record refund`,
+		`refundNote`,
+	} {
+		if strings.Contains(html, hidden) {
+			t.Fatalf("page html should hide unavailable action %q:\n%s", hidden, html)
+		}
+	}
+}
