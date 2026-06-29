@@ -276,6 +276,38 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldNavigationTelemetryToSelectionRunt
 	}
 }
 
+func TestWorkbenchRuntimeDelegatesPreviewFieldActionIntentToSelectionRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`function dispatchPreviewFieldActionResolve(detail)`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-action-resolve", { bubbles: true, detail: payload }))`,
+		`if (payload.result) return payload.result;`,
+		`var runtime = window.GoSXStudioSelectionRuntime;`,
+		`runtime.bind(document.body || document);`,
+		`var intent = dispatchPreviewFieldActionResolve(detail) || { reveal: !!detail.field };`,
+		`if (intent.inlineText && startInlineTextFromDetail(frame, detail, "preview-dock")) return true;`,
+		`if (intent.submit && submitPreviewFieldAction(detail)) {`,
+		`window.location.href = intent.href || "";`,
+		`if (fieldSourceNode) revealInspectorSelection(fieldSourceNode, inspectorControl(fieldSourceNode));`,
+		`emitPreviewDockAction(action, detail);`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing preview field-action intent delegation fragment %q", check)
+		}
+	}
+
+	actionBody := jsFunctionBody(t, script, "runPreviewDockAction")
+	for _, forbidden := range []string{
+		`detail.editable === "text"`,
+		`detail.actionFormAction && submitPreviewFieldAction`,
+		`if (detail.actionHref)`,
+	} {
+		if strings.Contains(actionBody, forbidden) {
+			t.Fatalf("preview field-action branch should use resolved intent, found %q in:\n%s", forbidden, actionBody)
+		}
+	}
+}
+
 func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{

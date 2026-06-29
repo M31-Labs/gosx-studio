@@ -538,6 +538,31 @@
       };
     }
 
+    function resolvePreviewFieldAction(event) {
+      var envelope = event.detail || {};
+      var field = envelope.field || "";
+      var editable = envelope.editable || "";
+      var label = envelope.label || "";
+      var blockKey = envelope.blockKey || "";
+      var action = envelope.action || "";
+      var actionHref = envelope.actionHref || "";
+      var actionFormAction = envelope.actionFormAction || "";
+      envelope.result = {
+        inlineText: editable === "text",
+        submit: !!actionFormAction,
+        navigate: !!actionHref,
+        href: actionHref || "",
+        reveal: !!field,
+        field: field,
+        editable: editable,
+        label: label,
+        blockKey: blockKey,
+        action: action,
+        actionHref: actionHref,
+        actionFormAction: actionFormAction
+      };
+    }
+
     function applyPreviewSelectionState(event) {
       var envelope = event.detail || {};
       var detail = envelope.detail || {};
@@ -968,6 +993,7 @@
     form.addEventListener("gosxstudio:preview-selection-apply", applyPreviewSelectionState);
     form.addEventListener("gosxstudio:preview-selection-clear", clearPreviewSelectionState);
     form.addEventListener("gosxstudio:preview-field-navigation-commit", emitPreviewFieldNavigation);
+    form.addEventListener("gosxstudio:preview-field-action-resolve", resolvePreviewFieldAction);
 
     bindCommandPaletteCommands();
     if (form.getAttribute("data-studio-mode") === "advanced") ensureWorkspaceSelection();

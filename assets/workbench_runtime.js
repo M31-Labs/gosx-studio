@@ -620,6 +620,37 @@
       });
     }
 
+    function dispatchPreviewFieldActionResolve(detail) {
+      detail = detail || {};
+      var payload = {
+        field: detail.field || "",
+        editable: detail.editable || "",
+        label: detail.label || "",
+        blockKey: detail.blockKey || "",
+        action: detail.action || "",
+        actionHref: detail.actionHref || "",
+        actionFormAction: detail.actionFormAction || ""
+      };
+      form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-action-resolve", { bubbles: true, detail: payload }));
+      if (payload.result) return payload.result;
+      var runtime = window.GoSXStudioSelectionRuntime;
+      if (runtime && typeof runtime.bind === "function") {
+        runtime.bind(document.body || document);
+        payload = {
+          field: detail.field || "",
+          editable: detail.editable || "",
+          label: detail.label || "",
+          blockKey: detail.blockKey || "",
+          action: detail.action || "",
+          actionHref: detail.actionHref || "",
+          actionFormAction: detail.actionFormAction || ""
+        };
+        form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-action-resolve", { bubbles: true, detail: payload }));
+        if (payload.result) return payload.result;
+      }
+      return null;
+    }
+
     function isFormSubmitControl(node) {
       if (!node) return false;
       var tag = String(node.tagName || "").toLowerCase();
@@ -770,14 +801,15 @@
         return false;
       }
       if (action === "field-action") {
-        if (detail.editable === "text" && startInlineTextFromDetail(frame, detail, "preview-dock")) return true;
-        if (detail.actionFormAction && submitPreviewFieldAction(detail)) {
+        var intent = dispatchPreviewFieldActionResolve(detail) || { reveal: !!detail.field };
+        if (intent.inlineText && startInlineTextFromDetail(frame, detail, "preview-dock")) return true;
+        if (intent.submit && submitPreviewFieldAction(detail)) {
           emitPreviewDockAction(action, detail);
           return true;
         }
-        if (detail.actionHref) {
-          window.location.href = detail.actionHref;
-        } else {
+        if (intent.navigate) {
+          window.location.href = intent.href || "";
+        } else if (intent.reveal) {
           var fieldSourceNode = inspectorSource(detail.field);
           if (fieldSourceNode) revealInspectorSelection(fieldSourceNode, inspectorControl(fieldSourceNode));
         }

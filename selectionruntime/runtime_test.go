@@ -232,6 +232,50 @@ func TestSelectionRuntimeIslandOwnsPreviewFieldNavigationTelemetry(t *testing.T)
 	}
 }
 
+func TestSelectionRuntimeIslandOwnsPreviewFieldActionResolve(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, contract := range []string{
+		`form.addEventListener("gosxstudio:preview-field-action-resolve", resolvePreviewFieldAction);`,
+		`function resolvePreviewFieldAction(event)`,
+		`var envelope = event.detail || {};`,
+		`var field = envelope.field || "";`,
+		`var editable = envelope.editable || "";`,
+		`var label = envelope.label || "";`,
+		`var blockKey = envelope.blockKey || "";`,
+		`var action = envelope.action || "";`,
+		`var actionHref = envelope.actionHref || "";`,
+		`var actionFormAction = envelope.actionFormAction || "";`,
+		`inlineText: editable === "text"`,
+		`submit: !!actionFormAction`,
+		`navigate: !!actionHref`,
+		`href: actionHref || ""`,
+		`reveal: !!field`,
+		`field: field`,
+		`editable: editable`,
+		`label: label`,
+		`blockKey: blockKey`,
+		`action: action`,
+		`actionHref: actionHref`,
+		`actionFormAction: actionFormAction`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() missing preview field-action resolve contract %q", contract)
+		}
+	}
+
+	handlerBody := jsFunctionBody(t, body, "resolvePreviewFieldAction")
+	for _, forbidden := range []string{
+		`form.dispatchEvent`,
+		`gosxstudio:preview-action`,
+		`gosxstudio:selection-action`,
+		`gosxstudio:editor-operation`,
+	} {
+		if strings.Contains(handlerBody, forbidden) {
+			t.Fatalf("preview field-action resolve should only set envelope.result; found %q in:\n%s", forbidden, handlerBody)
+		}
+	}
+}
+
 func TestSelectionRuntimeIslandOwnsPreviewSelectionApply(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	for _, contract := range []string{
