@@ -90,10 +90,10 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 func TestIslandRuntimeJSPublishesMountGlobal(t *testing.T) {
 	// Method 1/10: mount(root) — legacy
 	// window.GoSXStudioPreviewRuntime.mount at the legacy bundle:1119
-	// (bound to init at line 1113). The legacy walks every
-	// [data-editor-workbench] in root and calls bindPreview(form). The
-	// island writer publishes $preview.mount.epoch — the subscriber
-	// re-runs its mount-acknowledged routine when the epoch changes.
+	// (bound to init at line 1113). The legacy walks every workbench form
+	// in root and calls bindPreview(form). The island writer publishes
+	// $preview.mount.epoch — the subscriber re-runs its mount-acknowledged
+	// routine when the epoch changes.
 	body := string(IslandRuntimeJS())
 	if body == "" {
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
@@ -105,6 +105,12 @@ func TestIslandRuntimeJSPublishesMountGlobal(t *testing.T) {
 	for _, contract := range []string{
 		// Signal target — drift here breaks the cross-frame contract.
 		"$preview.mount.epoch",
+		`function editorPreviewWorkbenchForms(root)`,
+		`scope.matches("form[data-studio-workbench], form[data-editor-workbench]")`,
+		`forms.push(scope)`,
+		`scope.querySelectorAll("form[data-studio-workbench], form[data-editor-workbench]")`,
+		`editorPreviewWorkbenchForms(root).forEach(function (form)`,
+		`syncEditorPreviewDockPositions(form)`,
 	} {
 		if !strings.Contains(body, contract) {
 			t.Fatalf("IslandRuntimeJS() mount must preserve %q contract", contract)
@@ -671,7 +677,7 @@ func TestPreviewRuntimeIslandJSHandsPreviewDocumentEventsToHost(t *testing.T) {
 		`startEditorPreviewInlineTextFromSelection(form, frame, host, intent.reason)`,
 		`editorPreviewHostCall(host, "handleInlineTextPaste", false, frame, event)`,
 		`editorPreviewHostCall(host, "handleInlineTextBlur", false, frame, event)`,
-		`editorPreviewHostCall(host, "updatePreviewDockPosition", null, frame)`,
+		`syncEditorPreviewDockPositionForFrame(frame)`,
 		`event.preventDefault()`,
 		`event.stopPropagation()`,
 	} {
@@ -684,6 +690,9 @@ func TestPreviewRuntimeIslandJSHandsPreviewDocumentEventsToHost(t *testing.T) {
 	}
 	if strings.Contains(body, `editorPreviewHostCall(host, "startInlineTextFromSelection"`) {
 		t.Fatalf("IslandRuntimeJS() should extract selected inline-text detail locally, found old host callback")
+	}
+	if strings.Contains(body, `editorPreviewHostCall(host, "updatePreviewDockPosition"`) {
+		t.Fatalf("IslandRuntimeJS() should sync preview dock positions locally, found old host callback")
 	}
 }
 
@@ -1336,8 +1345,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockPosition(t *testing.T) {
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-dock-position-sync"`,
-		`setEditorPreviewResult(detail, syncEditorPreviewDockPosition(detail.frame, detail.dock, detail.target, detail.shell))`,
 		`function editorPreviewShellForFrame(frame)`,
 		`return frame && frame.closest ? frame.closest("[data-gosx-studio-preview], [data-studio-preview-shell], [data-studio-canvas]") : null`,
 		`function editorPreviewClamp(value, min, max)`,
@@ -1357,13 +1364,21 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockPosition(t *testing.T) {
 		`dock.style.top = Math.round(placement === "bottom" ? frameRect.top - shellRect.top + targetRect.bottom + 10 : top - 10) + "px"`,
 		`dock.style.left = Math.round(left) + "px"`,
 		`return { handled: true, placement: placement }`,
+		`function syncEditorPreviewDockPositionForFrame(frame)`,
+		`return syncEditorPreviewDockPosition(frame, dock, target)`,
+		`window.__gosx_preview_runtime_island_syncDockPosition = syncEditorPreviewDockPositionForFrame`,
 	} {
 		if !strings.Contains(body, fragment) {
 			t.Fatalf("IslandRuntimeJS() missing editor preview dock position fragment %q", fragment)
 		}
 	}
-	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-position-sync`) {
-		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock position control events")
+	for _, forbidden := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-dock-position-sync"`,
+		`dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-position-sync`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("IslandRuntimeJS() must not keep editor preview dock position control event boundary %q", forbidden)
+		}
 	}
 }
 
@@ -1373,8 +1388,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockPositionsSync(t *testing.T) 
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-dock-positions-sync"`,
-		`setEditorPreviewResult(detail, syncEditorPreviewDockPositions(form))`,
 		`function syncEditorPreviewDockPositions(form)`,
 		`if (!form) return { handled: false, count: 0 }`,
 		`var count = 0`,
@@ -1385,13 +1398,21 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockPositionsSync(t *testing.T) 
 		`var result = syncEditorPreviewDockPosition(frame, dock, target)`,
 		`if (result && result.handled) count += 1`,
 		`return { handled: true, count: count }`,
+		`window.addEventListener("resize", function ()`,
+		`editorPreviewWorkbenchForms(doc).forEach(function (form)`,
+		`syncEditorPreviewDockPositions(form)`,
 	} {
 		if !strings.Contains(body, fragment) {
 			t.Fatalf("IslandRuntimeJS() missing editor preview dock positions sync fragment %q", fragment)
 		}
 	}
-	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-positions-sync`) {
-		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock positions control events")
+	for _, forbidden := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-dock-positions-sync"`,
+		`dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-positions-sync`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("IslandRuntimeJS() must not keep editor preview dock positions control event boundary %q", forbidden)
+		}
 	}
 }
 

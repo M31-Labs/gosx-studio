@@ -588,6 +588,15 @@
     return { handled: true, count: count };
   }
 
+  function syncEditorPreviewDockPositionForFrame(frame) {
+    var dock = frame && frame.__gosxStudioPreviewDock;
+    var target = frame && frame.__gosxStudioPreviewDockTarget;
+    if (!dock || !target || dock.hidden) return { handled: false, placement: "" };
+    return syncEditorPreviewDockPosition(frame, dock, target);
+  }
+
+  window.__gosx_preview_runtime_island_syncDockPosition = syncEditorPreviewDockPositionForFrame;
+
   function syncEditorPreviewDockSelection(form, frame, target, selection, host) {
     var dockLookup = editorPreviewDockForFrame(frame);
     var dock = dockLookup.dock;
@@ -789,7 +798,7 @@
     setEditorPreviewBoundDocument(frame, frameDoc);
     if (frameDoc.documentElement) frameDoc.documentElement.setAttribute("data-gosx-studio-preview-selectable", "true");
     var repositionDock = editorPreviewFrameTask(function () {
-      editorPreviewHostCall(host, "updatePreviewDockPosition", null, frame);
+      syncEditorPreviewDockPositionForFrame(frame);
     });
     frameDoc.addEventListener("click", function (event) {
       if (editorPreviewInlineEditContains(frame, event.target)) return;
@@ -1113,15 +1122,6 @@
       var detail = event.detail || {};
       setEditorPreviewResult(detail, syncEditorPreviewDockFieldNavigation(detail.dock, detail.count, detail.index));
     });
-    doc.addEventListener("gosxstudio:editor-preview-dock-position-sync", function (event) {
-      var detail = event.detail || {};
-      setEditorPreviewResult(detail, syncEditorPreviewDockPosition(detail.frame, detail.dock, detail.target, detail.shell));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-dock-positions-sync", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      setEditorPreviewResult(detail, syncEditorPreviewDockPositions(form));
-    });
     doc.addEventListener("gosxstudio:editor-preview-document-bind", function (event) {
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
@@ -1157,17 +1157,40 @@
   // preview-runtime.js:1119 (the .mount field on the IIFE-exported
   // object, bound to init at line 1113).
   //
-  // The legacy mount() walks every [data-editor-workbench] in root and
-  // calls bindPreview(form) to wire the drag/drop/inline-edit machinery
-  // for the editor preview overlay. The slice-6 writer just bumps the
-  // mount epoch signal; the preview-side subscriber re-runs its
-  // bindPreview routine when the epoch changes.
+  // The legacy mount() walks every workbench form in root and calls
+  // bindPreview(form) to wire the drag/drop/inline-edit machinery for the
+  // editor preview overlay. The slice-6 writer just bumps the mount epoch
+  // signal; the preview-side subscriber re-runs its bindPreview routine
+  // when the epoch changes.
+  function editorPreviewWorkbenchForms(root) {
+    var scope = root || doc;
+    var forms = [];
+    if (scope && scope.matches && scope.matches("form[data-studio-workbench], form[data-editor-workbench]")) {
+      forms.push(scope);
+    }
+    if (scope && scope.querySelectorAll) {
+      Array.prototype.forEach.call(scope.querySelectorAll("form[data-studio-workbench], form[data-editor-workbench]"), function (form) {
+        forms.push(form);
+      });
+    }
+    return forms;
+  }
+
   function mountPreviewIsland(root) {
     mountEpoch += 1;
     writeSharedSignal("$preview.mount.epoch", mountEpoch);
+    editorPreviewWorkbenchForms(root).forEach(function (form) {
+      syncEditorPreviewDockPositions(form);
+    });
   }
 
   window.__gosx_preview_runtime_island_mount = mountPreviewIsland;
+
+  window.addEventListener("resize", function () {
+    editorPreviewWorkbenchForms(doc).forEach(function (form) {
+      syncEditorPreviewDockPositions(form);
+    });
+  });
 
   // ===== Method 2/10: setBlockVisibility(key, visible) =====
   //

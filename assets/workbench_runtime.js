@@ -268,21 +268,6 @@
       return detail.result || null;
     }
 
-    function updatePreviewDockPosition(frame) {
-      var dock = frame && frame.__gosxStudioPreviewDock;
-      var target = frame && frame.__gosxStudioPreviewDockTarget;
-      if (!dock || !target || dock.hidden) return null;
-      var detail = { form: form, frame: frame, dock: dock, target: target };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-position-sync", { bubbles: true, detail: detail }));
-      return detail.result || null;
-    }
-
-    function syncPreviewDockPositions(reason) {
-      var detail = { form: form, reason: reason || "sync" };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-positions-sync", { bubbles: true, detail: detail }));
-      return detail.result || null;
-    }
-
     function emitPreviewDockAction(action, detail) {
       emit(form, "gosxstudio:preview-action", {
         action: action || "",
@@ -629,7 +614,10 @@
         setStatus: setPreviewStatus,
         emitEditorOperation: emitEditorOperation,
         emitEvent: emitPreviewInlineTextEvent,
-        updateDock: updatePreviewDockPosition
+        updateDock: function (frame) {
+          if (typeof window.__gosx_preview_runtime_island_syncDockPosition !== "function") return null;
+          return window.__gosx_preview_runtime_island_syncDockPosition(frame);
+        }
       };
     }
 
@@ -709,8 +697,7 @@
         handleInlineTextInput: handleInlineTextInput,
         handleInlineTextKeyEvent: handleInlineTextKeyEvent,
         handleInlineTextPaste: handleInlineTextPaste,
-        handleInlineTextBlur: handleInlineTextBlur,
-        updatePreviewDockPosition: updatePreviewDockPosition
+        handleInlineTextBlur: handleInlineTextBlur
       };
     }
 
@@ -1079,10 +1066,6 @@
         clearPreviewSelections();
         dispatchPreviewSelectionClear("keyboard-escape");
       }
-    });
-
-    window.addEventListener("resize", function () {
-      syncPreviewDockPositions("resize");
     });
 
     restoreLayout(form);
