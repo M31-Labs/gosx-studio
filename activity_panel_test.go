@@ -87,6 +87,90 @@ func TestRenderActivityPanelMinimalOmitsOptionalPanels(t *testing.T) {
 	}
 }
 
+func TestRenderActivityPanelStructuredCommentsAndProposals(t *testing.T) {
+	view := activityPanelTestView(false, false)
+	comments := workbenchViewMap(view, "comments")
+	comments["countLabel"] = "1 open"
+	comments["comments"] = []map[string]any{
+		{
+			"id":           "comment-hero-headline",
+			"body":         "The lead is accurate, but it could feel warmer for a first-time shopper.",
+			"actorID":      "agent-studio",
+			"actorKind":    "agent",
+			"targetLabel":  "hero / headline",
+			"blockID":      "hero",
+			"field":        "headline",
+			"status":       "open",
+			"statusLabel":  "Open",
+			"canResolve":   true,
+			"resolveEvent": "studio.resolveComment",
+		},
+	}
+	proposals := workbenchViewMap(view, "proposals")
+	proposals["countLabel"] = "1 pending"
+	proposals["proposals"] = []map[string]any{
+		{
+			"id":             "proposal-home-lead",
+			"title":          "Warm up the homepage lead",
+			"summary":        "Make the hero copy more inviting before publish.",
+			"actorID":        "agent-studio",
+			"actorKind":      "agent",
+			"status":         "pending",
+			"statusLabel":    "Pending",
+			"operationCount": 2,
+			"reviewSummary":  "2 suggested copy operations need review.",
+			"canAccept":      true,
+			"canReject":      true,
+			"acceptEvent":    "studio.acceptSuggestion",
+			"rejectEvent":    "studio.rejectSuggestion",
+			"items": []map[string]any{
+				{
+					"operationID": "op-headline",
+					"kind":        "set_text",
+					"summary":     "Update the hero headline with a warmer seasonal lead.",
+				},
+				{
+					"operationID": "op-subhead",
+					"kind":        "set_text",
+					"summary":     "Tighten the supporting line around ready-to-ship favorites.",
+				},
+			},
+		},
+	}
+
+	html := gosx.RenderHTML(RenderActivityPanel(view, ActivityPanelOptions{}))
+
+	for _, fragment := range []string{
+		`<section class="studio-comments"><div class="studio-comments__head"><div><p class="studio-comments__kicker">Discuss</p><h2>Comments</h2></div><output class="studio-comments__count">1 open</output></div><div class="studio-comments__list">`,
+		`<article class="studio-comments__card studio-comments__card--open" data-studio-comment="comment-hero-headline" data-studio-comment-status="open" data-studio-comment-block="hero" data-studio-comment-field="headline">`,
+		`<strong>hero / headline</strong><span>From agent-studio</span>`,
+		`<p class="studio-comments__body">The lead is accurate, but it could feel warmer for a first-time shopper.</p>`,
+		`<button type="button" class="studio-comments__resolve" data-studio-comment-action="resolve" data-studio-comment-id="comment-hero-headline" data-studio-comment-event="studio.resolveComment">Resolve</button>`,
+		`<section class="studio-proposals"><div class="studio-proposals__head"><div><p class="studio-proposals__kicker">Review</p><h2>Proposals</h2></div><output class="studio-proposals__count">1 pending</output></div><div class="studio-proposals__list">`,
+		`<article class="studio-proposals__card studio-proposals__card--pending" data-studio-proposal="proposal-home-lead" data-studio-proposal-status="pending">`,
+		`<strong>Warm up the homepage lead</strong><span>2 operations from agent-studio</span>`,
+		`<p class="studio-proposals__summary">Make the hero copy more inviting before publish.</p>`,
+		`<p class="studio-proposals__review">2 suggested copy operations need review.</p>`,
+		`<li data-studio-proposal-operation="op-headline" data-studio-proposal-operation-kind="set_text">Update the hero headline with a warmer seasonal lead.</li>`,
+		`<button type="button" class="studio-proposals__accept" data-studio-proposal-action="accept" data-studio-proposal-id="proposal-home-lead" data-studio-proposal-event="studio.acceptSuggestion">Accept</button>`,
+		`<button type="button" class="studio-proposals__reject" data-studio-proposal-action="reject" data-studio-proposal-id="proposal-home-lead" data-studio-proposal-event="studio.rejectSuggestion">Reject</button>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("structured activity panel missing %q:\n%s", fragment, html)
+		}
+	}
+	for _, notWant := range []string{
+		`studio-comments__empty`,
+		`studio-proposals__empty`,
+		"<form",
+		"csrf_token",
+	} {
+		if strings.Contains(html, notWant) {
+			t.Fatalf("structured activity panel must not include %q:\n%s", notWant, html)
+		}
+	}
+}
+
 func activityPanelTestView(hasHealth, hasPerformance bool) map[string]any {
 	return map[string]any{
 		"class":         "studio-activity-drawer",

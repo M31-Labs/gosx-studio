@@ -1,6 +1,10 @@
 package studio
 
-import "m31labs.dev/gosx"
+import (
+	"fmt"
+
+	"m31labs.dev/gosx"
+)
 
 type ActivityPanelOptions struct {
 	RootAttrs map[string]any
@@ -27,8 +31,8 @@ func RenderActivityPanel(view map[string]any, options ActivityPanelOptions) gosx
 		children = append(children, renderActivityPerformancePanel(workbenchViewMap(view, "performance")))
 	}
 	children = append(children,
-		renderActivityEmptyPanel(workbenchViewMap(view, "comments")),
-		renderActivityEmptyPanel(workbenchViewMap(view, "proposals")),
+		renderActivityCommentPanel(workbenchViewMap(view, "comments")),
+		renderActivityProposalPanel(workbenchViewMap(view, "proposals")),
 	)
 
 	return gosx.El("section", gosx.Attrs(attrs...), gosx.Fragment(children...))
@@ -236,4 +240,210 @@ func renderActivityEmptyPanel(panel map[string]any) gosx.Node {
 			gosx.El("p", nil, gosx.Text(workbenchMapString(panel, "emptyDetail"))),
 		),
 	)
+}
+
+func renderActivitySubpanelHead(panel map[string]any) gosx.Node {
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", workbenchMapString(panel, "headClass"))),
+		gosx.El("div", nil,
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", workbenchMapString(panel, "kickerClass"))), gosx.Text(workbenchMapString(panel, "kicker"))),
+			gosx.El("h2", nil, gosx.Text(workbenchMapString(panel, "title"))),
+		),
+		gosx.El("output", gosx.Attrs(gosx.Attr("class", workbenchMapString(panel, "countClass"))), gosx.Text(workbenchMapString(panel, "countLabel"))),
+	)
+}
+
+func renderActivityCommentPanel(panel map[string]any) gosx.Node {
+	comments := activityPanelItems(panel, "comments")
+	if len(comments) == 0 {
+		return renderActivityEmptyPanel(panel)
+	}
+	className := workbenchMapString(panel, "class")
+	cards := make([]gosx.Node, 0, len(comments))
+	for _, comment := range comments {
+		cards = append(cards, renderActivityCommentCard(className, comment))
+	}
+	return gosx.El("section", gosx.Attrs(gosx.Attr("class", className)),
+		renderActivitySubpanelHead(panel),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", className+"__list")), gosx.Fragment(cards...)),
+	)
+}
+
+func renderActivityProposalPanel(panel map[string]any) gosx.Node {
+	proposals := activityPanelItems(panel, "proposals")
+	if len(proposals) == 0 {
+		return renderActivityEmptyPanel(panel)
+	}
+	className := workbenchMapString(panel, "class")
+	cards := make([]gosx.Node, 0, len(proposals))
+	for _, proposal := range proposals {
+		cards = append(cards, renderActivityProposalCard(className, proposal))
+	}
+	return gosx.El("section", gosx.Attrs(gosx.Attr("class", className)),
+		renderActivitySubpanelHead(panel),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", className+"__list")), gosx.Fragment(cards...)),
+	)
+}
+
+func renderActivityCommentCard(className string, comment map[string]any) gosx.Node {
+	children := []gosx.Node{
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", className+"__card-head")),
+			gosx.El("div", nil,
+				gosx.El("strong", nil, gosx.Text(firstNonEmpty(workbenchMapString(comment, "targetLabel"), "Page"))),
+				gosx.El("span", nil, gosx.Text(activityCommentMeta(comment))),
+			),
+			gosx.El("output", nil, gosx.Text(workbenchMapString(comment, "statusLabel"))),
+		),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", className+"__body")), gosx.Text(workbenchMapString(comment, "body"))),
+	}
+	if reason := workbenchMapString(comment, "decisionReason"); reason != "" {
+		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", className+"__decision")), gosx.Text(reason)))
+	}
+	if workbenchMapBool(comment, "canResolve") || workbenchMapBool(comment, "canReopen") {
+		children = append(children, renderActivityCommentActions(className, comment))
+	}
+	status := workbenchMapString(comment, "status")
+	return gosx.El("article", gosx.Attrs(
+		gosx.Attr("class", activityPanelCardClass(className, status)),
+		gosx.Attr("data-studio-comment", workbenchMapString(comment, "id")),
+		gosx.Attr("data-studio-comment-status", status),
+		gosx.Attr("data-studio-comment-block", workbenchMapString(comment, "blockID")),
+		gosx.Attr("data-studio-comment-field", workbenchMapString(comment, "field")),
+	), gosx.Fragment(children...))
+}
+
+func renderActivityCommentActions(className string, comment map[string]any) gosx.Node {
+	children := []gosx.Node{}
+	if workbenchMapBool(comment, "canResolve") {
+		children = append(children, gosx.El("button", gosx.Attrs(
+			gosx.Attr("type", "button"),
+			gosx.Attr("class", className+"__resolve"),
+			gosx.Attr("data-studio-comment-action", "resolve"),
+			gosx.Attr("data-studio-comment-id", workbenchMapString(comment, "id")),
+			gosx.Attr("data-studio-comment-event", workbenchMapString(comment, "resolveEvent")),
+		), gosx.Text("Resolve")))
+	}
+	if workbenchMapBool(comment, "canReopen") {
+		children = append(children, gosx.El("button", gosx.Attrs(
+			gosx.Attr("type", "button"),
+			gosx.Attr("class", className+"__reopen"),
+			gosx.Attr("data-studio-comment-action", "reopen"),
+			gosx.Attr("data-studio-comment-id", workbenchMapString(comment, "id")),
+			gosx.Attr("data-studio-comment-event", workbenchMapString(comment, "reopenEvent")),
+		), gosx.Text("Reopen")))
+	}
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", className+"__actions")), gosx.Fragment(children...))
+}
+
+func renderActivityProposalCard(className string, proposal map[string]any) gosx.Node {
+	children := []gosx.Node{
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", className+"__card-head")),
+			gosx.El("div", nil,
+				gosx.El("strong", nil, gosx.Text(firstNonEmpty(workbenchMapString(proposal, "title"), "Untitled suggestion"))),
+				gosx.El("span", nil, gosx.Text(activityProposalMeta(proposal))),
+			),
+			gosx.El("output", nil, gosx.Text(workbenchMapString(proposal, "statusLabel"))),
+		),
+	}
+	if summary := workbenchMapString(proposal, "summary"); summary != "" {
+		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", className+"__summary")), gosx.Text(summary)))
+	}
+	if review := workbenchMapString(proposal, "reviewSummary"); review != "" {
+		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", className+"__review")), gosx.Text(review)))
+	}
+	if items := activityPanelItems(proposal, "items"); len(items) > 0 {
+		nodes := make([]gosx.Node, 0, len(items))
+		for _, item := range items {
+			nodes = append(nodes, gosx.El("li", gosx.Attrs(
+				gosx.Attr("data-studio-proposal-operation", workbenchMapString(item, "operationID")),
+				gosx.Attr("data-studio-proposal-operation-kind", workbenchMapString(item, "kind")),
+			), gosx.Text(workbenchMapString(item, "summary"))))
+		}
+		children = append(children, gosx.El("ol", gosx.Attrs(gosx.Attr("class", className+"__ops")), gosx.Fragment(nodes...)))
+	}
+	if workbenchMapBool(proposal, "canAccept") || workbenchMapBool(proposal, "canReject") {
+		children = append(children, renderActivityProposalActions(className, proposal))
+	} else if reason := workbenchMapString(proposal, "decisionReason"); reason != "" {
+		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", className+"__decision")), gosx.Text(reason)))
+	}
+	status := workbenchMapString(proposal, "status")
+	return gosx.El("article", gosx.Attrs(
+		gosx.Attr("class", activityPanelCardClass(className, status)),
+		gosx.Attr("data-studio-proposal", workbenchMapString(proposal, "id")),
+		gosx.Attr("data-studio-proposal-status", status),
+	), gosx.Fragment(children...))
+}
+
+func renderActivityProposalActions(className string, proposal map[string]any) gosx.Node {
+	children := []gosx.Node{}
+	if workbenchMapBool(proposal, "canAccept") {
+		children = append(children, gosx.El("button", gosx.Attrs(
+			gosx.Attr("type", "button"),
+			gosx.Attr("class", className+"__accept"),
+			gosx.Attr("data-studio-proposal-action", "accept"),
+			gosx.Attr("data-studio-proposal-id", workbenchMapString(proposal, "id")),
+			gosx.Attr("data-studio-proposal-event", workbenchMapString(proposal, "acceptEvent")),
+		), gosx.Text("Accept")))
+	}
+	if workbenchMapBool(proposal, "canReject") {
+		children = append(children, gosx.El("button", gosx.Attrs(
+			gosx.Attr("type", "button"),
+			gosx.Attr("class", className+"__reject"),
+			gosx.Attr("data-studio-proposal-action", "reject"),
+			gosx.Attr("data-studio-proposal-id", workbenchMapString(proposal, "id")),
+			gosx.Attr("data-studio-proposal-event", workbenchMapString(proposal, "rejectEvent")),
+		), gosx.Text("Reject")))
+	}
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", className+"__actions")), gosx.Fragment(children...))
+}
+
+func activityCommentMeta(comment map[string]any) string {
+	if actor := workbenchMapString(comment, "decisionActorID"); actor != "" {
+		return fmt.Sprintf("%s by %s", workbenchMapString(comment, "statusLabel"), actor)
+	}
+	if actor := workbenchMapString(comment, "actorID"); actor != "" {
+		return "From " + actor
+	}
+	return "Review note"
+}
+
+func activityProposalMeta(proposal map[string]any) string {
+	if actor := workbenchMapString(proposal, "decisionActorID"); actor != "" {
+		return fmt.Sprintf("%s by %s", workbenchMapString(proposal, "statusLabel"), actor)
+	}
+	count := activityPanelInt(proposal, "operationCount")
+	if actor := workbenchMapString(proposal, "actorID"); actor != "" {
+		return fmt.Sprintf("%d operations from %s", count, actor)
+	}
+	return fmt.Sprintf("%d operations", count)
+}
+
+func activityPanelItems(view map[string]any, key string) []map[string]any {
+	if items := workbenchViewMapList(view, key); len(items) > 0 {
+		return items
+	}
+	return workbenchViewMapList(view, "items")
+}
+
+func activityPanelCardClass(className, status string) string {
+	if status == "" {
+		return className + "__card"
+	}
+	return className + "__card " + className + "__card--" + status
+}
+
+func activityPanelInt(values map[string]any, key string) int {
+	switch typed := values[key].(type) {
+	case int:
+		return typed
+	case int64:
+		return int(typed)
+	case float64:
+		return int(typed)
+	case string:
+		var out int
+		_, _ = fmt.Sscanf(typed, "%d", &out)
+		return out
+	default:
+		return 0
+	}
 }
