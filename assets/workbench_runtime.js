@@ -696,21 +696,6 @@
       return detail.result || null;
     }
 
-    function fieldPatch(field) {
-      if (!field || !field.name || field.disabled) return null;
-      var type = String(field.type || "").toLowerCase();
-      if (field.name === "csrf_token" || type === "button" || type === "submit" || type === "reset" || type === "file") return null;
-      return {
-        name: field.name,
-        source: field.getAttribute("data-studio-field-source") || field.getAttribute("data-editor-source") || field.name,
-        editable: field.getAttribute("data-studio-field-editable") || "",
-        value: type === "checkbox" || type === "radio" ? (field.checked ? (field.value || "on") : "") : (field.value || ""),
-        checked: !!field.checked,
-        type: type,
-        tag: String(field.tagName || "").toLowerCase()
-      };
-    }
-
     function resolvePreviewPatchTransport(field, reason) {
       var envelope = {
         field: field || null,
@@ -744,6 +729,29 @@
       return false;
     }
 
+    function resolveFieldOperationEnvelope(reason, field) {
+      var payload = {
+        form: form,
+        reason: reason || "field",
+        field: field || null,
+        result: null
+      };
+      var target = field && field.dispatchEvent ? field : form;
+      target.dispatchEvent(new CustomEvent("gosxstudio:field-operation-build", {
+        bubbles: true,
+        detail: payload
+      }));
+      return payload.result || null;
+    }
+
+    function fieldOperationEnvelope(reason, field) {
+      var envelope = resolveFieldOperationEnvelope(reason, field);
+      if (!envelope && bindFieldRuntimeForPreviewPatchResolution()) {
+        envelope = resolveFieldOperationEnvelope(reason, field);
+      }
+      return envelope || null;
+    }
+
     function shouldTransportPreviewPatch(field, reason) {
       if (!field) return true;
       var result = resolvePreviewPatchTransport(field, reason);
@@ -754,22 +762,9 @@
     }
 
     function emitFieldOperation(reason, field) {
-      var patch = fieldPatch(field);
-      if (!patch) return null;
-      return emitEditorOperation("set_field", {
-        mutation: true,
-        reason: reason || "field",
-        target: {
-          field: patch.source || patch.name || "",
-          name: patch.name || "",
-          editable: patch.editable || "",
-          selection: form.getAttribute("data-studio-selection") || "",
-          kind: form.getAttribute("data-studio-selection-kind") || ""
-        },
-        payload: {
-          field: patch
-        }
-      });
+      var envelope = fieldOperationEnvelope(reason, field);
+      if (!envelope) return null;
+      return emitEditorOperation("set_field", envelope);
     }
 
     function textControlForField(field) {

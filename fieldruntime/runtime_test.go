@@ -154,6 +154,49 @@ func TestIslandRuntimeJSOwnsMirroredPreviewPatchTransportPolicy(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSOwnsFieldOperationBuilder(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, fragment := range []string{
+		`function fieldRuntimePatch(field)`,
+		`if (!field || !field.name || field.disabled) return null;`,
+		`field.name === "csrf_token" || type === "button" || type === "submit" || type === "reset" || type === "file"`,
+		`source: field.getAttribute("data-studio-field-source") || field.getAttribute("data-editor-source") || field.name`,
+		`editable: field.getAttribute("data-studio-field-editable") || "",`,
+		`value: type === "checkbox" || type === "radio" ? (field.checked ? (field.value || "on") : "") : (field.value || ""),`,
+		`checked: !!field.checked,`,
+		`tag: String(field.tagName || "").toLowerCase()`,
+		`function fieldRuntimeOperationEnvelope(form, reason, field)`,
+		`var patch = fieldRuntimePatch(field);`,
+		`mutation: true,`,
+		`reason: reason || "field",`,
+		`selection: form && form.getAttribute ? (form.getAttribute("data-studio-selection") || "") : "",`,
+		`kind: form && form.getAttribute ? (form.getAttribute("data-studio-selection-kind") || "") : ""`,
+		`payload: {`,
+		`field: patch`,
+		`function installFieldOperationBuilder()`,
+		`marker.addEventListener("gosxstudio:field-operation-build", function (event) {`,
+		`var envelope = event.detail || {};`,
+		`envelope.result = fieldRuntimeOperationEnvelope(envelope.form, envelope.reason, envelope.field);`,
+		`installFieldOperationBuilder();`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing field operation builder fragment %q", fragment)
+		}
+	}
+	builderBody := jsFunctionBody(t, body, "installFieldOperationBuilder")
+	for _, forbidden := range []string{
+		`emitEditorOperation`,
+		`gosxstudio:editor-operation`,
+		`gosxstudio:preview-patch`,
+		`gosxstudio:editor-preview-patch-build-post`,
+		`postMessage`,
+	} {
+		if strings.Contains(builderBody, forbidden) {
+			t.Fatalf("FieldRuntime operation builder must only return an envelope and not emit/post; found %q in:\n%s", forbidden, builderBody)
+		}
+	}
+}
+
 func TestIslandRuntimeJSRefreshesMirroredFieldSourcesOnPreviewFrameLoad(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	for _, fragment := range []string{

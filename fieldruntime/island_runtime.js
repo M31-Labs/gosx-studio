@@ -68,6 +68,50 @@
 
   var mirroredPreviewFieldSelector = "[data-editor-source], [data-studio-field-source], [data-editor-frame-attr-target]";
 
+  function fieldRuntimePatch(field) {
+    if (!field || !field.name || field.disabled) return null;
+    var type = String(field.type || "").toLowerCase();
+    if (field.name === "csrf_token" || type === "button" || type === "submit" || type === "reset" || type === "file") return null;
+    return {
+      name: field.name,
+      source: field.getAttribute("data-studio-field-source") || field.getAttribute("data-editor-source") || field.name,
+      editable: field.getAttribute("data-studio-field-editable") || "",
+      value: type === "checkbox" || type === "radio" ? (field.checked ? (field.value || "on") : "") : (field.value || ""),
+      checked: !!field.checked,
+      type: type,
+      tag: String(field.tagName || "").toLowerCase()
+    };
+  }
+
+  function fieldRuntimeOperationEnvelope(form, reason, field) {
+    var patch = fieldRuntimePatch(field);
+    if (!patch) return null;
+    return {
+      mutation: true,
+      reason: reason || "field",
+      target: {
+        field: patch.source || patch.name || "",
+        name: patch.name || "",
+        editable: patch.editable || "",
+        selection: form && form.getAttribute ? (form.getAttribute("data-studio-selection") || "") : "",
+        kind: form && form.getAttribute ? (form.getAttribute("data-studio-selection-kind") || "") : ""
+      },
+      payload: {
+        field: patch
+      }
+    };
+  }
+
+  function installFieldOperationBuilder() {
+    var marker = doc.documentElement;
+    if (!marker || marker.dataset.gosxStudioFieldOperationBuilderBound === "true") return;
+    marker.dataset.gosxStudioFieldOperationBuilderBound = "true";
+    marker.addEventListener("gosxstudio:field-operation-build", function (event) {
+      var envelope = event.detail || {};
+      envelope.result = fieldRuntimeOperationEnvelope(envelope.form, envelope.reason, envelope.field);
+    });
+  }
+
   function installPreviewPatchResolver() {
     var marker = doc.documentElement;
     if (!marker || marker.dataset.gosxStudioFieldPreviewPatchResolverBound === "true") return;
@@ -107,6 +151,7 @@
   function bindFieldMirroringIsland(root) {
     var scope = resolveScope(root);
     installPreviewPatchResolver();
+    installFieldOperationBuilder();
     var inputs = scope.querySelectorAll(mirroredPreviewFieldSelector);
     Array.prototype.forEach.call(inputs, function (input) {
       if (input.dataset.gosxStudioFieldMirrorIslandBound === "true") return;

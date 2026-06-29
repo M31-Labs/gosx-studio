@@ -145,6 +145,40 @@ func TestWorkbenchRuntimeLetsFieldRuntimeOwnMirroredPreviewPatches(t *testing.T)
 	}
 }
 
+func TestWorkbenchRuntimeDelegatesFieldOperationEnvelopeToFieldRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`function fieldOperationEnvelope(reason, field)`,
+		`var payload = {`,
+		`form: form,`,
+		`reason: reason || "field",`,
+		`field: field || null,`,
+		`result: null`,
+		`target.dispatchEvent(new CustomEvent("gosxstudio:field-operation-build", {`,
+		`if (!envelope && bindFieldRuntimeForPreviewPatchResolution()) {`,
+		`return emitEditorOperation("set_field", envelope);`,
+		`emitFieldOperation("input", event.target);`,
+		`emitFieldOperation("change", event.target);`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing delegated FieldRuntime operation builder fragment %q", check)
+		}
+	}
+	for _, forbidden := range []string{
+		`function fieldPatch(field)`,
+		`field.name === "csrf_token"`,
+		`type === "button" || type === "submit" || type === "reset" || type === "file"`,
+		`source: field.getAttribute("data-studio-field-source") || field.getAttribute("data-editor-source") || field.name`,
+		`value: type === "checkbox" || type === "radio"`,
+		`checked: !!field.checked`,
+		`tag: String(field.tagName || "").toLowerCase()`,
+	} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should leave concrete field operation patch construction to FieldRuntime; found %q", forbidden)
+		}
+	}
+}
+
 func TestWorkbenchRuntimeDelegatesEditorPreviewPatchTransport(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
