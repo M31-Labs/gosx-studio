@@ -338,6 +338,10 @@ func TestWorkbenchRuntimeDelegatesPreviewInlineTextToInlineEditRuntime(t *testin
 		"startPreviewTextSession",
 		"syncPreviewTextSession",
 		"finishPreviewTextSession",
+		"handlePreviewTextInputEvent",
+		"handlePreviewTextKeyEvent",
+		"handlePreviewTextPasteEvent",
+		"handlePreviewTextBlurEvent",
 		"previewInlineTextHost",
 		"controlForField: textControlForField",
 		"setStatus: setPreviewStatus",
@@ -363,6 +367,35 @@ func TestWorkbenchRuntimeDelegatesPreviewInlineTextToInlineEditRuntime(t *testin
 	} {
 		if strings.Contains(script, forbidden) {
 			t.Fatalf("workbench runtime should delegate preview inline-text lifecycle, found low-level fragment %q", forbidden)
+		}
+	}
+
+	body := jsFunctionBody(t, script, "bindPreviewDocument")
+	for _, check := range []string{
+		"handleInlineTextInput(frame, event)",
+		"handleInlineTextKeyEvent(frame, event)",
+		"handleInlineTextPaste(frame, event)",
+		"handleInlineTextBlur(frame, event)",
+	} {
+		if !strings.Contains(body, check) {
+			t.Fatalf("bindPreviewDocument should delegate inline text document event handling, missing %q in:\n%s", check, body)
+		}
+	}
+	for _, forbidden := range []string{
+		`syncInlineTextEdit(frame, "input")`,
+		`finishInlineTextEdit(frame, false, "escape")`,
+		`finishInlineTextEdit(frame, true, "enter")`,
+		`finishInlineTextEdit(frame, true, "blur")`,
+		`event.key === "Escape"`,
+		`event.key === "Enter" && !event.shiftKey`,
+		`event.clipboardData && event.clipboardData.getData`,
+		`selection.deleteFromDocument()`,
+		`selection.getRangeAt(0).insertNode(doc.createTextNode(text))`,
+		`selection.collapseToEnd()`,
+		`syncInlineTextEdit(frame, "paste")`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("bindPreviewDocument should delegate preview inline-text event policy, found %q in:\n%s", forbidden, body)
 		}
 	}
 }

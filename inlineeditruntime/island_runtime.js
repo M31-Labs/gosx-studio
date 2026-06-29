@@ -14,6 +14,8 @@
   //     install, deriveKeys,
   //     startPreviewTextEdit, syncPreviewTextEdit, finishPreviewTextEdit,
   //     startPreviewTextSession, syncPreviewTextSession, finishPreviewTextSession,
+  //     handlePreviewTextInputEvent, handlePreviewTextKeyEvent,
+  //     handlePreviewTextPasteEvent, handlePreviewTextBlurEvent,
   //     previewTextEditState
   //   }
   //
@@ -249,6 +251,56 @@
 
   function finishPreviewTextSession(frame, commit, reason, host) {
     return finishPreviewTextEdit(frame, commit, reason, previewTextSessionOptions(frame, host));
+  }
+
+  function previewTextEventEdit(frame, event) {
+    var edit = previewTextEditState(frame);
+    if (!edit || !edit.target || !event || event.target !== edit.target) return null;
+    return edit;
+  }
+
+  function handlePreviewTextInputEvent(frame, event, host) {
+    if (!previewTextEventEdit(frame, event)) return false;
+    return syncPreviewTextSession(frame, "input", host);
+  }
+
+  function handlePreviewTextKeyEvent(frame, event, host) {
+    if (!previewTextEventEdit(frame, event)) return false;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      finishPreviewTextSession(frame, false, "escape", host);
+      return true;
+    }
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      finishPreviewTextSession(frame, true, "enter", host);
+      return true;
+    }
+    return false;
+  }
+
+  function handlePreviewTextPasteEvent(frame, event, host) {
+    if (!previewTextEventEdit(frame, event)) return false;
+    var text = event.clipboardData && event.clipboardData.getData ? event.clipboardData.getData("text/plain") : "";
+    if (!text) return false;
+    event.preventDefault();
+    try {
+      var doc = frameDocument(frame);
+      var selection = doc && doc.defaultView && doc.defaultView.getSelection ? doc.defaultView.getSelection() : null;
+      if (!doc || !selection || !selection.rangeCount) return false;
+      selection.deleteFromDocument();
+      selection.getRangeAt(0).insertNode(doc.createTextNode(text));
+      selection.collapseToEnd();
+      syncPreviewTextSession(frame, "paste", host);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function handlePreviewTextBlurEvent(frame, event, host) {
+    if (!previewTextEventEdit(frame, event)) return false;
+    return finishPreviewTextSession(frame, true, "blur", host);
   }
 
   function startPreviewTextEdit(frame, detail, reason, opts) {
@@ -577,6 +629,10 @@
     startPreviewTextSession: startPreviewTextSession,
     syncPreviewTextSession: syncPreviewTextSession,
     finishPreviewTextSession: finishPreviewTextSession,
+    handlePreviewTextInputEvent: handlePreviewTextInputEvent,
+    handlePreviewTextKeyEvent: handlePreviewTextKeyEvent,
+    handlePreviewTextPasteEvent: handlePreviewTextPasteEvent,
+    handlePreviewTextBlurEvent: handlePreviewTextBlurEvent,
     previewTextEditState: previewTextEditState
   };
 })();

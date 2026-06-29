@@ -833,6 +833,30 @@
       return runtime.finishPreviewTextSession(frame, commit, reason, previewInlineTextHost(frame));
     }
 
+    function handleInlineTextInput(frame, event) {
+      var runtime = previewInlineTextRuntime("handlePreviewTextInputEvent");
+      if (!runtime) return false;
+      return runtime.handlePreviewTextInputEvent(frame, event, previewInlineTextHost(frame));
+    }
+
+    function handleInlineTextKeyEvent(frame, event) {
+      var runtime = previewInlineTextRuntime("handlePreviewTextKeyEvent");
+      if (!runtime) return false;
+      return runtime.handlePreviewTextKeyEvent(frame, event, previewInlineTextHost(frame));
+    }
+
+    function handleInlineTextPaste(frame, event) {
+      var runtime = previewInlineTextRuntime("handlePreviewTextPasteEvent");
+      if (!runtime) return false;
+      return runtime.handlePreviewTextPasteEvent(frame, event, previewInlineTextHost(frame));
+    }
+
+    function handleInlineTextBlur(frame, event) {
+      var runtime = previewInlineTextRuntime("handlePreviewTextBlurEvent");
+      if (!runtime) return false;
+      return runtime.handlePreviewTextBlurEvent(frame, event, previewInlineTextHost(frame));
+    }
+
     function postPreviewPatch(reason, detail, field) {
       var frames = previewFrames();
       if (!frames.length) return;
@@ -900,22 +924,10 @@
         if (target) applyPreviewSelection(frame, target, previewSelectionDetail(target), { reveal: false, reason: "focus" });
       }, true);
       doc.addEventListener("input", function (event) {
-        var edit = frame.__gosxStudioInlineEdit;
-        if (edit && event.target === edit.target) syncInlineTextEdit(frame, "input");
+        handleInlineTextInput(frame, event);
       });
       doc.addEventListener("keydown", function (event) {
-        var edit = frame.__gosxStudioInlineEdit;
-        if (!edit || event.target !== edit.target) return;
-        if (event.key === "Escape") {
-          event.preventDefault();
-          finishInlineTextEdit(frame, false, "escape");
-          return;
-        }
-        if (event.key === "Enter" && !event.shiftKey) {
-          event.preventDefault();
-          finishInlineTextEdit(frame, true, "enter");
-        }
-        return;
+        handleInlineTextKeyEvent(frame, event);
       });
       doc.addEventListener("keydown", function (event) {
         if (frame.__gosxStudioInlineEdit) return;
@@ -935,25 +947,10 @@
         }
       });
       doc.addEventListener("paste", function (event) {
-        var edit = frame.__gosxStudioInlineEdit;
-        if (!edit || event.target !== edit.target) return;
-        var text = event.clipboardData && event.clipboardData.getData ? event.clipboardData.getData("text/plain") : "";
-        if (!text) return;
-        event.preventDefault();
-        try {
-          var selection = doc.defaultView && doc.defaultView.getSelection ? doc.defaultView.getSelection() : null;
-          if (!selection || !selection.rangeCount) return;
-          selection.deleteFromDocument();
-          selection.getRangeAt(0).insertNode(doc.createTextNode(text));
-          selection.collapseToEnd();
-          syncInlineTextEdit(frame, "paste");
-        } catch (error) {
-          return;
-        }
+        handleInlineTextPaste(frame, event);
       });
       doc.addEventListener("blur", function (event) {
-        var edit = frame.__gosxStudioInlineEdit;
-        if (edit && event.target === edit.target) finishInlineTextEdit(frame, true, "blur");
+        handleInlineTextBlur(frame, event);
       }, true);
       doc.addEventListener("scroll", repositionDock, true);
       if (frame.contentWindow) frame.contentWindow.addEventListener("resize", repositionDock);

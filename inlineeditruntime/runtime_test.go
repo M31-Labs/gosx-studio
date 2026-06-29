@@ -208,10 +208,42 @@ func TestInlineEditRuntimePublishesPreviewTextSessionMethods(t *testing.T) {
 		"startPreviewTextSession",
 		"syncPreviewTextSession",
 		"finishPreviewTextSession",
+		"handlePreviewTextInputEvent",
+		"handlePreviewTextKeyEvent",
+		"handlePreviewTextPasteEvent",
+		"handlePreviewTextBlurEvent",
 		"previewTextEditState",
 	} {
 		if !strings.Contains(body, fragment) {
 			t.Fatalf("InlineEditRuntimeScript() must expose preview text session method %q:\n%s", fragment, body)
+		}
+	}
+}
+
+func TestInlineEditRuntimeOwnsPreviewTextDocumentEventPolicy(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"function previewTextEventEdit(frame, event)",
+		"function handlePreviewTextInputEvent(frame, event, host)",
+		`syncPreviewTextSession(frame, "input", host)`,
+		"function handlePreviewTextKeyEvent(frame, event, host)",
+		`event.key === "Escape"`,
+		`finishPreviewTextSession(frame, false, "escape", host)`,
+		`event.key === "Enter" && !event.shiftKey`,
+		`finishPreviewTextSession(frame, true, "enter", host)`,
+		"function handlePreviewTextPasteEvent(frame, event, host)",
+		`event.clipboardData && event.clipboardData.getData`,
+		`event.clipboardData.getData("text/plain")`,
+		"var doc = frameDocument(frame)",
+		"selection.deleteFromDocument()",
+		"selection.getRangeAt(0).insertNode(doc.createTextNode(text))",
+		"selection.collapseToEnd()",
+		`syncPreviewTextSession(frame, "paste", host)`,
+		"function handlePreviewTextBlurEvent(frame, event, host)",
+		`finishPreviewTextSession(frame, true, "blur", host)`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() missing preview inline-text document event fragment %q:\n%s", fragment, body)
 		}
 	}
 }
