@@ -70,13 +70,23 @@ func TestWorkbenchRuntimePrefersShellRenderedPreviewDock(t *testing.T) {
 		`frame.closest("[data-gosx-studio-preview], [data-studio-preview-shell], [data-studio-canvas]")`,
 		`shell.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]")`,
 		`return normalizePreviewDock(frame, dock)`,
-		`dock.setAttribute("data-gosx-studio-preview-dock-fallback", "true")`,
+		"if (dock) return normalizePreviewDock(frame, dock);\n      return null;",
 		`dock.querySelector("[data-studio-preview-dock-title]")`,
 		`dock.querySelector("[data-studio-preview-field-count]")`,
 		`event.target.closest ? event.target.closest("[data-gosx-studio-preview-command], [data-studio-preview-action]")`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing shell-rendered dock contract %q", check)
+		}
+	}
+	for _, check := range []string{
+		`function createDockButton`,
+		`data-gosx-studio-preview-dock-fallback`,
+		`dock = document.createElement("div")`,
+		`actions.appendChild(createDockButton`,
+	} {
+		if strings.Contains(script, check) {
+			t.Fatalf("workbench runtime should not contain preview dock fallback fragment %q", check)
 		}
 	}
 }

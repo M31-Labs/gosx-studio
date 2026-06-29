@@ -404,50 +404,12 @@
       return frame && frame.closest ? (frame.closest("[data-gosx-studio-preview], [data-studio-preview-shell], [data-studio-canvas]") || frame.parentElement) : null;
     }
 
-    function createDockButton(action, label) {
-      var button = document.createElement("button");
-      button.type = "button";
-      button.textContent = label;
-      button.setAttribute("data-gosx-studio-preview-command", action);
-      return button;
-    }
-
     function previewDockForFrame(frame) {
       var shell = previewShellForFrame(frame);
       if (!shell) return null;
       var dock = shell.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]");
       if (dock) return normalizePreviewDock(frame, dock);
-      dock = document.createElement("div");
-      dock.hidden = true;
-      dock.setAttribute("data-gosx-studio-preview-dock", "true");
-      dock.setAttribute("data-gosx-studio-preview-dock-fallback", "true");
-      dock.setAttribute("role", "toolbar");
-      dock.setAttribute("aria-label", "Preview selection actions");
-      var label = document.createElement("strong");
-      label.setAttribute("data-gosx-studio-preview-dock-label", "true");
-      var breadcrumb = document.createElement("span");
-      breadcrumb.hidden = true;
-      breadcrumb.setAttribute("data-gosx-studio-preview-breadcrumb", "true");
-      var kind = document.createElement("span");
-      kind.setAttribute("data-gosx-studio-preview-dock-kind", "true");
-      var meter = document.createElement("span");
-      meter.hidden = true;
-      meter.setAttribute("data-gosx-studio-preview-field-meter", "true");
-      var actions = document.createElement("div");
-      actions.setAttribute("data-gosx-studio-preview-dock-actions", "true");
-      actions.appendChild(createDockButton("content", "Content"));
-      actions.appendChild(createDockButton("style", "Style"));
-      actions.appendChild(createDockButton("prev-field", "Prev field"));
-      actions.appendChild(createDockButton("next-field", "Next field"));
-      actions.appendChild(createDockButton("field-action", "Open"));
-      actions.appendChild(createDockButton("clear", "Clear"));
-      dock.appendChild(label);
-      dock.appendChild(breadcrumb);
-      dock.appendChild(kind);
-      dock.appendChild(meter);
-      dock.appendChild(actions);
-      shell.appendChild(dock);
-      return normalizePreviewDock(frame, dock);
+      return null;
     }
 
     function normalizePreviewDock(frame, dock) {
