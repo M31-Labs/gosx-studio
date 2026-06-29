@@ -994,6 +994,9 @@
   window.__gosx_preview_runtime_island_postPatch = function (form, reason, detail, field) {
     return postEditorPreviewPatch(form, reason, editorPreviewPatchEnvelope(reason, detail, field));
   };
+  window.__gosx_preview_runtime_island_bindFrames = function (form, host) {
+    return bindEditorPreviewFrames(form, host);
+  };
 
   function bindEditorPreviewChromeEvents() {
     doc.addEventListener("gosxstudio:editor-preview-patch-apply", function (event) {
@@ -1004,11 +1007,6 @@
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, detail.patch));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-frame-sync", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      setEditorPreviewResult(detail, syncEditorPreviewFrame(form, detail.frame, detail.reason, detail.shouldTransport));
     });
     doc.addEventListener("gosxstudio:editor-preview-targets-resolve", function (event) {
       var detail = event.detail || {};
@@ -1111,16 +1109,6 @@
     doc.addEventListener("gosxstudio:editor-preview-dock-field-navigation-sync", function (event) {
       var detail = event.detail || {};
       setEditorPreviewResult(detail, syncEditorPreviewDockFieldNavigation(detail.dock, detail.count, detail.index));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-document-bind", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      setEditorPreviewResult(detail, bindEditorPreviewDocument(form, detail.frame, detail.host));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-frames-bind", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      setEditorPreviewResult(detail, bindEditorPreviewFrames(form, detail.host));
     });
   }
 

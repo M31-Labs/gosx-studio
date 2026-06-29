@@ -430,9 +430,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewFrameSync(t *testing.T) {
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-frame-sync"`,
-		`var form = editorPreviewForm(detail, event)`,
-		`setEditorPreviewResult(detail, syncEditorPreviewFrame(form, detail.frame, detail.reason, detail.shouldTransport))`,
 		`function editorPreviewFieldPatch(field)`,
 		`if (!field || !field.name || field.disabled) return null`,
 		`if (field.name === "csrf_token" || type === "button" || type === "submit" || type === "reset" || type === "file") return null`,
@@ -460,6 +457,9 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewFrameSync(t *testing.T) {
 	}
 	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-frame-sync`) {
 		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview frame-sync events")
+	}
+	if strings.Contains(body, `doc.addEventListener("gosxstudio:editor-preview-frame-sync"`) {
+		t.Fatalf("IslandRuntimeJS() should expose local frame sync through bindFrames instead of frame-sync listener")
 	}
 }
 
@@ -556,8 +556,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDocumentBinding(t *testing.T) {
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-document-bind"`,
-		`setEditorPreviewResult(detail, bindEditorPreviewDocument(form, detail.frame, detail.host))`,
 		`function bindEditorPreviewDocument(form, frame, host)`,
 		`var frameDoc = editorPreviewFrameDocument(frame)`,
 		`if (!frame || !frameDoc || editorPreviewBoundDocument(frame) === frameDoc) return { handled: false, bound: false }`,
@@ -579,6 +577,9 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDocumentBinding(t *testing.T) {
 	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-document-bind`) {
 		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview document-bind events")
 	}
+	if strings.Contains(body, `doc.addEventListener("gosxstudio:editor-preview-document-bind"`) {
+		t.Fatalf("IslandRuntimeJS() should bind preview documents through local frame lifecycle helpers instead of document-bind listener")
+	}
 }
 
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewFrameLifecycleBinding(t *testing.T) {
@@ -587,8 +588,8 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewFrameLifecycleBinding(t *testing
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-frames-bind"`,
-		`setEditorPreviewResult(detail, bindEditorPreviewFrames(form, detail.host))`,
+		`window.__gosx_preview_runtime_island_bindFrames = function (form, host)`,
+		`return bindEditorPreviewFrames(form, host);`,
 		`function bindEditorPreviewFrames(form, host)`,
 		`var frames = editorPreviewFrames(form)`,
 		`if (frame.dataset && frame.dataset.gosxStudioPreviewBound === "true") return`,
@@ -607,6 +608,9 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewFrameLifecycleBinding(t *testing
 	}
 	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-frames-bind`) {
 		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview frames-bind events")
+	}
+	if strings.Contains(body, `doc.addEventListener("gosxstudio:editor-preview-frames-bind"`) {
+		t.Fatalf("IslandRuntimeJS() should expose bindFrames helper instead of frames-bind listener")
 	}
 }
 

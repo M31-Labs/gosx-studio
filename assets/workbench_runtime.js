@@ -672,14 +672,11 @@
     }
 
     function bindPreviewFrames() {
-      var detail = {
-        form: form,
-        host: Object.assign({
-          shouldTransportPreviewPatch: shouldTransportPreviewPatch
-        }, previewDocumentHost())
-      };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-frames-bind", { bubbles: true, detail: detail }));
-      return detail.result || null;
+      var host = Object.assign({
+        shouldTransportPreviewPatch: shouldTransportPreviewPatch
+      }, previewDocumentHost());
+      if (typeof window.__gosx_preview_runtime_island_bindFrames !== "function") return null;
+      return window.__gosx_preview_runtime_island_bindFrames(form, host) || null;
     }
 
     function previewDocumentHost() {

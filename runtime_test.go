@@ -277,13 +277,11 @@ func TestWorkbenchRuntimeDelegatesPreviewFrameLifecycleToPreviewRuntime(t *testi
 	body := jsFunctionBody(t, script, "bindPreviewFrames")
 	for _, check := range []string{
 		`function bindPreviewFrames()`,
-		`var detail = {`,
-		`form: form,`,
-		`host: Object.assign({`,
+		`var host = Object.assign({`,
 		`shouldTransportPreviewPatch: shouldTransportPreviewPatch`,
 		`}, previewDocumentHost())`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-frames-bind", { bubbles: true, detail: detail }));`,
-		`return detail.result || null;`,
+		`typeof window.__gosx_preview_runtime_island_bindFrames !== "function"`,
+		`return window.__gosx_preview_runtime_island_bindFrames(form, host) || null;`,
 	} {
 		if !strings.Contains(body, check) {
 			t.Fatalf("bindPreviewFrames missing PreviewRuntime frame-bind fragment %q in:\n%s", check, body)
@@ -305,6 +303,9 @@ func TestWorkbenchRuntimeDelegatesPreviewFrameLifecycleToPreviewRuntime(t *testi
 		`syncPreviewFrame: syncPreviewFrame`,
 		`bindPreviewDocument: bindPreviewDocument`,
 		`setPreviewStatus("error", "Preview failed", "error")`,
+		`gosxstudio:editor-preview-frames-bind`,
+		`gosxstudio:editor-preview-document-bind`,
+		`gosxstudio:editor-preview-frame-sync`,
 	} {
 		if strings.Contains(body, forbidden) {
 			t.Fatalf("bindPreviewFrames should not own concrete preview frame lifecycle; found %q in:\n%s", forbidden, body)
@@ -394,9 +395,10 @@ func TestWorkbenchRuntimeSkipsMirroredFieldsDuringPreviewLoadSync(t *testing.T) 
 	script := string(WorkbenchRuntimeScript())
 	body := jsFunctionBody(t, script, "bindPreviewFrames")
 	for _, check := range []string{
-		`host: Object.assign({`,
+		`var host = Object.assign({`,
 		`shouldTransportPreviewPatch: shouldTransportPreviewPatch`,
 		`}, previewDocumentHost())`,
+		`return window.__gosx_preview_runtime_island_bindFrames(form, host) || null;`,
 	} {
 		if !strings.Contains(body, check) {
 			t.Fatalf("workbench runtime missing delegated load-sync fragment %q", check)
