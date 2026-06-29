@@ -63,6 +63,24 @@ func TestWorkbenchRuntimeDoesNotInjectPreviewStyles(t *testing.T) {
 	}
 }
 
+func TestWorkbenchRuntimePrefersShellRenderedPreviewDock(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`"[data-gosx-studio-preview], [data-studio-preview-shell], [data-studio-canvas]"`,
+		`frame.closest("[data-gosx-studio-preview], [data-studio-preview-shell], [data-studio-canvas]")`,
+		`shell.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]")`,
+		`return normalizePreviewDock(frame, dock)`,
+		`dock.setAttribute("data-gosx-studio-preview-dock-fallback", "true")`,
+		`dock.querySelector("[data-studio-preview-dock-title]")`,
+		`dock.querySelector("[data-studio-preview-field-count]")`,
+		`event.target.closest ? event.target.closest("[data-gosx-studio-preview-command], [data-studio-preview-action]")`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing shell-rendered dock contract %q", check)
+		}
+	}
+}
+
 func TestLegacyRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
 	for name, tt := range map[string]struct {
 		path    string

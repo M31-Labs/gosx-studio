@@ -171,8 +171,36 @@ func renderWorkbenchFrameCanvasShell(view map[string]any, options WorkbenchFrame
 	}
 	children = append(children, gosx.El("div", gosx.Attrs(workbenchFrameBoardAttrs(options)...), gosx.Fragment(options.Board...)))
 	children = append(children, options.CanvasStatus...)
+	children = appendWorkbenchNode(children, RenderWorkbenchPreviewDockShell(view))
 
 	return gosx.El("div", gosx.Attrs(workbenchFrameCanvasShellAttrs(view, options)...), gosx.Fragment(children...))
+}
+
+func RenderWorkbenchPreviewDockShell(view map[string]any) gosx.Node {
+	previewShell := workbenchViewMap(view, "previewShell")
+	if len(previewShell) == 0 {
+		return gosx.Fragment()
+	}
+	return gosx.El("div", gosx.Attrs(workbenchPreviewDockAttrs(previewShell)...),
+		gosx.El("strong", gosx.Attrs(workbenchPreviewDockTitleAttrs(previewShell)...), gosx.Text("Preview selection")),
+		gosx.El("span", gosx.Attrs(
+			gosx.Attr("hidden", "hidden"),
+			gosx.Attr("data-gosx-studio-preview-breadcrumb", "true"),
+		)),
+		gosx.El("span", gosx.Attrs(gosx.Attr("data-gosx-studio-preview-dock-kind", "true")), gosx.Text("Block")),
+		gosx.El("span", gosx.Attrs(workbenchPreviewFieldCountAttrs(previewShell)...)),
+		gosx.El("div", gosx.Attrs(gosx.Attr("data-gosx-studio-preview-dock-actions", "true")),
+			workbenchPreviewDockButton(previewShell, "contentActionAttrs", "content", "Content"),
+			workbenchPreviewDockButton(previewShell, "styleActionAttrs", "style", "Style"),
+			workbenchPreviewDockButton(previewShell, "moveUpActionAttrs", "move-up", "Move up"),
+			workbenchPreviewDockButton(previewShell, "moveDownActionAttrs", "move-down", "Move down"),
+			workbenchPreviewDockButton(previewShell, "", "prev-field", "Prev field"),
+			workbenchPreviewDockButton(previewShell, "", "next-field", "Next field"),
+			workbenchPreviewDockButton(previewShell, "inlineTextAttrs", "field-action", "Open"),
+			workbenchPreviewDockButton(previewShell, "visibilityAttrs", "toggle-visibility", "Visibility"),
+			workbenchPreviewDockButton(previewShell, "", "clear", "Clear"),
+		),
+	)
 }
 
 func renderWorkbenchFrameCSRF(view map[string]any, options WorkbenchFrameOptions) gosx.Node {
@@ -276,6 +304,7 @@ func workbenchFrameCanvasShellAttrs(view map[string]any, options WorkbenchFrameO
 	return []any{
 		gosx.Attr("class", FirstNonEmpty(options.CanvasShellClass, "studio-canvas-shell")),
 		gosx.Attr("data-studio-canvas", "true"),
+		gosx.Attr("data-studio-preview-shell", "true"),
 		gosx.Attr("data-studio-canvas-zoom", FirstNonEmpty(workbenchViewString(view, "zoom"), "fit")),
 		gosx.Attr("data-gosx-studio-canvas-shell-renderer", "gosx-studio"),
 	}
@@ -343,4 +372,42 @@ func appendWorkbenchFrameAttrs(attrs []any, values map[string]any) []any {
 		attrs = append(attrs, gosx.Attr(name, value))
 	}
 	return attrs
+}
+
+func workbenchPreviewDockAttrs(previewShell map[string]any) []any {
+	attrs := blockLibraryPanelMapAttrs(workbenchViewMap(previewShell, "dockAttrs"))
+	attrs = append(attrs,
+		gosx.Attr("hidden", "hidden"),
+		gosx.Attr("role", "toolbar"),
+		gosx.Attr("aria-label", "Preview selection actions"),
+		gosx.Attr("data-gosx-studio-preview-dock", "true"),
+		gosx.Attr("data-gosx-studio-preview-dock-renderer", "gosx-studio"),
+	)
+	return attrs
+}
+
+func workbenchPreviewDockTitleAttrs(previewShell map[string]any) []any {
+	attrs := blockLibraryPanelMapAttrs(workbenchViewMap(previewShell, "dockTitleAttrs"))
+	attrs = append(attrs, gosx.Attr("data-gosx-studio-preview-dock-label", "true"))
+	return attrs
+}
+
+func workbenchPreviewFieldCountAttrs(previewShell map[string]any) []any {
+	attrs := blockLibraryPanelMapAttrs(workbenchViewMap(previewShell, "fieldCountAttrs"))
+	attrs = append(attrs,
+		gosx.Attr("hidden", "hidden"),
+		gosx.Attr("data-gosx-studio-preview-field-meter", "true"),
+	)
+	return attrs
+}
+
+func workbenchPreviewDockButton(previewShell map[string]any, attrKey, command, label string) gosx.Node {
+	attrs := []any{
+		gosx.Attr("type", "button"),
+		gosx.Attr("data-gosx-studio-preview-command", command),
+	}
+	if attrKey != "" {
+		attrs = append(attrs, blockLibraryPanelMapAttrs(workbenchViewMap(previewShell, attrKey))...)
+	}
+	return gosx.El("button", gosx.Attrs(attrs...), gosx.Text(label))
 }

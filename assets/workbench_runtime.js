@@ -245,7 +245,7 @@
     }
 
     function previewShells() {
-      return queryAll(form, "[data-gosx-studio-preview]");
+      return queryAll(form, "[data-gosx-studio-preview], [data-studio-preview-shell], [data-studio-canvas]");
     }
 
     function previewFrames() {
@@ -401,7 +401,7 @@
     }
 
     function previewShellForFrame(frame) {
-      return frame && frame.closest ? (frame.closest("[data-gosx-studio-preview]") || frame.parentElement) : null;
+      return frame && frame.closest ? (frame.closest("[data-gosx-studio-preview], [data-studio-preview-shell], [data-studio-canvas]") || frame.parentElement) : null;
     }
 
     function createDockButton(action, label) {
@@ -415,11 +415,12 @@
     function previewDockForFrame(frame) {
       var shell = previewShellForFrame(frame);
       if (!shell) return null;
-      var dock = shell.querySelector("[data-gosx-studio-preview-dock]");
-      if (dock) return dock;
+      var dock = shell.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]");
+      if (dock) return normalizePreviewDock(frame, dock);
       dock = document.createElement("div");
       dock.hidden = true;
       dock.setAttribute("data-gosx-studio-preview-dock", "true");
+      dock.setAttribute("data-gosx-studio-preview-dock-fallback", "true");
       dock.setAttribute("role", "toolbar");
       dock.setAttribute("aria-label", "Preview selection actions");
       var label = document.createElement("strong");
@@ -446,12 +447,36 @@
       dock.appendChild(meter);
       dock.appendChild(actions);
       shell.appendChild(dock);
-      dock.addEventListener("click", function (event) {
-        var button = event.target && event.target.closest ? event.target.closest("[data-gosx-studio-preview-command]") : null;
-        if (!button || !dock.contains(button)) return;
-        event.preventDefault();
-        runPreviewDockAction(frame, button.getAttribute("data-gosx-studio-preview-command") || "");
+      return normalizePreviewDock(frame, dock);
+    }
+
+    function normalizePreviewDock(frame, dock) {
+      if (!dock) return null;
+      if (!dock.hasAttribute("data-gosx-studio-preview-dock")) {
+        dock.setAttribute("data-gosx-studio-preview-dock", "true");
+      }
+      var title = dock.querySelector("[data-studio-preview-dock-title]");
+      if (title && !title.hasAttribute("data-gosx-studio-preview-dock-label")) {
+        title.setAttribute("data-gosx-studio-preview-dock-label", "true");
+      }
+      var fieldCount = dock.querySelector("[data-studio-preview-field-count]");
+      if (fieldCount && !fieldCount.hasAttribute("data-gosx-studio-preview-field-meter")) {
+        fieldCount.setAttribute("data-gosx-studio-preview-field-meter", "true");
+      }
+      queryAll(dock, "[data-studio-preview-action]").forEach(function (button) {
+        if (!button.hasAttribute("data-gosx-studio-preview-command")) {
+          button.setAttribute("data-gosx-studio-preview-command", button.getAttribute("data-studio-preview-action") || "");
+        }
       });
+      if (!dock.__gosxStudioPreviewDockHandler) {
+        dock.__gosxStudioPreviewDockHandler = true;
+        dock.addEventListener("click", function (event) {
+          var button = event.target && event.target.closest ? event.target.closest("[data-gosx-studio-preview-command], [data-studio-preview-action]") : null;
+          if (!button || !dock.contains(button)) return;
+          event.preventDefault();
+          runPreviewDockAction(frame, button.getAttribute("data-gosx-studio-preview-command") || button.getAttribute("data-studio-preview-action") || "");
+        });
+      }
       return dock;
     }
 
