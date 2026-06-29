@@ -419,6 +419,36 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldMapMarkers(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionMarkers(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-selection-marker-clear"`,
+		`doc.addEventListener("gosxstudio:editor-preview-selection-marker-apply"`,
+		`setEditorPreviewResult(detail, clearEditorPreviewSelectionMarker(detail.frame))`,
+		`setEditorPreviewResult(detail, applyEditorPreviewSelectionMarker(detail.frame, detail.targets, detail.clear))`,
+		`function clearEditorPreviewSelectionMarker(frame)`,
+		`var frameDoc = editorPreviewFrameDocument(frame)`,
+		`queryAll(frameDoc, "[data-gosx-studio-preview-selected]").forEach(function (target)`,
+		`target.removeAttribute("data-gosx-studio-preview-selected")`,
+		`return { handled: true, count: count }`,
+		`function applyEditorPreviewSelectionMarker(frame, targets, clear)`,
+		`var result = clear === false ? { count: 0 } : clearEditorPreviewSelectionMarker(frame)`,
+		`targets = Array.isArray(targets) ? targets : []`,
+		`target.setAttribute("data-gosx-studio-preview-selected", "true")`,
+		`return { handled: true, count: targets.length, cleared: result.count || 0 }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview selected-marker fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-marker`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview selected-marker control events")
+	}
+}
+
 func TestSubscriberRuntimeScriptPublishesObservers(t *testing.T) {
 	// The preview-side subscriber registers observers for each
 	// $preview.* signal family. This test guards against drift between

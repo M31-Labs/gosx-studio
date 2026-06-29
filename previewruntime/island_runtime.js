@@ -144,6 +144,27 @@
     return { handled: true, count: fields.length, cleared: result.count || 0 };
   }
 
+  function clearEditorPreviewSelectionMarker(frame) {
+    var frameDoc = editorPreviewFrameDocument(frame);
+    if (!frameDoc) return { handled: false, count: 0 };
+    var count = 0;
+    queryAll(frameDoc, "[data-gosx-studio-preview-selected]").forEach(function (target) {
+      target.removeAttribute("data-gosx-studio-preview-selected");
+      count += 1;
+    });
+    return { handled: true, count: count };
+  }
+
+  function applyEditorPreviewSelectionMarker(frame, targets, clear) {
+    var result = clear === false ? { count: 0 } : clearEditorPreviewSelectionMarker(frame);
+    targets = Array.isArray(targets) ? targets : [];
+    targets.forEach(function (target) {
+      if (!target || !target.setAttribute) return;
+      target.setAttribute("data-gosx-studio-preview-selected", "true");
+    });
+    return { handled: true, count: targets.length, cleared: result.count || 0 };
+  }
+
   function updateEditorPreviewPatchTarget(target, field) {
     if (!target || !field) return;
     var value = field.value == null ? "" : String(field.value);
@@ -331,6 +352,14 @@
     doc.addEventListener("gosxstudio:editor-preview-field-map-sync", function (event) {
       var detail = event.detail || {};
       setEditorPreviewResult(detail, syncEditorPreviewFieldMap(detail.frame, detail.fields, detail.current, detail.count));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-selection-marker-clear", function (event) {
+      var detail = event.detail || {};
+      setEditorPreviewResult(detail, clearEditorPreviewSelectionMarker(detail.frame));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-selection-marker-apply", function (event) {
+      var detail = event.detail || {};
+      setEditorPreviewResult(detail, applyEditorPreviewSelectionMarker(detail.frame, detail.targets, detail.clear));
     });
   }
 

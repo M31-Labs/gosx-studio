@@ -366,17 +366,25 @@
       return detail.result || null;
     }
 
+    function clearPreviewSelectionMarker(frame) {
+      var detail = { form: form, frame: frame };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-marker-clear", { bubbles: true, detail: detail }));
+      return detail.result || null;
+    }
+
+    function applyPreviewSelectionMarker(frame, selectedTargets) {
+      var detail = { form: form, frame: frame, targets: selectedTargets || [], clear: true };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-marker-apply", { bubbles: true, detail: detail }));
+      return detail.result || null;
+    }
+
     function clearPreviewSelections() {
       previewFrames().forEach(function (frame) {
         finishInlineTextEdit(frame, true, "clear-selection");
       });
       previewFrames().forEach(function (frame) {
-        var doc = frameDocument(frame);
-        if (!doc) return;
         clearPreviewFieldMap(frame);
-        queryAll(doc, "[data-gosx-studio-preview-selected]").forEach(function (target) {
-          target.removeAttribute("data-gosx-studio-preview-selected");
-        });
+        clearPreviewSelectionMarker(frame);
       });
       previewShells().forEach(function (shell) {
         shell.removeAttribute("data-gosx-studio-preview-selection");
@@ -891,9 +899,7 @@
       clearPreviewSelections();
       var selectedTargets = detail.field ? previewTargets(frame, { field: { source: detail.field, name: detail.field } }) : [];
       if (!selectedTargets.length && target) selectedTargets = [target];
-      selectedTargets.forEach(function (candidate) {
-        candidate.setAttribute("data-gosx-studio-preview-selected", "true");
-      });
+      applyPreviewSelectionMarker(frame, selectedTargets);
       var source = inspectorSource(detail.field);
       var control = inspectorControl(source);
       var result = dispatchPreviewSelectionApply(detail, options);

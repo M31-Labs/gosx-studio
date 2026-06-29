@@ -262,7 +262,9 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`runtime.bind(document.body || document);`,
 		`var result = dispatchPreviewSelectionApply(detail, options);`,
 		`if (!result) return false;`,
-		`candidate.setAttribute("data-gosx-studio-preview-selected", "true");`,
+		`function applyPreviewSelectionMarker(frame, selectedTargets)`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-marker-apply", { bubbles: true, detail: detail }))`,
+		`applyPreviewSelectionMarker(frame, selectedTargets);`,
 		`syncPreviewDock(frame, selectedTargets[0] || target, {`,
 		`if (options.reveal && source) revealInspectorSelection(source, control);`,
 	} {
@@ -290,6 +292,8 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`setReadout("[data-studio-selection-label]"`,
 		`setReadout("[data-studio-selection-status]"`,
 		`setReadout("[data-studio-field-selection-label]"`,
+		`setAttribute("data-gosx-studio-preview-selected"`,
+		`removeAttribute("data-gosx-studio-preview-selected"`,
 		`emit(form, "gosxstudio:preview-select"`,
 		`emitEditorOperation("select_preview"`,
 	} {
@@ -470,7 +474,9 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 		`function clearPreviewSelections()`,
 		`function hidePreviewDocks()`,
 		`finishInlineTextEdit(frame, true, "clear-selection");`,
-		`target.removeAttribute("data-gosx-studio-preview-selected");`,
+		`function clearPreviewSelectionMarker(frame)`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-marker-clear", { bubbles: true, detail: detail }))`,
+		`clearPreviewSelectionMarker(frame);`,
 		`shell.removeAttribute("data-gosx-studio-preview-selection");`,
 		`frame.removeAttribute("data-studio-preview-selection");`,
 		`hidePreviewDocks();`,
@@ -485,6 +491,16 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 	} {
 		if strings.Contains(script, forbidden) {
 			t.Fatalf("workbench runtime should not own preview inspector selection helper %q", forbidden)
+		}
+	}
+
+	clearBody := jsFunctionBody(t, script, "clearPreviewSelections")
+	for _, forbidden := range []string{
+		`setAttribute("data-gosx-studio-preview-selected"`,
+		`removeAttribute("data-gosx-studio-preview-selected"`,
+	} {
+		if strings.Contains(clearBody, forbidden) {
+			t.Fatalf("clearPreviewSelections should delegate concrete preview selected-marker mutation; found %q in:\n%s", forbidden, clearBody)
 		}
 	}
 
