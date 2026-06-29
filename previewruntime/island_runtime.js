@@ -209,6 +209,27 @@
     return { handled: true, count: docks.length };
   }
 
+  function syncEditorPreviewDockFieldNavigation(dock, count, index) {
+    if (!dock || !dock.setAttribute) return { handled: false, count: 0, index: -1 };
+    count = Number.isFinite(Number(count)) ? Number(count) : 0;
+    index = Number.isFinite(Number(index)) ? Number(index) : -1;
+    dock.setAttribute("data-gosx-studio-preview-field-count", String(count));
+    dock.setAttribute("data-gosx-studio-preview-field-index", index >= 0 ? String(index + 1) : "");
+    var meter = dock.querySelector("[data-gosx-studio-preview-field-meter]");
+    if (meter) {
+      meter.hidden = count < 2 || index < 0;
+      meter.textContent = count > 1 && index >= 0 ? "Field " + (index + 1) + " of " + count : "";
+    }
+    ["prev-field", "next-field"].forEach(function (action) {
+      var button = dock.querySelector('[data-gosx-studio-preview-command="' + action + '"]');
+      if (!button) return;
+      button.hidden = count === 0;
+      button.disabled = count < 2;
+      button.setAttribute("aria-label", (action === "prev-field" ? "Previous" : "Next") + " editable field");
+    });
+    return { handled: true, count: count, index: index };
+  }
+
   function updateEditorPreviewPatchTarget(target, field) {
     if (!target || !field) return;
     var value = field.value == null ? "" : String(field.value);
@@ -419,6 +440,10 @@
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, hideEditorPreviewDocks(form));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-dock-field-navigation-sync", function (event) {
+      var detail = event.detail || {};
+      setEditorPreviewResult(detail, syncEditorPreviewDockFieldNavigation(detail.dock, detail.count, detail.index));
     });
   }
 

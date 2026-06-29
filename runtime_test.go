@@ -394,6 +394,35 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldMapMarkersToPreviewRuntime(t *test
 	}
 }
 
+func TestWorkbenchRuntimeDelegatesPreviewDockFieldNavigationUIToPreviewRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	body := jsFunctionBody(t, script, "updatePreviewFieldNavigation")
+	for _, check := range []string{
+		`function updatePreviewFieldNavigation(frame, dock, target, detail)`,
+		`var state = previewFieldNavigationState(frame, target, detail);`,
+		`var payload = { form: form, frame: frame, dock: dock, count: state.count, index: state.index };`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-field-navigation-sync", { bubbles: true, detail: payload }))`,
+		`return state;`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing preview dock field-navigation delegation fragment %q", check)
+		}
+	}
+	for _, forbidden := range []string{
+		`setAttribute("data-gosx-studio-preview-field-count"`,
+		`setAttribute("data-gosx-studio-preview-field-index"`,
+		`meter.hidden`,
+		`meter.textContent`,
+		`button.hidden`,
+		`button.disabled`,
+		`button.setAttribute("aria-label"`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("updatePreviewFieldNavigation should delegate concrete preview dock field-navigation UI mutation; found %q in:\n%s", forbidden, body)
+		}
+	}
+}
+
 func TestWorkbenchRuntimeDelegatesPreviewFieldActionIntentToSelectionRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{

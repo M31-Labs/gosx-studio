@@ -531,20 +531,8 @@
 
     function updatePreviewFieldNavigation(frame, dock, target, detail) {
       var state = previewFieldNavigationState(frame, target, detail);
-      dock.setAttribute("data-gosx-studio-preview-field-count", String(state.count));
-      dock.setAttribute("data-gosx-studio-preview-field-index", state.index >= 0 ? String(state.index + 1) : "");
-      var meter = dock.querySelector("[data-gosx-studio-preview-field-meter]");
-      if (meter) {
-        meter.hidden = state.count < 2 || state.index < 0;
-        meter.textContent = state.count > 1 && state.index >= 0 ? "Field " + (state.index + 1) + " of " + state.count : "";
-      }
-      ["prev-field", "next-field"].forEach(function (action) {
-        var button = dock.querySelector('[data-gosx-studio-preview-command="' + action + '"]');
-        if (!button) return;
-        button.hidden = state.count === 0;
-        button.disabled = state.count < 2;
-        button.setAttribute("aria-label", (action === "prev-field" ? "Previous" : "Next") + " editable field");
-      });
+      var payload = { form: form, frame: frame, dock: dock, count: state.count, index: state.index };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-field-navigation-sync", { bubbles: true, detail: payload }));
       return state;
     }
 

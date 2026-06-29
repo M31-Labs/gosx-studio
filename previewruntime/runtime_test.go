@@ -511,6 +511,37 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockHide(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockFieldNavigationUI(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-dock-field-navigation-sync"`,
+		`setEditorPreviewResult(detail, syncEditorPreviewDockFieldNavigation(detail.dock, detail.count, detail.index))`,
+		`function syncEditorPreviewDockFieldNavigation(dock, count, index)`,
+		`if (!dock || !dock.setAttribute) return { handled: false, count: 0, index: -1 }`,
+		`dock.setAttribute("data-gosx-studio-preview-field-count", String(count))`,
+		`dock.setAttribute("data-gosx-studio-preview-field-index", index >= 0 ? String(index + 1) : "")`,
+		`var meter = dock.querySelector("[data-gosx-studio-preview-field-meter]")`,
+		`meter.hidden = count < 2 || index < 0`,
+		`meter.textContent = count > 1 && index >= 0 ? "Field " + (index + 1) + " of " + count : ""`,
+		`["prev-field", "next-field"].forEach(function (action)`,
+		`var button = dock.querySelector('[data-gosx-studio-preview-command="' + action + '"]')`,
+		`button.hidden = count === 0`,
+		`button.disabled = count < 2`,
+		`button.setAttribute("aria-label", (action === "prev-field" ? "Previous" : "Next") + " editable field")`,
+		`return { handled: true, count: count, index: index }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview dock field-navigation UI fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-field-navigation-sync`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock field-navigation control events")
+	}
+}
+
 func TestSubscriberRuntimeScriptPublishesObservers(t *testing.T) {
 	// The preview-side subscriber registers observers for each
 	// $preview.* signal family. This test guards against drift between
