@@ -642,24 +642,9 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldNavigationTelemetryToSelectionRunt
 		}
 	}
 
-	navigateBody := jsFunctionBody(t, script, "navigatePreviewField")
-	for _, check := range []string{
-		`form: form,`,
-		`frame: frame,`,
-		`direction: direction,`,
-		`reason: reason || "field-navigation",`,
-		`finishInlineTextEdit: finishInlineTextEdit,`,
-		`previewSelectionDetail: previewSelectionDetail,`,
-		`applyPreviewSelection: applyPreviewSelection,`,
-		`dispatchPreviewFieldNavigation: dispatchPreviewFieldNavigation`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-navigation-run", { bubbles: true, detail: payload }))`,
-		`return !!(payload.result && payload.result.navigated);`,
-	} {
-		if !strings.Contains(navigateBody, check) {
-			t.Fatalf("navigatePreviewField missing field navigation boundary fragment %q in:\n%s", check, navigateBody)
-		}
-	}
 	for _, forbidden := range []string{
+		`function navigatePreviewField`,
+		`gosxstudio:editor-preview-field-navigation-run`,
 		`emitEditorOperation("preview_field_navigate"`,
 		`emit(form, "gosxstudio:preview-field-navigate"`,
 		`previewFieldNavigationState(`,
@@ -667,8 +652,8 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldNavigationTelemetryToSelectionRunt
 		`applyPreviewSelection(frame, nextTarget`,
 		`dispatchPreviewFieldNavigation(nextDetail`,
 	} {
-		if strings.Contains(navigateBody, forbidden) {
-			t.Fatalf("navigatePreviewField should delegate preview field navigation telemetry; found %q in:\n%s", forbidden, navigateBody)
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should not own preview field navigation run dispatch/arithmetic; found %q", forbidden)
 		}
 	}
 }

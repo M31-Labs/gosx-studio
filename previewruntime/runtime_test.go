@@ -799,7 +799,7 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldNavigationState(t *testing.
 	}
 }
 
-func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldNavigationRun(t *testing.T) {
+func TestPreviewRuntimeIslandJSRunsEditorPreviewFieldNavigationLocally(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
@@ -829,15 +829,25 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldNavigationRun(t *testing.T)
 		`reason: reason`,
 		`editorPreviewHostCall(host, "dispatchPreviewFieldNavigation", null, nextDetail, navigation)`,
 		`return { handled: true, navigated: true, detail: nextDetail, navigation: navigation, state: state }`,
-		`doc.addEventListener("gosxstudio:editor-preview-field-navigation-run"`,
-		`setEditorPreviewResult(detail, runEditorPreviewFieldNavigation(detail, event))`,
+		`var result = runEditorPreviewFieldNavigation({`,
+		`direction: intent.action === "next-field" ? 1 : -1,`,
+		`reason: intent.reason,`,
+		`var navigation = runEditorPreviewFieldNavigation({`,
+		`direction: action === "next-field" ? 1 : -1`,
+		`reason: "preview-dock"`,
 	} {
 		if !strings.Contains(body, fragment) {
-			t.Fatalf("IslandRuntimeJS() missing editor preview field-navigation run fragment %q", fragment)
+			t.Fatalf("IslandRuntimeJS() missing local editor preview field-navigation fragment %q", fragment)
 		}
 	}
-	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-navigation-run`) {
-		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview field-navigation run events")
+	for _, forbidden := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-field-navigation-run"`,
+		`dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-navigation-run`,
+		`setEditorPreviewResult(detail, runEditorPreviewFieldNavigation(detail, event))`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("IslandRuntimeJS() must run editor preview field navigation locally without an external event boundary; found %q", forbidden)
+		}
 	}
 }
 

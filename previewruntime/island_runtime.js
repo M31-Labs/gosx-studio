@@ -1046,10 +1046,6 @@
       var detail = event.detail || {};
       setEditorPreviewResult(detail, editorPreviewFieldNavigationState(detail.frame, detail.target, detail.selection || detail.detail || {}));
     });
-    doc.addEventListener("gosxstudio:editor-preview-field-navigation-run", function (event) {
-      var detail = event.detail || {};
-      setEditorPreviewResult(detail, runEditorPreviewFieldNavigation(detail, event));
-    });
     doc.addEventListener("gosxstudio:editor-preview-selection-clear-sync", function (event) {
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);

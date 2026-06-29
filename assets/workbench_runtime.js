@@ -396,23 +396,6 @@
       return false;
     }
 
-    function navigatePreviewField(frame, direction, reason) {
-      var payload = {
-        form: form,
-        frame: frame,
-        direction: direction,
-        reason: reason || "field-navigation",
-        host: {
-          finishInlineTextEdit: finishInlineTextEdit,
-          previewSelectionDetail: previewSelectionDetail,
-          applyPreviewSelection: applyPreviewSelection,
-          dispatchPreviewFieldNavigation: dispatchPreviewFieldNavigation
-        }
-      };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-navigation-run", { bubbles: true, detail: payload }));
-      return !!(payload.result && payload.result.navigated);
-    }
-
     function navigatePreviewDockHref(href) {
       window.location.href = href || "";
       return true;
