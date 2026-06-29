@@ -481,6 +481,63 @@
       return "";
     }
 
+    function previewReadableFieldName(field, editable) {
+      var value = compactText(field || "field").split(".").pop() || field || "Field";
+      value = value.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[-_]/g, " ");
+      value = value.charAt(0).toUpperCase() + value.slice(1);
+      if (editable === "media" || editable === "image") return value === "Media" ? value : value + " media";
+      if (editable === "source") return value + " source";
+      if (editable === "flow") return value + " flow";
+      if (editable === "url" || editable === "link") return value + " URL";
+      return value || "Field";
+    }
+
+    function previewBlockLabel(node, fallback) {
+      if (!node) return fallback || "Preview selection";
+      var explicit = node.getAttribute("data-studio-block-label") || node.getAttribute("data-studio-node-label") || node.getAttribute("aria-label") || "";
+      if (explicit) return explicit;
+      var heading = node.querySelector && node.querySelector("[data-studio-block-title], h1, h2, h3, strong");
+      var text = compactText(heading ? heading.textContent : node.textContent);
+      if (text) return text.length > 72 ? text.slice(0, 69) + "..." : text;
+      return fallback || "Preview selection";
+    }
+
+    function resolvePreviewSelectionDetail(event) {
+      var envelope = event.detail || {};
+      var node = envelope.target;
+      if (!node || !node.closest) {
+        envelope.result = {};
+        return;
+      }
+      var fieldNode = node.closest("[data-studio-field], [data-editor-preview], [data-studio-field-source]");
+      var blockNode = node.closest("[data-studio-block-key], [data-studio-node-id]");
+      var field = fieldNode ? (fieldNode.getAttribute("data-studio-field") || fieldNode.getAttribute("data-editor-preview") || fieldNode.getAttribute("data-studio-field-source") || "") : "";
+      var editable = fieldNode ? (fieldNode.getAttribute("data-studio-editable") || fieldNode.getAttribute("data-studio-field-editable") || "") : "";
+      var source = fieldSource(field);
+      var control = fieldControl(source);
+      if (!editable) editable = inferPreviewEditableKind(source, control);
+      var label = fieldNode ? (fieldNode.getAttribute("data-studio-field-label") || previewReadableFieldName(field, editable)) : "";
+      var action = fieldNode ? (fieldNode.getAttribute("data-studio-field-action") || "") : "";
+      var actionHref = fieldNode ? (fieldNode.getAttribute("data-studio-field-action-href") || "") : "";
+      var actionFormAction = fieldNode ? (fieldNode.getAttribute("data-studio-field-action-formaction") || "") : "";
+      var blockKey = blockNode ? (blockNode.getAttribute("data-studio-block-key") || "") : "";
+      var nodeID = blockNode ? (blockNode.getAttribute("data-studio-node-id") || "") : "";
+      var blockLabel = blockNode ? previewBlockLabel(blockNode, blockKey || nodeID || "") : "";
+      if (!label) label = blockLabel || "Preview selection";
+      envelope.result = {
+        field: field,
+        source: field,
+        editable: editable,
+        label: label,
+        blockLabel: blockLabel,
+        action: action,
+        actionHref: actionHref,
+        actionFormAction: actionFormAction,
+        blockKey: blockKey,
+        nodeID: nodeID
+      };
+    }
+
     function applyFieldActionMetadata(source, detail) {
       detail = detail || {};
       var actionLabel = detail.action || (source && source.getAttribute("data-studio-field-action")) || "";
@@ -1144,6 +1201,7 @@
       }
     });
     form.addEventListener("gosxstudio:preview-action", mirrorPreviewActionSelection);
+    form.addEventListener("gosxstudio:preview-selection-detail-resolve", resolvePreviewSelectionDetail);
     form.addEventListener("gosxstudio:preview-selection-apply", applyPreviewSelectionState);
     form.addEventListener("gosxstudio:preview-selection-clear", clearPreviewSelectionState);
     form.addEventListener("gosxstudio:preview-field-navigation-commit", emitPreviewFieldNavigation);

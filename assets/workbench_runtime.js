@@ -280,17 +280,6 @@
       return queryAll(doc, previewPatchSelector(source));
     }
 
-    function readableFieldName(field, editable) {
-      var value = compactText(field || "field").split(".").pop() || field || "Field";
-      value = value.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[-_]/g, " ");
-      value = value.charAt(0).toUpperCase() + value.slice(1);
-      if (editable === "media" || editable === "image") return value === "Media" ? value : value + " media";
-      if (editable === "source") return value + " source";
-      if (editable === "flow") return value + " flow";
-      if (editable === "url" || editable === "link") return value + " URL";
-      return value || "Field";
-    }
-
     function inspectorSource(field) {
       if (!field) return null;
       var source = attrValue(field);
@@ -303,56 +292,18 @@
       return source.querySelector ? source.querySelector("input, textarea, select, button, a[href], [tabindex]") : null;
     }
 
-    function inferInspectorEditable(source, control) {
-      var explicit = source && (source.getAttribute("data-studio-field-editable") || source.getAttribute("data-studio-editable"));
-      if (explicit) return explicit;
-      var tag = control && control.tagName ? String(control.tagName).toLowerCase() : "";
-      var type = control && control.type ? String(control.type).toLowerCase() : "";
-      if (tag === "textarea") return "text";
-      if (tag === "input" && (type === "url" || type === "email")) return "url";
-      if (tag === "input" || tag === "select") return "text";
-      return "";
-    }
-
-    function previewBlockLabel(node, fallback) {
-      if (!node) return fallback || "Preview selection";
-      var explicit = node.getAttribute("data-studio-block-label") || node.getAttribute("data-studio-node-label") || node.getAttribute("aria-label") || "";
-      if (explicit) return explicit;
-      var heading = node.querySelector && node.querySelector("[data-studio-block-title], h1, h2, h3, strong");
-      var text = compactText(heading ? heading.textContent : node.textContent);
-      if (text) return text.length > 72 ? text.slice(0, 69) + "..." : text;
-      return fallback || "Preview selection";
-    }
-
     function previewSelectionDetail(node) {
-      if (!node || !node.closest) return {};
-      var fieldNode = node.closest("[data-studio-field], [data-editor-preview], [data-studio-field-source]");
-      var blockNode = node.closest("[data-studio-block-key], [data-studio-node-id]");
-      var field = fieldNode ? (fieldNode.getAttribute("data-studio-field") || fieldNode.getAttribute("data-editor-preview") || fieldNode.getAttribute("data-studio-field-source") || "") : "";
-      var editable = fieldNode ? (fieldNode.getAttribute("data-studio-editable") || fieldNode.getAttribute("data-studio-field-editable") || "") : "";
-      var source = inspectorSource(field);
-      var control = inspectorControl(source);
-      if (!editable) editable = inferInspectorEditable(source, control);
-      var label = fieldNode ? (fieldNode.getAttribute("data-studio-field-label") || readableFieldName(field, editable)) : "";
-      var action = fieldNode ? (fieldNode.getAttribute("data-studio-field-action") || "") : "";
-      var actionHref = fieldNode ? (fieldNode.getAttribute("data-studio-field-action-href") || "") : "";
-      var actionFormAction = fieldNode ? (fieldNode.getAttribute("data-studio-field-action-formaction") || "") : "";
-      var blockKey = blockNode ? (blockNode.getAttribute("data-studio-block-key") || "") : "";
-      var nodeID = blockNode ? (blockNode.getAttribute("data-studio-node-id") || "") : "";
-      var blockLabel = blockNode ? previewBlockLabel(blockNode, blockKey || nodeID || "") : "";
-      if (!label) label = blockLabel || "Preview selection";
-      return {
-        field: field,
-        source: field,
-        editable: editable,
-        label: label,
-        blockLabel: blockLabel,
-        action: action,
-        actionHref: actionHref,
-        actionFormAction: actionFormAction,
-        blockKey: blockKey,
-        nodeID: nodeID
-      };
+      var payload = { target: node };
+      form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-detail-resolve", { bubbles: true, detail: payload }));
+      if (payload.result) return payload.result;
+      var runtime = window.GoSXStudioSelectionRuntime;
+      if (runtime && typeof runtime.bind === "function") {
+        runtime.bind(document.body || document);
+        payload = { target: node };
+        form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-detail-resolve", { bubbles: true, detail: payload }));
+        if (payload.result) return payload.result;
+      }
+      return {};
     }
 
     function previewSelectableNode(target) {
@@ -811,7 +762,7 @@
       var control = inspectorControl(source);
       var result = dispatchPreviewSelectionApply(detail, options);
       if (!result) return false;
-      var selectedEditable = result.editable || detail.editable || inferInspectorEditable(source, control) || "";
+      var selectedEditable = result.editable || detail.editable || "";
       applyPreviewSelectionChrome(frame, detail.field || detail.blockKey || detail.nodeID || "");
       syncPreviewDock(frame, selectedTargets[0] || target, {
         field: result.field || detail.field || "",

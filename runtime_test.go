@@ -265,6 +265,12 @@ func TestWorkbenchRuntimeDelegatesPreviewInlineTextToInlineEditRuntime(t *testin
 func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
+		`function previewSelectionDetail(node)`,
+		`var payload = { target: node };`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-detail-resolve", { bubbles: true, detail: payload }))`,
+		`if (payload.result) return payload.result;`,
+		`runtime.bind(document.body || document);`,
+		`return {};`,
 		`function dispatchPreviewSelectionApply(detail, options)`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-apply", { bubbles: true, detail: payload }))`,
 		`if (payload.result) return payload.result;`,
@@ -279,10 +285,23 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-chrome-apply", { bubbles: true, detail: detail }))`,
 		`applyPreviewSelectionChrome(frame, detail.field || detail.blockKey || detail.nodeID || "");`,
 		`syncPreviewDock(frame, selectedTargets[0] || target, {`,
+		`var selectedEditable = result.editable || detail.editable || "";`,
 		`if (options.reveal && source) revealInspectorSelection(source, control);`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing preview selection delegation fragment %q", check)
+		}
+	}
+
+	for _, forbidden := range []string{
+		`function readableFieldName`,
+		`function inferInspectorEditable`,
+		`function previewBlockLabel`,
+		`fieldNode.getAttribute("data-studio-field")`,
+		`node.getAttribute("data-studio-block-label")`,
+	} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should delegate preview selection detail resolution, found %q", forbidden)
 		}
 	}
 
