@@ -11,7 +11,8 @@
 // while preserving exact observable behavior:
 //
 //   bindMirroring(root)
-//     Scans root for [data-editor-source], [data-editor-frame-attr-target];
+//     Scans root for [data-editor-source], [data-studio-field-source],
+//     [data-editor-frame-attr-target];
 //     attaches an input listener that, on every keystroke (frame-throttled
 //     via rAF), writes the value to the shared signal
 //     $preview.field.<sourceKey>. Slice 6's preview subscriber receives the
@@ -87,11 +88,11 @@
 
   function bindFieldMirroringIsland(root) {
     var scope = resolveScope(root);
-    var inputs = scope.querySelectorAll("[data-editor-source], [data-editor-frame-attr-target]");
+    var inputs = scope.querySelectorAll("[data-editor-source], [data-studio-field-source], [data-editor-frame-attr-target]");
     Array.prototype.forEach.call(inputs, function (input) {
       if (input.dataset.gosxStudioFieldMirrorIslandBound === "true") return;
       input.dataset.gosxStudioFieldMirrorIslandBound = "true";
-      var key = input.getAttribute("data-editor-source");
+      var key = input.getAttribute("data-editor-source") || input.getAttribute("data-studio-field-source");
       var frameTarget = input.getAttribute("data-editor-frame-target");
       var attrTarget = input.getAttribute("data-editor-frame-attr-target");
       var attrName = input.getAttribute("data-editor-frame-attr");

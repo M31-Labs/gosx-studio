@@ -91,6 +91,25 @@ func TestWorkbenchRuntimePrefersShellRenderedPreviewDock(t *testing.T) {
 	}
 }
 
+func TestWorkbenchRuntimeLetsFieldRuntimeOwnMirroredPreviewPatches(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`function fieldRuntimeMirrors(field)`,
+		`field.matches("[data-editor-source], [data-studio-field-source], [data-editor-frame-attr-target]")`,
+		`emitFieldOperation("input", event.target);`,
+		`if (!fieldRuntimeMirrors(event.target)) postPreviewPatch("input", {}, event.target);`,
+		`emitFieldOperation("change", event.target);`,
+		`if (!fieldRuntimeMirrors(event.target)) postPreviewPatch("change", {}, event.target);`,
+		`postPreviewPatch("load-sync", { route: previewURL(frame) || frame.getAttribute("src") || "" }, null);`,
+		`postPreviewPatch("transaction", event.detail || {}, null);`,
+		`postPreviewPatch("history-restore", event.detail || {}, null);`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing FieldRuntime preview patch ownership fragment %q", check)
+		}
+	}
+}
+
 func TestLegacyRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
 	for name, tt := range map[string]struct {
 		path    string
@@ -281,6 +300,7 @@ func TestEngineRuntimeIncludesFieldRuntimeIslandBundle(t *testing.T) {
 		"__gosx_field_runtime_island_bindClipboard",
 		"field-runtime-islands",
 		"data-gosx-studio-feature-flag-field-runtime-islands",
+		"data-studio-field-source",
 	} {
 		if !strings.Contains(engines, fragment) {
 			t.Fatalf("engine runtime missing fieldruntime fragment %q", fragment)

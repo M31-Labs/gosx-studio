@@ -1060,6 +1060,10 @@
       };
     }
 
+    function fieldRuntimeMirrors(field) {
+      return !!(field && field.matches && field.matches("[data-editor-source], [data-studio-field-source], [data-editor-frame-attr-target]"));
+    }
+
     function emitFieldOperation(reason, field) {
       var patch = fieldPatch(field);
       if (!patch) return null;
@@ -1758,13 +1762,13 @@
     form.addEventListener("input", function (event) {
       if (!event.target || !form.contains(event.target)) return;
       emitFieldOperation("input", event.target);
-      postPreviewPatch("input", {}, event.target);
+      if (!fieldRuntimeMirrors(event.target)) postPreviewPatch("input", {}, event.target);
     });
 
     form.addEventListener("change", function (event) {
       if (!event.target || !form.contains(event.target)) return;
       emitFieldOperation("change", event.target);
-      postPreviewPatch("change", {}, event.target);
+      if (!fieldRuntimeMirrors(event.target)) postPreviewPatch("change", {}, event.target);
     });
 
     form.addEventListener("gosxstudio:editor-transaction", function (event) {

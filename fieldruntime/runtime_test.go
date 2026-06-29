@@ -88,15 +88,31 @@ func TestIslandRuntimeJSPublishesIslandGlobals(t *testing.T) {
 		}
 	}
 	// Mirroring must preserve the data-editor-source / data-editor-frame-*
-	// attribute contract from legacy bindFieldMirroring.
+	// attribute contract from legacy bindFieldMirroring and the public
+	// data-studio-field-source Studio field contract.
 	for _, contract := range []string{
 		"data-editor-source",
+		"data-studio-field-source",
 		"data-editor-frame-attr-target",
 		"data-editor-frame-attr-prefix",
 		"data-editor-frame-attr-suffix",
 	} {
 		if !strings.Contains(body, contract) {
 			t.Fatalf("IslandRuntimeJS() mirroring contract missing %q", contract)
+		}
+	}
+}
+
+func TestIslandRuntimeJSMirrorsStudioFieldSourceControls(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, fragment := range []string{
+		`querySelectorAll("[data-editor-source], [data-studio-field-source], [data-editor-frame-attr-target]")`,
+		`input.getAttribute("data-editor-source") || input.getAttribute("data-studio-field-source")`,
+		`writeSharedSignal("$preview.field." + key, input.value)`,
+		`writeSharedSignal("$preview.text." + detailKey, {`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing data-studio-field-source mirroring fragment %q", fragment)
 		}
 	}
 }
