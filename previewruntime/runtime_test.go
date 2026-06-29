@@ -469,12 +469,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewTargetLookup(t *testing.T) {
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-targets-resolve"`,
-		`var field = detail.patch && detail.patch.field;`,
-		`var source = field && (field.source || field.name);`,
-		`detail.result = { handled: false, targets: [], count: 0 };`,
-		`var targets = editorPreviewPatchTargets(detail.frame, detail.patch);`,
-		`detail.result = { handled: true, targets: targets, count: targets.length };`,
 		`function editorPreviewPatchTargets(frame, patch)`,
 		`var frameDoc = editorPreviewFrameDocument(frame)`,
 		`return queryAll(frameDoc, editorPreviewPatchSelector(source));`,
@@ -487,6 +481,9 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewTargetLookup(t *testing.T) {
 			t.Fatalf("IslandRuntimeJS() missing editor preview target lookup fragment %q", fragment)
 		}
 	}
+	if strings.Contains(body, `doc.addEventListener("gosxstudio:editor-preview-targets-resolve"`) {
+		t.Fatalf("IslandRuntimeJS() should use local editor preview target lookup helpers instead of targets-resolve listener")
+	}
 	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-targets-resolve`) {
 		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview target lookup events")
 	}
@@ -498,8 +495,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectableNodeResolution(t *test
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-selectable-node-resolve"`,
-		`detail.result = editorPreviewSelectableNode(detail.target)`,
 		`function editorPreviewSelectableNode(target)`,
 		`if (!target || !target.closest) return null`,
 		`return target.closest("[data-studio-field], [data-editor-preview], [data-studio-field-source], [data-studio-block-key], [data-studio-node-id]")`,
@@ -507,6 +502,9 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectableNodeResolution(t *test
 		if !strings.Contains(body, fragment) {
 			t.Fatalf("IslandRuntimeJS() missing editor preview selectable-node resolver fragment %q", fragment)
 		}
+	}
+	if strings.Contains(body, `doc.addEventListener("gosxstudio:editor-preview-selectable-node-resolve"`) {
+		t.Fatalf("IslandRuntimeJS() should use local selectable-node resolution instead of selectable-node-resolve listener")
 	}
 	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selectable-node-resolve`) {
 		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview selectable-node resolver events")
@@ -519,10 +517,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewEventPolicy(t *testing.T) {
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-pointer-event-eligible"`,
-		`detail.result = { eligible: editorPreviewPointerEventEligible(detail.event) }`,
-		`doc.addEventListener("gosxstudio:editor-preview-key-intent"`,
-		`detail.result = editorPreviewKeyboardIntent(detail.event)`,
 		`function editorPreviewPointerEventEligible(event)`,
 		`if (!event || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false`,
 		`if (event.button > 0) return false`,
@@ -544,6 +538,9 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewEventPolicy(t *testing.T) {
 		`gosxstudio:editor-preview-pointer-event-eligible`,
 		`gosxstudio:editor-preview-key-intent`,
 	} {
+		if strings.Contains(body, `doc.addEventListener("`+eventName+`"`) {
+			t.Fatalf("IslandRuntimeJS() should use local event policy helpers instead of %s listener", eventName)
+		}
 		if strings.Contains(body, `dispatchEvent(new CustomEvent("`+eventName) {
 			t.Fatalf("IslandRuntimeJS() must not recursively dispatch %s events", eventName)
 		}
@@ -761,10 +758,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldMapMarkers(t *testing.T) {
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-field-map-clear"`,
-		`doc.addEventListener("gosxstudio:editor-preview-field-map-sync"`,
-		`setEditorPreviewResult(detail, clearEditorPreviewFieldMap(detail.frame))`,
-		`setEditorPreviewResult(detail, syncEditorPreviewFieldMap(detail.frame, detail.fields, detail.current, detail.count))`,
 		`function editorPreviewFieldKey(target)`,
 		`target.getAttribute("data-studio-field") || target.getAttribute("data-editor-preview") || target.getAttribute("data-studio-field-source")`,
 		`function clearEditorPreviewFieldMap(frame)`,
@@ -787,6 +780,14 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldMapMarkers(t *testing.T) {
 			t.Fatalf("IslandRuntimeJS() missing editor preview field-map marker fragment %q", fragment)
 		}
 	}
+	for _, eventName := range []string{
+		`gosxstudio:editor-preview-field-map-clear`,
+		`gosxstudio:editor-preview-field-map-sync`,
+	} {
+		if strings.Contains(body, `doc.addEventListener("`+eventName+`"`) {
+			t.Fatalf("IslandRuntimeJS() should use local field-map helpers instead of %s listener", eventName)
+		}
+	}
 	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-map`) {
 		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview field-map control events")
 	}
@@ -798,8 +799,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldNavigationState(t *testing.
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-field-navigation-state"`,
-		`setEditorPreviewResult(detail, editorPreviewFieldNavigationState(detail.frame, detail.target, detail.selection || detail.detail || {}))`,
 		`function editorPreviewFieldKeyForTarget(target)`,
 		`return target.getAttribute("data-studio-field") || target.getAttribute("data-editor-preview") || target.getAttribute("data-studio-field-source") || ""`,
 		`function editorPreviewFieldNavigationScope(frame, target, detail)`,
@@ -822,6 +821,9 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldNavigationState(t *testing.
 		if !strings.Contains(body, fragment) {
 			t.Fatalf("IslandRuntimeJS() missing editor preview field-navigation state fragment %q", fragment)
 		}
+	}
+	if strings.Contains(body, `doc.addEventListener("gosxstudio:editor-preview-field-navigation-state"`) {
+		t.Fatalf("IslandRuntimeJS() should use local field-navigation state helpers instead of field-navigation-state listener")
 	}
 	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-navigation-state`) {
 		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview field-navigation state control events")

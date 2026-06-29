@@ -215,6 +215,23 @@ func TestWorkbenchRuntimeDoesNotOwnEditorPreviewTargetLookup(t *testing.T) {
 	}
 }
 
+func TestWorkbenchRuntimeDoesNotReferenceRetiredPreviewRuntimeBoundaries(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, forbidden := range []string{
+		`gosxstudio:editor-preview-targets-resolve`,
+		`gosxstudio:editor-preview-selectable-node-resolve`,
+		`gosxstudio:editor-preview-pointer-event-eligible`,
+		`gosxstudio:editor-preview-key-intent`,
+		`gosxstudio:editor-preview-field-map-clear`,
+		`gosxstudio:editor-preview-field-map-sync`,
+		`gosxstudio:editor-preview-field-navigation-state`,
+	} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should not reference retired PreviewRuntime boundary %q", forbidden)
+		}
+	}
+}
+
 func TestWorkbenchRuntimeDelegatesPreviewDocumentBindingToPreviewRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	body := jsFunctionBody(t, script, "previewDocumentHost")

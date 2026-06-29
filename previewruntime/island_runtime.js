@@ -1008,41 +1008,6 @@
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, detail.patch));
     });
-    doc.addEventListener("gosxstudio:editor-preview-targets-resolve", function (event) {
-      var detail = event.detail || {};
-      var field = detail.patch && detail.patch.field;
-      var source = field && (field.source || field.name);
-      if (!editorPreviewFrameDocument(detail.frame) || !source) {
-        detail.result = { handled: false, targets: [], count: 0 };
-        return;
-      }
-      var targets = editorPreviewPatchTargets(detail.frame, detail.patch);
-      detail.result = { handled: true, targets: targets, count: targets.length };
-    });
-    doc.addEventListener("gosxstudio:editor-preview-selectable-node-resolve", function (event) {
-      var detail = event.detail || {};
-      detail.result = editorPreviewSelectableNode(detail.target);
-    });
-    doc.addEventListener("gosxstudio:editor-preview-pointer-event-eligible", function (event) {
-      var detail = event.detail || {};
-      detail.result = { eligible: editorPreviewPointerEventEligible(detail.event) };
-    });
-    doc.addEventListener("gosxstudio:editor-preview-key-intent", function (event) {
-      var detail = event.detail || {};
-      detail.result = editorPreviewKeyboardIntent(detail.event);
-    });
-    doc.addEventListener("gosxstudio:editor-preview-field-map-clear", function (event) {
-      var detail = event.detail || {};
-      setEditorPreviewResult(detail, clearEditorPreviewFieldMap(detail.frame));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-field-map-sync", function (event) {
-      var detail = event.detail || {};
-      setEditorPreviewResult(detail, syncEditorPreviewFieldMap(detail.frame, detail.fields, detail.current, detail.count));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-field-navigation-state", function (event) {
-      var detail = event.detail || {};
-      setEditorPreviewResult(detail, editorPreviewFieldNavigationState(detail.frame, detail.target, detail.selection || detail.detail || {}));
-    });
     doc.addEventListener("gosxstudio:editor-preview-selection-clear-sync", function (event) {
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
