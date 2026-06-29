@@ -258,14 +258,10 @@
     }
 
     function clearPreviewSelections() {
-      var detail = {
-        form: form,
-        host: {
-          finishInlineTextEdit: finishInlineTextEdit
-        }
-      };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-clear-sync", { bubbles: true, detail: detail }));
-      return detail.result || null;
+      if (typeof window.__gosx_preview_runtime_island_clearSelections !== "function") return null;
+      return window.__gosx_preview_runtime_island_clearSelections(form, {
+        finishInlineTextEdit: finishInlineTextEdit
+      }) || null;
     }
 
     function emitPreviewDockAction(action, detail) {
@@ -426,14 +422,14 @@
     }
 
     function runPreviewDockAction(frame, action) {
-      var payload = {
+      if (typeof window.__gosx_preview_runtime_island_runDockAction !== "function") return false;
+      var result = window.__gosx_preview_runtime_island_runDockAction({
         form: form,
         frame: frame,
         action: action || "",
         host: previewDockActionHost()
-      };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-action-run", { bubbles: true, detail: payload }));
-      return !!(payload.result && payload.result.result);
+      });
+      return !!(result && result.result);
     }
 
     function dispatchPreviewSelectionApply(detail, options) {
@@ -478,7 +474,8 @@
       detail = detail || previewSelectionDetail(target);
       options = options || {};
       if (!detail.field && !detail.blockKey && !detail.nodeID) return false;
-      var payload = {
+      if (typeof window.__gosx_preview_runtime_island_applySelection !== "function") return false;
+      var result = window.__gosx_preview_runtime_island_applySelection({
         form: form,
         frame: frame,
         target: target,
@@ -488,9 +485,8 @@
         host: Object.assign({
           dispatchPreviewSelectionApply: dispatchPreviewSelectionApply
         }, previewDockActionHost())
-      };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-apply-sync", { bubbles: true, detail: payload }));
-      if (!payload.result || !payload.result.handled || !payload.result.applied) return false;
+      });
+      if (!result || !result.handled || !result.applied) return false;
       if (options.reveal) revealPreviewField(detail, options.reason || "preview-select");
       return true;
     }

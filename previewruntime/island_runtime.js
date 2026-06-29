@@ -997,6 +997,15 @@
   window.__gosx_preview_runtime_island_bindFrames = function (form, host) {
     return bindEditorPreviewFrames(form, host);
   };
+  window.__gosx_preview_runtime_island_clearSelections = function (form, host) {
+    return clearEditorPreviewSelections(form, host);
+  };
+  window.__gosx_preview_runtime_island_applySelection = function (detail) {
+    return applyEditorPreviewSelectionSync(detail, null);
+  };
+  window.__gosx_preview_runtime_island_runDockAction = function (detail) {
+    return runEditorPreviewDockAction(detail, null);
+  };
 
   function bindEditorPreviewChromeEvents() {
     doc.addEventListener("gosxstudio:editor-preview-patch-apply", function (event) {
@@ -1007,15 +1016,6 @@
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, detail.patch));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-selection-clear-sync", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      setEditorPreviewResult(detail, clearEditorPreviewSelections(form, detail.host));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-selection-apply-sync", function (event) {
-      var detail = event.detail || {};
-      setEditorPreviewResult(detail, applyEditorPreviewSelectionSync(detail, event));
     });
     doc.addEventListener("gosxstudio:editor-preview-selection-marker-clear", function (event) {
       var detail = event.detail || {};
@@ -1048,10 +1048,6 @@
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, bindEditorPreviewDock(form, detail.frame, detail.dock, detail.host));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-dock-action-run", function (event) {
-      var detail = event.detail || {};
-      setEditorPreviewResult(detail, runEditorPreviewDockAction(detail, event));
     });
     doc.addEventListener("gosxstudio:editor-preview-dock-selection-resolve", function (event) {
       var detail = event.detail || {};

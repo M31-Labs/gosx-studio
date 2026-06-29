@@ -526,12 +526,13 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`if (payload.result) return payload.result;`,
 		`var runtime = window.GoSXStudioSelectionRuntime;`,
 		`runtime.bind(document.body || document);`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-apply-sync", { bubbles: true, detail: payload }))`,
+		`typeof window.__gosx_preview_runtime_island_applySelection !== "function"`,
+		`var result = window.__gosx_preview_runtime_island_applySelection({`,
 		`host: Object.assign({`,
 		`dispatchPreviewSelectionApply: dispatchPreviewSelectionApply`,
 		`}, previewDockActionHost())`,
 		`finishInlineTextEdit: finishInlineTextEdit,`,
-		`if (!payload.result || !payload.result.handled || !payload.result.applied) return false;`,
+		`if (!result || !result.handled || !result.applied) return false;`,
 		`function revealPreviewField(detail, reason)`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-reveal", { bubbles: true, detail: payload }))`,
 		`if (payload.result) return !!payload.result.revealed;`,
@@ -606,6 +607,7 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`applyPreviewSelectionChrome(`,
 		`previewDockSelection(`,
 		`syncPreviewDock(`,
+		`gosxstudio:editor-preview-selection-apply-sync`,
 	} {
 		if strings.Contains(applyBody, forbidden) {
 			t.Fatalf("applyPreviewSelection should delegate editor preview selection state; found %q in:\n%s", forbidden, applyBody)
@@ -911,7 +913,7 @@ func TestWorkbenchRuntimeDelegatesPreviewDockContentStyleIntentToSelectionRuntim
 	}
 }
 
-func TestWorkbenchRuntimeDispatchesPreviewDockActionRunToPreviewRuntime(t *testing.T) {
+func TestWorkbenchRuntimeCallsPreviewDockActionRunHelper(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	body := jsFunctionBody(t, script, "runPreviewDockAction")
 	for _, check := range []string{
@@ -931,12 +933,13 @@ func TestWorkbenchRuntimeDispatchesPreviewDockActionRunToPreviewRuntime(t *testi
 		`submitPreviewFieldAction: submitPreviewFieldAction`,
 		`navigateToHref: navigatePreviewDockHref`,
 		`function runPreviewDockAction(frame, action)`,
+		`typeof window.__gosx_preview_runtime_island_runDockAction !== "function"`,
+		`var result = window.__gosx_preview_runtime_island_runDockAction({`,
 		`form: form`,
 		`frame: frame`,
 		`action: action || ""`,
 		`host: previewDockActionHost()`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-action-run", { bubbles: true, detail: payload }))`,
-		`return !!(payload.result && payload.result.result);`,
+		`return !!(result && result.result);`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing preview dock action dispatcher fragment %q", check)
@@ -949,6 +952,7 @@ func TestWorkbenchRuntimeDispatchesPreviewDockActionRunToPreviewRuntime(t *testi
 		`window.location.href`,
 		`navigatePreviewField(frame, action === "next-field" ? 1 : -1`,
 		`previewDockDetail(dock)`,
+		`gosxstudio:editor-preview-dock-action-run`,
 	} {
 		if strings.Contains(body, forbidden) {
 			t.Fatalf("runPreviewDockAction should be a thin preview-runtime dispatcher; found %q in:\n%s", forbidden, body)
@@ -966,6 +970,9 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 		`runtime.bind(document.body || document);`,
 		`clearPreviewSelections: clearPreviewSelections`,
 		`dispatchPreviewSelectionClear: dispatchPreviewSelectionClear`,
+		`typeof window.__gosx_preview_runtime_island_clearSelections !== "function"`,
+		`return window.__gosx_preview_runtime_island_clearSelections(form, {`,
+		`finishInlineTextEdit: finishInlineTextEdit`,
 		`dispatchPreviewSelectionClear("keyboard-escape");`,
 	} {
 		if !strings.Contains(script, check) {
@@ -999,6 +1006,7 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 		`setAttribute("data-studio-preview-selection"`,
 		`removeAttribute("data-gosx-studio-preview-selection"`,
 		`removeAttribute("data-studio-preview-selection"`,
+		`gosxstudio:editor-preview-selection-clear-sync`,
 	} {
 		if strings.Contains(clearBody, forbidden) {
 			t.Fatalf("clearPreviewSelections should delegate concrete preview selected-marker mutation; found %q in:\n%s", forbidden, clearBody)
@@ -1025,6 +1033,28 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 	} {
 		if strings.Contains(dockBody, forbidden) {
 			t.Fatalf("preview dock clear should delegate editor preview selection state; found %q in:\n%s", forbidden, dockBody)
+		}
+	}
+}
+
+func TestWorkbenchRuntimeDoesNotUseRetiredPreviewRuntimeBridgeEvents(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, retired := range []string{
+		`gosxstudio:editor-preview-selection-clear-sync`,
+		`gosxstudio:editor-preview-selection-apply-sync`,
+		`gosxstudio:editor-preview-dock-action-run`,
+	} {
+		if strings.Contains(script, retired) {
+			t.Fatalf("workbench runtime should call private PreviewRuntime helpers instead of retired event %q", retired)
+		}
+	}
+	for _, helper := range []string{
+		`window.__gosx_preview_runtime_island_clearSelections`,
+		`window.__gosx_preview_runtime_island_applySelection`,
+		`window.__gosx_preview_runtime_island_runDockAction`,
+	} {
+		if !strings.Contains(script, helper) {
+			t.Fatalf("workbench runtime missing private PreviewRuntime helper call %q", helper)
 		}
 	}
 }
