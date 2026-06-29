@@ -217,6 +217,28 @@
     return { handled: true, count: docks.length };
   }
 
+  function normalizeEditorPreviewDock(dock) {
+    if (!dock || !dock.setAttribute || !dock.querySelector) return { handled: false, commands: 0 };
+    if (!dock.hasAttribute("data-gosx-studio-preview-dock")) {
+      dock.setAttribute("data-gosx-studio-preview-dock", "true");
+    }
+    var title = dock.querySelector("[data-studio-preview-dock-title]");
+    if (title && !title.hasAttribute("data-gosx-studio-preview-dock-label")) {
+      title.setAttribute("data-gosx-studio-preview-dock-label", "true");
+    }
+    var fieldCount = dock.querySelector("[data-studio-preview-field-count]");
+    if (fieldCount && !fieldCount.hasAttribute("data-gosx-studio-preview-field-meter")) {
+      fieldCount.setAttribute("data-gosx-studio-preview-field-meter", "true");
+    }
+    var actions = queryAll(dock, "[data-studio-preview-action]");
+    actions.forEach(function (button) {
+      if (!button.hasAttribute("data-gosx-studio-preview-command")) {
+        button.setAttribute("data-gosx-studio-preview-command", button.getAttribute("data-studio-preview-action") || "");
+      }
+    });
+    return { handled: true, commands: actions.length };
+  }
+
   function editorPreviewDockKindLabel(selection) {
     if (!selection || !selection.field) return "Block";
     var editable = selection.editable || "";
@@ -503,6 +525,10 @@
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, hideEditorPreviewDocks(form));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-dock-normalize", function (event) {
+      var detail = event.detail || {};
+      setEditorPreviewResult(detail, normalizeEditorPreviewDock(detail.dock));
     });
     doc.addEventListener("gosxstudio:editor-preview-dock-sync", function (event) {
       var detail = event.detail || {};

@@ -416,22 +416,7 @@
 
     function normalizePreviewDock(frame, dock) {
       if (!dock) return null;
-      if (!dock.hasAttribute("data-gosx-studio-preview-dock")) {
-        dock.setAttribute("data-gosx-studio-preview-dock", "true");
-      }
-      var title = dock.querySelector("[data-studio-preview-dock-title]");
-      if (title && !title.hasAttribute("data-gosx-studio-preview-dock-label")) {
-        title.setAttribute("data-gosx-studio-preview-dock-label", "true");
-      }
-      var fieldCount = dock.querySelector("[data-studio-preview-field-count]");
-      if (fieldCount && !fieldCount.hasAttribute("data-gosx-studio-preview-field-meter")) {
-        fieldCount.setAttribute("data-gosx-studio-preview-field-meter", "true");
-      }
-      queryAll(dock, "[data-studio-preview-action]").forEach(function (button) {
-        if (!button.hasAttribute("data-gosx-studio-preview-command")) {
-          button.setAttribute("data-gosx-studio-preview-command", button.getAttribute("data-studio-preview-action") || "");
-        }
-      });
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-normalize", { bubbles: true, detail: { form: form, frame: frame, dock: dock } }));
       if (!dock.__gosxStudioPreviewDockHandler) {
         dock.__gosxStudioPreviewDockHandler = true;
         dock.addEventListener("click", function (event) {

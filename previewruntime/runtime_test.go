@@ -511,6 +511,34 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockHide(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockNormalization(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-dock-normalize"`,
+		`setEditorPreviewResult(detail, normalizeEditorPreviewDock(detail.dock))`,
+		`function normalizeEditorPreviewDock(dock)`,
+		`if (!dock || !dock.setAttribute || !dock.querySelector) return { handled: false, commands: 0 }`,
+		`dock.setAttribute("data-gosx-studio-preview-dock", "true")`,
+		`var title = dock.querySelector("[data-studio-preview-dock-title]")`,
+		`title.setAttribute("data-gosx-studio-preview-dock-label", "true")`,
+		`var fieldCount = dock.querySelector("[data-studio-preview-field-count]")`,
+		`fieldCount.setAttribute("data-gosx-studio-preview-field-meter", "true")`,
+		`var actions = queryAll(dock, "[data-studio-preview-action]")`,
+		`button.setAttribute("data-gosx-studio-preview-command", button.getAttribute("data-studio-preview-action") || "")`,
+		`return { handled: true, commands: actions.length }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview dock normalization fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-normalize`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock normalize control events")
+	}
+}
+
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockShowContent(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {

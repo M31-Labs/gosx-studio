@@ -84,9 +84,9 @@ func TestWorkbenchRuntimePrefersShellRenderedPreviewDock(t *testing.T) {
 		`shell.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]")`,
 		`return normalizePreviewDock(frame, dock)`,
 		"if (dock) return normalizePreviewDock(frame, dock);\n      return null;",
-		`dock.querySelector("[data-studio-preview-dock-title]")`,
-		`dock.querySelector("[data-studio-preview-field-count]")`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-normalize", { bubbles: true, detail: { form: form, frame: frame, dock: dock } }))`,
 		`event.target.closest ? event.target.closest("[data-gosx-studio-preview-command], [data-studio-preview-action]")`,
+		`runPreviewDockAction(frame, button.getAttribute("data-gosx-studio-preview-command") || button.getAttribute("data-studio-preview-action") || "")`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing shell-rendered dock contract %q", check)
@@ -100,6 +100,16 @@ func TestWorkbenchRuntimePrefersShellRenderedPreviewDock(t *testing.T) {
 	} {
 		if strings.Contains(script, check) {
 			t.Fatalf("workbench runtime should not contain preview dock fallback fragment %q", check)
+		}
+	}
+	for _, check := range []string{
+		`dock.setAttribute("data-gosx-studio-preview-dock"`,
+		`title.setAttribute("data-gosx-studio-preview-dock-label"`,
+		`fieldCount.setAttribute("data-gosx-studio-preview-field-meter"`,
+		`button.setAttribute("data-gosx-studio-preview-command"`,
+	} {
+		if strings.Contains(script, check) {
+			t.Fatalf("workbench runtime should not contain direct preview dock normalization fragment %q", check)
 		}
 	}
 }
