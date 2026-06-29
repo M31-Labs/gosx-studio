@@ -255,14 +255,6 @@
       return frame.getAttribute("data-studio-preview-src") || frame.getAttribute("src") || "";
     }
 
-    function frameDocument(frame) {
-      try {
-        return frame.contentDocument || (frame.contentWindow && frame.contentWindow.document) || null;
-      } catch (error) {
-        return null;
-      }
-    }
-
     function previewTargets(frame, patch) {
       var detail = { form: form, frame: frame, patch: patch };
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-targets-resolve", { bubbles: true, detail: detail }));
@@ -281,24 +273,6 @@
         if (payload.result) return payload.result;
       }
       return {};
-    }
-
-    function previewSelectableNode(target) {
-      var detail = { form: form, target: target };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selectable-node-resolve", { bubbles: true, detail: detail }));
-      return detail.result || null;
-    }
-
-    function previewPointerEventEligible(event) {
-      var detail = { form: form, event: event };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-pointer-event-eligible", { bubbles: true, detail: detail }));
-      return !!(detail.result && detail.result.eligible);
-    }
-
-    function previewKeyIntent(event) {
-      var detail = { form: form, event: event };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-key-intent", { bubbles: true, detail: detail }));
-      return detail.result || null;
     }
 
     function clearPreviewFieldMap(frame) {
@@ -901,74 +875,24 @@
     }
 
     function bindPreviewDocument(frame) {
-      var doc = frameDocument(frame);
-      if (!doc || frame.__gosxStudioPreviewDocument === doc) return;
-      frame.__gosxStudioPreviewDocument = doc;
-      if (doc.documentElement) doc.documentElement.setAttribute("data-gosx-studio-preview-selectable", "true");
-      var repositionDock = frameTask(function () {
-        updatePreviewDockPosition(frame);
-      });
-      doc.addEventListener("click", function (event) {
-        var edit = frame.__gosxStudioInlineEdit;
-        if (edit && edit.target && (event.target === edit.target || (edit.target.contains && edit.target.contains(event.target)))) return;
-        if (!previewPointerEventEligible(event)) return;
-        var target = previewSelectableNode(event.target);
-        if (!target) return;
-        if (applyPreviewSelection(frame, target, previewSelectionDetail(target), { reveal: true, reason: "click" })) {
-          event.preventDefault();
-          event.stopPropagation();
+      var detail = {
+        form: form,
+        frame: frame,
+        host: {
+          previewSelectionDetail: previewSelectionDetail,
+          applyPreviewSelection: applyPreviewSelection,
+          startInlineTextFromDetail: startInlineTextFromDetail,
+          startInlineTextFromSelection: startInlineTextFromSelection,
+          navigatePreviewField: navigatePreviewField,
+          handleInlineTextInput: handleInlineTextInput,
+          handleInlineTextKeyEvent: handleInlineTextKeyEvent,
+          handleInlineTextPaste: handleInlineTextPaste,
+          handleInlineTextBlur: handleInlineTextBlur,
+          updatePreviewDockPosition: updatePreviewDockPosition
         }
-      }, true);
-      doc.addEventListener("dblclick", function (event) {
-        var edit = frame.__gosxStudioInlineEdit;
-        if (edit && edit.target && (event.target === edit.target || (edit.target.contains && edit.target.contains(event.target)))) return;
-        if (!previewPointerEventEligible(event)) return;
-        var target = previewSelectableNode(event.target);
-        if (!target) return;
-        var detail = previewSelectionDetail(target);
-        if (detail.editable !== "text") return;
-        if (applyPreviewSelection(frame, target, detail, { reveal: true, reason: "double-click" }) && startInlineTextFromDetail(frame, detail, "double-click")) {
-          event.preventDefault();
-          event.stopPropagation();
-        }
-      }, true);
-      doc.addEventListener("focusin", function (event) {
-        var edit = frame.__gosxStudioInlineEdit;
-        if (edit && event.target === edit.target) return;
-        var target = previewSelectableNode(event.target);
-        if (target) applyPreviewSelection(frame, target, previewSelectionDetail(target), { reveal: false, reason: "focus" });
-      }, true);
-      doc.addEventListener("input", function (event) {
-        handleInlineTextInput(frame, event);
-      });
-      doc.addEventListener("keydown", function (event) {
-        handleInlineTextKeyEvent(frame, event);
-      });
-      doc.addEventListener("keydown", function (event) {
-        if (frame.__gosxStudioInlineEdit) return;
-        var intent = previewKeyIntent(event);
-        if (!intent) return;
-        if (intent.action === "prev-field" || intent.action === "next-field") {
-          if (navigatePreviewField(frame, intent.action === "next-field" ? 1 : -1, intent.reason)) {
-            event.preventDefault();
-            event.stopPropagation();
-          }
-          return;
-        }
-        if (intent.action !== "inline-text") return;
-        if (startInlineTextFromSelection(frame, intent.reason)) {
-          event.preventDefault();
-          event.stopPropagation();
-        }
-      });
-      doc.addEventListener("paste", function (event) {
-        handleInlineTextPaste(frame, event);
-      });
-      doc.addEventListener("blur", function (event) {
-        handleInlineTextBlur(frame, event);
-      }, true);
-      doc.addEventListener("scroll", repositionDock, true);
-      if (frame.contentWindow) frame.contentWindow.addEventListener("resize", repositionDock);
+      };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-document-bind", { bubbles: true, detail: detail }));
+      return detail.result || null;
     }
 
     function modeLabel(mode) {

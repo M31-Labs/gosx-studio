@@ -530,6 +530,30 @@
     return result;
   }
 
+  function editorPreviewFrameTask(fn) {
+    var pending = false;
+    return function () {
+      if (pending) return;
+      pending = true;
+      window.requestAnimationFrame(function () {
+        pending = false;
+        fn();
+      });
+    };
+  }
+
+  function editorPreviewHostCall(host, name, fallback) {
+    if (!host || typeof host[name] !== "function") return fallback;
+    return host[name].apply(host, Array.prototype.slice.call(arguments, 3));
+  }
+
+  function editorPreviewInlineEditContains(frame, target) {
+    var edit = frame && frame.__gosxStudioInlineEdit;
+    var editTarget = edit && edit.target;
+    if (!editTarget || !target) return false;
+    return target === editTarget || !!(editTarget.contains && editTarget.contains(target));
+  }
+
   function editorPreviewPointerEventEligible(event) {
     if (!event || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
     if (event.button > 0) return false;
@@ -545,6 +569,92 @@
     if (event.key === "F2") return { action: "inline-text", reason: "keyboard-f2" };
     if (event.key === "Enter") return { action: "inline-text", reason: "keyboard-enter" };
     return null;
+  }
+
+  var editorPreviewDocumentBindings = typeof WeakMap !== "undefined" ? new WeakMap() : null;
+
+  function editorPreviewBoundDocument(frame) {
+    if (!frame) return null;
+    return editorPreviewDocumentBindings ? editorPreviewDocumentBindings.get(frame) : frame.__gosxStudioPreviewRuntimeDocument;
+  }
+
+  function setEditorPreviewBoundDocument(frame, frameDoc) {
+    if (!frame) return;
+    if (editorPreviewDocumentBindings) editorPreviewDocumentBindings.set(frame, frameDoc);
+    else frame.__gosxStudioPreviewRuntimeDocument = frameDoc;
+  }
+
+  function bindEditorPreviewDocument(form, frame, host) {
+    var frameDoc = editorPreviewFrameDocument(frame);
+    if (!frame || !frameDoc || editorPreviewBoundDocument(frame) === frameDoc) return { handled: false, bound: false };
+    setEditorPreviewBoundDocument(frame, frameDoc);
+    if (frameDoc.documentElement) frameDoc.documentElement.setAttribute("data-gosx-studio-preview-selectable", "true");
+    var repositionDock = editorPreviewFrameTask(function () {
+      editorPreviewHostCall(host, "updatePreviewDockPosition", null, frame);
+    });
+    frameDoc.addEventListener("click", function (event) {
+      if (editorPreviewInlineEditContains(frame, event.target)) return;
+      if (!editorPreviewPointerEventEligible(event)) return;
+      var target = editorPreviewSelectableNode(event.target);
+      if (!target) return;
+      var detail = editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {};
+      if (editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: true, reason: "click" })) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, true);
+    frameDoc.addEventListener("dblclick", function (event) {
+      if (editorPreviewInlineEditContains(frame, event.target)) return;
+      if (!editorPreviewPointerEventEligible(event)) return;
+      var target = editorPreviewSelectableNode(event.target);
+      if (!target) return;
+      var detail = editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {};
+      if (detail.editable !== "text") return;
+      if (editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: true, reason: "double-click" }) && editorPreviewHostCall(host, "startInlineTextFromDetail", false, frame, detail, "double-click")) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, true);
+    frameDoc.addEventListener("focusin", function (event) {
+      if (editorPreviewInlineEditContains(frame, event.target)) return;
+      var target = editorPreviewSelectableNode(event.target);
+      if (target) {
+        var detail = editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {};
+        editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: false, reason: "focus" });
+      }
+    }, true);
+    frameDoc.addEventListener("input", function (event) {
+      editorPreviewHostCall(host, "handleInlineTextInput", false, frame, event);
+    });
+    frameDoc.addEventListener("keydown", function (event) {
+      editorPreviewHostCall(host, "handleInlineTextKeyEvent", false, frame, event);
+    });
+    frameDoc.addEventListener("keydown", function (event) {
+      if (frame.__gosxStudioInlineEdit) return;
+      var intent = editorPreviewKeyboardIntent(event);
+      if (!intent) return;
+      if (intent.action === "prev-field" || intent.action === "next-field") {
+        if (editorPreviewHostCall(host, "navigatePreviewField", false, frame, intent.action === "next-field" ? 1 : -1, intent.reason)) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return;
+      }
+      if (intent.action !== "inline-text") return;
+      if (editorPreviewHostCall(host, "startInlineTextFromSelection", false, frame, intent.reason)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    });
+    frameDoc.addEventListener("paste", function (event) {
+      editorPreviewHostCall(host, "handleInlineTextPaste", false, frame, event);
+    });
+    frameDoc.addEventListener("blur", function (event) {
+      editorPreviewHostCall(host, "handleInlineTextBlur", false, frame, event);
+    }, true);
+    frameDoc.addEventListener("scroll", repositionDock, true);
+    if (frame.contentWindow) frame.contentWindow.addEventListener("resize", repositionDock);
+    return { handled: true, bound: true };
   }
 
   function setEditorPreviewStatus(form, state, label, reason) {
@@ -740,6 +850,11 @@
     doc.addEventListener("gosxstudio:editor-preview-dock-position-sync", function (event) {
       var detail = event.detail || {};
       setEditorPreviewResult(detail, syncEditorPreviewDockPosition(detail.frame, detail.dock, detail.target, detail.shell));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-document-bind", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      setEditorPreviewResult(detail, bindEditorPreviewDocument(form, detail.frame, detail.host));
     });
   }
 

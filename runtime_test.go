@@ -239,55 +239,78 @@ func TestWorkbenchRuntimeDelegatesEditorPreviewTargetLookup(t *testing.T) {
 	}
 }
 
-func TestWorkbenchRuntimeDelegatesPreviewSelectableNodeResolutionToPreviewRuntime(t *testing.T) {
+func TestWorkbenchRuntimeDelegatesPreviewDocumentBindingToPreviewRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
-	body := jsFunctionBody(t, script, "previewSelectableNode")
-	for _, check := range []string{
+	body := jsFunctionBody(t, script, "bindPreviewDocument")
+	for _, forbidden := range []string{
+		`function frameDocument(frame)`,
 		`function previewSelectableNode(target)`,
-		`var detail = { form: form, target: target };`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selectable-node-resolve", { bubbles: true, detail: detail }))`,
-		`return detail.result || null;`,
-		`var target = previewSelectableNode(event.target);`,
+		`function previewPointerEventEligible(event)`,
+		`function previewKeyIntent(event)`,
+		`frame.__gosxStudioPreviewDocument`,
+		`data-gosx-studio-preview-selectable`,
 	} {
-		if !strings.Contains(script, check) {
-			t.Fatalf("workbench runtime missing preview selectable-node delegation fragment %q", check)
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should not keep old preview document binding wrapper %q", forbidden)
+		}
+	}
+	for _, check := range []string{
+		`function bindPreviewDocument(frame)`,
+		`var detail = {`,
+		`form: form,`,
+		`frame: frame,`,
+		`host: {`,
+		`previewSelectionDetail: previewSelectionDetail,`,
+		`applyPreviewSelection: applyPreviewSelection,`,
+		`startInlineTextFromDetail: startInlineTextFromDetail,`,
+		`startInlineTextFromSelection: startInlineTextFromSelection,`,
+		`navigatePreviewField: navigatePreviewField,`,
+		`handleInlineTextInput: handleInlineTextInput,`,
+		`handleInlineTextKeyEvent: handleInlineTextKeyEvent,`,
+		`handleInlineTextPaste: handleInlineTextPaste,`,
+		`handleInlineTextBlur: handleInlineTextBlur,`,
+		`updatePreviewDockPosition: updatePreviewDockPosition`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-document-bind", { bubbles: true, detail: detail }))`,
+		`return detail.result || null;`,
+	} {
+		if !strings.Contains(body, check) {
+			t.Fatalf("bindPreviewDocument missing PreviewRuntime document-bind fragment %q in:\n%s", check, body)
 		}
 	}
 
 	for _, forbidden := range []string{
+		`doc.addEventListener(`,
+		`.addEventListener("click"`,
+		`.addEventListener("dblclick"`,
+		`.addEventListener("focusin"`,
+		`.addEventListener("input"`,
+		`.addEventListener("keydown"`,
+		`.addEventListener("paste"`,
+		`.addEventListener("blur"`,
+		`.addEventListener("scroll"`,
+		`contentWindow.addEventListener("resize"`,
 		`target.closest("[data-studio-field], [data-editor-preview], [data-studio-field-source], [data-studio-block-key], [data-studio-node-id]")`,
 		`[data-studio-block-key], [data-studio-node-id]`,
 	} {
 		if strings.Contains(body, forbidden) {
-			t.Fatalf("previewSelectableNode should delegate concrete selectable-node selector resolution; found %q in:\n%s", forbidden, body)
+			t.Fatalf("bindPreviewDocument should not own concrete preview document binding; found %q in:\n%s", forbidden, body)
 		}
 	}
 }
 
 func TestWorkbenchRuntimeDelegatesPreviewEventPolicyToPreviewRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
-	for _, check := range []string{
-		`function previewPointerEventEligible(event)`,
-		`var detail = { form: form, event: event };`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-pointer-event-eligible", { bubbles: true, detail: detail }))`,
-		`return !!(detail.result && detail.result.eligible);`,
-		`function previewKeyIntent(event)`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-key-intent", { bubbles: true, detail: detail }))`,
-		`return detail.result || null;`,
-		`if (!previewPointerEventEligible(event)) return;`,
-		`var intent = previewKeyIntent(event);`,
-		`if (intent.action === "prev-field" || intent.action === "next-field")`,
-		`navigatePreviewField(frame, intent.action === "next-field" ? 1 : -1, intent.reason)`,
-		`if (intent.action !== "inline-text") return;`,
-		`startInlineTextFromSelection(frame, intent.reason)`,
-	} {
-		if !strings.Contains(script, check) {
-			t.Fatalf("workbench runtime missing preview event-policy delegation fragment %q", check)
-		}
-	}
-
 	body := jsFunctionBody(t, script, "bindPreviewDocument")
 	for _, forbidden := range []string{
+		`function previewPointerEventEligible(event)`,
+		`function previewKeyIntent(event)`,
+		`gosxstudio:editor-preview-pointer-event-eligible`,
+		`gosxstudio:editor-preview-key-intent`,
+		`previewPointerEventEligible(event)`,
+		`previewKeyIntent(event)`,
+		`var intent =`,
+		`event.preventDefault()`,
+		`event.stopPropagation()`,
 		`event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button > 0`,
 		`event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey`,
 		`var focusedControl = event.target && event.target.closest ? event.target.closest("input, textarea, select, button, a[href], [contenteditable='true'], [contenteditable='plaintext-only']") : null;`,
@@ -406,16 +429,20 @@ func TestWorkbenchRuntimeDelegatesPreviewInlineTextToInlineEditRuntime(t *testin
 
 	body := jsFunctionBody(t, script, "bindPreviewDocument")
 	for _, check := range []string{
-		"handleInlineTextInput(frame, event)",
-		"handleInlineTextKeyEvent(frame, event)",
-		"handleInlineTextPaste(frame, event)",
-		"handleInlineTextBlur(frame, event)",
+		"handleInlineTextInput: handleInlineTextInput",
+		"handleInlineTextKeyEvent: handleInlineTextKeyEvent",
+		"handleInlineTextPaste: handleInlineTextPaste",
+		"handleInlineTextBlur: handleInlineTextBlur",
 	} {
 		if !strings.Contains(body, check) {
-			t.Fatalf("bindPreviewDocument should delegate inline text document event handling, missing %q in:\n%s", check, body)
+			t.Fatalf("bindPreviewDocument should pass inline text host callbacks, missing %q in:\n%s", check, body)
 		}
 	}
 	for _, forbidden := range []string{
+		`doc.addEventListener("input"`,
+		`doc.addEventListener("keydown"`,
+		`doc.addEventListener("paste"`,
+		`doc.addEventListener("blur"`,
 		`syncInlineTextEdit(frame, "input")`,
 		`finishInlineTextEdit(frame, false, "escape")`,
 		`finishInlineTextEdit(frame, true, "enter")`,

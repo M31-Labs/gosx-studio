@@ -515,6 +515,95 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewEventPolicy(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewDocumentBinding(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-document-bind"`,
+		`setEditorPreviewResult(detail, bindEditorPreviewDocument(form, detail.frame, detail.host))`,
+		`function bindEditorPreviewDocument(form, frame, host)`,
+		`var frameDoc = editorPreviewFrameDocument(frame)`,
+		`if (!frame || !frameDoc || editorPreviewBoundDocument(frame) === frameDoc) return { handled: false, bound: false }`,
+		`setEditorPreviewBoundDocument(frame, frameDoc)`,
+		`frameDoc.documentElement.setAttribute("data-gosx-studio-preview-selectable", "true")`,
+		`function editorPreviewBoundDocument(frame)`,
+		`return editorPreviewDocumentBindings ? editorPreviewDocumentBindings.get(frame) : frame.__gosxStudioPreviewRuntimeDocument`,
+		`function setEditorPreviewBoundDocument(frame, frameDoc)`,
+		`editorPreviewDocumentBindings.set(frame, frameDoc)`,
+		`frame.__gosxStudioPreviewRuntimeDocument = frameDoc`,
+		`var editorPreviewDocumentBindings = typeof WeakMap !== "undefined" ? new WeakMap() : null`,
+		`function editorPreviewFrameTask(fn)`,
+		`window.requestAnimationFrame(function ()`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview document binding fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-document-bind`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview document-bind events")
+	}
+}
+
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewDocumentListeners(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`frameDoc.addEventListener("click", function (event)`,
+		`frameDoc.addEventListener("dblclick", function (event)`,
+		`frameDoc.addEventListener("focusin", function (event)`,
+		`frameDoc.addEventListener("input", function (event)`,
+		`frameDoc.addEventListener("keydown", function (event)`,
+		`frameDoc.addEventListener("paste", function (event)`,
+		`frameDoc.addEventListener("blur", function (event)`,
+		`frameDoc.addEventListener("scroll", repositionDock, true)`,
+		`frame.contentWindow.addEventListener("resize", repositionDock)`,
+		`if (editorPreviewInlineEditContains(frame, event.target)) return`,
+		`if (!editorPreviewPointerEventEligible(event)) return`,
+		`var target = editorPreviewSelectableNode(event.target)`,
+		`var intent = editorPreviewKeyboardIntent(event)`,
+		`if (frame.__gosxStudioInlineEdit) return`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview document listener fragment %q", fragment)
+		}
+	}
+	if strings.Count(body, `frameDoc.addEventListener("keydown", function (event)`) < 2 {
+		t.Fatalf("IslandRuntimeJS() should bind both inline-text and preview-key-intent keydown paths")
+	}
+}
+
+func TestPreviewRuntimeIslandJSHandsPreviewDocumentEventsToHost(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`function editorPreviewHostCall(host, name, fallback)`,
+		`return host[name].apply(host, Array.prototype.slice.call(arguments, 3))`,
+		`editorPreviewHostCall(host, "previewSelectionDetail", {}, target)`,
+		`editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: true, reason: "click" })`,
+		`editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: true, reason: "double-click" }) && editorPreviewHostCall(host, "startInlineTextFromDetail", false, frame, detail, "double-click")`,
+		`editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: false, reason: "focus" })`,
+		`editorPreviewHostCall(host, "handleInlineTextInput", false, frame, event)`,
+		`editorPreviewHostCall(host, "handleInlineTextKeyEvent", false, frame, event)`,
+		`editorPreviewHostCall(host, "navigatePreviewField", false, frame, intent.action === "next-field" ? 1 : -1, intent.reason)`,
+		`editorPreviewHostCall(host, "startInlineTextFromSelection", false, frame, intent.reason)`,
+		`editorPreviewHostCall(host, "handleInlineTextPaste", false, frame, event)`,
+		`editorPreviewHostCall(host, "handleInlineTextBlur", false, frame, event)`,
+		`editorPreviewHostCall(host, "updatePreviewDockPosition", null, frame)`,
+		`event.preventDefault()`,
+		`event.stopPropagation()`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview document host handoff fragment %q", fragment)
+		}
+	}
+}
+
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldMapMarkers(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {
