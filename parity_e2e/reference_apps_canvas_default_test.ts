@@ -16,9 +16,11 @@ import {
 // With no Muddy canvas env/query override, the production default is now the
 // low-WASM static WebGPU/Canvas2D-fallback path: a muddy-owned canvas with no
 // data-gosx-surface-kind, no full CanvasBoard globals, and no full
-// gosx-runtime.<hash>.wasm fetch. The still-present DOM board remains the
-// selection/authoring sink while its graph sub-tree is hidden by the sole-graph
-// marker.
+// gosx-runtime.<hash>.wasm fetch. Zero WASM requests are valid/preferred when
+// Studio JS runtimes provide the needed globals; if any WASM or manifest runtime
+// path is present, it must be islands-only. The still-present DOM board remains
+// the selection/authoring sink while its graph sub-tree is hidden by the
+// sole-graph marker.
 
 const CANVAS_SELECTOR = WASM_FREE_CANVAS_SELECTOR;
 const BOARD_SELECTOR = "[data-studio-site-map-board='true']";
@@ -121,8 +123,12 @@ test.describe("@reference-apps low-WASM default canvas", () => {
       await page.waitForTimeout(250);
       const manifestRuntime = await runtimeManifestPath(page);
       const fullWasm = wasmRequests.filter(isFullRuntimeWasm);
-      const islandsWasm = wasmRequests.filter((u) => /gosx-runtime-islands/i.test(u) || /runtime-islands\.wasm/i.test(u));
-      const footprintEvidence = { manifestRuntime, wasmRequests, fullWasm, islandsWasm, renderEvidence };
+      const islandsWasm = wasmRequests.filter(isIslandsRuntimePath);
+      const zeroWasmNoManifestRuntime = wasmRequests.length === 0 && manifestRuntime === "";
+      const islandsOnlyFootprint = fullWasm.length === 0 &&
+        wasmRequests.every(isIslandsRuntimePath) &&
+        (manifestRuntime === "" || isIslandsRuntimePath(manifestRuntime));
+      const footprintEvidence = { manifestRuntime, wasmRequests, fullWasm, islandsWasm, zeroWasmNoManifestRuntime, renderEvidence };
       await testInfo.attach("default-low-wasm-footprint-evidence.json", {
         contentType: "application/json",
         body: JSON.stringify(footprintEvidence, null, 2),
@@ -132,12 +138,8 @@ test.describe("@reference-apps low-WASM default canvas", () => {
         `the full gosx-runtime.<hash>.wasm must never be fetched by the no-env default; footprint=${JSON.stringify(footprintEvidence)}`,
       ).toEqual([]);
       expect(
-        islandsWasm.length,
-        `the islands runtime should be the only WASM fetched by the no-env default; footprint=${JSON.stringify(footprintEvidence)}`,
-      ).toBeGreaterThanOrEqual(1);
-      expect(
-        /islands/i.test(manifestRuntime),
-        `the runtime manifest should select the islands-only WASM; manifest.runtime.path=${JSON.stringify(manifestRuntime)}`,
+        zeroWasmNoManifestRuntime || islandsOnlyFootprint,
+        `the no-env default must have either zero WASM with no manifest runtime path, or an islands-only WASM footprint; footprint=${JSON.stringify(footprintEvidence)}`,
       ).toBe(true);
 
       const rects = await pollForRects(page);
@@ -326,4 +328,8 @@ async function runtimeManifestPath(page: Page): Promise<string> {
 
 function isFullRuntimeWasm(url: string): boolean {
   return /gosx-runtime\.[0-9a-f]+\.wasm/i.test(url) || /\/gosx\/runtime\.wasm/i.test(url);
+}
+
+function isIslandsRuntimePath(url: string): boolean {
+  return /gosx-runtime-islands/i.test(url) || /runtime-islands\.wasm/i.test(url);
 }
