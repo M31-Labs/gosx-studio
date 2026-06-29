@@ -24,6 +24,140 @@ body:has(.editor-page),
   color: var(--color-success, var(--color-accent, currentColor));
 }
 
+[data-gosx-studio-preview-patched] {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+  transition:
+    outline-offset 180ms ease,
+    filter 180ms ease;
+}
+
+[data-gosx-studio-preview-patched="fresh"] {
+  outline-offset: 6px;
+  filter: brightness(1.03);
+}
+
+[data-gosx-studio-preview-selectable="true"] [data-studio-field],
+[data-gosx-studio-preview-selectable="true"] [data-editor-preview],
+[data-gosx-studio-preview-selectable="true"] [data-studio-field-source],
+[data-gosx-studio-preview-selectable="true"] [data-studio-block-key],
+[data-gosx-studio-preview-selectable="true"] [data-studio-node-id] {
+  cursor: pointer;
+}
+
+[data-gosx-studio-preview-field-scope] {
+  outline: 1px dashed currentColor;
+  outline-offset: 3px;
+}
+
+[data-gosx-studio-preview-field-current],
+[data-gosx-studio-preview-selected] {
+  outline: 3px solid currentColor;
+  outline-offset: 6px;
+  filter: saturate(1.08);
+}
+
+[data-gosx-studio-inline-editing] {
+  outline: 3px solid currentColor;
+  outline-offset: 5px;
+  caret-color: currentColor;
+}
+
+[data-gosx-studio-inline-editing]:focus {
+  outline-offset: 7px;
+}
+
+[data-gosx-studio-preview] {
+  position: relative;
+}
+
+[data-gosx-studio-preview-dock] {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--gosx-studio-space-2, 0.5rem);
+  max-width: min(34rem, calc(100% - 1rem));
+  padding: var(--gosx-studio-space-2, 0.5rem);
+  border: 1px solid var(--gosx-studio-border, currentColor);
+  border-radius: var(--gosx-studio-radius-md, 0.5rem);
+  background: var(--gosx-studio-surface-raised, Canvas);
+  color: var(--gosx-studio-text, CanvasText);
+  font: inherit;
+  box-shadow: 0 14px 40px color-mix(in srgb, currentColor 18%, transparent);
+  transform: translate(-50%, -100%);
+  transition:
+    opacity var(--gosx-studio-duration-base, 180ms)
+      var(--gosx-studio-ease-out, ease),
+    transform var(--gosx-studio-duration-base, 180ms)
+      var(--gosx-studio-ease-out, ease);
+}
+
+[data-gosx-studio-preview-dock][hidden] {
+  display: none;
+}
+
+[data-gosx-studio-preview-dock][data-gosx-studio-preview-dock-placement="bottom"] {
+  transform: translate(-50%, 0);
+}
+
+[data-gosx-studio-preview-dock-label] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+[data-gosx-studio-preview-breadcrumb] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--gosx-studio-muted, currentColor);
+  font-size: 0.8125em;
+}
+
+[data-gosx-studio-preview-dock-kind],
+[data-gosx-studio-preview-field-meter] {
+  color: var(--gosx-studio-muted, currentColor);
+  font-size: 0.8125em;
+  white-space: nowrap;
+}
+
+[data-gosx-studio-preview-dock-actions] {
+  display: flex;
+  align-items: center;
+  gap: var(--gosx-studio-space-1, 0.25rem);
+  margin-left: auto;
+}
+
+[data-gosx-studio-preview-command] {
+  appearance: none;
+  border: 1px solid var(--gosx-studio-border, currentColor);
+  border-radius: var(--gosx-studio-radius-sm, 0.375rem);
+  background: var(--gosx-studio-surface, Canvas);
+  color: inherit;
+  font: inherit;
+  font-size: 0.8125em;
+  line-height: 1;
+  padding: var(--gosx-studio-space-2, 0.5rem);
+  cursor: pointer;
+}
+
+[data-gosx-studio-preview-command]:hover,
+[data-gosx-studio-preview-command]:focus-visible {
+  border-color: var(--gosx-studio-accent, Highlight);
+  outline: 2px solid var(--gosx-studio-accent, Highlight);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-gosx-studio-preview-dock] {
+    transition: none;
+  }
+}
+
 [data-studio-site-filter="site"]
   .studio-page-list
   a[data-studio-site-group]:not([data-studio-site-group="site"]),

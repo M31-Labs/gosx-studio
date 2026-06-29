@@ -29,11 +29,27 @@ func TestStylesheetHandlerServesStudioChromeTokens(t *testing.T) {
 		"--studio-stage-height",
 		".gosx-studio",
 		"data-gosx-studio-authoring-selected",
+		"data-gosx-studio-preview-patched",
+		"data-gosx-studio-preview-dock",
+		"data-gosx-studio-inline-editing",
 		`[data-studio-site-filter="site"]`,
 		`a[data-studio-site-group]:not([data-studio-site-group="site"])`,
 	} {
 		if !strings.Contains(rec.Body.String(), check) {
 			t.Fatalf("stylesheet missing %q: %s", check, rec.Body.String())
+		}
+	}
+}
+
+func TestWorkbenchRuntimeDoesNotInjectPreviewStyles(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		"gosx-studio-preview-patch-style",
+		"gosx-studio-preview-dock-style",
+		`createElement("style")`,
+	} {
+		if strings.Contains(script, check) {
+			t.Fatalf("workbench runtime should not contain preview style injector fragment %q", check)
 		}
 	}
 }
