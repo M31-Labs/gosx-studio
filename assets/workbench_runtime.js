@@ -727,28 +727,10 @@
       return true;
     }
 
-    function applyPreviewPatch(frame, patch) {
-      var detail = { form: form, frame: frame, patch: patch };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-patch-apply", { bubbles: true, detail: detail }));
-      return detail.result && detail.result.count ? detail.result.count : 0;
-    }
-
     function syncPreviewFrame(frame, reason) {
-      if (!frameDocument(frame)) return 0;
-      var count = 0;
-      queryAll(form, "[data-studio-field-source], [data-editor-source], input[name], textarea[name], select[name]").forEach(function (field) {
-        if (!shouldTransportPreviewPatch(field, reason || "sync")) return;
-        var patch = {
-          type: "gosxstudio:preview-patch",
-          source: "gosx-studio",
-          reason: reason || "sync",
-          detail: {},
-          field: fieldPatch(field)
-        };
-        count += applyPreviewPatch(frame, patch);
-      });
-      if (count) emit(form, "gosxstudio:preview-sync", { count: count, reason: reason || "sync" });
-      return count;
+      var detail = { form: form, frame: frame, reason: reason || "sync", shouldTransport: shouldTransportPreviewPatch };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-frame-sync", { bubbles: true, detail: detail }));
+      return detail.result && detail.result.count ? detail.result.count : 0;
     }
 
     function setPreviewStatus(state, label, reason) {

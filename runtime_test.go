@@ -148,10 +148,6 @@ func TestWorkbenchRuntimeLetsFieldRuntimeOwnMirroredPreviewPatches(t *testing.T)
 func TestWorkbenchRuntimeDelegatesEditorPreviewPatchTransport(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
-		`function applyPreviewPatch(frame, patch)`,
-		`var detail = { form: form, frame: frame, patch: patch };`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-patch-apply", { bubbles: true, detail: detail }));`,
-		`return detail.result && detail.result.count ? detail.result.count : 0;`,
 		`function postPreviewPatch(reason, detail, field)`,
 		`field: fieldPatch(field)`,
 		`var payload = { form: form, frames: frames, patch: patch, reason: reason || "patch", detail: detail || {} };`,
@@ -159,13 +155,13 @@ func TestWorkbenchRuntimeDelegatesEditorPreviewPatchTransport(t *testing.T) {
 		`return payload.result || null;`,
 		`postPreviewPatch("transaction", event.detail || {}, null);`,
 		`postPreviewPatch("history-restore", event.detail || {}, null);`,
-		`count += applyPreviewPatch(frame, patch);`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing delegated editor preview patch transport fragment %q", check)
 		}
 	}
 	for _, forbidden := range []string{
+		`function applyPreviewPatch(frame, patch)`,
 		`function updatePreviewTarget`,
 		`frame.contentWindow.postMessage`,
 		`new URL(frame.getAttribute("src"), window.location.href).origin`,
@@ -244,12 +240,26 @@ func TestWorkbenchRuntimeDelegatesEditorPreviewChromeToPreviewRuntimeEvents(t *t
 func TestWorkbenchRuntimeSkipsMirroredFieldsDuringPreviewLoadSync(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
-		`queryAll(form, "[data-studio-field-source], [data-editor-source], input[name], textarea[name], select[name]").forEach(function (field) {`,
-		`if (!shouldTransportPreviewPatch(field, reason || "sync")) return;`,
-		`count += applyPreviewPatch(frame, patch);`,
+		`function syncPreviewFrame(frame, reason)`,
+		`var detail = { form: form, frame: frame, reason: reason || "sync", shouldTransport: shouldTransportPreviewPatch };`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-frame-sync", { bubbles: true, detail: detail }));`,
+		`return detail.result && detail.result.count ? detail.result.count : 0;`,
 	} {
 		if !strings.Contains(script, check) {
-			t.Fatalf("workbench runtime missing load-sync mirrored-field skip/fallback fragment %q", check)
+			t.Fatalf("workbench runtime missing delegated load-sync fragment %q", check)
+		}
+	}
+
+	body := jsFunctionBody(t, script, "syncPreviewFrame")
+	for _, forbidden := range []string{
+		`queryAll(form, "[data-studio-field-source], [data-editor-source], input[name], textarea[name], select[name]")`,
+		`type: "gosxstudio:preview-patch"`,
+		`field: fieldPatch(field)`,
+		`count += applyPreviewPatch(frame, patch)`,
+		`if (!frameDocument(frame)) return 0`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("syncPreviewFrame should delegate load-sync construction; found %q", forbidden)
 		}
 	}
 }

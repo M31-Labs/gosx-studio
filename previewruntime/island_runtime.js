@@ -397,6 +397,40 @@
     return { handled: true, count: targets.length };
   }
 
+  function editorPreviewFieldPatch(field) {
+    if (!field || !field.name || field.disabled) return null;
+    var type = String(field.type || "").toLowerCase();
+    if (field.name === "csrf_token" || type === "button" || type === "submit" || type === "reset" || type === "file") return null;
+    return {
+      name: field.name,
+      source: field.getAttribute("data-studio-field-source") || field.getAttribute("data-editor-source") || field.name,
+      editable: field.getAttribute("data-studio-field-editable") || "",
+      value: type === "checkbox" || type === "radio" ? (field.checked ? (field.value || "on") : "") : (field.value || ""),
+      checked: !!field.checked,
+      type: type,
+      tag: String(field.tagName || "").toLowerCase()
+    };
+  }
+
+  function syncEditorPreviewFrame(form, frame, reason, shouldTransport) {
+    if (!form || !editorPreviewFrameDocument(frame)) return { handled: false, count: 0 };
+    reason = reason || "sync";
+    var count = 0;
+    queryAll(form, "[data-studio-field-source], [data-editor-source], input[name], textarea[name], select[name]").forEach(function (field) {
+      if (typeof shouldTransport === "function" && shouldTransport(field, reason) === false) return;
+      var patch = {
+        type: "gosxstudio:preview-patch",
+        source: "gosx-studio",
+        reason: reason,
+        detail: {},
+        field: editorPreviewFieldPatch(field)
+      };
+      count += applyEditorPreviewPatch(frame, patch).count || 0;
+    });
+    if (count) emitEditorPreview(form, "gosxstudio:preview-sync", { count: count, reason: reason });
+    return { handled: true, count: count };
+  }
+
   function postEditorPreviewPatch(form, reason, patch) {
     var frames = editorPreviewFrames(form);
     var count = 0;
@@ -543,6 +577,11 @@
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, detail.patch));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-frame-sync", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      setEditorPreviewResult(detail, syncEditorPreviewFrame(form, detail.frame, detail.reason, detail.shouldTransport));
     });
     doc.addEventListener("gosxstudio:editor-preview-targets-resolve", function (event) {
       var detail = event.detail || {};
