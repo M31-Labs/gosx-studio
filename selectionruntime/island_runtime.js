@@ -354,6 +354,7 @@
       form.removeAttribute("data-studio-field-editable");
       form.removeAttribute("data-studio-field-action-label");
       form.removeAttribute("data-studio-field-action-href");
+      form.removeAttribute("data-studio-field-action-formaction");
       Array.prototype.forEach.call(form.querySelectorAll(".is-studio-field-active"), function (row) {
         row.classList.remove("is-studio-field-active");
       });
@@ -434,7 +435,7 @@
 
     function fieldSource(field) {
       if (!field) return null;
-      return form.querySelector('[data-studio-field-source="' + attrValue(field) + '"]');
+      return form.querySelector('[data-studio-field-source="' + attrValue(field) + '"], [data-editor-source="' + attrValue(field) + '"]');
     }
 
     function fieldControl(source) {
@@ -467,12 +468,122 @@
       return "field";
     }
 
+    function inferPreviewEditableKind(source, control) {
+      if (!source) return "";
+      var explicit = source.getAttribute("data-studio-field-editable") || source.getAttribute("data-studio-editable") || "";
+      if (explicit) return explicit;
+      var tag = control && control.tagName ? control.tagName.toLowerCase() : "";
+      var type = control && control.type ? String(control.type).toLowerCase() : "";
+      if (tag === "textarea") return "text";
+      if (tag === "input" && (type === "url" || type === "email")) return "url";
+      if (tag === "input" || tag === "select") return "text";
+      return "";
+    }
+
     function applyFieldActionMetadata(source, detail) {
-      if (!source) return;
-      var actionLabel = detail.action || source.getAttribute("data-studio-field-action") || "";
-      var actionHref = source.getAttribute("data-studio-field-action-href") || "";
+      detail = detail || {};
+      var actionLabel = detail.action || (source && source.getAttribute("data-studio-field-action")) || "";
+      var actionHref = detail.actionHref || (source && source.getAttribute("data-studio-field-action-href")) || "";
+      var actionFormAction = detail.actionFormAction || (source && source.getAttribute("data-studio-field-action-formaction")) || "";
       if (actionLabel) form.setAttribute("data-studio-field-action-label", actionLabel);
+      else form.removeAttribute("data-studio-field-action-label");
       if (actionHref) form.setAttribute("data-studio-field-action-href", actionHref);
+      else form.removeAttribute("data-studio-field-action-href");
+      if (actionFormAction) form.setAttribute("data-studio-field-action-formaction", actionFormAction);
+      else form.removeAttribute("data-studio-field-action-formaction");
+      return {
+        action: actionLabel,
+        actionHref: actionHref,
+        actionFormAction: actionFormAction
+      };
+    }
+
+    function clearPreviewInspectorSelection() {
+      Array.prototype.forEach.call(form.querySelectorAll("[data-gosx-studio-inspector-selected]"), function (target) {
+        target.removeAttribute("data-gosx-studio-inspector-selected");
+        if (target.classList) target.classList.remove("is-studio-field-active", "is-preview-selected");
+      });
+    }
+
+    function markPreviewInspectorSelection(source, control) {
+      var row = source && source.closest ? source.closest(".field-row, [data-studio-field-row]") : null;
+      [source, row, control].forEach(function (target) {
+        if (!target) return;
+        target.setAttribute("data-gosx-studio-inspector-selected", "true");
+        if (target.classList) target.classList.add(target === row ? "is-studio-field-active" : "is-preview-selected");
+      });
+    }
+
+    function previewSelectionResult(detail) {
+      detail = detail || {};
+      var source = fieldSource(detail.field || "");
+      var control = fieldControl(source);
+      var editable = detail.editable || inferPreviewEditableKind(source, control) || "";
+      var actions = applyFieldActionMetadata(source, detail);
+      var selectionKey = detail.blockKey || detail.nodeID || detail.field || "";
+      var kind = detail.field ? "preview-field" : "preview";
+      return {
+        field: detail.field || "",
+        editable: editable,
+        label: detail.label || "",
+        blockLabel: detail.blockLabel || "",
+        action: actions.action || "",
+        actionHref: actions.actionHref || "",
+        actionFormAction: actions.actionFormAction || "",
+        selectionKey: selectionKey,
+        kind: kind,
+        blockKey: detail.blockKey || "",
+        nodeID: detail.nodeID || ""
+      };
+    }
+
+    function applyPreviewSelectionState(event) {
+      var envelope = event.detail || {};
+      var detail = envelope.detail || {};
+      var options = envelope.options || {};
+      if (!detail.field && !detail.blockKey && !detail.nodeID) return;
+      clearPreviewInspectorSelection();
+      clearFieldFocus();
+      var result = previewSelectionResult(detail);
+      var source = fieldSource(result.field);
+      var control = fieldControl(source);
+      if (result.field) {
+        form.setAttribute("data-studio-field-selection", result.field);
+        if (result.editable) form.setAttribute("data-studio-field-editable", result.editable);
+        else form.removeAttribute("data-studio-field-editable");
+        markPreviewInspectorSelection(source, control);
+      } else {
+        form.removeAttribute("data-studio-field-selection");
+        form.removeAttribute("data-studio-field-editable");
+      }
+      if (result.selectionKey) form.setAttribute("data-studio-selection", result.selectionKey);
+      else form.removeAttribute("data-studio-selection");
+      form.setAttribute("data-studio-selection-kind", result.kind);
+      setSelectionReadout(result.label || result.field || result.blockKey || "Preview selection");
+      setReadout("[data-studio-selection-status]", result.field ? "Preview field" : "Preview selection");
+      Array.prototype.forEach.call(form.querySelectorAll("[data-studio-field-selection-label]"), function (readout) {
+        readout.textContent = result.field ? (result.label || fieldLabel(result.field)) : "Block";
+      });
+      updateFieldActionLabels();
+      updateStyleScope();
+      writeSharedSignal("$selection.fieldFocus", { field: result.field, editable: result.editable, label: result.label || fieldLabel(result.field) });
+      envelope.result = result;
+      form.dispatchEvent(new CustomEvent("gosxstudio:preview-select", {
+        bubbles: true,
+        detail: {
+          field: result.field,
+          source: detail.source || result.field,
+          editable: result.editable,
+          label: result.label,
+          blockLabel: result.blockLabel,
+          action: result.action,
+          actionHref: result.actionHref,
+          actionFormAction: result.actionFormAction,
+          blockKey: result.blockKey,
+          nodeID: result.nodeID,
+          reason: options.reason || "preview"
+        }
+      }));
     }
 
     function revealFieldControl(source, control) {
@@ -743,6 +854,7 @@
         updateSelection(selectedKey());
       }
     });
+    form.addEventListener("gosxstudio:preview-selection-apply", applyPreviewSelectionState);
 
     bindCommandPaletteCommands();
     if (form.getAttribute("data-studio-mode") === "advanced") ensureWorkspaceSelection();

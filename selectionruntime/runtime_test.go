@@ -122,6 +122,39 @@ func TestSelectionRuntimeIslandOwnsSelectionActionTelemetry(t *testing.T) {
 	}
 }
 
+func TestSelectionRuntimeIslandOwnsPreviewSelectionApply(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, contract := range []string{
+		`form.addEventListener("gosxstudio:preview-selection-apply", applyPreviewSelectionState);`,
+		`function applyPreviewSelectionState(event)`,
+		`function inferPreviewEditableKind(source, control)`,
+		`source.getAttribute("data-studio-field-editable") || source.getAttribute("data-studio-editable") || ""`,
+		`if (tag === "input" || tag === "select") return "text";`,
+		`return "";`,
+		`var editable = detail.editable || inferPreviewEditableKind(source, control) || "";`,
+		`clearPreviewInspectorSelection();`,
+		`markPreviewInspectorSelection(source, control);`,
+		`target.setAttribute("data-gosx-studio-inspector-selected", "true");`,
+		`form.setAttribute("data-studio-field-selection", result.field);`,
+		`form.setAttribute("data-studio-field-editable", result.editable);`,
+		`form.setAttribute("data-studio-field-action-label", actionLabel);`,
+		`form.setAttribute("data-studio-field-action-href", actionHref);`,
+		`form.setAttribute("data-studio-field-action-formaction", actionFormAction);`,
+		`form.setAttribute("data-studio-selection", result.selectionKey);`,
+		`form.setAttribute("data-studio-selection-kind", result.kind);`,
+		`setSelectionReadout(result.label || result.field || result.blockKey || "Preview selection");`,
+		`setReadout("[data-studio-selection-status]", result.field ? "Preview field" : "Preview selection");`,
+		`form.querySelectorAll("[data-studio-field-selection-label]")`,
+		`envelope.result = result;`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-select"`,
+		`actionFormAction: result.actionFormAction`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() missing preview-selection apply contract %q", contract)
+		}
+	}
+}
+
 func TestBridgeShimAutoMountsOnDocumentReady(t *testing.T) {
 	// Pre-2026-05-27 the deleted studio-engines.js bundle auto-mounted every
 	// runtime contract at DOMContentLoaded via its top-level init() function.

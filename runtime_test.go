@@ -10,6 +10,19 @@ func legacyMuddyGlobal(name string) string {
 	return "__" + "muddy" + name
 }
 
+func jsFunctionBody(t *testing.T, script, name string) string {
+	t.Helper()
+	start := strings.Index(script, "function "+name+"(")
+	if start < 0 {
+		t.Fatalf("script missing function %s", name)
+	}
+	next := strings.Index(script[start+len("function "+name+"("):], "\n    function ")
+	if next < 0 {
+		return script[start:]
+	}
+	return script[start : start+len("function "+name+"(")+next]
+}
+
 // The legacy monolithic JS bundles (studio-engines.js and
 // preview-runtime.js) were deleted on 2026-05-27 — see Phase 3
 // burn-down. The tests below cover the post-deletion contract: the
@@ -171,6 +184,53 @@ func TestWorkbenchRuntimeDelegatesPreviewInlineTextToInlineEditRuntime(t *testin
 	} {
 		if strings.Contains(script, forbidden) {
 			t.Fatalf("workbench runtime should delegate preview inline-text lifecycle, found low-level fragment %q", forbidden)
+		}
+	}
+}
+
+func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`function dispatchPreviewSelectionApply(detail, options)`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-apply", { bubbles: true, detail: payload }))`,
+		`if (payload.result) return payload.result;`,
+		`var runtime = window.GoSXStudioSelectionRuntime;`,
+		`runtime.bind(document.body || document);`,
+		`var result = dispatchPreviewSelectionApply(detail, options);`,
+		`if (!result) return false;`,
+		`candidate.setAttribute("data-gosx-studio-preview-selected", "true");`,
+		`syncPreviewDock(frame, selectedTargets[0] || target, {`,
+		`if (options.reveal && source) revealInspectorSelection(source, control);`,
+		`emitEditorOperation("select_preview", {`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing preview selection delegation fragment %q", check)
+		}
+	}
+
+	applyBody := jsFunctionBody(t, script, "applyPreviewSelection")
+	for _, forbidden := range []string{
+		`clearInspectorSelection();`,
+		`markInspectorSelection(source)`,
+		`form.setAttribute("data-studio-field-selection"`,
+		`form.removeAttribute("data-studio-field-selection"`,
+		`form.setAttribute("data-studio-field-editable"`,
+		`form.removeAttribute("data-studio-field-editable"`,
+		`form.setAttribute("data-studio-field-action-label"`,
+		`form.removeAttribute("data-studio-field-action-label"`,
+		`form.setAttribute("data-studio-field-action-href"`,
+		`form.removeAttribute("data-studio-field-action-href"`,
+		`form.setAttribute("data-studio-field-action-formaction"`,
+		`form.removeAttribute("data-studio-field-action-formaction"`,
+		`form.setAttribute("data-studio-selection"`,
+		`form.setAttribute("data-studio-selection-kind"`,
+		`setReadout("[data-studio-selection-label]"`,
+		`setReadout("[data-studio-selection-status]"`,
+		`setReadout("[data-studio-field-selection-label]"`,
+		`emit(form, "gosxstudio:preview-select"`,
+	} {
+		if strings.Contains(applyBody, forbidden) {
+			t.Fatalf("applyPreviewSelection should delegate editor preview selection state; found %q in:\n%s", forbidden, applyBody)
 		}
 	}
 }

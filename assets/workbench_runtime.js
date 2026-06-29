@@ -833,96 +833,76 @@
       }, 120);
     }
 
+    function dispatchPreviewSelectionApply(detail, options) {
+      var payload = {
+        detail: detail || {},
+        options: options || {}
+      };
+      form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-apply", { bubbles: true, detail: payload }));
+      if (payload.result) return payload.result;
+      var runtime = window.GoSXStudioSelectionRuntime;
+      if (runtime && typeof runtime.bind === "function") {
+        runtime.bind(document.body || document);
+        payload = {
+          detail: detail || {},
+          options: options || {}
+        };
+        form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-apply", { bubbles: true, detail: payload }));
+        if (payload.result) return payload.result;
+      }
+      return null;
+    }
+
     function applyPreviewSelection(frame, target, detail, options) {
       detail = detail || previewSelectionDetail(target);
       options = options || {};
       if (!detail.field && !detail.blockKey && !detail.nodeID) return false;
       clearPreviewSelections();
-      clearInspectorSelection();
       var selectedTargets = detail.field ? previewTargets(frame, { field: { source: detail.field, name: detail.field } }) : [];
       if (!selectedTargets.length && target) selectedTargets = [target];
       selectedTargets.forEach(function (candidate) {
         candidate.setAttribute("data-gosx-studio-preview-selected", "true");
       });
       var source = inspectorSource(detail.field);
-      var control = markInspectorSelection(source);
-      var selectedEditable = detail.editable || inferInspectorEditable(source, control) || "";
-      if (detail.field) {
-        form.setAttribute("data-studio-field-selection", detail.field);
-        if (selectedEditable) form.setAttribute("data-studio-field-editable", selectedEditable);
-        else form.removeAttribute("data-studio-field-editable");
-      } else {
-        form.removeAttribute("data-studio-field-selection");
-        form.removeAttribute("data-studio-field-editable");
-      }
-      var actionLabel = detail.action || (source && source.getAttribute("data-studio-field-action")) || "";
-      if (actionLabel) form.setAttribute("data-studio-field-action-label", actionLabel);
-      else form.removeAttribute("data-studio-field-action-label");
-      var actionHref = detail.actionHref || (source && source.getAttribute("data-studio-field-action-href")) || "";
-      if (actionHref) {
-        form.setAttribute("data-studio-field-action-href", actionHref);
-      } else {
-        form.removeAttribute("data-studio-field-action-href");
-      }
-      var actionFormAction = detail.actionFormAction || (source && source.getAttribute("data-studio-field-action-formaction")) || "";
-      if (actionFormAction) {
-        form.setAttribute("data-studio-field-action-formaction", actionFormAction);
-      } else {
-        form.removeAttribute("data-studio-field-action-formaction");
-      }
-      var selectionKey = detail.blockKey || detail.nodeID || detail.field || "";
-      if (selectionKey) form.setAttribute("data-studio-selection", selectionKey);
-      else form.removeAttribute("data-studio-selection");
-      form.setAttribute("data-studio-selection-kind", detail.field ? "preview-field" : "preview");
-      setReadout("[data-studio-selection-label]", detail.label || detail.field || detail.blockKey || "Preview selection");
-      setReadout("[data-studio-selection-status]", detail.field ? "Preview field" : "Preview selection");
-      setReadout("[data-studio-field-selection-label]", detail.field ? (detail.label || readableFieldName(detail.field, selectedEditable)) : "Block");
+      var control = inspectorControl(source);
+      var result = dispatchPreviewSelectionApply(detail, options);
+      if (!result) return false;
+      var selectedEditable = result.editable || detail.editable || inferInspectorEditable(source, control) || "";
+      var selectionKey = result.selectionKey || detail.blockKey || detail.nodeID || detail.field || "";
+      var kind = result.kind || (detail.field ? "preview-field" : "preview");
       previewShells().forEach(function (shell) {
         shell.setAttribute("data-gosx-studio-preview-selection", detail.field || detail.blockKey || detail.nodeID || "");
       });
       frame.setAttribute("data-studio-preview-selection", detail.field || detail.blockKey || detail.nodeID || "");
       syncPreviewDock(frame, selectedTargets[0] || target, {
-        field: detail.field || "",
+        field: result.field || detail.field || "",
         editable: selectedEditable,
-        label: detail.label || "",
-        blockLabel: detail.blockLabel || "",
-        action: actionLabel || "",
-        actionHref: actionHref || "",
-        actionFormAction: actionFormAction || "",
-        blockKey: detail.blockKey || "",
-        nodeID: detail.nodeID || ""
+        label: result.label || detail.label || "",
+        blockLabel: result.blockLabel || detail.blockLabel || "",
+        action: result.action || "",
+        actionHref: result.actionHref || "",
+        actionFormAction: result.actionFormAction || "",
+        blockKey: result.blockKey || detail.blockKey || "",
+        nodeID: result.nodeID || detail.nodeID || ""
       });
       if (options.reveal && source) revealInspectorSelection(source, control);
-      emit(form, "gosxstudio:preview-select", {
-        field: detail.field || "",
-        source: detail.source || detail.field || "",
-        editable: selectedEditable,
-        label: detail.label || "",
-        blockLabel: detail.blockLabel || "",
-        action: actionLabel || "",
-        actionHref: actionHref || "",
-        actionFormAction: actionFormAction || "",
-        blockKey: detail.blockKey || "",
-        nodeID: detail.nodeID || "",
-        reason: options.reason || "preview"
-      });
       emitEditorOperation("select_preview", {
         mutation: false,
         reason: options.reason || "preview",
         target: {
-          field: detail.field || "",
+          field: result.field || detail.field || "",
           editable: selectedEditable,
-          blockKey: detail.blockKey || "",
-          nodeID: detail.nodeID || "",
+          blockKey: result.blockKey || detail.blockKey || "",
+          nodeID: result.nodeID || detail.nodeID || "",
           selection: selectionKey,
-          kind: detail.field ? "preview-field" : "preview"
+          kind: kind
         },
         payload: {
-          label: detail.label || "",
-          blockLabel: detail.blockLabel || "",
-          action: actionLabel || "",
-          actionHref: actionHref || "",
-          actionFormAction: actionFormAction || ""
+          label: result.label || detail.label || "",
+          blockLabel: result.blockLabel || detail.blockLabel || "",
+          action: result.action || "",
+          actionHref: result.actionHref || "",
+          actionFormAction: result.actionFormAction || ""
         }
       });
       return true;
