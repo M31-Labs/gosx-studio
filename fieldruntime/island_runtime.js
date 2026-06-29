@@ -126,16 +126,17 @@
       };
       var update = frameTask(updateNow);
       input.addEventListener("input", update);
-      if (frameTarget || attrTarget) {
+      if (key || frameTarget || attrTarget) {
         // Re-trigger on iframe load so the preview gets the current value
         // after a navigation. Matches legacy bindStudioFrameLoad behavior.
-        Array.prototype.forEach.call(doc.querySelectorAll(".editor-preview-frame"), function (iframe) {
-          var attr = "data-editor-frame-text-island-" + String(key || input.name || attrName || "field")
+        Array.prototype.forEach.call(doc.querySelectorAll(".editor-preview-frame, [data-studio-preview-frame]"), function (iframe) {
+          var bindingKey = [key, input.name, frameTarget, attrTarget, attrName].filter(Boolean).join("-") || "field";
+          var attr = "data-editor-frame-text-island-" + String(bindingKey)
             .replace(/[^a-z0-9_-]/gi, "-")
             .toLowerCase();
           if (iframe.getAttribute(attr) === "true") return;
           iframe.setAttribute(attr, "true");
-          iframe.addEventListener("load", function () { window.requestAnimationFrame(update); });
+          iframe.addEventListener("load", update);
         });
       }
       updateNow();

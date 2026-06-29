@@ -117,6 +117,23 @@ func TestIslandRuntimeJSMirrorsStudioFieldSourceControls(t *testing.T) {
 	}
 }
 
+func TestIslandRuntimeJSRefreshesMirroredFieldSourcesOnPreviewFrameLoad(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, fragment := range []string{
+		`if (key || frameTarget || attrTarget) {`,
+		`doc.querySelectorAll(".editor-preview-frame, [data-studio-preview-frame]")`,
+		`var bindingKey = [key, input.name, frameTarget, attrTarget, attrName].filter(Boolean).join("-") || "field";`,
+		`iframe.addEventListener("load", update);`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing mirrored preview-frame load refresh fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `iframe.addEventListener("load", function () { window.requestAnimationFrame(update); });`) {
+		t.Fatalf("IslandRuntimeJS() preview-frame load refresh should use frameTask-wrapped update, not direct requestAnimationFrame")
+	}
+}
+
 func TestBridgeShimAutoMountsOnDocumentReady(t *testing.T) {
 	// Pre-2026-05-27 the deleted studio-engines.js bundle auto-mounted every
 	// runtime contract at DOMContentLoaded via its top-level init() function

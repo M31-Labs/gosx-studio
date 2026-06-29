@@ -110,6 +110,19 @@ func TestWorkbenchRuntimeLetsFieldRuntimeOwnMirroredPreviewPatches(t *testing.T)
 	}
 }
 
+func TestWorkbenchRuntimeSkipsMirroredFieldsDuringPreviewLoadSync(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`queryAll(form, "[data-studio-field-source], [data-editor-source], input[name], textarea[name], select[name]").forEach(function (field) {`,
+		`if (fieldRuntimeMirrors(field)) return;`,
+		`count += applyPreviewPatch(frame, patch);`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing load-sync mirrored-field skip/fallback fragment %q", check)
+		}
+	}
+}
+
 func TestLegacyRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
 	for name, tt := range map[string]struct {
 		path    string

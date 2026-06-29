@@ -965,7 +965,8 @@
     function syncPreviewFrame(frame, reason) {
       if (!frameDocument(frame)) return 0;
       var count = 0;
-      queryAll(form, "[data-studio-field-source], [data-editor-source]").forEach(function (field) {
+      queryAll(form, "[data-studio-field-source], [data-editor-source], input[name], textarea[name], select[name]").forEach(function (field) {
+        if (fieldRuntimeMirrors(field)) return;
         var patch = {
           type: "gosxstudio:preview-patch",
           source: "gosx-studio",
