@@ -58,6 +58,10 @@
     return Array.prototype.slice.call(root.querySelectorAll(selector));
   }
 
+  function attrValue(value) {
+    return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  }
+
   function closestWorkbenchForm(node) {
     return node && node.closest ? node.closest("form[data-studio-workbench], form[data-editor-workbench]") : null;
   }
@@ -76,8 +80,93 @@
     return queryAll(form, ".editor-preview-frame, [data-studio-preview-frame]");
   }
 
+  function editorPreviewFrameDocument(frame) {
+    try {
+      return frame.contentDocument || (frame.contentWindow && frame.contentWindow.document) || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
   function editorPreviewURL(frame) {
     return frame.getAttribute("data-studio-preview-src") || frame.getAttribute("src") || "";
+  }
+
+  function editorPreviewPatchSelector(source) {
+    source = attrValue(source);
+    return [
+      '[data-studio-field="' + source + '"]',
+      '[data-editor-preview="' + source + '"]',
+      '[data-studio-field-source="' + source + '"]'
+    ].join(",");
+  }
+
+  function editorPreviewPatchTargets(frame, patch) {
+    var frameDoc = editorPreviewFrameDocument(frame);
+    var field = patch && patch.field;
+    var source = field && (field.source || field.name);
+    if (!frameDoc || !source) return [];
+    return queryAll(frameDoc, editorPreviewPatchSelector(source));
+  }
+
+  function updateEditorPreviewPatchTarget(target, field) {
+    if (!target || !field) return;
+    var value = field.value == null ? "" : String(field.value);
+    var tag = String(target.tagName || "").toLowerCase();
+    var editable = target.getAttribute("data-studio-editable") || target.getAttribute("data-studio-field-editable") || "";
+    if (tag === "input" || tag === "textarea" || tag === "select") {
+      target.value = value;
+      if (field.type === "checkbox" || field.type === "radio") target.checked = !!field.checked;
+    } else if (tag === "img" || tag === "video" || tag === "audio" || editable === "media" || editable === "image") {
+      if (value) target.setAttribute("src", value);
+    } else if (tag === "a" && (editable === "url" || editable === "link" || String(field.name || "").toLowerCase().indexOf("url") >= 0)) {
+      target.setAttribute("href", value || "#");
+    } else {
+      target.textContent = value;
+    }
+    target.setAttribute("data-gosx-studio-preview-patched", "fresh");
+    window.setTimeout(function () {
+      if (target && target.setAttribute) target.setAttribute("data-gosx-studio-preview-patched", "true");
+    }, 220);
+  }
+
+  function applyEditorPreviewPatch(frame, patch) {
+    if (!frame || !patch || !patch.field) return { handled: false, count: 0 };
+    var targets = editorPreviewPatchTargets(frame, patch);
+    targets.forEach(function (target) {
+      updateEditorPreviewPatchTarget(target, patch.field);
+    });
+    if (targets.length) {
+      frame.setAttribute("data-studio-preview-patched-count", String(targets.length));
+    }
+    return { handled: true, count: targets.length };
+  }
+
+  function postEditorPreviewPatch(form, reason, patch) {
+    var frames = editorPreviewFrames(form);
+    var count = 0;
+    if (!form || !frames.length || !patch) return { handled: false, count: 0 };
+    if (!patch.field) {
+      if (reason !== "load-sync") setEditorPreviewStatus(form, "dirty", "Live preview pending", reason || "patch");
+      emitEditorPreview(form, "gosxstudio:preview-patch", patch);
+      return { handled: true, count: 0 };
+    }
+    frames.forEach(function (frame) {
+      if (!frame.contentWindow || !frame.getAttribute("src")) return;
+      count += applyEditorPreviewPatch(frame, patch).count || 0;
+      try {
+        frame.contentWindow.postMessage(patch, new URL(frame.getAttribute("src"), window.location.href).origin);
+      } catch (error) {
+        try {
+          frame.contentWindow.postMessage(patch, window.location.origin);
+        } catch (ignored) {
+          return;
+        }
+      }
+    });
+    if (reason !== "load-sync") setEditorPreviewStatus(form, "dirty", "Live preview pending", reason || "patch");
+    emitEditorPreview(form, "gosxstudio:preview-patch", patch);
+    return { handled: true, count: count };
   }
 
   function cacheBustPreviewURL(url, reason) {
@@ -190,6 +279,15 @@
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, scheduleEditorPreviewRefresh(form, detail.reason, detail.route));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-patch-apply", function (event) {
+      var detail = event.detail || {};
+      setEditorPreviewResult(detail, applyEditorPreviewPatch(detail.frame, detail.patch));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-patch-post", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, detail.patch));
     });
   }
 

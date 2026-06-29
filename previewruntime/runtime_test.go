@@ -339,6 +339,49 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewChromeEvents(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewPatchTransport(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-patch-apply"`,
+		`doc.addEventListener("gosxstudio:editor-preview-patch-post"`,
+		`setEditorPreviewResult(detail, applyEditorPreviewPatch(detail.frame, detail.patch))`,
+		`setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, detail.patch))`,
+		`function editorPreviewFrameDocument(frame)`,
+		`frame.contentDocument || (frame.contentWindow && frame.contentWindow.document) || null`,
+		`function editorPreviewPatchSelector(source)`,
+		`'[data-studio-field="' + source + '"]'`,
+		`'[data-editor-preview="' + source + '"]'`,
+		`'[data-studio-field-source="' + source + '"]'`,
+		`function updateEditorPreviewPatchTarget(target, field)`,
+		`target.value = value`,
+		`if (field.type === "checkbox" || field.type === "radio") target.checked = !!field.checked`,
+		`target.setAttribute("src", value)`,
+		`target.setAttribute("href", value || "#")`,
+		`target.textContent = value`,
+		`target.setAttribute("data-gosx-studio-preview-patched", "fresh")`,
+		`target.setAttribute("data-gosx-studio-preview-patched", "true")`,
+		`}, 220)`,
+		`frame.setAttribute("data-studio-preview-patched-count", String(targets.length))`,
+		`if (!patch.field) {`,
+		`if (reason !== "load-sync") setEditorPreviewStatus(form, "dirty", "Live preview pending", reason || "patch")`,
+		`emitEditorPreview(form, "gosxstudio:preview-patch", patch)`,
+		`if (!frame.contentWindow || !frame.getAttribute("src")) return`,
+		`frame.contentWindow.postMessage(patch, new URL(frame.getAttribute("src"), window.location.href).origin)`,
+		`frame.contentWindow.postMessage(patch, window.location.origin)`,
+		`return { handled: true, count: count }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview patch transport fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview patch control events")
+	}
+}
+
 func TestSubscriberRuntimeScriptPublishesObservers(t *testing.T) {
 	// The preview-side subscriber registers observers for each
 	// $preview.* signal family. This test guards against drift between

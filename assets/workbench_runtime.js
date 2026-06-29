@@ -930,38 +930,10 @@
       return true;
     }
 
-    function updatePreviewTarget(target, field) {
-      if (!target || !field) return;
-      var value = field.value == null ? "" : String(field.value);
-      var tag = String(target.tagName || "").toLowerCase();
-      var editable = target.getAttribute("data-studio-editable") || target.getAttribute("data-studio-field-editable") || "";
-      if (tag === "input" || tag === "textarea" || tag === "select") {
-        target.value = value;
-        if (field.type === "checkbox" || field.type === "radio") target.checked = !!field.checked;
-      } else if (tag === "img" || editable === "media" || editable === "image") {
-        if (value) target.setAttribute("src", value);
-      } else if (tag === "a" && (editable === "url" || field.name.toLowerCase().indexOf("url") >= 0)) {
-        target.setAttribute("href", value || "#");
-      } else {
-        target.textContent = value;
-      }
-      target.setAttribute("data-gosx-studio-preview-patched", "fresh");
-      window.setTimeout(function () {
-        if (target && target.setAttribute) target.setAttribute("data-gosx-studio-preview-patched", "true");
-      }, 220);
-    }
-
     function applyPreviewPatch(frame, patch) {
-      var doc = frameDocument(frame);
-      if (!doc || !patch || !patch.field) return 0;
-      var targets = previewTargets(frame, patch);
-      targets.forEach(function (target) {
-        updatePreviewTarget(target, patch.field);
-      });
-      if (targets.length) {
-        frame.setAttribute("data-studio-preview-patched-count", String(targets.length));
-      }
-      return targets.length;
+      var detail = { form: form, frame: frame, patch: patch };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-patch-apply", { bubbles: true, detail: detail }));
+      return detail.result && detail.result.count ? detail.result.count : 0;
     }
 
     function syncPreviewFrame(frame, reason) {
@@ -1153,26 +1125,9 @@
         detail: detail || {},
         field: fieldPatch(field)
       };
-      if (!patch.field) {
-        if (reason !== "load-sync") setPreviewStatus("dirty", "Live preview pending", reason || "patch");
-        emit(form, "gosxstudio:preview-patch", patch);
-        return;
-      }
-      frames.forEach(function (frame) {
-        if (!frame.contentWindow || !frame.getAttribute("src")) return;
-        applyPreviewPatch(frame, patch);
-        try {
-          frame.contentWindow.postMessage(patch, new URL(frame.getAttribute("src"), window.location.href).origin);
-        } catch (error) {
-          try {
-            frame.contentWindow.postMessage(patch, window.location.origin);
-          } catch (ignored) {
-            return;
-          }
-        }
-      });
-      if (reason !== "load-sync") setPreviewStatus("dirty", "Live preview pending", reason || "patch");
-      emit(form, "gosxstudio:preview-patch", patch);
+      var payload = { form: form, frames: frames, patch: patch, reason: reason || "patch", detail: detail || {} };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-patch-post", { bubbles: true, detail: payload }));
+      return payload.result || null;
     }
 
     function bindPreviewFrames() {
