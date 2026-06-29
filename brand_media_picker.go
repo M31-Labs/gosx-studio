@@ -2,6 +2,33 @@ package studio
 
 import "m31labs.dev/gosx"
 
+type BrandMediaPickerAssetItem struct {
+	ID          string
+	URL         string
+	Alt         string
+	Filename    string
+	CardClass   string
+	FilterGroup string
+	StatusLabel string
+	ActionLabel string
+}
+
+type BrandMediaPickerProps struct {
+	Kicker          string
+	Title           string
+	Summary         string
+	FilterLabel     string
+	AssetLabel      string
+	EmptyLabel      string
+	UploadHref      string
+	FormID          string
+	SaveAction      string
+	LogoPickName    string
+	FaviconPickName string
+	HasAssets       bool
+	Assets          []BrandMediaPickerAssetItem
+}
+
 type BrandMediaPickerOptions struct {
 	RootAttrs map[string]any
 }
