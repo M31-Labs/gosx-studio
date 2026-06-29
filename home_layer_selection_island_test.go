@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"m31labs.dev/gosx"
 )
 
 func TestHomeLayerSelectionIslandSourceContract(t *testing.T) {
@@ -51,6 +53,29 @@ func TestHomeLayerSelectionIslandSourceContract(t *testing.T) {
 	} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("home layer selection island source should use serializable typed props, found %q", forbidden)
+		}
+	}
+}
+
+func TestRenderHomeLayerSelectionUsesTypedProps(t *testing.T) {
+	html := gosx.RenderHTML(RenderHomeLayerSelection(HomeLayerSelectionProps{
+		DefaultSelectedKey:   "hero",
+		DefaultSelectedLabel: "Hero",
+		Items: []HomeLayerSelectionItem{
+			{Key: "hero", Label: "Hero"},
+			{Key: "featured", Label: "Featured"},
+		},
+	}))
+
+	for _, fragment := range []string{
+		`<div class="studio-home-layer-picker" data-studio-home-layer-selected="hero">`,
+		`<output data-studio-selection-label="true" aria-live="polite">Hero</output>`,
+		`<div class="studio-home-layer-picker__list" role="toolbar" aria-label="Select home section">`,
+		`<button type="button" data-studio-home-layer-pick="hero" aria-pressed>Hero</button>`,
+		`<button type="button" data-studio-home-layer-pick="featured">Featured</button>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("home layer selection render missing %q:\n%s", fragment, html)
 		}
 	}
 }

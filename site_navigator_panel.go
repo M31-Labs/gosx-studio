@@ -25,6 +25,32 @@ type SiteNavigatorPanelOptions struct {
 	RootAttrs map[string]any
 }
 
+func RenderSiteNavigatorPanel(props SiteNavigatorProps, options SiteNavigatorPanelOptions) gosx.Node {
+	view := map[string]any{
+		"mode":     props.Mode,
+		"kicker":   props.Kicker,
+		"title":    props.Title,
+		"label":    props.Label,
+		"empty":    props.Empty,
+		"hasItems": props.HasItems,
+		"items":    siteNavigatorItemViews(props.Items),
+	}
+	attrs := []any{
+		gosx.Attr("class", "studio-nav-panel"),
+		gosx.Attr("data-studio-site-navigator-panel", "true"),
+		gosx.Attr("data-studio-mode-panel", props.Mode),
+		gosx.Attr("data-studio-engine-source", "gosx"),
+		gosx.Attr("data-studio-site-filter", "all"),
+		gosx.Attr("data-gosx-studio-site-navigator-renderer", "gosx-studio"),
+	}
+	attrs = appendBlockLibraryPanelAttrs(attrs, options.RootAttrs)
+	return gosx.El("section", gosx.Attrs(attrs...),
+		RenderSiteNavigatorHeader(view, SiteNavigatorPanelOptions{}),
+		renderSiteNavigatorFilterControls(),
+		RenderSiteNavigatorList(view, SiteNavigatorPanelOptions{}),
+	)
+}
+
 func RenderSiteNavigatorHeader(view map[string]any, options SiteNavigatorPanelOptions) gosx.Node {
 	attrs := []any{
 		gosx.Attr("class", "studio-panel-heading"),
@@ -35,6 +61,27 @@ func RenderSiteNavigatorHeader(view map[string]any, options SiteNavigatorPanelOp
 		gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchMapString(view, "kicker"))),
 		gosx.El("h2", nil, gosx.Text(workbenchMapString(view, "title"))),
 	)
+}
+
+func renderSiteNavigatorFilterControls() gosx.Node {
+	return gosx.El("div", gosx.Attrs(
+		gosx.Attr("class", "studio-page-filter"),
+		gosx.Attr("role", "toolbar"),
+		gosx.Attr("aria-label", "Site area filter"),
+	),
+		renderSiteNavigatorFilterButton("All", true),
+		renderSiteNavigatorFilterButton("Site", false),
+		renderSiteNavigatorFilterButton("Content", false),
+		renderSiteNavigatorFilterButton("Store", false),
+		renderSiteNavigatorFilterButton("Tools", false),
+	)
+}
+
+func renderSiteNavigatorFilterButton(label string, pressed bool) gosx.Node {
+	return gosx.El("button", gosx.Attrs(
+		gosx.Attr("type", "button"),
+		gosx.Attr("aria-pressed", pressed),
+	), gosx.Text(label))
 }
 
 func RenderSiteNavigatorList(view map[string]any, options SiteNavigatorPanelOptions) gosx.Node {
@@ -67,4 +114,19 @@ func renderSiteNavigatorItems(items []map[string]any) []gosx.Node {
 		), gosx.El("span", nil, gosx.Text(workbenchMapString(item, "label")))))
 	}
 	return nodes
+}
+
+func siteNavigatorItemViews(items []SiteNavigatorItem) []map[string]any {
+	out := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, map[string]any{
+			"key":     item.Key,
+			"group":   item.Group,
+			"label":   item.Label,
+			"href":    item.Href,
+			"class":   item.Class,
+			"summary": item.Summary,
+		})
+	}
+	return out
 }
