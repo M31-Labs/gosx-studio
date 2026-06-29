@@ -107,18 +107,30 @@ func TestWorkbenchRuntimePrefersShellRenderedPreviewDock(t *testing.T) {
 func TestWorkbenchRuntimeLetsFieldRuntimeOwnMirroredPreviewPatches(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
-		`function fieldRuntimeMirrors(field)`,
-		`field.matches("[data-editor-source], [data-studio-field-source], [data-editor-frame-attr-target]")`,
+		`function shouldTransportPreviewPatch(field, reason)`,
+		`target.dispatchEvent(new CustomEvent("gosxstudio:field-preview-patch-resolve", {`,
+		`var runtime = window.GoSXStudioFieldRuntime;`,
+		`runtime.bindMirroring(root);`,
+		`runtime.bind(root);`,
+		`return !(result && result.transport === false);`,
 		`emitFieldOperation("input", event.target);`,
-		`if (!fieldRuntimeMirrors(event.target)) postPreviewPatch("input", {}, event.target);`,
+		`if (shouldTransportPreviewPatch(event.target, "input")) postPreviewPatch("input", {}, event.target);`,
 		`emitFieldOperation("change", event.target);`,
-		`if (!fieldRuntimeMirrors(event.target)) postPreviewPatch("change", {}, event.target);`,
+		`if (shouldTransportPreviewPatch(event.target, "change")) postPreviewPatch("change", {}, event.target);`,
 		`postPreviewPatch("load-sync", { route: previewURL(frame) || frame.getAttribute("src") || "" }, null);`,
 		`postPreviewPatch("transaction", event.detail || {}, null);`,
 		`postPreviewPatch("history-restore", event.detail || {}, null);`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing FieldRuntime preview patch ownership fragment %q", check)
+		}
+	}
+	for _, forbidden := range []string{
+		`function fieldRuntimeMirrors(field)`,
+		`field.matches("[data-editor-source], [data-studio-field-source], [data-editor-frame-attr-target]")`,
+	} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should not own mirrored FieldRuntime preview patch policy fragment %q", forbidden)
 		}
 	}
 }
@@ -150,7 +162,7 @@ func TestWorkbenchRuntimeSkipsMirroredFieldsDuringPreviewLoadSync(t *testing.T) 
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
 		`queryAll(form, "[data-studio-field-source], [data-editor-source], input[name], textarea[name], select[name]").forEach(function (field) {`,
-		`if (fieldRuntimeMirrors(field)) return;`,
+		`if (!shouldTransportPreviewPatch(field, reason || "sync")) return;`,
 		`count += applyPreviewPatch(frame, patch);`,
 	} {
 		if !strings.Contains(script, check) {

@@ -5,6 +5,19 @@ import (
 	"testing"
 )
 
+func jsFunctionBody(t *testing.T, script, name string) string {
+	t.Helper()
+	start := strings.Index(script, "function "+name+"(")
+	if start < 0 {
+		t.Fatalf("script missing function %s", name)
+	}
+	next := strings.Index(script[start+len("function "+name+"("):], "\n  function ")
+	if next < 0 {
+		return script[start:]
+	}
+	return script[start : start+len("function "+name+"(")+next]
+}
+
 // The fieldruntime package is the Go-side surface for the Phase 3 slice-1
 // island implementation of GoSXStudioFieldRuntime. It owns:
 //   1. The feature-flag key (retained for host-probe API stability — the
@@ -106,7 +119,8 @@ func TestIslandRuntimeJSPublishesIslandGlobals(t *testing.T) {
 func TestIslandRuntimeJSMirrorsStudioFieldSourceControls(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	for _, fragment := range []string{
-		`querySelectorAll("[data-editor-source], [data-studio-field-source], [data-editor-frame-attr-target]")`,
+		`var mirroredPreviewFieldSelector = "[data-editor-source], [data-studio-field-source], [data-editor-frame-attr-target]";`,
+		`querySelectorAll(mirroredPreviewFieldSelector)`,
 		`input.getAttribute("data-editor-source") || input.getAttribute("data-studio-field-source")`,
 		`writeSharedSignal("$preview.field." + key, input.value)`,
 		`writeSharedSignal("$preview.text." + detailKey, {`,
@@ -114,6 +128,29 @@ func TestIslandRuntimeJSMirrorsStudioFieldSourceControls(t *testing.T) {
 		if !strings.Contains(body, fragment) {
 			t.Fatalf("IslandRuntimeJS() missing data-studio-field-source mirroring fragment %q", fragment)
 		}
+	}
+}
+
+func TestIslandRuntimeJSOwnsMirroredPreviewPatchTransportPolicy(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, fragment := range []string{
+		`function installPreviewPatchResolver()`,
+		`installPreviewPatchResolver();`,
+		`marker.addEventListener("gosxstudio:field-preview-patch-resolve", function (event) {`,
+		`var envelope = event.detail || {};`,
+		`var field = envelope.field;`,
+		`var mirrored = !!(field && field.matches && field.matches(mirroredPreviewFieldSelector));`,
+		`envelope.result = {`,
+		`mirrored: mirrored,`,
+		`transport: !mirrored,`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing mirrored preview patch resolver fragment %q", fragment)
+		}
+	}
+	resolverBody := jsFunctionBody(t, body, "installPreviewPatchResolver")
+	if strings.Contains(resolverBody, `gosxstudio:preview-patch`) {
+		t.Fatalf("FieldRuntime preview patch resolver must only answer policy and not emit preview patch events:\n%s", resolverBody)
 	}
 }
 

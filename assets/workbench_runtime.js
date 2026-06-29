@@ -990,7 +990,7 @@
       if (!frameDocument(frame)) return 0;
       var count = 0;
       queryAll(form, "[data-studio-field-source], [data-editor-source], input[name], textarea[name], select[name]").forEach(function (field) {
-        if (fieldRuntimeMirrors(field)) return;
+        if (!shouldTransportPreviewPatch(field, reason || "sync")) return;
         var patch = {
           type: "gosxstudio:preview-patch",
           source: "gosx-studio",
@@ -1085,8 +1085,46 @@
       };
     }
 
-    function fieldRuntimeMirrors(field) {
-      return !!(field && field.matches && field.matches("[data-editor-source], [data-studio-field-source], [data-editor-frame-attr-target]"));
+    function resolvePreviewPatchTransport(field, reason) {
+      var envelope = {
+        field: field || null,
+        reason: reason || "patch",
+        result: null
+      };
+      var target = field && field.dispatchEvent ? field : form;
+      target.dispatchEvent(new CustomEvent("gosxstudio:field-preview-patch-resolve", {
+        bubbles: true,
+        detail: envelope
+      }));
+      return envelope.result || null;
+    }
+
+    function bindFieldRuntimeForPreviewPatchResolution() {
+      var runtime = window.GoSXStudioFieldRuntime;
+      var root = document.body || document;
+      if (!runtime) return false;
+      try {
+        if (typeof runtime.bindMirroring === "function") {
+          runtime.bindMirroring(root);
+          return true;
+        }
+        if (typeof runtime.bind === "function") {
+          runtime.bind(root);
+          return true;
+        }
+      } catch (error) {
+        return false;
+      }
+      return false;
+    }
+
+    function shouldTransportPreviewPatch(field, reason) {
+      if (!field) return true;
+      var result = resolvePreviewPatchTransport(field, reason);
+      if (!result && bindFieldRuntimeForPreviewPatchResolution()) {
+        result = resolvePreviewPatchTransport(field, reason);
+      }
+      return !(result && result.transport === false);
     }
 
     function emitFieldOperation(reason, field) {
@@ -1673,13 +1711,13 @@
     form.addEventListener("input", function (event) {
       if (!event.target || !form.contains(event.target)) return;
       emitFieldOperation("input", event.target);
-      if (!fieldRuntimeMirrors(event.target)) postPreviewPatch("input", {}, event.target);
+      if (shouldTransportPreviewPatch(event.target, "input")) postPreviewPatch("input", {}, event.target);
     });
 
     form.addEventListener("change", function (event) {
       if (!event.target || !form.contains(event.target)) return;
       emitFieldOperation("change", event.target);
-      if (!fieldRuntimeMirrors(event.target)) postPreviewPatch("change", {}, event.target);
+      if (shouldTransportPreviewPatch(event.target, "change")) postPreviewPatch("change", {}, event.target);
     });
 
     form.addEventListener("gosxstudio:editor-transaction", function (event) {

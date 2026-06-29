@@ -66,6 +66,24 @@
     return doc;
   }
 
+  var mirroredPreviewFieldSelector = "[data-editor-source], [data-studio-field-source], [data-editor-frame-attr-target]";
+
+  function installPreviewPatchResolver() {
+    var marker = doc.documentElement;
+    if (!marker || marker.dataset.gosxStudioFieldPreviewPatchResolverBound === "true") return;
+    marker.dataset.gosxStudioFieldPreviewPatchResolverBound = "true";
+    marker.addEventListener("gosxstudio:field-preview-patch-resolve", function (event) {
+      var envelope = event.detail || {};
+      var field = envelope.field;
+      var mirrored = !!(field && field.matches && field.matches(mirroredPreviewFieldSelector));
+      envelope.result = {
+        mirrored: mirrored,
+        transport: !mirrored,
+        reason: mirrored ? "fieldruntime-mirrored-" + (envelope.reason || "patch") : "fieldruntime-concrete-" + (envelope.reason || "patch")
+      };
+    });
+  }
+
   // Set a shared signal value through the WASM bridge. The bridge exposes
   // window.__gosx_set_shared_signal_json(name, valueJSON) after the
   // runtime boots; the cross-frame relay (per ADR 0009 +
@@ -88,7 +106,8 @@
 
   function bindFieldMirroringIsland(root) {
     var scope = resolveScope(root);
-    var inputs = scope.querySelectorAll("[data-editor-source], [data-studio-field-source], [data-editor-frame-attr-target]");
+    installPreviewPatchResolver();
+    var inputs = scope.querySelectorAll(mirroredPreviewFieldSelector);
     Array.prototype.forEach.call(inputs, function (input) {
       if (input.dataset.gosxStudioFieldMirrorIslandBound === "true") return;
       input.dataset.gosxStudioFieldMirrorIslandBound = "true";
