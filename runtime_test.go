@@ -123,6 +123,35 @@ func TestWorkbenchRuntimeSkipsMirroredFieldsDuringPreviewLoadSync(t *testing.T) 
 	}
 }
 
+func TestWorkbenchRuntimeDelegatesPreviewInlineTextToInlineEditRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		"window.GoSXStudioInlineEditRuntime",
+		"startPreviewTextEdit",
+		"syncPreviewTextEdit",
+		"finishPreviewTextEdit",
+		"previewInlineTextOptions",
+		"controlForField: textControlForField",
+		"emitOperation: function (type, operation)",
+		"emitEvent: function (name, detail)",
+		"onFinish: function (finishedFrame)",
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing InlineEditRuntime preview inline-text delegate fragment %q", check)
+		}
+	}
+	for _, forbidden := range []string{
+		"function placeCaretAtEnd",
+		`target.setAttribute("contenteditable", "plaintext-only")`,
+		`target.removeAttribute("contenteditable")`,
+		"function inlineTextPayload",
+	} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should delegate preview inline-text lifecycle, found low-level fragment %q", forbidden)
+		}
+	}
+}
+
 func TestWorkbenchRuntimeLeavesSelectionActionsToSelectionRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, forbidden := range []string{

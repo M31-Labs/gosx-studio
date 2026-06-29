@@ -1092,106 +1092,48 @@
       return null;
     }
 
-    function placeCaretAtEnd(doc, node) {
-      try {
-        node.focus();
-        var selection = doc.defaultView && doc.defaultView.getSelection ? doc.defaultView.getSelection() : null;
-        if (!selection || !doc.createRange) return;
-        var range = doc.createRange();
-        range.selectNodeContents(node);
-        range.collapse(false);
-        selection.removeAllRanges();
-        selection.addRange(range);
-      } catch (error) {
-        return;
-      }
+    function previewInlineTextRuntime(method) {
+      var runtime = window.GoSXStudioInlineEditRuntime;
+      return runtime && typeof runtime[method] === "function" ? runtime : null;
     }
 
-    function inlineTextPayload(edit, text) {
+    function previewInlineTextOptions(frame) {
       return {
-        text: text,
-        field: edit.field || "",
-        previous: edit.originalValue || "",
-        label: edit.label || ""
+        form: form,
+        target: frame && frame.__gosxStudioPreviewDockTarget,
+        controlForField: textControlForField,
+        selection: function (edit) {
+          return {
+            selection: form.getAttribute("data-studio-selection") || edit.blockKey || edit.field || "",
+            kind: form.getAttribute("data-studio-selection-kind") || "preview-field"
+          };
+        },
+        setDirty: function (reason) {
+          setPreviewStatus("dirty", "Draft changed", reason || "inline-text");
+        },
+        emitOperation: function (type, operation) {
+          return emitEditorOperation(type, operation);
+        },
+        emitEvent: function (name, detail) {
+          emit(form, name, detail);
+        },
+        onFinish: function (finishedFrame) {
+          updatePreviewDockPosition(finishedFrame);
+        }
       };
-    }
-
-    function emitInlineTextEvent(name, edit, reason, text) {
-      emit(form, name, {
-        field: edit.field || "",
-        editable: "text",
-        blockKey: edit.blockKey || "",
-        label: edit.label || "",
-        text: text == null ? (edit.target && edit.target.textContent) || "" : text,
-        reason: reason || ""
-      });
     }
 
     function syncInlineTextEdit(frame, reason) {
-      var edit = frame && frame.__gosxStudioInlineEdit;
-      if (!edit || !edit.target) return false;
-      var text = edit.target.textContent || "";
-      if (edit.control && "value" in edit.control) edit.control.value = text;
-      if (edit.lastText === text) return true;
-      edit.lastText = text;
-      setPreviewStatus("dirty", "Draft changed", reason || "inline-text");
-      emitEditorOperation("set_text", {
-        mutation: true,
-        reason: reason || "inline-text",
-        target: {
-          field: edit.field || "",
-          editable: "text",
-          blockKey: edit.blockKey || "",
-          selection: form.getAttribute("data-studio-selection") || edit.blockKey || edit.field || "",
-          kind: form.getAttribute("data-studio-selection-kind") || "preview-field"
-        },
-        payload: inlineTextPayload(edit, text)
-      });
-      emitInlineTextEvent("gosxstudio:inline-text", edit, reason || "inline-text", text);
-      return true;
+      var runtime = previewInlineTextRuntime("syncPreviewTextEdit");
+      if (!runtime) return false;
+      return runtime.syncPreviewTextEdit(frame, reason, previewInlineTextOptions(frame));
     }
 
     function startInlineTextEdit(frame, detail, reason) {
-      var target = frame && frame.__gosxStudioPreviewDockTarget;
+      var runtime = previewInlineTextRuntime("startPreviewTextEdit");
+      if (!runtime) return false;
       detail = detail || (frame && frame.__gosxStudioPreviewDock ? previewDockDetail(frame.__gosxStudioPreviewDock) : {});
-      if (!frame || !target || !detail.field || detail.editable !== "text") return false;
-      finishInlineTextEdit(frame, true, "restart-inline-text");
-      var doc = frameDocument(frame);
-      if (!doc) return false;
-      var startReason = reason || "preview-dock";
-      var control = textControlForField(detail.field);
-      var text = target.textContent || "";
-      frame.__gosxStudioInlineEdit = {
-        target: target,
-        field: detail.field || "",
-        blockKey: detail.blockKey || "",
-        label: detail.label || "",
-        control: control,
-        originalText: text,
-        originalValue: control && "value" in control ? control.value || "" : text,
-        lastText: text
-      };
-      target.setAttribute("contenteditable", "plaintext-only");
-      target.setAttribute("spellcheck", "true");
-      target.setAttribute("data-gosx-studio-inline-editing", "true");
-      form.setAttribute("data-gosx-studio-inline-field", detail.field);
-      placeCaretAtEnd(doc, target);
-      emitEditorOperation("inline_text_start", {
-        mutation: false,
-        reason: startReason,
-        target: {
-          field: detail.field || "",
-          editable: "text",
-          blockKey: detail.blockKey || "",
-          selection: form.getAttribute("data-studio-selection") || detail.blockKey || detail.field || "",
-          kind: form.getAttribute("data-studio-selection-kind") || "preview-field"
-        },
-        payload: {
-          label: detail.label || ""
-        }
-      });
-      emitInlineTextEvent("gosxstudio:inline-text-start", frame.__gosxStudioInlineEdit, startReason, text);
-      return true;
+      return runtime.startPreviewTextEdit(frame, detail, reason || "preview-dock", previewInlineTextOptions(frame));
     }
 
     function startInlineTextFromDetail(frame, detail, reason) {
@@ -1208,34 +1150,9 @@
     }
 
     function finishInlineTextEdit(frame, commit, reason) {
-      var edit = frame && frame.__gosxStudioInlineEdit;
-      if (!edit || !edit.target) return false;
-      if (edit.finishing) return false;
-      edit.finishing = true;
-      if (commit) {
-        syncInlineTextEdit(frame, reason || "commit");
-        emitInlineTextEvent("gosxstudio:inline-text-commit", edit, reason || "commit", edit.target.textContent || "");
-      } else {
-        edit.target.textContent = edit.originalText || "";
-        if (edit.control && "value" in edit.control) edit.control.value = edit.originalValue || "";
-        emitEditorOperation("inline_text_cancel", {
-          mutation: false,
-          reason: reason || "cancel",
-          target: {
-            field: edit.field || "",
-            editable: "text",
-            blockKey: edit.blockKey || ""
-          },
-          payload: inlineTextPayload(edit, edit.originalValue || "")
-        });
-        emitInlineTextEvent("gosxstudio:inline-text-cancel", edit, reason || "cancel", edit.originalValue || "");
-      }
-      edit.target.removeAttribute("contenteditable");
-      edit.target.removeAttribute("data-gosx-studio-inline-editing");
-      form.removeAttribute("data-gosx-studio-inline-field");
-      frame.__gosxStudioInlineEdit = null;
-      updatePreviewDockPosition(frame);
-      return true;
+      var runtime = previewInlineTextRuntime("finishPreviewTextEdit");
+      if (!runtime) return false;
+      return runtime.finishPreviewTextEdit(frame, commit, reason, previewInlineTextOptions(frame));
     }
 
     function postPreviewPatch(reason, detail, field) {

@@ -10,7 +10,11 @@
   // window.GoSXStudioInlineEditRuntime.install(overlayEl, opts).
   //
   // Public API:
-  //   window.GoSXStudioInlineEditRuntime = { install, deriveKeys }
+  //   window.GoSXStudioInlineEditRuntime = {
+  //     install, deriveKeys,
+  //     startPreviewTextEdit, syncPreviewTextEdit, finishPreviewTextEdit,
+  //     previewTextEditState
+  //   }
   //
   //   install(root, opts)
   //     root : the overlay container element whose [contenteditable][data-studio-field]
@@ -80,6 +84,198 @@
     if (!el) return "";
     var t = el.textContent;
     return typeof t === "string" ? t : "";
+  }
+
+  function frameDocument(frame) {
+    try {
+      return frame && (frame.contentDocument || (frame.contentWindow && frame.contentWindow.document)) || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function placeCaretAtEnd(doc, node) {
+    try {
+      node.focus();
+      var selection = doc.defaultView && doc.defaultView.getSelection ? doc.defaultView.getSelection() : null;
+      if (!selection || !doc.createRange) return;
+      var range = doc.createRange();
+      range.selectNodeContents(node);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } catch (error) {
+      return;
+    }
+  }
+
+  function previewTextEditState(frame) {
+    return frame && frame.__gosxStudioInlineEdit || null;
+  }
+
+  function previewTextSelection(edit, opts) {
+    var selection = {};
+    if (opts && typeof opts.selection === "function") {
+      try { selection = opts.selection(edit) || {}; } catch (error) { selection = {}; }
+    }
+    return {
+      selection: selection.selection || edit.blockKey || edit.field || "",
+      kind: selection.kind || "preview-field"
+    };
+  }
+
+  function previewTextTarget(edit, opts, includeSelection) {
+    var target = {
+      field: edit.field || "",
+      editable: "text",
+      blockKey: edit.blockKey || ""
+    };
+    if (includeSelection) {
+      var selection = previewTextSelection(edit, opts);
+      target.selection = selection.selection;
+      target.kind = selection.kind;
+    }
+    return target;
+  }
+
+  function inlineTextPayload(edit, text) {
+    return {
+      text: text,
+      field: edit.field || "",
+      previous: edit.originalValue || "",
+      label: edit.label || ""
+    };
+  }
+
+  function emitPreviewTextOperation(opts, type, operation) {
+    opts = opts || {};
+    if (typeof opts.emitOperation === "function") {
+      try { return opts.emitOperation(type, operation); } catch (error) { return null; }
+    }
+    if (typeof opts.emitEditorOperation === "function") {
+      var detail = operation || {};
+      try { return opts.emitEditorOperation(type, detail); } catch (error) { return null; }
+    }
+    return null;
+  }
+
+  function inlineTextEventDetail(edit, reason, text) {
+    return {
+      field: edit.field || "",
+      editable: "text",
+      blockKey: edit.blockKey || "",
+      label: edit.label || "",
+      text: text == null ? textOf(edit.target) : text,
+      reason: reason || ""
+    };
+  }
+
+  function emitPreviewTextEvent(opts, name, edit, reason, text) {
+    opts = opts || {};
+    if (typeof opts.emitEvent !== "function") return;
+    try { opts.emitEvent(name, inlineTextEventDetail(edit, reason, text)); } catch (error) { return; }
+  }
+
+  function previewTextControl(field, opts) {
+    if (!opts || typeof opts.controlForField !== "function") return null;
+    try {
+      var control = opts.controlForField(field);
+      return control && "value" in control ? control : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function startPreviewTextEdit(frame, detail, reason, opts) {
+    opts = opts || {};
+    detail = detail || {};
+    var target = opts.target || (frame && frame.__gosxStudioPreviewDockTarget);
+    if (!frame || !target || !detail.field || detail.editable !== "text") return false;
+    finishPreviewTextEdit(frame, true, "restart-inline-text", opts);
+    var doc = frameDocument(frame);
+    if (!doc) return false;
+    var startReason = reason || "preview-dock";
+    var control = previewTextControl(detail.field, opts);
+    var text = textOf(target);
+    var edit = {
+      target: target,
+      field: detail.field || "",
+      blockKey: detail.blockKey || "",
+      label: detail.label || "",
+      control: control,
+      originalText: text,
+      originalValue: control && "value" in control ? control.value || "" : text,
+      lastText: text
+    };
+    frame.__gosxStudioInlineEdit = edit;
+    target.setAttribute("contenteditable", "plaintext-only");
+    target.setAttribute("spellcheck", "true");
+    target.setAttribute("data-gosx-studio-inline-editing", "true");
+    if (opts.form && typeof opts.form.setAttribute === "function") {
+      opts.form.setAttribute("data-gosx-studio-inline-field", detail.field);
+    }
+    placeCaretAtEnd(doc, target);
+    emitPreviewTextOperation(opts, "inline_text_start", {
+      mutation: false,
+      reason: startReason,
+      target: previewTextTarget(edit, opts, true),
+      payload: { label: detail.label || "" }
+    });
+    emitPreviewTextEvent(opts, "gosxstudio:inline-text-start", edit, startReason, text);
+    return true;
+  }
+
+  function syncPreviewTextEdit(frame, reason, opts) {
+    opts = opts || {};
+    var edit = previewTextEditState(frame);
+    if (!edit || !edit.target) return false;
+    var text = textOf(edit.target);
+    if (edit.control && "value" in edit.control) edit.control.value = text;
+    if (edit.lastText === text) return true;
+    edit.lastText = text;
+    if (typeof opts.setDirty === "function") {
+      try { opts.setDirty(reason || "inline-text"); } catch (error) { /* tolerate */ }
+    }
+    emitPreviewTextOperation(opts, "set_text", {
+      mutation: true,
+      reason: reason || "inline-text",
+      target: previewTextTarget(edit, opts, true),
+      payload: inlineTextPayload(edit, text)
+    });
+    emitPreviewTextEvent(opts, "gosxstudio:inline-text", edit, reason || "inline-text", text);
+    return true;
+  }
+
+  function finishPreviewTextEdit(frame, commit, reason, opts) {
+    opts = opts || {};
+    var edit = previewTextEditState(frame);
+    if (!edit || !edit.target) return false;
+    if (edit.finishing) return false;
+    edit.finishing = true;
+    if (commit) {
+      syncPreviewTextEdit(frame, reason || "commit", opts);
+      emitPreviewTextEvent(opts, "gosxstudio:inline-text-commit", edit, reason || "commit", textOf(edit.target));
+    } else {
+      edit.target.textContent = edit.originalText || "";
+      if (edit.control && "value" in edit.control) edit.control.value = edit.originalValue || "";
+      emitPreviewTextOperation(opts, "inline_text_cancel", {
+        mutation: false,
+        reason: reason || "cancel",
+        target: previewTextTarget(edit, opts, false),
+        payload: inlineTextPayload(edit, edit.originalValue || "")
+      });
+      emitPreviewTextEvent(opts, "gosxstudio:inline-text-cancel", edit, reason || "cancel", edit.originalValue || "");
+    }
+    edit.target.removeAttribute("contenteditable");
+    edit.target.removeAttribute("data-gosx-studio-inline-editing");
+    if (opts.form && typeof opts.form.removeAttribute === "function") {
+      opts.form.removeAttribute("data-gosx-studio-inline-field");
+    }
+    frame.__gosxStudioInlineEdit = null;
+    if (typeof opts.onFinish === "function") {
+      try { opts.onFinish(frame, edit, reason || (commit ? "commit" : "cancel"), !!commit); } catch (error) { /* tolerate */ }
+    }
+    return true;
   }
 
   // deriveKeys maps a binding string to { page, component, control } by
@@ -307,5 +503,12 @@
     });
   }
 
-  window.GoSXStudioInlineEditRuntime = { install: install, deriveKeys: deriveKeys };
+  window.GoSXStudioInlineEditRuntime = {
+    install: install,
+    deriveKeys: deriveKeys,
+    startPreviewTextEdit: startPreviewTextEdit,
+    syncPreviewTextEdit: syncPreviewTextEdit,
+    finishPreviewTextEdit: finishPreviewTextEdit,
+    previewTextEditState: previewTextEditState
+  };
 })();

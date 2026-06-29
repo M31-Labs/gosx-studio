@@ -199,6 +199,77 @@ func TestInlineEditRuntimeOnCommitHook(t *testing.T) {
 	}
 }
 
+func TestInlineEditRuntimePublishesPreviewTextSessionMethods(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"startPreviewTextEdit",
+		"syncPreviewTextEdit",
+		"finishPreviewTextEdit",
+		"previewTextEditState",
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() must expose preview text session method %q:\n%s", fragment, body)
+		}
+	}
+}
+
+func TestInlineEditRuntimeOwnsPreviewTextSessionLifecycle(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"frame.__gosxStudioInlineEdit",
+		`detail.editable !== "text"`,
+		`frame.__gosxStudioPreviewDockTarget`,
+		`target.setAttribute("contenteditable", "plaintext-only")`,
+		`target.setAttribute("spellcheck", "true")`,
+		`target.setAttribute("data-gosx-studio-inline-editing", "true")`,
+		`target.removeAttribute("contenteditable")`,
+		`target.removeAttribute("data-gosx-studio-inline-editing")`,
+		`data-gosx-studio-inline-field`,
+		"placeCaretAtEnd",
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() must own preview inline-text lifecycle fragment %q:\n%s", fragment, body)
+		}
+	}
+}
+
+func TestInlineEditRuntimePreviewTextOperationsAndEvents(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"inline_text_start",
+		"set_text",
+		"inline_text_cancel",
+		"gosxstudio:inline-text-start",
+		"gosxstudio:inline-text",
+		"gosxstudio:inline-text-commit",
+		"gosxstudio:inline-text-cancel",
+		"inlineTextPayload",
+		"inlineTextEventDetail",
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() missing preview inline-text operation/event fragment %q:\n%s", fragment, body)
+		}
+	}
+}
+
+func TestInlineEditRuntimePreviewTextCallbacks(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"opts.form",
+		"opts.controlForField",
+		"opts.selection",
+		"opts.setDirty",
+		"opts.emitOperation",
+		"opts.emitEditorOperation",
+		"opts.emitEvent",
+		"opts.onFinish",
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() missing preview inline-text callback hook %q:\n%s", fragment, body)
+		}
+	}
+}
+
 // TestInlineEditRuntimeNoPersistRepaintSafeLogic verifies that muddy-specific
 // bundle-rewriting is NOT ported into the generic island. The prohibition is
 // documented in a header comment (it is fine for the word to appear there), but
