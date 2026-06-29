@@ -243,14 +243,6 @@
       return operation;
     }
 
-    function previewShells() {
-      return queryAll(form, "[data-gosx-studio-preview], [data-studio-preview-shell], [data-studio-canvas]");
-    }
-
-    function previewFrames() {
-      return queryAll(form, "[data-studio-preview-frame]");
-    }
-
     function previewSelectionDetail(node) {
       var payload = { target: node };
       form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-detail-resolve", { bubbles: true, detail: payload }));
@@ -282,6 +274,12 @@
       if (!dock || !target || dock.hidden) return null;
       var detail = { form: form, frame: frame, dock: dock, target: target };
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-position-sync", { bubbles: true, detail: detail }));
+      return detail.result || null;
+    }
+
+    function syncPreviewDockPositions(reason) {
+      var detail = { form: form, reason: reason || "sync" };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-positions-sync", { bubbles: true, detail: detail }));
       return detail.result || null;
     }
 
@@ -715,8 +713,6 @@
     }
 
     function postPreviewPatch(reason, detail, field) {
-      var frames = previewFrames();
-      if (!frames.length) return;
       var payload = { form: form, reason: reason || "patch", detail: detail || {}, field: field || null };
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-patch-build-post", { bubbles: true, detail: payload }));
       return payload.result || null;
@@ -1117,7 +1113,7 @@
     });
 
     window.addEventListener("resize", function () {
-      previewFrames().forEach(updatePreviewDockPosition);
+      syncPreviewDockPositions("resize");
     });
 
     restoreLayout(form);

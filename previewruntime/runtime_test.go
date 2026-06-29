@@ -1315,6 +1315,34 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockPosition(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockPositionsSync(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-dock-positions-sync"`,
+		`setEditorPreviewResult(detail, syncEditorPreviewDockPositions(form))`,
+		`function syncEditorPreviewDockPositions(form)`,
+		`if (!form) return { handled: false, count: 0 }`,
+		`var count = 0`,
+		`editorPreviewFrames(form).forEach(function (frame)`,
+		`var dock = frame && frame.__gosxStudioPreviewDock`,
+		`var target = frame && frame.__gosxStudioPreviewDockTarget`,
+		`if (!dock || !target || dock.hidden) return`,
+		`var result = syncEditorPreviewDockPosition(frame, dock, target)`,
+		`if (result && result.handled) count += 1`,
+		`return { handled: true, count: count }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview dock positions sync fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-positions-sync`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock positions control events")
+	}
+}
+
 func TestSubscriberRuntimeScriptPublishesObservers(t *testing.T) {
 	// The preview-side subscriber registers observers for each
 	// $preview.* signal family. This test guards against drift between

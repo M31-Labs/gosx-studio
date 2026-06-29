@@ -178,6 +178,9 @@ func TestWorkbenchRuntimeDelegatesEditorPreviewPatchTransport(t *testing.T) {
 	}
 	body := jsFunctionBody(t, script, "postPreviewPatch")
 	for _, forbidden := range []string{
+		`var frames = previewFrames()`,
+		`if (!frames.length) return`,
+		`previewFrames()`,
 		`type: "gosxstudio:preview-patch"`,
 		`source: "gosx-studio"`,
 		`field: fieldPatch(field)`,
@@ -308,6 +311,14 @@ func TestWorkbenchRuntimeDelegatesPreviewFrameLifecycleToPreviewRuntime(t *testi
 	}
 	if strings.Contains(script, `function previewURL(frame)`) {
 		t.Fatalf("workbench runtime should not keep previewURL after delegating frame lifecycle")
+	}
+	for _, forbidden := range []string{
+		`function previewFrames()`,
+		`function previewShells()`,
+	} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should not keep preview frame/shell query helper %q", forbidden)
+		}
 	}
 }
 
@@ -734,6 +745,35 @@ func TestWorkbenchRuntimeDelegatesPreviewDockPositionToPreviewRuntime(t *testing
 	} {
 		if strings.Contains(body, forbidden) {
 			t.Fatalf("updatePreviewDockPosition should delegate concrete preview dock positioning mutation; found %q in:\n%s", forbidden, body)
+		}
+	}
+}
+
+func TestWorkbenchRuntimeDelegatesAllPreviewDockPositionsToPreviewRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	body := jsFunctionBody(t, script, "syncPreviewDockPositions")
+	for _, check := range []string{
+		`function syncPreviewDockPositions(reason)`,
+		`var detail = { form: form, reason: reason || "sync" };`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-positions-sync", { bubbles: true, detail: detail }))`,
+		`return detail.result || null;`,
+		`window.addEventListener("resize", function () {`,
+		`syncPreviewDockPositions("resize");`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing all-preview dock position delegation fragment %q", check)
+		}
+	}
+	for _, forbidden := range []string{
+		`previewFrames().forEach(updatePreviewDockPosition)`,
+		`previewFrames().forEach`,
+		`queryAll(form, "[data-studio-preview-frame]")`,
+		`getBoundingClientRect`,
+		`dock.style.top`,
+		`dock.style.left`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("syncPreviewDockPositions should delegate all-preview dock positioning; found %q in:\n%s", forbidden, body)
 		}
 	}
 }

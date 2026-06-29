@@ -575,6 +575,19 @@
     return { handled: true, placement: placement };
   }
 
+  function syncEditorPreviewDockPositions(form) {
+    if (!form) return { handled: false, count: 0 };
+    var count = 0;
+    editorPreviewFrames(form).forEach(function (frame) {
+      var dock = frame && frame.__gosxStudioPreviewDock;
+      var target = frame && frame.__gosxStudioPreviewDockTarget;
+      if (!dock || !target || dock.hidden) return;
+      var result = syncEditorPreviewDockPosition(frame, dock, target);
+      if (result && result.handled) count += 1;
+    });
+    return { handled: true, count: count };
+  }
+
   function syncEditorPreviewDockSelection(form, frame, target, selection, host) {
     var dockLookup = editorPreviewDockForFrame(frame);
     var dock = dockLookup.dock;
@@ -1100,6 +1113,11 @@
     doc.addEventListener("gosxstudio:editor-preview-dock-position-sync", function (event) {
       var detail = event.detail || {};
       setEditorPreviewResult(detail, syncEditorPreviewDockPosition(detail.frame, detail.dock, detail.target, detail.shell));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-dock-positions-sync", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      setEditorPreviewResult(detail, syncEditorPreviewDockPositions(form));
     });
     doc.addEventListener("gosxstudio:editor-preview-document-bind", function (event) {
       var detail = event.detail || {};
