@@ -98,6 +98,30 @@ func TestIslandRuntimeJSPublishesIslandGlobal(t *testing.T) {
 	}
 }
 
+func TestSelectionRuntimeIslandOwnsSelectionActionTelemetry(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, contract := range []string{
+		`function selectionActionLabel(action, labelOverride)`,
+		`|| labelOverride || action || ""`,
+		`function emitSelectionAction(action, labelOverride)`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:selection-action", { bubbles: true, detail: detail }))`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:workbench-action", { bubbles: true, detail: detail }))`,
+		`action: action || ""`,
+		`label: selectionActionLabel(action, labelOverride)`,
+		`selection: form.getAttribute("data-studio-selection") || form.getAttribute("data-gosx-studio-canvas-selected") || ""`,
+		`kind: form.getAttribute("data-studio-selection-kind") || ""`,
+		`button.getAttribute("aria-label") || button.getAttribute("title") || button.textContent`,
+		`function runSelectionAction(action, labelOverride)`,
+		`emitSelectionAction(action, labelOverride);`,
+		`runSelectionAction(target, detail.label);`,
+		`if (event.preventDefault) event.preventDefault();`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() missing selection-action telemetry contract %q", contract)
+		}
+	}
+}
+
 func TestBridgeShimAutoMountsOnDocumentReady(t *testing.T) {
 	// Pre-2026-05-27 the deleted studio-engines.js bundle auto-mounted every
 	// runtime contract at DOMContentLoaded via its top-level init() function.

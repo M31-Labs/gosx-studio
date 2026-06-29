@@ -1626,18 +1626,6 @@
       if (add && add !== button && add.click) add.click();
     }
 
-    function runSelectionAction(button) {
-      var action = button.getAttribute("data-studio-selection-action") || "";
-      var detail = {
-        action: action,
-        label: labelFromButton(button, action),
-        selection: form.getAttribute("data-studio-selection") || form.getAttribute("data-gosx-studio-canvas-selected") || "",
-        kind: form.getAttribute("data-studio-selection-kind") || ""
-      };
-      emit(form, "gosxstudio:selection-action", detail);
-      emit(form, "gosxstudio:workbench-action", detail);
-    }
-
     function runInsertTarget(target, label) {
       target = target || "";
       if (!target) return false;
@@ -1648,24 +1636,6 @@
       }
       emit(form, "gosxstudio:insert-block", { target: target, label: label || target });
       emit(form, "gosxstudio:workbench-action", { action: "insert-block", target: target, label: label || target });
-      return true;
-    }
-
-    function runSelectionTarget(target, label) {
-      target = target || "";
-      if (!target) return false;
-      var button = form.querySelector('[data-studio-selection-action="' + attrValue(target) + '"]');
-      if (button) {
-        runSelectionAction(button);
-        return true;
-      }
-      emit(form, "gosxstudio:selection-action", {
-        action: target,
-        label: label || target,
-        selection: form.getAttribute("data-studio-selection") || "",
-        kind: form.getAttribute("data-studio-selection-kind") || ""
-      });
-      emit(form, "gosxstudio:workbench-action", { action: target, label: label || target });
       return true;
     }
 
@@ -1691,7 +1661,6 @@
         return true;
       }
       if (detail.kind === "insert") return runInsertTarget(detail.target, detail.label);
-      if (detail.kind === "selection-action") return runSelectionTarget(detail.target, detail.label);
       return false;
     }
 
@@ -1743,11 +1712,6 @@
       if (insert && form.contains(insert)) {
         runInsert(insert);
         return;
-      }
-      var selectionAction = event.target.closest("[data-studio-selection-action]");
-      if (selectionAction && form.contains(selectionAction)) {
-        event.preventDefault();
-        runSelectionAction(selectionAction);
       }
     });
 

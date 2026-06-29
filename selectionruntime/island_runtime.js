@@ -134,6 +134,10 @@
     return String(value).replace(/"/g, '\\"');
   }
 
+  function compactText(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
   function editorWorkbench(root) {
     var scope = root && root.querySelector ? root : doc;
     return scope.querySelector ? scope.querySelector("[data-studio-workbench]") : null;
@@ -547,7 +551,24 @@
     }
 
     // Sub-behavior 4: selection commandbar actions.
-    function runSelectionAction(action) {
+    function selectionActionLabel(action, labelOverride) {
+      var button = action ? form.querySelector('[data-studio-selection-action="' + attrValue(action) + '"]') : null;
+      return compactText(button && (button.getAttribute("aria-label") || button.getAttribute("title") || button.textContent)) || labelOverride || action || "";
+    }
+
+    function emitSelectionAction(action, labelOverride) {
+      var detail = {
+        action: action || "",
+        label: selectionActionLabel(action, labelOverride),
+        selection: form.getAttribute("data-studio-selection") || form.getAttribute("data-gosx-studio-canvas-selected") || "",
+        kind: form.getAttribute("data-studio-selection-kind") || ""
+      };
+      form.dispatchEvent(new CustomEvent("gosxstudio:selection-action", { bubbles: true, detail: detail }));
+      form.dispatchEvent(new CustomEvent("gosxstudio:workbench-action", { bubbles: true, detail: detail }));
+    }
+
+    function runSelectionAction(action, labelOverride) {
+      emitSelectionAction(action, labelOverride);
       var row = selectedRow();
       if (!row) return;
       var key = row.getAttribute("data-block-studio-block") || "";
@@ -604,7 +625,10 @@
         var detail = event.detail || {};
         var kind = detail.kind || "";
         var target = detail.target || "";
-        if (kind === "selection-action") runSelectionAction(target);
+        if (kind === "selection-action") {
+          runSelectionAction(target, detail.label);
+          if (event.preventDefault) event.preventDefault();
+        }
       });
     }
 

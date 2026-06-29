@@ -123,6 +123,32 @@ func TestWorkbenchRuntimeSkipsMirroredFieldsDuringPreviewLoadSync(t *testing.T) 
 	}
 }
 
+func TestWorkbenchRuntimeLeavesSelectionActionsToSelectionRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, forbidden := range []string{
+		`function runSelectionAction(button)`,
+		`function runSelectionTarget(target, label)`,
+		`detail.kind === "selection-action"`,
+		`event.target.closest("[data-studio-selection-action]")`,
+		`[data-studio-selection-action="`,
+	} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should not own selection action bridge fragment %q", forbidden)
+		}
+	}
+	for _, check := range []string{
+		`function runInsert(button)`,
+		`emit(form, "gosxstudio:insert-block", detail)`,
+		`if (detail.kind === "insert") return runInsertTarget(detail.target, detail.label);`,
+		`var mode = event.target.closest("[data-studio-mode-control]")`,
+		`var rail = event.target.closest("[data-studio-rail-toggle]")`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing non-selection chrome/insert fragment %q", check)
+		}
+	}
+}
+
 func TestLegacyRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
 	for name, tt := range map[string]struct {
 		path    string
