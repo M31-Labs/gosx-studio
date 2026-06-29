@@ -89,6 +89,7 @@ test.describe("@reference-apps low-WASM default canvas", () => {
       await expect(graphSurface, "DOM graph sub-tree still exists").toBeAttached();
       await expect(graphSurface, "DOM graph sub-tree is hidden because the canvas is the sole graph").toBeHidden();
 
+      await canvas.scrollIntoViewIfNeeded();
       const box = await canvas.boundingBox();
       expect(box, "default canvas should have a layout box").not.toBeNull();
       expect(box!.width, "canvas CSS width > 0").toBeGreaterThan(0);
