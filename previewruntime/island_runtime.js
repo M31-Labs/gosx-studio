@@ -514,6 +514,23 @@
     return result;
   }
 
+  function editorPreviewPointerEventEligible(event) {
+    if (!event || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+    if (event.button > 0) return false;
+    return true;
+  }
+
+  function editorPreviewKeyboardIntent(event) {
+    if (!event || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return null;
+    var focusedControl = event.target && event.target.closest ? event.target.closest("input, textarea, select, button, a[href], [contenteditable='true'], [contenteditable='plaintext-only']") : null;
+    if (focusedControl) return null;
+    if (event.key === "[") return { action: "prev-field", reason: "keyboard-prev-field" };
+    if (event.key === "]") return { action: "next-field", reason: "keyboard-next-field" };
+    if (event.key === "F2") return { action: "inline-text", reason: "keyboard-f2" };
+    if (event.key === "Enter") return { action: "inline-text", reason: "keyboard-enter" };
+    return null;
+  }
+
   function setEditorPreviewStatus(form, state, label, reason) {
     if (!form) return { handled: false };
     editorPreviewShells(form).forEach(function (shell) {
@@ -639,6 +656,14 @@
     doc.addEventListener("gosxstudio:editor-preview-selectable-node-resolve", function (event) {
       var detail = event.detail || {};
       detail.result = editorPreviewSelectableNode(detail.target);
+    });
+    doc.addEventListener("gosxstudio:editor-preview-pointer-event-eligible", function (event) {
+      var detail = event.detail || {};
+      detail.result = { eligible: editorPreviewPointerEventEligible(detail.event) };
+    });
+    doc.addEventListener("gosxstudio:editor-preview-key-intent", function (event) {
+      var detail = event.detail || {};
+      detail.result = editorPreviewKeyboardIntent(detail.event);
     });
     doc.addEventListener("gosxstudio:editor-preview-field-map-clear", function (event) {
       var detail = event.detail || {};

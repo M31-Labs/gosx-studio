@@ -230,6 +230,44 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectableNodeResolutionToPreviewRuntim
 	}
 }
 
+func TestWorkbenchRuntimeDelegatesPreviewEventPolicyToPreviewRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`function previewPointerEventEligible(event)`,
+		`var detail = { form: form, event: event };`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-pointer-event-eligible", { bubbles: true, detail: detail }))`,
+		`return !!(detail.result && detail.result.eligible);`,
+		`function previewKeyIntent(event)`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-key-intent", { bubbles: true, detail: detail }))`,
+		`return detail.result || null;`,
+		`if (!previewPointerEventEligible(event)) return;`,
+		`var intent = previewKeyIntent(event);`,
+		`if (intent.action === "prev-field" || intent.action === "next-field")`,
+		`navigatePreviewField(frame, intent.action === "next-field" ? 1 : -1, intent.reason)`,
+		`if (intent.action !== "inline-text") return;`,
+		`startInlineTextFromSelection(frame, intent.reason)`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing preview event-policy delegation fragment %q", check)
+		}
+	}
+
+	body := jsFunctionBody(t, script, "bindPreviewDocument")
+	for _, forbidden := range []string{
+		`event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button > 0`,
+		`event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey`,
+		`var focusedControl = event.target && event.target.closest ? event.target.closest("input, textarea, select, button, a[href], [contenteditable='true'], [contenteditable='plaintext-only']") : null;`,
+		`if (focusedControl) return;`,
+		`if (event.key === "[" || event.key === "]")`,
+		`event.key === "]" ? "keyboard-next-field" : "keyboard-prev-field"`,
+		`event.key === "F2" ? "keyboard-f2" : "keyboard-enter"`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("bindPreviewDocument should delegate preview event policy; found %q in:\n%s", forbidden, body)
+		}
+	}
+}
+
 func TestWorkbenchRuntimeDelegatesEditorPreviewChromeToPreviewRuntimeEvents(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{

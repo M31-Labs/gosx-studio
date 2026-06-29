@@ -301,6 +301,18 @@
       return detail.result || null;
     }
 
+    function previewPointerEventEligible(event) {
+      var detail = { form: form, event: event };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-pointer-event-eligible", { bubbles: true, detail: detail }));
+      return !!(detail.result && detail.result.eligible);
+    }
+
+    function previewKeyIntent(event) {
+      var detail = { form: form, event: event };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-key-intent", { bubbles: true, detail: detail }));
+      return detail.result || null;
+    }
+
     function clearPreviewFieldMap(frame) {
       var detail = { form: form, frame: frame };
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-map-clear", { bubbles: true, detail: detail }));
@@ -927,7 +939,7 @@
       doc.addEventListener("click", function (event) {
         var edit = frame.__gosxStudioInlineEdit;
         if (edit && edit.target && (event.target === edit.target || (edit.target.contains && edit.target.contains(event.target)))) return;
-        if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button > 0) return;
+        if (!previewPointerEventEligible(event)) return;
         var target = previewSelectableNode(event.target);
         if (!target) return;
         if (applyPreviewSelection(frame, target, previewSelectionDetail(target), { reveal: true, reason: "click" })) {
@@ -938,7 +950,7 @@
       doc.addEventListener("dblclick", function (event) {
         var edit = frame.__gosxStudioInlineEdit;
         if (edit && edit.target && (event.target === edit.target || (edit.target.contains && edit.target.contains(event.target)))) return;
-        if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button > 0) return;
+        if (!previewPointerEventEligible(event)) return;
         var target = previewSelectableNode(event.target);
         if (!target) return;
         var detail = previewSelectionDetail(target);
@@ -974,18 +986,17 @@
       });
       doc.addEventListener("keydown", function (event) {
         if (frame.__gosxStudioInlineEdit) return;
-        if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
-        var focusedControl = event.target && event.target.closest ? event.target.closest("input, textarea, select, button, a[href], [contenteditable='true'], [contenteditable='plaintext-only']") : null;
-        if (focusedControl) return;
-        if (event.key === "[" || event.key === "]") {
-          if (navigatePreviewField(frame, event.key === "]" ? 1 : -1, event.key === "]" ? "keyboard-next-field" : "keyboard-prev-field")) {
+        var intent = previewKeyIntent(event);
+        if (!intent) return;
+        if (intent.action === "prev-field" || intent.action === "next-field") {
+          if (navigatePreviewField(frame, intent.action === "next-field" ? 1 : -1, intent.reason)) {
             event.preventDefault();
             event.stopPropagation();
           }
           return;
         }
-        if (event.key !== "Enter" && event.key !== "F2") return;
-        if (startInlineTextFromSelection(frame, event.key === "F2" ? "keyboard-f2" : "keyboard-enter")) {
+        if (intent.action !== "inline-text") return;
+        if (startInlineTextFromSelection(frame, intent.reason)) {
           event.preventDefault();
           event.stopPropagation();
         }

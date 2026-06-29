@@ -478,6 +478,43 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectableNodeResolution(t *test
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewEventPolicy(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-pointer-event-eligible"`,
+		`detail.result = { eligible: editorPreviewPointerEventEligible(detail.event) }`,
+		`doc.addEventListener("gosxstudio:editor-preview-key-intent"`,
+		`detail.result = editorPreviewKeyboardIntent(detail.event)`,
+		`function editorPreviewPointerEventEligible(event)`,
+		`if (!event || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false`,
+		`if (event.button > 0) return false`,
+		`return true`,
+		`function editorPreviewKeyboardIntent(event)`,
+		`if (!event || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return null`,
+		`event.target.closest ? event.target.closest("input, textarea, select, button, a[href], [contenteditable='true'], [contenteditable='plaintext-only']") : null`,
+		`if (focusedControl) return null`,
+		`if (event.key === "[") return { action: "prev-field", reason: "keyboard-prev-field" }`,
+		`if (event.key === "]") return { action: "next-field", reason: "keyboard-next-field" }`,
+		`if (event.key === "F2") return { action: "inline-text", reason: "keyboard-f2" }`,
+		`if (event.key === "Enter") return { action: "inline-text", reason: "keyboard-enter" }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview event-policy fragment %q", fragment)
+		}
+	}
+	for _, eventName := range []string{
+		`gosxstudio:editor-preview-pointer-event-eligible`,
+		`gosxstudio:editor-preview-key-intent`,
+	} {
+		if strings.Contains(body, `dispatchEvent(new CustomEvent("`+eventName) {
+			t.Fatalf("IslandRuntimeJS() must not recursively dispatch %s events", eventName)
+		}
+	}
+}
+
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldMapMarkers(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {
