@@ -101,12 +101,12 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
       await page.waitForFunction(() => {
         const w = window as unknown as Record<string, unknown>;
         const rt = w.GoSXStudioSiteMapRuntime as { setState?: unknown } | undefined;
-        const painter = w.__muddyCanvas2DPainter as { paint?: unknown } | undefined;
-        const el = document.querySelector("canvas[data-gosx-canvas-wasm-free='true']") as (HTMLCanvasElement & { __muddyCanvasWasmFree?: unknown }) | null;
+        const painter = w.GoSXStudioCanvas2DPainterRuntime as { paint?: unknown } | undefined;
+        const el = document.querySelector("canvas[data-gosx-canvas-wasm-free='true']") as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: unknown }) | null;
         return !!painter && typeof painter.paint === "function" &&
           !!rt && typeof rt.setState === "function" &&
           document.documentElement.getAttribute("data-gosx-canvas-wasm-free-client") === "true" &&
-          !!el && !!el.__muddyCanvasWasmFree &&
+          !!el && !!el.GoSXStudioCanvasWasmFree &&
           el.getAttribute("data-gosx-canvas-wasm-free-bound") === "true";
       }, null, { timeout: 120_000 });
 
@@ -322,9 +322,9 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
 // build the SAME world→screen transform the painter applies.
 async function readBundleRects(page: Page): Promise<RectInfo[]> {
   return page.evaluate(({ canvasSel, boardSel }) => {
-    const el = document.querySelector(canvasSel) as (HTMLCanvasElement & { __muddyCanvasWasmFree?: { camera: () => { x: number; y: number; z: number }; bundle: () => unknown } }) | null;
-    if (!el || !el.__muddyCanvasWasmFree) return [];
-    const hook = el.__muddyCanvasWasmFree;
+    const el = document.querySelector(canvasSel) as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: { camera: () => { x: number; y: number; z: number }; bundle: () => unknown } }) | null;
+    if (!el || !el.GoSXStudioCanvasWasmFree) return [];
+    const hook = el.GoSXStudioCanvasWasmFree;
     const bundle = hook.bundle() as { objects?: Array<{ id?: string; kind?: string; pickable?: boolean; bounds?: { minX?: number; maxX?: number; minY?: number; maxY?: number } }> } | null;
     if (!bundle) return [];
     const cam = hook.camera();
@@ -373,16 +373,16 @@ async function pollForRects(page: Page): Promise<RectInfo[]> {
 
 async function readCamera(page: Page): Promise<{ x: number; y: number; z: number }> {
   return page.evaluate((sel) => {
-    const el = document.querySelector(sel) as (HTMLCanvasElement & { __muddyCanvasWasmFree?: { camera: () => { x: number; y: number; z: number } } }) | null;
-    if (!el || !el.__muddyCanvasWasmFree) return { x: NaN, y: NaN, z: NaN };
-    return el.__muddyCanvasWasmFree.camera();
+    const el = document.querySelector(sel) as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: { camera: () => { x: number; y: number; z: number } } }) | null;
+    if (!el || !el.GoSXStudioCanvasWasmFree) return { x: NaN, y: NaN, z: NaN };
+    return el.GoSXStudioCanvasWasmFree.camera();
   }, CANVAS_SELECTOR);
 }
 
 async function resetCamera(page: Page): Promise<void> {
   await page.evaluate((sel) => {
-    const el = document.querySelector(sel) as (HTMLCanvasElement & { __muddyCanvasWasmFree?: { setCamera: (x: number, y: number, z: number) => void } }) | null;
-    el?.__muddyCanvasWasmFree?.setCamera(0, 0, 1);
+    const el = document.querySelector(sel) as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: { setCamera: (x: number, y: number, z: number) => void } }) | null;
+    el?.GoSXStudioCanvasWasmFree?.setCamera(0, 0, 1);
   }, CANVAS_SELECTOR);
 }
 

@@ -5,6 +5,10 @@ import (
 	"testing"
 )
 
+func legacyMuddyGlobal(name string) string {
+	return "__" + "muddy" + name
+}
+
 func TestCanvas2DPainterScriptContract(t *testing.T) {
 	body := string(Canvas2DPainterScript())
 	if body == "" {
@@ -12,7 +16,6 @@ func TestCanvas2DPainterScriptContract(t *testing.T) {
 	}
 	for _, check := range []string{
 		"window.GoSXStudioCanvas2DPainterRuntime",
-		"window.__muddyCanvas2DPainter",
 		"paint: paintCanvasBundle",
 		"screenTransform: canvasBoardScreenTransform",
 		"renderCanvasBoardHTML",
@@ -21,6 +24,9 @@ func TestCanvas2DPainterScriptContract(t *testing.T) {
 		if !strings.Contains(body, check) {
 			t.Fatalf("Canvas2DPainterScript() missing %q", check)
 		}
+	}
+	if forbidden := legacyMuddyGlobal("Canvas2DPainter"); strings.Contains(body, forbidden) {
+		t.Fatalf("Canvas2DPainterScript() should not contain %q", forbidden)
 	}
 }
 
@@ -31,19 +37,27 @@ func TestCanvasWASMFreeClientScriptContract(t *testing.T) {
 	}
 	for _, check := range []string{
 		"window.GoSXStudioCanvasWASMFreeClientRuntime",
-		"window.__muddyCanvasWasmFreeClient",
 		"window.GoSXStudioCanvas2DPainterRuntime",
-		"window.__muddyCanvas2DPainter",
 		"window.GoSXStudioCanvasInlineEditRuntime",
-		"window.__muddyCanvasInlineEdit",
 		"window.GoSXStudioCanvasContextualPanelRuntime",
 		"canvas.__gosxStudioCanvasWASMFree",
-		"canvas.__muddyCanvasWasmFree",
+		"canvas.GoSXStudioCanvasWasmFree",
 		"data-gosx-canvas-wasm-free-client",
 		"mountAll: mountAll",
 	} {
 		if !strings.Contains(body, check) {
 			t.Fatalf("CanvasWASMFreeClientScript() missing %q", check)
+		}
+	}
+	for _, check := range []string{
+		legacyMuddyGlobal("CanvasWasmFreeClient"),
+		legacyMuddyGlobal("Canvas2DPainter"),
+		legacyMuddyGlobal("CanvasInlineEdit"),
+		legacyMuddyGlobal("CanvasContextualPanel"),
+		legacyMuddyGlobal("CanvasWasmFree"),
+	} {
+		if strings.Contains(body, check) {
+			t.Fatalf("CanvasWASMFreeClientScript() should not contain %q", check)
 		}
 	}
 }

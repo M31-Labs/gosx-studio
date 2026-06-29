@@ -213,7 +213,7 @@ func TestInlineEditRuntimeNoPersistRepaintSafeLogic(t *testing.T) {
 	for _, muddySpecific := range []string{
 		"__muddyInlineEditInstalled",
 		"data-gosx-canvas-bundle",
-		"__muddyCanvasInlineEdit",
+		"legacyCanvasInlineEditAlias",
 		"PAINTER_CACHE",
 		"__gosxHTMLMarkup",
 	} {

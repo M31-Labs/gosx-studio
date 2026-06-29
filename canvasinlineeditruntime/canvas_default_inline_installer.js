@@ -30,7 +30,7 @@
   }
 
   function install() {
-    var api = window.GoSXStudioCanvasInlineEditRuntime || window.__muddyCanvasInlineEdit;
+    var api = window.GoSXStudioCanvasInlineEditRuntime;
     if (!api || typeof api.install !== "function") return;
     if (typeof document === "undefined" || typeof document.querySelectorAll !== "function") return;
     var markers = document.querySelectorAll(MARKER_SEL);
@@ -56,5 +56,4 @@
 
   var api = { install: install, installHost: installHost };
   window.GoSXStudioCanvasDefaultInlineInstallerRuntime = api;
-  window.__muddyCanvasDefaultInlineInstaller = api;
 })();

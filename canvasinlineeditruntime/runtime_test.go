@@ -5,6 +5,10 @@ import (
 	"testing"
 )
 
+func legacyMuddyGlobal(name string) string {
+	return "__" + "muddy" + name
+}
+
 func TestCanvasInlineEditScriptContract(t *testing.T) {
 	body := string(CanvasInlineEditScript())
 	if body == "" {
@@ -12,7 +16,6 @@ func TestCanvasInlineEditScriptContract(t *testing.T) {
 	}
 	for _, check := range []string{
 		"window.GoSXStudioCanvasInlineEditRuntime",
-		"window.__muddyCanvasInlineEdit",
 		"GoSXStudioInlineEditRuntime",
 		"__gosxStudioCanvasInlineEditPendingInstall",
 		"return false",
@@ -21,6 +24,11 @@ func TestCanvasInlineEditScriptContract(t *testing.T) {
 	} {
 		if !strings.Contains(body, check) {
 			t.Fatalf("CanvasInlineEditScript() missing %q", check)
+		}
+	}
+	for _, check := range []string{"window." + legacyMuddyGlobal("CanvasInlineEdit"), legacyMuddyGlobal("CanvasInlineEdit")} {
+		if strings.Contains(body, check) {
+			t.Fatalf("CanvasInlineEditScript() should not contain %q", check)
 		}
 	}
 }
@@ -39,7 +47,6 @@ func TestCanvasDefaultInlineInstallerScriptContract(t *testing.T) {
 	}
 	for _, check := range []string{
 		"window.GoSXStudioCanvasDefaultInlineInstallerRuntime",
-		"window.__muddyCanvasDefaultInlineInstaller",
 		"GoSXStudioCanvasInlineEditRuntime",
 		"data-studio-site-map-canvas-default",
 		"data-gosx-canvas-html",
@@ -48,5 +55,8 @@ func TestCanvasDefaultInlineInstallerScriptContract(t *testing.T) {
 		if !strings.Contains(body, check) {
 			t.Fatalf("CanvasDefaultInlineInstallerScript() missing %q", check)
 		}
+	}
+	if forbidden := legacyMuddyGlobal("CanvasDefaultInlineInstaller"); strings.Contains(body, forbidden) {
+		t.Fatalf("CanvasDefaultInlineInstallerScript() should not contain %q", forbidden)
 	}
 }

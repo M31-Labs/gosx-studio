@@ -28,14 +28,14 @@ import { startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
 //         far    (z <  THUMB_ZOOM)              → enriched cards only
 //         medium (THUMB_ZOOM <= z < SURFACE)    → faithful thumbnail <img>
 //         near   (z >= SURFACE_ZOOM)            → live editable dom surface
-//       Both thresholds are exported on window.__muddyCanvas2DPainter. We drive the
+//       Both thresholds are exported on window.GoSXStudioCanvas2DPainterRuntime. We drive the
 //       camera across all three bands via the WASM-free client's documented test
-//       hook (canvas.__muddyCanvasWasmFree.setCamera + .repaint — the same hook the
+//       hook (canvas.GoSXStudioCanvasWasmFree.setCamera + .repaint — the same hook the
 //       M7 cards-LOD test uses) and a real wheel gesture, and assert the
 //       thumbnail-img / live-surface counts swap as the tier changes.
 //
 // Honesty discipline (matching the sibling canvas tests): BOTH LOD thresholds are
-// READ FROM THE PAGE (window.__muddyCanvas2DPainter) — no magic numbers — and the
+// READ FROM THE PAGE (window.GoSXStudioCanvas2DPainterRuntime) — no magic numbers — and the
 // sprite/thumbnail is DISCOVERED in the live bundle/overlay, not hardcoded. Each
 // camera change is followed by a poll on the live overlay counts with a deadline
 // so the assertion only fires after the rAF render has applied.
@@ -82,14 +82,14 @@ test.describe("@reference-apps canvas2d site-map WASM-free faithful thumbnails +
       await page.waitForFunction(() => {
         const w = window as unknown as Record<string, unknown>;
         const rt = w.GoSXStudioSiteMapRuntime as { setState?: unknown } | undefined;
-        const painter = w.__muddyCanvas2DPainter as {
+        const painter = w.GoSXStudioCanvas2DPainterRuntime as {
           paint?: unknown;
           renderCanvasBoardHTML?: unknown;
           renderCanvasBoardThumbnails?: unknown;
           CANVAS_LOD_SURFACE_ZOOM?: unknown;
           CANVAS_LOD_THUMB_ZOOM?: unknown;
         } | undefined;
-        const el = document.querySelector("canvas[data-gosx-canvas-wasm-free='true']") as (HTMLCanvasElement & { __muddyCanvasWasmFree?: { setCamera?: unknown; camera?: unknown } }) | null;
+        const el = document.querySelector("canvas[data-gosx-canvas-wasm-free='true']") as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: { setCamera?: unknown; camera?: unknown } }) | null;
         return !!painter && typeof painter.paint === "function" &&
           typeof painter.renderCanvasBoardHTML === "function" &&
           typeof painter.renderCanvasBoardThumbnails === "function" &&
@@ -97,8 +97,8 @@ test.describe("@reference-apps canvas2d site-map WASM-free faithful thumbnails +
           typeof painter.CANVAS_LOD_THUMB_ZOOM === "number" &&
           !!rt && typeof rt.setState === "function" &&
           document.documentElement.getAttribute("data-gosx-canvas-wasm-free-client") === "true" &&
-          !!el && !!el.__muddyCanvasWasmFree &&
-          typeof el.__muddyCanvasWasmFree.setCamera === "function" && typeof el.__muddyCanvasWasmFree.camera === "function";
+          !!el && !!el.GoSXStudioCanvasWasmFree &&
+          typeof el.GoSXStudioCanvasWasmFree.setCamera === "function" && typeof el.GoSXStudioCanvasWasmFree.camera === "function";
       }, null, { timeout: 120_000 });
 
       // Read BOTH LOD thresholds straight off the page so the assertions gate on the
@@ -106,7 +106,7 @@ test.describe("@reference-apps canvas2d site-map WASM-free faithful thumbnails +
       // lower bound of a non-empty medium band, i.e. strictly below SURFACE_ZOOM.
       const lod = await page.evaluate(() => {
         const w = window as unknown as Record<string, unknown>;
-        const painter = w.__muddyCanvas2DPainter as { CANVAS_LOD_SURFACE_ZOOM?: number; CANVAS_LOD_THUMB_ZOOM?: number } | undefined;
+        const painter = w.GoSXStudioCanvas2DPainterRuntime as { CANVAS_LOD_SURFACE_ZOOM?: number; CANVAS_LOD_THUMB_ZOOM?: number } | undefined;
         return {
           thumb: painter && typeof painter.CANVAS_LOD_THUMB_ZOOM === "number" ? painter.CANVAS_LOD_THUMB_ZOOM : NaN,
           surface: painter && typeof painter.CANVAS_LOD_SURFACE_ZOOM === "number" ? painter.CANVAS_LOD_SURFACE_ZOOM : NaN,
@@ -316,8 +316,8 @@ async function pollCount(page: Page, selector: string, predicate: (n: number) =>
 
 async function cameraZoom(page: Page): Promise<number> {
   return page.evaluate((sel) => {
-    const el = document.querySelector(sel) as (HTMLCanvasElement & { __muddyCanvasWasmFree?: { camera: () => { z: number } } }) | null;
-    const hook = el && el.__muddyCanvasWasmFree;
+    const el = document.querySelector(sel) as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: { camera: () => { z: number } } }) | null;
+    const hook = el && el.GoSXStudioCanvasWasmFree;
     return hook ? hook.camera().z : NaN;
   }, CANVAS_SELECTOR);
 }
@@ -335,8 +335,8 @@ async function pollCameraZoom(page: Page, predicate: (z: number) => boolean): Pr
 
 async function setCameraZoom(page: Page, z: number): Promise<void> {
   await page.evaluate(({ sel, zoom }) => {
-    const el = document.querySelector(sel) as (HTMLCanvasElement & { __muddyCanvasWasmFree?: { camera: () => { x: number; y: number; z: number }; setCamera: (x: number, y: number, z: number) => void; repaint: () => void } }) | null;
-    const hook = el && el.__muddyCanvasWasmFree;
+    const el = document.querySelector(sel) as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: { camera: () => { x: number; y: number; z: number }; setCamera: (x: number, y: number, z: number) => void; repaint: () => void } }) | null;
+    const hook = el && el.GoSXStudioCanvasWasmFree;
     if (!hook) return;
     const cam = hook.camera();
     hook.setCamera(cam.x, cam.y, zoom);

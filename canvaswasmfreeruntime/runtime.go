@@ -3,9 +3,7 @@
 //
 // The runtime is host-agnostic: it paints server-provided CanvasBoard render
 // bundles, mounts CanvasBoard overlays, and delegates selection/editor behavior
-// through public Studio browser runtime APIs. Temporary Muddy compatibility
-// globals remain for hosts and tests that have not yet moved to the primary
-// Studio names.
+// through public Studio browser runtime APIs.
 package canvaswasmfreeruntime
 
 import (
@@ -19,15 +17,13 @@ var canvas2DPainterJS []byte
 var canvasWASMFreeClientJS []byte
 
 // Canvas2DPainterScript returns the WASM-free Canvas2D painter. It publishes
-// window.GoSXStudioCanvas2DPainterRuntime and a temporary
-// window.__muddyCanvas2DPainter compatibility alias.
+// window.GoSXStudioCanvas2DPainterRuntime.
 func Canvas2DPainterScript() []byte {
 	return canvas2DPainterJS
 }
 
 // CanvasWASMFreeClientScript returns the WASM-free CanvasBoard browser client.
-// It publishes window.GoSXStudioCanvasWASMFreeClientRuntime and a temporary
-// window.__muddyCanvasWasmFreeClient compatibility alias.
+// It publishes window.GoSXStudioCanvasWASMFreeClientRuntime.
 func CanvasWASMFreeClientScript() []byte {
 	return canvasWASMFreeClientJS
 }

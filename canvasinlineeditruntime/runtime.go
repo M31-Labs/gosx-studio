@@ -18,15 +18,13 @@ var canvasInlineEditJS []byte
 var canvasDefaultInlineInstallerJS []byte
 
 // CanvasInlineEditScript returns the CanvasBoard inline-edit bridge. It
-// publishes window.GoSXStudioCanvasInlineEditRuntime and a temporary
-// window.__muddyCanvasInlineEdit compatibility alias.
+// publishes window.GoSXStudioCanvasInlineEditRuntime.
 func CanvasInlineEditScript() []byte {
 	return canvasInlineEditJS
 }
 
 // CanvasDefaultInlineInstallerScript returns the default CanvasBoard installer.
-// It publishes window.GoSXStudioCanvasDefaultInlineInstallerRuntime and a
-// temporary window.__muddyCanvasDefaultInlineInstaller compatibility alias.
+// It publishes window.GoSXStudioCanvasDefaultInlineInstallerRuntime.
 func CanvasDefaultInlineInstallerScript() []byte {
 	return canvasDefaultInlineInstallerJS
 }

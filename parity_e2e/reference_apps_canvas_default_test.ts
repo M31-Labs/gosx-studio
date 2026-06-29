@@ -66,12 +66,12 @@ test.describe("@reference-apps low-WASM default canvas", () => {
       await page.waitForFunction(() => {
         const w = window as unknown as Record<string, unknown>;
         const rt = w.GoSXStudioSiteMapRuntime as { setState?: unknown } | undefined;
-        const painter = w.__muddyCanvas2DPainter as { paint?: unknown } | undefined;
-        const el = document.querySelector("canvas[data-gosx-canvas-wasm-free='true']") as (HTMLCanvasElement & { __muddyCanvasWasmFree?: unknown }) | null;
+        const painter = w.GoSXStudioCanvas2DPainterRuntime as { paint?: unknown } | undefined;
+        const el = document.querySelector("canvas[data-gosx-canvas-wasm-free='true']") as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: unknown }) | null;
         return !!painter && typeof painter.paint === "function" &&
           !!rt && typeof rt.setState === "function" &&
           document.documentElement.getAttribute("data-gosx-canvas-wasm-free-client") === "true" &&
-          !!el && !!el.__muddyCanvasWasmFree &&
+          !!el && !!el.GoSXStudioCanvasWasmFree &&
           el.getAttribute("data-gosx-canvas-wasm-free-bound") === "true";
       }, null, { timeout: 120_000 });
 
@@ -242,11 +242,11 @@ async function pollForRects(page: Page): Promise<RectInfo[]> {
   let last: RectInfo[] = [];
   while (Date.now() < deadline) {
     last = await page.evaluate(({ canvasSel, boardSel }) => {
-      const el = document.querySelector(canvasSel) as (HTMLCanvasElement & { __muddyCanvasWasmFree?: { camera: () => { x: number; y: number; z: number }; bundle: () => unknown } }) | null;
-      if (!el || !el.__muddyCanvasWasmFree) return [];
-      const bundle = el.__muddyCanvasWasmFree.bundle() as { objects?: Array<{ id?: string; kind?: string; pickable?: boolean; bounds?: { minX?: number; maxX?: number; minY?: number; maxY?: number } }> } | null;
+      const el = document.querySelector(canvasSel) as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: { camera: () => { x: number; y: number; z: number }; bundle: () => unknown } }) | null;
+      if (!el || !el.GoSXStudioCanvasWasmFree) return [];
+      const bundle = el.GoSXStudioCanvasWasmFree.bundle() as { objects?: Array<{ id?: string; kind?: string; pickable?: boolean; bounds?: { minX?: number; maxX?: number; minY?: number; maxY?: number } }> } | null;
       if (!bundle) return [];
-      const cam = el.__muddyCanvasWasmFree.camera();
+      const cam = el.GoSXStudioCanvasWasmFree.camera();
       const cssW = Math.max(1, el.clientWidth || 1);
       const cssH = Math.max(1, el.clientHeight || 1);
       const zoom = cam.z > 0 ? cam.z : 1;

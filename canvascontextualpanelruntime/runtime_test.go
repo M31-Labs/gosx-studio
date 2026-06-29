@@ -5,6 +5,10 @@ import (
 	"testing"
 )
 
+func legacyMuddyGlobal(name string) string {
+	return "__" + "muddy" + name
+}
+
 func TestCanvasContextualPanelScriptContract(t *testing.T) {
 	body := string(CanvasContextualPanelScript())
 	if body == "" {
@@ -12,14 +16,17 @@ func TestCanvasContextualPanelScriptContract(t *testing.T) {
 	}
 	for _, check := range []string{
 		"window.GoSXStudioCanvasContextualPanelRuntime",
-		"window.__muddyCanvasContextualPanel",
 		"window.GoSXStudioCanvasInlineEditRuntime",
-		"window.__muddyCanvasInlineEdit",
 		"persistRepaintSafe",
 		"render: render",
 	} {
 		if !strings.Contains(body, check) {
 			t.Fatalf("CanvasContextualPanelScript() missing %q", check)
+		}
+	}
+	for _, check := range []string{legacyMuddyGlobal("CanvasContextualPanel"), legacyMuddyGlobal("CanvasInlineEdit")} {
+		if strings.Contains(body, check) {
+			t.Fatalf("CanvasContextualPanelScript() should not contain %q", check)
 		}
 	}
 }

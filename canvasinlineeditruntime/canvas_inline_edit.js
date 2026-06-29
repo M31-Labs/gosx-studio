@@ -19,10 +19,6 @@
   //
   // Public API:
   //   window.GoSXStudioCanvasInlineEditRuntime = { install, deriveKeys, persist, persistRepaintSafe, csrfToken }
-  //   window.__muddyCanvasInlineEdit = window.GoSXStudioCanvasInlineEditRuntime
-  //
-  // The __muddyCanvasInlineEdit alias is temporary compatibility for hosts that
-  // have not yet moved painter/client/contextual-panel ownership into Studio.
   //
   //   install(overlay, opts)
   //     overlay : the HTML overlay element whose [contenteditable][data-studio-field]
@@ -352,5 +348,4 @@
 
   var api = { install: install, deriveKeys: deriveKeys, persist: persist, persistRepaintSafe: persistRepaintSafe, csrfToken: csrfToken };
   window.GoSXStudioCanvasInlineEditRuntime = api;
-  window.__muddyCanvasInlineEdit = api;
 })();

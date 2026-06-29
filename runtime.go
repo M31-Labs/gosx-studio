@@ -112,7 +112,7 @@ func CanvasDefaultInlineInstallerScript() []byte {
 
 // CanvasContextualPanelScript returns the CanvasBoard contextual inspector
 // panel. The panel persists field edits through the Studio Canvas inline-edit
-// runtime API and keeps a temporary Muddy compatibility alias.
+// runtime API.
 func CanvasContextualPanelScript() []byte {
 	return canvascontextualpanelruntime.CanvasContextualPanelScript()
 }
@@ -124,15 +124,13 @@ func CanvasSelectionBridgeScript() []byte {
 }
 
 // Canvas2DPainterScript returns the WASM-free Canvas2D painter. It publishes
-// window.GoSXStudioCanvas2DPainterRuntime and keeps
-// window.__muddyCanvas2DPainter as a temporary compatibility alias.
+// window.GoSXStudioCanvas2DPainterRuntime.
 func Canvas2DPainterScript() []byte {
 	return canvaswasmfreeruntime.Canvas2DPainterScript()
 }
 
 // CanvasWASMFreeClientScript returns the WASM-free CanvasBoard browser client.
-// It publishes window.GoSXStudioCanvasWASMFreeClientRuntime and keeps
-// window.__muddyCanvasWasmFreeClient as a temporary compatibility alias.
+// It publishes window.GoSXStudioCanvasWASMFreeClientRuntime.
 func CanvasWASMFreeClientScript() []byte {
 	return canvaswasmfreeruntime.CanvasWASMFreeClientScript()
 }

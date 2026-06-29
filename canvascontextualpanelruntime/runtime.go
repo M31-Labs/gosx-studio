@@ -2,9 +2,7 @@
 // contextual inspector panel runtime.
 //
 // The panel is host-agnostic: it renders selected CanvasBoard fields and
-// persists edits through the Studio Canvas inline-edit runtime API. A temporary
-// legacy Muddy global remains for hosts that have not yet moved their client
-// runtime to the Studio primary global.
+// persists edits through the Studio Canvas inline-edit runtime API.
 package canvascontextualpanelruntime
 
 import (
@@ -15,8 +13,7 @@ import (
 var canvasContextualPanelJS []byte
 
 // CanvasContextualPanelScript returns the CanvasBoard contextual inspector
-// panel. It publishes window.GoSXStudioCanvasContextualPanelRuntime and a
-// temporary window.__muddyCanvasContextualPanel compatibility alias.
+// panel. It publishes window.GoSXStudioCanvasContextualPanelRuntime.
 func CanvasContextualPanelScript() []byte {
 	return canvasContextualPanelJS
 }

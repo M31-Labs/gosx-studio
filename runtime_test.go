@@ -6,6 +6,10 @@ import (
 	"testing"
 )
 
+func legacyMuddyGlobal(name string) string {
+	return "__" + "muddy" + name
+}
+
 // The legacy monolithic JS bundles (studio-engines.js and
 // preview-runtime.js) were deleted on 2026-05-27 — see Phase 3
 // burn-down. The tests below cover the post-deletion contract: the
@@ -119,7 +123,6 @@ func TestCanvasInlineRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
 			script: CanvasInlineEditScript(),
 			checks: []string{
 				"window.GoSXStudioCanvasInlineEditRuntime",
-				"window.__muddyCanvasInlineEdit",
 				"persistRepaintSafe",
 			},
 			serve: func() *httptest.ResponseRecorder {
@@ -148,7 +151,6 @@ func TestCanvasInlineRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
 			script: Canvas2DPainterScript(),
 			checks: []string{
 				"window.GoSXStudioCanvas2DPainterRuntime",
-				"window.__muddyCanvas2DPainter",
 				"paint: paintCanvasBundle",
 			},
 			serve: func() *httptest.ResponseRecorder {
@@ -162,8 +164,8 @@ func TestCanvasInlineRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
 			script: CanvasWASMFreeClientScript(),
 			checks: []string{
 				"window.GoSXStudioCanvasWASMFreeClientRuntime",
-				"window.__muddyCanvasWasmFreeClient",
 				"canvas.__gosxStudioCanvasWASMFree",
+				"canvas.GoSXStudioCanvasWasmFree",
 				"data-gosx-canvas-wasm-free-client",
 			},
 			serve: func() *httptest.ResponseRecorder {
@@ -177,7 +179,6 @@ func TestCanvasInlineRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
 			script: CanvasDefaultInlineInstallerScript(),
 			checks: []string{
 				"window.GoSXStudioCanvasDefaultInlineInstallerRuntime",
-				"window.__muddyCanvasDefaultInlineInstaller",
 				"data-studio-site-map-canvas-default",
 			},
 			serve: func() *httptest.ResponseRecorder {
@@ -191,7 +192,6 @@ func TestCanvasInlineRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
 			script: CanvasContextualPanelScript(),
 			checks: []string{
 				"window.GoSXStudioCanvasContextualPanelRuntime",
-				"window.__muddyCanvasContextualPanel",
 				"GoSXStudioCanvasInlineEditRuntime",
 				"render: render",
 			},
@@ -218,6 +218,18 @@ func TestCanvasInlineRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
 		for _, check := range tt.checks {
 			if !strings.Contains(rec.Body.String(), check) {
 				t.Fatalf("%s runtime handler body missing %q", name, check)
+			}
+		}
+		for _, forbidden := range []string{
+			legacyMuddyGlobal("CanvasInlineEdit"),
+			legacyMuddyGlobal("Canvas2DPainter"),
+			legacyMuddyGlobal("CanvasWasmFreeClient"),
+			legacyMuddyGlobal("CanvasDefaultInlineInstaller"),
+			legacyMuddyGlobal("CanvasContextualPanel"),
+			legacyMuddyGlobal("CanvasWasmFree"),
+		} {
+			if strings.Contains(rec.Body.String(), forbidden) {
+				t.Fatalf("%s runtime handler body should not contain %q", name, forbidden)
 			}
 		}
 	}

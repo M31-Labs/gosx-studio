@@ -23,8 +23,7 @@
   // It installs window.GoSXStudioCanvas2DPainterRuntime = { paint,
   // screenTransform } on evaluation so the WASM-free render loop + interaction
   // handlers can reuse the identical forward transform (keeping click → rect
-  // alignment exact). window.__muddyCanvas2DPainter remains as a temporary
-  // compatibility alias for existing hosts and tests.
+  // alignment exact).
   if (typeof window === "undefined") return;
 
   // canvasBoardScreenTransform builds the world→screen mapping from a bundle
@@ -448,5 +447,4 @@
     CANVAS_LOD_THUMB_ZOOM: CANVAS_LOD_THUMB_ZOOM,
   };
   window.GoSXStudioCanvas2DPainterRuntime = api;
-  window.__muddyCanvas2DPainter = api;
 })();

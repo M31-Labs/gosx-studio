@@ -8,9 +8,9 @@
   // Figma-inspector-style panel anchored near that surface, listing its editable
   // field(s) — each as a label + a prefilled <input>. Editing a field persists
   // through the SAME server save path as inline editing
-  // (window.GoSXStudioCanvasInlineEditRuntime.persist, with a temporary
-  // window.__muddyCanvasInlineEdit fallback) and reflects the new value straight
-  // back into the live surface element, so the canvas board and the panel agree.
+  // (window.GoSXStudioCanvasInlineEditRuntime.persist) and reflects the new value
+  // straight back into the live surface element, so the canvas board and the
+  // panel agree.
   //
   // It is intentionally dependency-free, window-attached (no bundler), and a
   // sibling of the absolutely-positioned overlay — matching its sibling files
@@ -18,7 +18,6 @@
   //
   // Public API:
   //   window.GoSXStudioCanvasContextualPanelRuntime.render(host, state)
-  //   window.__muddyCanvasContextualPanel = window.GoSXStudioCanvasContextualPanelRuntime
   //     host  : an element the panel is (singly) mounted into. The caller owns
   //             positioning the host itself; this module positions the panel
   //             absolutely within it using the supplied transform.
@@ -28,10 +27,6 @@
   //                       fields:[{label,binding,value[,element]}] },
   //         transform: { zoom, x(worldX), y(worldY) } }
   //         → builds/updates exactly one panel anchored near the surface.
-  //
-  // The __muddyCanvasContextualPanel alias is temporary compatibility for hosts
-  // that have not yet moved their CanvasBoard client runtime to the Studio
-  // primary global.
   //
   // render is idempotent: re-rendering reuses the one mounted panel, so a
   // per-frame call from the render loop never accumulates DOM.
@@ -53,7 +48,7 @@
   }
 
   function inlineEdit() {
-    var ie = window.GoSXStudioCanvasInlineEditRuntime || window.__muddyCanvasInlineEdit;
+    var ie = window.GoSXStudioCanvasInlineEditRuntime;
     return ie && typeof ie.persist === "function" ? ie : null;
   }
 
@@ -247,5 +242,4 @@
 
   var api = { render: render };
   window.GoSXStudioCanvasContextualPanelRuntime = api;
-  window.__muddyCanvasContextualPanel = api;
 })();

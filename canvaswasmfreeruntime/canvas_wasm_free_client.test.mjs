@@ -3,7 +3,11 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
 
-test("WASM-free client installs Studio primary and legacy globals", () => {
+function legacyMuddyGlobal(name) {
+  return "__" + "muddy" + name;
+}
+
+test("WASM-free client installs Studio primary global only", () => {
   const source = readFileSync(new URL("./canvas_wasm_free_client.js", import.meta.url), "utf8");
   const attrs = new Map();
   const window = {
@@ -36,7 +40,7 @@ test("WASM-free client installs Studio primary and legacy globals", () => {
 
   const runtime = window.GoSXStudioCanvasWASMFreeClientRuntime;
   assert.ok(runtime, "primary Studio runtime global should be installed");
-  assert.equal(window.__muddyCanvasWasmFreeClient, runtime);
+  assert.equal(window[legacyMuddyGlobal("CanvasWasmFreeClient")], undefined);
   assert.equal(typeof runtime.mountAll, "function");
   assert.equal(attrs.get("data-gosx-canvas-wasm-free-client"), "true");
 });

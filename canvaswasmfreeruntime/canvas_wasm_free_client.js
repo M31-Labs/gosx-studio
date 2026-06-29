@@ -7,9 +7,8 @@
   // site-map board WITHOUT the gosx client WASM. It reads the server-precomputed
   // RenderBundle that ships inline (<script data-gosx-canvas-bundle>), maintains a
   // JS-side camera, paints via requestAnimationFrame using the ported painter
-  // (window.GoSXStudioCanvas2DPainterRuntime, with the legacy
-  // window.__muddyCanvas2DPainter fallback), and owns all interaction
-  // (pan/zoom/pick/marquee/nav) in pure JS — no __gosx_* calls, no signal poll. Selection flows
+  // (window.GoSXStudioCanvas2DPainterRuntime), and owns all interaction
+  // (pan/zoom/pick/marquee/nav) in pure JS - no __gosx_* calls, no signal poll. Selection flows
   // directly into the DOM board via window.GoSXStudioSiteMapRuntime.setState, the
   // SAME public API a DOM-board click uses, so the right-rail inspector / selection
   // detail card updates identically.
@@ -95,7 +94,7 @@
   }
 
   function painter() {
-    var p = window.GoSXStudioCanvas2DPainterRuntime || window.__muddyCanvas2DPainter;
+    var p = window.GoSXStudioCanvas2DPainterRuntime;
     return p && typeof p.paint === "function" ? p : null;
   }
 
@@ -534,7 +533,7 @@
         // route on blur / Enter, so an inline edit survives a board repaint.
         // install() is idempotent, but guard the lookup so a missing module
         // (script load order) never throws.
-        var inlineEdit = window.GoSXStudioCanvasInlineEditRuntime || window.__muddyCanvasInlineEdit;
+        var inlineEdit = window.GoSXStudioCanvasInlineEditRuntime;
         if (inlineEdit && typeof inlineEdit.install === "function") {
           inlineEdit.install(ov, {});
         }
@@ -644,7 +643,7 @@
     // the same OrthoCamera2D transform as the painter. Cheap + idempotent: the
     // panel module reuses its single element across frames.
     function renderPanel(composed, size) {
-      var panel = window.GoSXStudioCanvasContextualPanelRuntime || window.__muddyCanvasContextualPanel;
+      var panel = window.GoSXStudioCanvasContextualPanelRuntime;
       if (!panel || typeof panel.render !== "function" || !panelHost) return;
       var p = painter();
       var key = selectedID || currentSelection();
@@ -905,7 +904,7 @@
       repaint: markDirty,
     };
     canvas.__gosxStudioCanvasWASMFree = controlAPI;
-    canvas.__muddyCanvasWasmFree = controlAPI;
+    canvas.GoSXStudioCanvasWasmFree = controlAPI;
 
     render();
   }
@@ -922,7 +921,6 @@
   document.documentElement.setAttribute("data-gosx-canvas-wasm-free-client", "true");
   var api = { mountAll: mountAll };
   window.GoSXStudioCanvasWASMFreeClientRuntime = api;
-  window.__muddyCanvasWasmFreeClient = api;
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", mountAll);
