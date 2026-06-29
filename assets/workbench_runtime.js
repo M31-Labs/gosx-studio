@@ -396,50 +396,10 @@
       return detail.result || null;
     }
 
-    function fieldKeyForTarget(target) {
-      if (!target) return "";
-      return target.getAttribute("data-studio-field") || target.getAttribute("data-editor-preview") || target.getAttribute("data-studio-field-source") || "";
-    }
-
-    function fieldNavigationScope(frame, target, detail) {
-      var doc = frameDocument(frame);
-      if (!doc) return null;
-      if (target && target.closest) {
-        var targetBlock = target.closest("[data-studio-block-key], [data-studio-node-id]");
-        if (targetBlock) return targetBlock;
-      }
-      var blockKey = detail && (detail.blockKey || detail.nodeID);
-      if (blockKey) {
-        var selector = '[data-studio-block-key="' + attrValue(blockKey) + '"], [data-studio-node-id="' + attrValue(blockKey) + '"]';
-        return doc.querySelector(selector) || doc.body || doc.documentElement;
-      }
-      return doc.body || doc.documentElement;
-    }
-
-    function previewFieldNodesForSelection(frame, target, detail) {
-      var scope = fieldNavigationScope(frame, target, detail);
-      if (!scope) return [];
-      var seen = {};
-      return queryAll(scope, "[data-studio-field], [data-editor-preview], [data-studio-field-source]").filter(function (candidate) {
-        var key = fieldKeyForTarget(candidate);
-        if (!key || seen[key]) return false;
-        seen[key] = true;
-        return true;
-      });
-    }
-
     function previewFieldNavigationState(frame, target, detail) {
-      var fields = previewFieldNodesForSelection(frame, target, detail);
-      var current = detail && detail.field ? detail.field : fieldKeyForTarget(target);
-      var index = -1;
-      fields.forEach(function (candidate, candidateIndex) {
-        if (index < 0 && fieldKeyForTarget(candidate) === current) index = candidateIndex;
-      });
-      return {
-        fields: fields,
-        count: fields.length,
-        index: index
-      };
+      var payload = { form: form, frame: frame, target: target, selection: detail || {} };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-navigation-state", { bubbles: true, detail: payload }));
+      return payload.result || { fields: [], count: 0, index: -1, current: detail && detail.field ? detail.field : "" };
     }
 
     function updatePreviewFieldNavigation(frame, dock, target, detail) {
@@ -451,8 +411,7 @@
 
     function syncPreviewFieldMap(frame, target, detail) {
       var state = previewFieldNavigationState(frame, target, detail);
-      var current = detail && detail.field ? detail.field : fieldKeyForTarget(target);
-      var payload = { form: form, frame: frame, fields: state.fields, current: current, count: state.count };
+      var payload = { form: form, frame: frame, fields: state.fields, current: state.current, count: state.count };
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-map-sync", { bubbles: true, detail: payload }));
       return state;
     }

@@ -117,9 +117,58 @@
     return queryAll(frameDoc, editorPreviewPatchSelector(source));
   }
 
-  function editorPreviewFieldKey(target) {
+  function editorPreviewFieldKeyForTarget(target) {
     if (!target || !target.getAttribute) return "";
     return target.getAttribute("data-studio-field") || target.getAttribute("data-editor-preview") || target.getAttribute("data-studio-field-source") || "";
+  }
+
+  function editorPreviewFieldKey(target) {
+    return editorPreviewFieldKeyForTarget(target);
+  }
+
+  function editorPreviewFieldNavigationScope(frame, target, detail) {
+    var frameDoc = editorPreviewFrameDocument(frame);
+    if (!frameDoc) return null;
+    if (target && target.closest) {
+      var targetBlock = target.closest("[data-studio-block-key], [data-studio-node-id]");
+      if (targetBlock) return targetBlock;
+    }
+    var blockKey = detail && (detail.blockKey || detail.nodeID);
+    if (blockKey) {
+      var selector = '[data-studio-block-key="' + attrValue(blockKey) + '"], [data-studio-node-id="' + attrValue(blockKey) + '"]';
+      return frameDoc.querySelector(selector) || frameDoc.body || frameDoc.documentElement;
+    }
+    return frameDoc.body || frameDoc.documentElement;
+  }
+
+  function editorPreviewFieldNodesForSelection(frame, target, detail) {
+    var scope = editorPreviewFieldNavigationScope(frame, target, detail);
+    if (!scope) return [];
+    var seen = {};
+    return queryAll(scope, "[data-studio-field], [data-editor-preview], [data-studio-field-source]").filter(function (candidate) {
+      var key = editorPreviewFieldKeyForTarget(candidate);
+      if (!key || seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
+  }
+
+  function editorPreviewFieldNavigationState(frame, target, detail) {
+    var scope = editorPreviewFieldNavigationScope(frame, target, detail);
+    if (!frame || !scope) return { handled: false, fields: [], count: 0, index: -1, current: "" };
+    var fields = editorPreviewFieldNodesForSelection(frame, target, detail);
+    var current = detail && detail.field ? detail.field : editorPreviewFieldKeyForTarget(target);
+    var index = -1;
+    fields.forEach(function (candidate, candidateIndex) {
+      if (index < 0 && editorPreviewFieldKeyForTarget(candidate) === current) index = candidateIndex;
+    });
+    return {
+      handled: true,
+      fields: fields,
+      count: fields.length,
+      index: index,
+      current: current
+    };
   }
 
   function clearEditorPreviewFieldMap(frame) {
@@ -502,6 +551,10 @@
     doc.addEventListener("gosxstudio:editor-preview-field-map-sync", function (event) {
       var detail = event.detail || {};
       setEditorPreviewResult(detail, syncEditorPreviewFieldMap(detail.frame, detail.fields, detail.current, detail.count));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-field-navigation-state", function (event) {
+      var detail = event.detail || {};
+      setEditorPreviewResult(detail, editorPreviewFieldNavigationState(detail.frame, detail.target, detail.selection || detail.detail || {}));
     });
     doc.addEventListener("gosxstudio:editor-preview-selection-marker-clear", function (event) {
       var detail = event.detail || {};

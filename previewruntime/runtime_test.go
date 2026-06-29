@@ -419,6 +419,42 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldMapMarkers(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldNavigationState(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-field-navigation-state"`,
+		`setEditorPreviewResult(detail, editorPreviewFieldNavigationState(detail.frame, detail.target, detail.selection || detail.detail || {}))`,
+		`function editorPreviewFieldKeyForTarget(target)`,
+		`return target.getAttribute("data-studio-field") || target.getAttribute("data-editor-preview") || target.getAttribute("data-studio-field-source") || ""`,
+		`function editorPreviewFieldNavigationScope(frame, target, detail)`,
+		`var frameDoc = editorPreviewFrameDocument(frame)`,
+		`var targetBlock = target.closest("[data-studio-block-key], [data-studio-node-id]")`,
+		`var selector = '[data-studio-block-key="' + attrValue(blockKey) + '"], [data-studio-node-id="' + attrValue(blockKey) + '"]'`,
+		`return frameDoc.querySelector(selector) || frameDoc.body || frameDoc.documentElement`,
+		`function editorPreviewFieldNodesForSelection(frame, target, detail)`,
+		`var seen = {}`,
+		`queryAll(scope, "[data-studio-field], [data-editor-preview], [data-studio-field-source]").filter(function (candidate)`,
+		`var key = editorPreviewFieldKeyForTarget(candidate)`,
+		`function editorPreviewFieldNavigationState(frame, target, detail)`,
+		`if (!frame || !scope) return { handled: false, fields: [], count: 0, index: -1, current: "" }`,
+		`var current = detail && detail.field ? detail.field : editorPreviewFieldKeyForTarget(target)`,
+		`if (index < 0 && editorPreviewFieldKeyForTarget(candidate) === current) index = candidateIndex`,
+		`handled: true`,
+		`count: fields.length`,
+		`current: current`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview field-navigation state fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-navigation-state`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview field-navigation state control events")
+	}
+}
+
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionMarkers(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {

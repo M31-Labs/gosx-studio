@@ -389,8 +389,7 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldMapMarkersToPreviewRuntime(t *test
 		`return detail.result || null;`,
 		`function syncPreviewFieldMap(frame, target, detail)`,
 		`var state = previewFieldNavigationState(frame, target, detail);`,
-		`var current = detail && detail.field ? detail.field : fieldKeyForTarget(target);`,
-		`var payload = { form: form, frame: frame, fields: state.fields, current: current, count: state.count };`,
+		`var payload = { form: form, frame: frame, fields: state.fields, current: state.current, count: state.count };`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-map-sync", { bubbles: true, detail: payload }))`,
 		`return state;`,
 	} {
@@ -419,6 +418,37 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldMapMarkersToPreviewRuntime(t *test
 			if strings.Contains(body.body, forbidden) {
 				t.Fatalf("%s should delegate preview field-map marker mutation; found %q in:\n%s", body.name, forbidden, body.body)
 			}
+		}
+	}
+}
+
+func TestWorkbenchRuntimeDelegatesPreviewFieldNavigationStateToPreviewRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	body := jsFunctionBody(t, script, "previewFieldNavigationState")
+	for _, check := range []string{
+		`function previewFieldNavigationState(frame, target, detail)`,
+		`var payload = { form: form, frame: frame, target: target, selection: detail || {} };`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-navigation-state", { bubbles: true, detail: payload }))`,
+		`return payload.result || { fields: [], count: 0, index: -1, current: detail && detail.field ? detail.field : "" };`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing preview field-navigation state delegation fragment %q", check)
+		}
+	}
+
+	for _, forbidden := range []string{
+		`function fieldKeyForTarget`,
+		`function fieldNavigationScope`,
+		`function previewFieldNodesForSelection`,
+		`target.closest("[data-studio-block-key], [data-studio-node-id]")`,
+		`doc.querySelector(selector)`,
+		`var seen = {}`,
+	} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should delegate preview field-navigation state calculation; found %q", forbidden)
+		}
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("previewFieldNavigationState should only dispatch state calculation; found %q in:\n%s", forbidden, body)
 		}
 	}
 }
