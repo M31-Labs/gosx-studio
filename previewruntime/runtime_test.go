@@ -382,6 +382,35 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewPatchTransport(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewTargetLookup(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-targets-resolve"`,
+		`var field = detail.patch && detail.patch.field;`,
+		`var source = field && (field.source || field.name);`,
+		`detail.result = { handled: false, targets: [], count: 0 };`,
+		`var targets = editorPreviewPatchTargets(detail.frame, detail.patch);`,
+		`detail.result = { handled: true, targets: targets, count: targets.length };`,
+		`function editorPreviewPatchTargets(frame, patch)`,
+		`var frameDoc = editorPreviewFrameDocument(frame)`,
+		`return queryAll(frameDoc, editorPreviewPatchSelector(source));`,
+		`function editorPreviewPatchSelector(source)`,
+		`'[data-studio-field="' + source + '"]'`,
+		`'[data-editor-preview="' + source + '"]'`,
+		`'[data-studio-field-source="' + source + '"]'`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview target lookup fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-targets-resolve`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview target lookup events")
+	}
+}
+
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldMapMarkers(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {

@@ -544,6 +544,17 @@
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, detail.patch));
     });
+    doc.addEventListener("gosxstudio:editor-preview-targets-resolve", function (event) {
+      var detail = event.detail || {};
+      var field = detail.patch && detail.patch.field;
+      var source = field && (field.source || field.name);
+      if (!editorPreviewFrameDocument(detail.frame) || !source) {
+        detail.result = { handled: false, targets: [], count: 0 };
+        return;
+      }
+      var targets = editorPreviewPatchTargets(detail.frame, detail.patch);
+      detail.result = { handled: true, targets: targets, count: targets.length };
+    });
     doc.addEventListener("gosxstudio:editor-preview-field-map-clear", function (event) {
       var detail = event.detail || {};
       setEditorPreviewResult(detail, clearEditorPreviewFieldMap(detail.frame));

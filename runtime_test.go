@@ -177,6 +177,34 @@ func TestWorkbenchRuntimeDelegatesEditorPreviewPatchTransport(t *testing.T) {
 	}
 }
 
+func TestWorkbenchRuntimeDelegatesEditorPreviewTargetLookup(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`function previewTargets(frame, patch)`,
+		`var detail = { form: form, frame: frame, patch: patch };`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-targets-resolve", { bubbles: true, detail: detail }));`,
+		`return (detail.result && detail.result.targets) || [];`,
+		`var selectedTargets = detail.field ? previewTargets(frame, { field: { source: detail.field, name: detail.field } }) : [];`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing delegated editor preview target lookup fragment %q", check)
+		}
+	}
+
+	body := jsFunctionBody(t, script, "previewTargets")
+	for _, forbidden := range []string{
+		`function previewPatchSelector`,
+		`return queryAll(doc, previewPatchSelector(source));`,
+		`'[data-studio-field="' + source + '"]'`,
+		`'[data-editor-preview="' + source + '"]'`,
+		`'[data-studio-field-source="' + source + '"]'`,
+	} {
+		if strings.Contains(body, forbidden) || strings.Contains(script, `function previewPatchSelector`) {
+			t.Fatalf("workbench runtime should delegate concrete editor preview target lookup; found %q", forbidden)
+		}
+	}
+}
+
 func TestWorkbenchRuntimeDelegatesEditorPreviewChromeToPreviewRuntimeEvents(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{

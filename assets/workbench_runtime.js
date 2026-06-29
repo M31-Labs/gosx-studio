@@ -263,21 +263,10 @@
       }
     }
 
-    function previewPatchSelector(source) {
-      source = attrValue(source);
-      return [
-        '[data-studio-field="' + source + '"]',
-        '[data-editor-preview="' + source + '"]',
-        '[data-studio-field-source="' + source + '"]'
-      ].join(",");
-    }
-
     function previewTargets(frame, patch) {
-      var doc = frameDocument(frame);
-      var field = patch && patch.field;
-      var source = field && (field.source || field.name);
-      if (!doc || !source) return [];
-      return queryAll(doc, previewPatchSelector(source));
+      var detail = { form: form, frame: frame, patch: patch };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-targets-resolve", { bubbles: true, detail: detail }));
+      return (detail.result && detail.result.targets) || [];
     }
 
     function inspectorSource(field) {
