@@ -33,6 +33,37 @@ type BackendEditorWorkbenchContentProps struct {
 	AdvancedPanel   gosx.Node
 }
 
+type BackendEditorWorkbenchPanelStackProps struct {
+	View         map[string]any
+	AuthoringURL string
+	Toolbar      gosx.Node
+	CanvasBar    gosx.Node
+	CanvasStatus gosx.Node
+
+	SiteNavigator               gosx.Node
+	HomeLayers                  map[string]any
+	HomeLayerSelection          gosx.Node
+	BlockLayoutEngineHost       gosx.Node
+	BlockLibraryPanel           gosx.Node
+	SiteMapEngine               gosx.Node
+	SiteMapCanvas               gosx.Node
+	InspectorChrome             gosx.Node
+	HomeInspector               gosx.Node
+	LookPanel                   gosx.Node
+	BrandPanel                  map[string]any
+	BrandFields                 map[string]any
+	BrandMediaPicker            gosx.Node
+	NavigationPanel             gosx.Node
+	CheckoutPanel               gosx.Node
+	PublishPanel                gosx.Node
+	AdvancedPanel               map[string]any
+	FlowDesigner                gosx.Node
+	AdvancedToolsPanel          gosx.Node
+	AdvancedWorkspaceFieldPanel gosx.Node
+	AdvancedCalendarFieldPanel  gosx.Node
+	AdvancedTypeFieldPanel      gosx.Node
+}
+
 func RenderBackendEditorWorkbench(props BackendEditorWorkbenchProps) gosx.Node {
 	options := WorkbenchFrameOptions{
 		AuthoringURL:   props.AuthoringURL,
@@ -78,6 +109,51 @@ func RenderBackendEditorWorkbenchContent(props BackendEditorWorkbenchContentProp
 			props.PublishPanel,
 			props.AdvancedPanel,
 		},
+	})
+}
+
+func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelStackProps) gosx.Node {
+	homeLayersPanel := RenderHomeLayersPanel(props.HomeLayers, HomeLayersPanelOptions{
+		PickerNode: props.HomeLayerSelection,
+	})
+	blockLayout := RenderBlockLayoutEngine(props.HomeLayers, BlockLayoutEngineOptions{
+		EngineHostNode: props.BlockLayoutEngineHost,
+		LayersNode:     homeLayersPanel,
+		LibraryNode:    props.BlockLibraryPanel,
+		Kicker:         "Home",
+		Title:          "Sections",
+	})
+	brandPanel := RenderBrandPanel(props.BrandPanel, props.BrandFields, BrandPanelOptions{
+		MediaPickerNode: props.BrandMediaPicker,
+	})
+	advancedPanel := RenderAdvancedPanel(props.AdvancedPanel, AdvancedPanelOptions{
+		GroupNodes: map[string]gosx.Node{
+			"flows":      props.FlowDesigner,
+			"tools":      props.AdvancedToolsPanel,
+			"schema":     props.AdvancedWorkspaceFieldPanel,
+			"schedule":   props.AdvancedCalendarFieldPanel,
+			"typography": props.AdvancedTypeFieldPanel,
+		},
+	})
+
+	return RenderBackendEditorWorkbenchContent(BackendEditorWorkbenchContentProps{
+		View:            props.View,
+		AuthoringURL:    props.AuthoringURL,
+		Toolbar:         props.Toolbar,
+		CanvasBar:       props.CanvasBar,
+		CanvasStatus:    props.CanvasStatus,
+		SiteNavigator:   props.SiteNavigator,
+		BlockLayout:     blockLayout,
+		SiteMapEngine:   props.SiteMapEngine,
+		SiteMapCanvas:   props.SiteMapCanvas,
+		InspectorChrome: props.InspectorChrome,
+		HomeInspector:   props.HomeInspector,
+		LookPanel:       props.LookPanel,
+		BrandPanel:      brandPanel,
+		NavigationPanel: props.NavigationPanel,
+		CheckoutPanel:   props.CheckoutPanel,
+		PublishPanel:    props.PublishPanel,
+		AdvancedPanel:   advancedPanel,
 	})
 }
 

@@ -141,6 +141,141 @@ func TestRenderBackendEditorWorkbenchContentOwnsStandardContentOrder(t *testing.
 	)
 }
 
+func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{
+		Title:      "Website editor",
+		SaveAction: "/admin/editor/__actions/save",
+		Canvas: CanvasSurface{
+			RouteLabel:     "Home",
+			SelectionLabel: "Hero selected",
+			Zoom:           "100",
+		},
+	}, WorkbenchShellViewOptions{
+		CSRFToken: "csrf-token",
+	})
+	brandPanel := map[string]any{
+		"kicker":          "Brand",
+		"title":           "Identity",
+		"summary":         "Brand system",
+		"previewLabel":    "Preview",
+		"groupLabel":      "Brand groups",
+		"defaultGroupKey": "files",
+		"groups": []map[string]any{{
+			"key":      "files",
+			"inputID":  "brandFiles",
+			"label":    "Files",
+			"summary":  "Media",
+			"selected": true,
+		}},
+	}
+	brandFields := map[string]any{
+		"preview": map[string]any{
+			"cornerLabel": "Logo",
+			"buttonLabel": "Adjust logo",
+			"logoURL":     "/logo.png",
+			"logoAlt":     "Logo",
+		},
+	}
+	advancedPanel := map[string]any{
+		"kicker":          "Advanced",
+		"title":           "Controls",
+		"summary":         "Advanced controls",
+		"groupLabel":      "Advanced groups",
+		"defaultGroupKey": "flows",
+		"groups": []map[string]any{
+			{"key": "flows", "inputID": "advancedFlows", "label": "Flows", "summary": "Automation", "selected": true},
+			{"key": "tools", "inputID": "advancedTools", "label": "Tools", "summary": "Tools"},
+			{"key": "schema", "inputID": "advancedSchema", "label": "Schema", "summary": "Workspace"},
+			{"key": "schedule", "inputID": "advancedSchedule", "label": "Schedule", "summary": "Calendar"},
+			{"key": "typography", "inputID": "advancedType", "label": "Type", "summary": "Typography"},
+		},
+	}
+
+	html := gosx.RenderHTML(RenderBackendEditorWorkbenchPanelStack(BackendEditorWorkbenchPanelStackProps{
+		View:                        view,
+		AuthoringURL:                "/admin/editor/__actions/authoring",
+		Toolbar:                     gosx.El("div", gosx.Attrs(gosx.Attr("data-editor-toolbar", "true")), gosx.Text("Toolbar")),
+		CanvasBar:                   gosx.El("div", gosx.Attrs(gosx.Attr("data-editor-canvas-bar", "true")), gosx.Text("Canvas bar")),
+		CanvasStatus:                gosx.El("div", gosx.Attrs(gosx.Attr("data-editor-canvas-status", "true")), gosx.Text("Ready")),
+		SiteNavigator:               gosx.El("section", gosx.Attrs(gosx.Attr("data-site-navigator", "true")), gosx.Text("Pages")),
+		HomeLayers:                  map[string]any{"kicker": "Home", "title": "Sections", "empty": "No sections."},
+		HomeLayerSelection:          gosx.El("select", gosx.Attrs(gosx.Attr("data-home-layer-selection", "true"))),
+		BlockLayoutEngineHost:       gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
+		BlockLibraryPanel:           gosx.El("section", gosx.Attrs(gosx.Attr("data-block-library", "true")), gosx.Text("Library")),
+		SiteMapEngine:               gosx.El("section", gosx.Attrs(gosx.Attr("data-site-map-engine", "true")), gosx.Text("Site map")),
+		SiteMapCanvas:               gosx.El("section", gosx.Attrs(gosx.Attr("data-site-map-canvas", "true")), gosx.Text("Canvas")),
+		InspectorChrome:             gosx.El("section", gosx.Attrs(gosx.Attr("data-inspector-chrome", "true")), gosx.Text("Inspector")),
+		HomeInspector:               gosx.El("section", gosx.Attrs(gosx.Attr("data-home-inspector", "true")), gosx.Text("Home")),
+		LookPanel:                   gosx.El("section", gosx.Attrs(gosx.Attr("data-look-panel", "true")), gosx.Text("Look")),
+		BrandPanel:                  brandPanel,
+		BrandFields:                 brandFields,
+		BrandMediaPicker:            gosx.El("section", gosx.Attrs(gosx.Attr("data-brand-media-picker", "true")), gosx.Text("Media")),
+		NavigationPanel:             gosx.El("section", gosx.Attrs(gosx.Attr("data-navigation-panel", "true")), gosx.Text("Navigation")),
+		CheckoutPanel:               gosx.El("section", gosx.Attrs(gosx.Attr("data-checkout-panel", "true")), gosx.Text("Checkout")),
+		PublishPanel:                gosx.El("section", gosx.Attrs(gosx.Attr("data-publish-panel", "true")), gosx.Text("Publish")),
+		AdvancedPanel:               advancedPanel,
+		FlowDesigner:                gosx.El("section", gosx.Attrs(gosx.Attr("data-flow-designer", "true")), gosx.Text("Flows")),
+		AdvancedToolsPanel:          gosx.El("section", gosx.Attrs(gosx.Attr("data-advanced-tools", "true")), gosx.Text("Tools")),
+		AdvancedWorkspaceFieldPanel: gosx.El("section", gosx.Attrs(gosx.Attr("data-advanced-workspace", "true")), gosx.Text("Workspace")),
+		AdvancedCalendarFieldPanel:  gosx.El("section", gosx.Attrs(gosx.Attr("data-advanced-calendar", "true")), gosx.Text("Calendar")),
+		AdvancedTypeFieldPanel:      gosx.El("section", gosx.Attrs(gosx.Attr("data-advanced-type", "true")), gosx.Text("Type")),
+	}))
+
+	for _, fragment := range []string{
+		`data-gosx-studio-frame-slot="true"`,
+		`data-gosx-studio-frame-renderer="gosx-studio"`,
+		`data-gosx-studio-left-rail-slot="true"`,
+		`data-gosx-studio-board-slot="true"`,
+		`data-gosx-studio-right-rail-slot="true"`,
+		`data-gosx-studio-home-layers-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-block-layout-engine-renderer="gosx-studio"`,
+		`data-gosx-studio-brand-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-advanced-panel-renderer="gosx-studio"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("backend editor panel stack missing %q:\n%s", fragment, html)
+		}
+	}
+
+	for _, fragment := range []string{
+		`<header class="studio-panel-heading"><div><p class="kicker">Home</p><h2>Sections</h2></div><select data-home-layer-selection="true"></select></header>`,
+		`<div class="studio-block-layout-engine__layers" data-studio-block-layout-layers="true"><section class="" data-studio-mode-panel="" data-studio-engine-source="gosx" data-gosx-studio-home-layers-panel-renderer="gosx-studio">`,
+		`<div class="studio-block-layout-engine__library" data-studio-block-layout-library="true"><section data-block-library="true">Library</section></div>`,
+		`<section class="studio-brand-panel__group-slot studio-brand-media-picker-slot" data-studio-brand-group-slot="files" data-studio-brand-group-selected="false"><section data-brand-media-picker="true">Media</section></section>`,
+		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="flows"><section data-flow-designer="true">Flows</section></div>`,
+		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="tools"><section data-advanced-tools="true">Tools</section></div>`,
+		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="schema"><section data-advanced-workspace="true">Workspace</section></div>`,
+		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="schedule"><section data-advanced-calendar="true">Calendar</section></div>`,
+		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="typography"><section data-advanced-type="true">Type</section></div>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("backend editor panel stack did not nest %q:\n%s", fragment, html)
+		}
+	}
+
+	assertOrder(t, html,
+		`data-gosx-studio-left-rail-slot="true"`,
+		`data-site-navigator="true"`,
+		`data-gosx-studio-block-layout-engine-renderer="gosx-studio"`,
+		`data-studio-block-layout-layers="true"`,
+		`data-home-layer-selection="true"`,
+		`data-studio-block-layout-library="true"`,
+		`data-block-library="true"`,
+		`data-gosx-studio-board-slot="true"`,
+		`data-site-map-engine="true"`,
+		`data-site-map-canvas="true"`,
+		`data-gosx-studio-right-rail-slot="true"`,
+		`data-gosx-studio-brand-panel-renderer="gosx-studio"`,
+		`data-brand-media-picker="true"`,
+		`data-gosx-studio-advanced-panel-renderer="gosx-studio"`,
+		`data-flow-designer="true"`,
+		`data-advanced-tools="true"`,
+		`data-advanced-workspace="true"`,
+		`data-advanced-calendar="true"`,
+		`data-advanced-type="true"`,
+	)
+}
+
 func TestRenderBackendEditorWorkbenchSlotHelpers(t *testing.T) {
 	left := gosx.RenderHTML(RenderBackendEditorLeftRail(gosx.El("span", nil, gosx.Text("left"))))
 	board := gosx.RenderHTML(RenderBackendEditorBoard(gosx.El("span", nil, gosx.Text("board"))))
