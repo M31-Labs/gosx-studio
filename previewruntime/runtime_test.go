@@ -691,6 +691,39 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockShowContent(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockDetailExtraction(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`function compactText(value)`,
+		`return String(value || "").replace(/\s+/g, " ").trim()`,
+		`function editorPreviewDockDetail(form, dock)`,
+		`if (!dock || !dock.getAttribute || !dock.querySelector)`,
+		`return { field: "", blockKey: "", blockLabel: "", label: "", action: "", actionHref: "", actionFormAction: "", editable: "" }`,
+		`var label = dock.querySelector("[data-gosx-studio-preview-dock-label]")`,
+		`field: dock.getAttribute("data-gosx-studio-preview-field") || ""`,
+		`blockKey: dock.getAttribute("data-gosx-studio-preview-block") || ""`,
+		`blockLabel: dock.getAttribute("data-gosx-studio-preview-block-label") || ""`,
+		`label: compactText(label && label.textContent)`,
+		`action: dock.getAttribute("data-gosx-studio-preview-action-label") || ""`,
+		`actionHref: dock.getAttribute("data-gosx-studio-preview-action-href") || ""`,
+		`actionFormAction: dock.getAttribute("data-gosx-studio-preview-action-formaction") || ""`,
+		`editable: form ? form.getAttribute("data-studio-field-editable") || "" : ""`,
+		`doc.addEventListener("gosxstudio:editor-preview-dock-detail-resolve"`,
+		`var form = editorPreviewForm(detail, event)`,
+		`setEditorPreviewResult(detail, editorPreviewDockDetail(form, detail.dock))`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview dock detail extraction fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-detail-resolve`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock detail control events")
+	}
+}
+
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockFieldNavigationUI(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {

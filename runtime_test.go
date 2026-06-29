@@ -594,6 +594,31 @@ func TestWorkbenchRuntimeDelegatesPreviewDockShowContentToPreviewRuntime(t *test
 	}
 }
 
+func TestWorkbenchRuntimeDelegatesPreviewDockDetailExtractionToPreviewRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	body := jsFunctionBody(t, script, "previewDockDetail")
+	for _, check := range []string{
+		`function previewDockDetail(dock)`,
+		`var detail = { form: form, dock: dock };`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-detail-resolve", { bubbles: true, detail: detail }))`,
+		`return detail.result || {};`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing preview dock detail delegation fragment %q", check)
+		}
+	}
+	for _, forbidden := range []string{
+		`dock.getAttribute("data-gosx-studio-preview-field")`,
+		`dock.querySelector("[data-gosx-studio-preview-dock-label]")`,
+		`data-gosx-studio-preview-action-formaction`,
+		`form.getAttribute("data-studio-field-editable")`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("previewDockDetail should delegate concrete dock detail extraction; found %q in:\n%s", forbidden, body)
+		}
+	}
+}
+
 func TestWorkbenchRuntimeDelegatesPreviewFieldActionIntentToSelectionRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{

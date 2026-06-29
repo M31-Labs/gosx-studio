@@ -418,16 +418,9 @@
     }
 
     function previewDockDetail(dock) {
-      return {
-        field: dock.getAttribute("data-gosx-studio-preview-field") || "",
-        blockKey: dock.getAttribute("data-gosx-studio-preview-block") || "",
-        blockLabel: dock.getAttribute("data-gosx-studio-preview-block-label") || "",
-        label: compactText(dock.querySelector("[data-gosx-studio-preview-dock-label]") && dock.querySelector("[data-gosx-studio-preview-dock-label]").textContent),
-        action: dock.getAttribute("data-gosx-studio-preview-action-label") || "",
-        actionHref: dock.getAttribute("data-gosx-studio-preview-action-href") || "",
-        actionFormAction: dock.getAttribute("data-gosx-studio-preview-action-formaction") || "",
-        editable: form.getAttribute("data-studio-field-editable") || ""
-      };
+      var detail = { form: form, dock: dock };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-detail-resolve", { bubbles: true, detail: detail }));
+      return detail.result || {};
     }
 
     function emitPreviewDockAction(action, detail) {

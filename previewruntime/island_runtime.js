@@ -62,6 +62,10 @@
     return Math.min(max, Math.max(min, value));
   }
 
+  function compactText(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
   function attrValue(value) {
     return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   }
@@ -324,6 +328,23 @@
       action.disabled = !selection.field && !selection.action && !selection.actionHref && !selection.actionFormAction;
     }
     return { handled: true };
+  }
+
+  function editorPreviewDockDetail(form, dock) {
+    if (!dock || !dock.getAttribute || !dock.querySelector) {
+      return { field: "", blockKey: "", blockLabel: "", label: "", action: "", actionHref: "", actionFormAction: "", editable: "" };
+    }
+    var label = dock.querySelector("[data-gosx-studio-preview-dock-label]");
+    return {
+      field: dock.getAttribute("data-gosx-studio-preview-field") || "",
+      blockKey: dock.getAttribute("data-gosx-studio-preview-block") || "",
+      blockLabel: dock.getAttribute("data-gosx-studio-preview-block-label") || "",
+      label: compactText(label && label.textContent),
+      action: dock.getAttribute("data-gosx-studio-preview-action-label") || "",
+      actionHref: dock.getAttribute("data-gosx-studio-preview-action-href") || "",
+      actionFormAction: dock.getAttribute("data-gosx-studio-preview-action-formaction") || "",
+      editable: form ? form.getAttribute("data-studio-field-editable") || "" : ""
+    };
   }
 
   function syncEditorPreviewDockFieldNavigation(dock, count, index) {
@@ -652,6 +673,11 @@
     doc.addEventListener("gosxstudio:editor-preview-dock-sync", function (event) {
       var detail = event.detail || {};
       setEditorPreviewResult(detail, syncEditorPreviewDock(detail.dock, detail.selection));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-dock-detail-resolve", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      setEditorPreviewResult(detail, editorPreviewDockDetail(form, detail.dock));
     });
     doc.addEventListener("gosxstudio:editor-preview-dock-field-navigation-sync", function (event) {
       var detail = event.detail || {};
