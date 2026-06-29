@@ -251,12 +251,6 @@
       return queryAll(form, "[data-studio-preview-frame]");
     }
 
-    function previewTargets(frame, patch) {
-      var detail = { form: form, frame: frame, patch: patch };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-targets-resolve", { bubbles: true, detail: detail }));
-      return (detail.result && detail.result.targets) || [];
-    }
-
     function previewSelectionDetail(node) {
       var payload = { target: node };
       form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-detail-resolve", { bubbles: true, detail: payload }));
@@ -269,18 +263,6 @@
         if (payload.result) return payload.result;
       }
       return {};
-    }
-
-    function applyPreviewSelectionMarker(frame, selectedTargets) {
-      var detail = { form: form, frame: frame, targets: selectedTargets || [], clear: true };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-marker-apply", { bubbles: true, detail: detail }));
-      return detail.result || null;
-    }
-
-    function applyPreviewSelectionChrome(frame, selection) {
-      var detail = { form: form, frame: frame, selection: selection || "" };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-chrome-apply", { bubbles: true, detail: detail }));
-      return detail.result || null;
     }
 
     function clearPreviewSelections() {
@@ -307,18 +289,6 @@
       var payload = { form: form, frame: frame, target: target, selection: detail || {} };
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-navigation-state", { bubbles: true, detail: payload }));
       return payload.result || { fields: [], count: 0, index: -1, current: detail && detail.field ? detail.field : "" };
-    }
-
-    function previewDockSelection(detail, result) {
-      var payload = { form: form, selection: detail || {}, applied: result || {} };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-selection-resolve", { bubbles: true, detail: payload }));
-      return payload.result || {};
-    }
-
-    function syncPreviewDock(frame, target, detail) {
-      var payload = { form: form, frame: frame, target: target, selection: detail || {}, host: { runPreviewDockAction: runPreviewDockAction } };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-selection-sync", { bubbles: true, detail: payload }));
-      return payload.result || null;
     }
 
     function previewDockDetail(dock) {
@@ -571,15 +541,21 @@
       detail = detail || previewSelectionDetail(target);
       options = options || {};
       if (!detail.field && !detail.blockKey && !detail.nodeID) return false;
-      clearPreviewSelections();
-      var selectedTargets = detail.field ? previewTargets(frame, { field: { source: detail.field, name: detail.field } }) : [];
-      if (!selectedTargets.length && target) selectedTargets = [target];
-      applyPreviewSelectionMarker(frame, selectedTargets);
-      var result = dispatchPreviewSelectionApply(detail, options);
-      if (!result) return false;
-      applyPreviewSelectionChrome(frame, detail.field || detail.blockKey || detail.nodeID || "");
-      var dockSelection = previewDockSelection(detail, result);
-      syncPreviewDock(frame, selectedTargets[0] || target, dockSelection);
+      var payload = {
+        form: form,
+        frame: frame,
+        target: target,
+        selection: detail,
+        detail: detail,
+        options: options,
+        host: {
+          finishInlineTextEdit: finishInlineTextEdit,
+          dispatchPreviewSelectionApply: dispatchPreviewSelectionApply,
+          runPreviewDockAction: runPreviewDockAction
+        }
+      };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-apply-sync", { bubbles: true, detail: payload }));
+      if (!payload.result || !payload.result.handled || !payload.result.applied) return false;
       if (options.reveal) revealPreviewField(detail, options.reason || "preview-select");
       return true;
     }

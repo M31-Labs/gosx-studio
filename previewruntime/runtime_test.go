@@ -798,6 +798,69 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionClearSync(t *testing.T)
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionApplySync(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-selection-apply-sync"`,
+		`setEditorPreviewResult(detail, applyEditorPreviewSelectionSync(detail, event))`,
+		`function applyEditorPreviewSelectionSync(detail, event)`,
+		`var form = editorPreviewForm(detail, event)`,
+		`var selection = detail.selection || detail.detail || {}`,
+		`var options = detail.options || {}`,
+		`var host = detail.host || {}`,
+		`if (!selection.field && !selection.blockKey && !selection.nodeID)`,
+		`var cleared = clearEditorPreviewSelections(form, host)`,
+		`var selectedTargets = selection.field ? editorPreviewPatchTargets(frame, { field: { source: selection.field, name: selection.field } }) : []`,
+		`if (!selectedTargets.length && target) selectedTargets = [target]`,
+		`var marker = applyEditorPreviewSelectionMarker(frame, selectedTargets, true)`,
+		`var applied = editorPreviewHostCall(host, "dispatchPreviewSelectionApply", null, selection, options)`,
+		`if (!applied)`,
+		`var chrome = applyEditorPreviewSelectionChrome(form, frame, selection.field || selection.blockKey || selection.nodeID || "")`,
+		`var dockSelection = editorPreviewDockSelection(selection, applied)`,
+		`var dock = syncEditorPreviewDockSelection(form, frame, selectedTargets[0] || target, dockSelection, host)`,
+		`return { handled: true, applied: applied, targets: selectedTargets, marker: marker, chrome: chrome, dock: dock, cleared: cleared }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview selection apply-sync fragment %q", fragment)
+		}
+	}
+
+	applyBody := islandJSFunctionBody(t, body, "applyEditorPreviewSelectionSync")
+	for _, ordered := range [][]string{
+		{
+			`var form = editorPreviewForm(detail, event)`,
+			`if (!selection.field && !selection.blockKey && !selection.nodeID)`,
+			`var cleared = clearEditorPreviewSelections(form, host)`,
+			`var selectedTargets = selection.field ? editorPreviewPatchTargets(frame, { field: { source: selection.field, name: selection.field } }) : []`,
+			`if (!selectedTargets.length && target) selectedTargets = [target]`,
+			`var marker = applyEditorPreviewSelectionMarker(frame, selectedTargets, true)`,
+			`var applied = editorPreviewHostCall(host, "dispatchPreviewSelectionApply", null, selection, options)`,
+			`if (!applied)`,
+			`var chrome = applyEditorPreviewSelectionChrome(form, frame, selection.field || selection.blockKey || selection.nodeID || "")`,
+			`var dockSelection = editorPreviewDockSelection(selection, applied)`,
+			`var dock = syncEditorPreviewDockSelection(form, frame, selectedTargets[0] || target, dockSelection, host)`,
+		},
+	} {
+		last := -1
+		for _, fragment := range ordered {
+			index := strings.Index(applyBody, fragment)
+			if index < 0 {
+				t.Fatalf("applyEditorPreviewSelectionSync missing order fragment %q in:\n%s", fragment, applyBody)
+			}
+			if index < last {
+				t.Fatalf("applyEditorPreviewSelectionSync has out-of-order fragment %q in:\n%s", fragment, applyBody)
+			}
+			last = index
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-apply-sync`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview selection apply-sync control events")
+	}
+}
+
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionMarkers(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {

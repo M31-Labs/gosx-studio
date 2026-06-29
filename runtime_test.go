@@ -76,19 +76,11 @@ func TestWorkbenchRuntimeDoesNotInjectPreviewStyles(t *testing.T) {
 	}
 }
 
-func TestWorkbenchRuntimeDelegatesShellRenderedPreviewDockSelectionSync(t *testing.T) {
+func TestWorkbenchRuntimeDoesNotOwnShellRenderedPreviewDockSelectionSync(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
 		`function syncPreviewDock(frame, target, detail)`,
-		`var payload = { form: form, frame: frame, target: target, selection: detail || {}, host: { runPreviewDockAction: runPreviewDockAction } };`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-selection-sync", { bubbles: true, detail: payload }))`,
-		`return payload.result || null;`,
-	} {
-		if !strings.Contains(script, check) {
-			t.Fatalf("workbench runtime missing preview dock selection-sync delegation contract %q", check)
-		}
-	}
-	for _, check := range []string{
+		`gosxstudio:editor-preview-dock-selection-sync`,
 		`function previewShellForFrame`,
 		`function previewDockForFrame`,
 		`function normalizePreviewDock`,
@@ -100,7 +92,7 @@ func TestWorkbenchRuntimeDelegatesShellRenderedPreviewDockSelectionSync(t *testi
 		`actions.appendChild(createDockButton`,
 	} {
 		if strings.Contains(script, check) {
-			t.Fatalf("workbench runtime should not own preview dock lookup/binding/fallback fragment %q", check)
+			t.Fatalf("workbench runtime should not own preview dock selection-sync/lookup/binding/fallback fragment %q", check)
 		}
 	}
 }
@@ -202,30 +194,20 @@ func TestWorkbenchRuntimeDelegatesEditorPreviewPatchTransport(t *testing.T) {
 	}
 }
 
-func TestWorkbenchRuntimeDelegatesEditorPreviewTargetLookup(t *testing.T) {
+func TestWorkbenchRuntimeDoesNotOwnEditorPreviewTargetLookup(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
-	for _, check := range []string{
-		`function previewTargets(frame, patch)`,
-		`var detail = { form: form, frame: frame, patch: patch };`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-targets-resolve", { bubbles: true, detail: detail }));`,
-		`return (detail.result && detail.result.targets) || [];`,
-		`var selectedTargets = detail.field ? previewTargets(frame, { field: { source: detail.field, name: detail.field } }) : [];`,
-	} {
-		if !strings.Contains(script, check) {
-			t.Fatalf("workbench runtime missing delegated editor preview target lookup fragment %q", check)
-		}
-	}
-
-	body := jsFunctionBody(t, script, "previewTargets")
 	for _, forbidden := range []string{
+		`function previewTargets(frame, patch)`,
+		`gosxstudio:editor-preview-targets-resolve`,
+		`var selectedTargets = detail.field ? previewTargets(frame, { field: { source: detail.field, name: detail.field } }) : [];`,
 		`function previewPatchSelector`,
 		`return queryAll(doc, previewPatchSelector(source));`,
 		`'[data-studio-field="' + source + '"]'`,
 		`'[data-editor-preview="' + source + '"]'`,
 		`'[data-studio-field-source="' + source + '"]'`,
 	} {
-		if strings.Contains(body, forbidden) || strings.Contains(script, `function previewPatchSelector`) {
-			t.Fatalf("workbench runtime should delegate concrete editor preview target lookup; found %q", forbidden)
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should leave editor preview target lookup to PreviewRuntime; found %q", forbidden)
 		}
 	}
 }
@@ -508,20 +490,11 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`if (payload.result) return payload.result;`,
 		`var runtime = window.GoSXStudioSelectionRuntime;`,
 		`runtime.bind(document.body || document);`,
-		`var result = dispatchPreviewSelectionApply(detail, options);`,
-		`if (!result) return false;`,
-		`function applyPreviewSelectionMarker(frame, selectedTargets)`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-marker-apply", { bubbles: true, detail: detail }))`,
-		`applyPreviewSelectionMarker(frame, selectedTargets);`,
-		`function applyPreviewSelectionChrome(frame, selection)`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-chrome-apply", { bubbles: true, detail: detail }))`,
-		`applyPreviewSelectionChrome(frame, detail.field || detail.blockKey || detail.nodeID || "");`,
-		`function previewDockSelection(detail, result)`,
-		`var payload = { form: form, selection: detail || {}, applied: result || {} };`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-selection-resolve", { bubbles: true, detail: payload }))`,
-		`return payload.result || {};`,
-		`var dockSelection = previewDockSelection(detail, result);`,
-		`syncPreviewDock(frame, selectedTargets[0] || target, dockSelection);`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-apply-sync", { bubbles: true, detail: payload }))`,
+		`finishInlineTextEdit: finishInlineTextEdit,`,
+		`dispatchPreviewSelectionApply: dispatchPreviewSelectionApply,`,
+		`runPreviewDockAction: runPreviewDockAction`,
+		`if (!payload.result || !payload.result.handled || !payload.result.applied) return false;`,
 		`function revealPreviewField(detail, reason)`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-reveal", { bubbles: true, detail: payload }))`,
 		`if (payload.result) return !!payload.result.revealed;`,
@@ -585,6 +558,17 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`inspectorSource`,
 		`inspectorControl`,
 		`revealInspectorSelection`,
+		`gosxstudio:editor-preview-targets-resolve`,
+		`gosxstudio:editor-preview-selection-clear-sync`,
+		`gosxstudio:editor-preview-selection-marker-apply`,
+		`gosxstudio:editor-preview-selection-chrome-apply`,
+		`gosxstudio:editor-preview-dock-selection-resolve`,
+		`gosxstudio:editor-preview-dock-selection-sync`,
+		`previewTargets(`,
+		`applyPreviewSelectionMarker(`,
+		`applyPreviewSelectionChrome(`,
+		`previewDockSelection(`,
+		`syncPreviewDock(`,
 	} {
 		if strings.Contains(applyBody, forbidden) {
 			t.Fatalf("applyPreviewSelection should delegate editor preview selection state; found %q in:\n%s", forbidden, applyBody)
@@ -763,27 +747,17 @@ func TestWorkbenchRuntimeDelegatesPreviewDockPositionToPreviewRuntime(t *testing
 	}
 }
 
-func TestWorkbenchRuntimeDelegatesPreviewDockShowContentToPreviewRuntime(t *testing.T) {
+func TestWorkbenchRuntimeDoesNotOwnPreviewDockShowContent(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
-	body := jsFunctionBody(t, script, "syncPreviewDock")
-	for _, check := range []string{
-		`function syncPreviewDock(frame, target, detail)`,
-		`var payload = { form: form, frame: frame, target: target, selection: detail || {}, host: { runPreviewDockAction: runPreviewDockAction } };`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-selection-sync", { bubbles: true, detail: payload }))`,
-		`return payload.result || null;`,
-	} {
-		if !strings.Contains(script, check) {
-			t.Fatalf("workbench runtime missing preview dock show/content delegation fragment %q", check)
-		}
-	}
 	for _, forbidden := range []string{
+		`function syncPreviewDock(frame, target, detail)`,
+		`gosxstudio:editor-preview-dock-selection-sync`,
 		`previewDockForFrame(frame)`,
 		`frame.__gosxStudioPreviewDock = dock`,
 		`frame.__gosxStudioPreviewDockTarget = target`,
 		`gosxstudio:editor-preview-dock-sync`,
 		`updatePreviewFieldNavigation(frame, dock, target, detail)`,
 		`syncPreviewFieldMap(frame, target, detail)`,
-		`updatePreviewDockPosition(frame)`,
 		`dock.hidden = false`,
 		`dock.setAttribute("data-gosx-studio-preview-field"`,
 		`dock.setAttribute("data-gosx-studio-preview-block"`,
@@ -807,8 +781,8 @@ func TestWorkbenchRuntimeDelegatesPreviewDockShowContentToPreviewRuntime(t *test
 		`blockKey: detail.blockKey || ""`,
 		`nodeID: detail.nodeID || ""`,
 	} {
-		if strings.Contains(body, forbidden) {
-			t.Fatalf("syncPreviewDock should delegate concrete preview dock show/content mutation; found %q in:\n%s", forbidden, body)
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should leave preview dock show/content mutation to PreviewRuntime; found %q", forbidden)
 		}
 	}
 	if strings.Contains(script, `function dockKindLabel`) {
@@ -934,12 +908,6 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 		`runtime.bind(document.body || document);`,
 		`dispatchPreviewSelectionClear("preview-dock");`,
 		`dispatchPreviewSelectionClear("keyboard-escape");`,
-		`function clearPreviewSelections()`,
-		`host: {
-          finishInlineTextEdit: finishInlineTextEdit
-        }`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-clear-sync", { bubbles: true, detail: detail }))`,
-		`return detail.result || null;`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing preview selection clear boundary fragment %q", check)

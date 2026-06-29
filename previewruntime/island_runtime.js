@@ -303,6 +303,31 @@
     return { handled: true, frames: frames.length, fieldMaps: fieldMaps, markers: markers, chrome: chrome, docks: docks };
   }
 
+  function applyEditorPreviewSelectionSync(detail, event) {
+    detail = detail || {};
+    var form = editorPreviewForm(detail, event);
+    var frame = detail.frame;
+    var target = detail.target;
+    var selection = detail.selection || detail.detail || {};
+    var options = detail.options || {};
+    var host = detail.host || {};
+    if (!selection.field && !selection.blockKey && !selection.nodeID) {
+      return { handled: false, applied: null, targets: [] };
+    }
+    var cleared = clearEditorPreviewSelections(form, host);
+    var selectedTargets = selection.field ? editorPreviewPatchTargets(frame, { field: { source: selection.field, name: selection.field } }) : [];
+    if (!selectedTargets.length && target) selectedTargets = [target];
+    var marker = applyEditorPreviewSelectionMarker(frame, selectedTargets, true);
+    var applied = editorPreviewHostCall(host, "dispatchPreviewSelectionApply", null, selection, options);
+    if (!applied) {
+      return { handled: false, applied: null, targets: selectedTargets, marker: marker, cleared: cleared };
+    }
+    var chrome = applyEditorPreviewSelectionChrome(form, frame, selection.field || selection.blockKey || selection.nodeID || "");
+    var dockSelection = editorPreviewDockSelection(selection, applied);
+    var dock = syncEditorPreviewDockSelection(form, frame, selectedTargets[0] || target, dockSelection, host);
+    return { handled: true, applied: applied, targets: selectedTargets, marker: marker, chrome: chrome, dock: dock, cleared: cleared };
+  }
+
   function normalizeEditorPreviewDock(dock) {
     if (!dock || !dock.setAttribute || !dock.querySelector) return { handled: false, commands: 0 };
     if (!dock.hasAttribute("data-gosx-studio-preview-dock")) {
@@ -916,6 +941,10 @@
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, clearEditorPreviewSelections(form, detail.host));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-selection-apply-sync", function (event) {
+      var detail = event.detail || {};
+      setEditorPreviewResult(detail, applyEditorPreviewSelectionSync(detail, event));
     });
     doc.addEventListener("gosxstudio:editor-preview-selection-marker-clear", function (event) {
       var detail = event.detail || {};
