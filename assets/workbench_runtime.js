@@ -1601,28 +1601,6 @@
       });
     }
 
-    function runInsert(button) {
-      var target = button.getAttribute("data-studio-insert-block") || button.getAttribute("data-editor-add-block") || "";
-      var detail = { target: target, label: labelFromButton(button, target), button: button };
-      emit(form, "gosxstudio:insert-block", detail);
-      emit(form, "gosxstudio:workbench-action", { action: "insert-block", target: target, label: detail.label });
-      var add = target ? form.querySelector('[data-editor-add-block="' + attrValue(target) + '"]') : null;
-      if (add && add !== button && add.click) add.click();
-    }
-
-    function runInsertTarget(target, label) {
-      target = target || "";
-      if (!target) return false;
-      var button = form.querySelector('[data-studio-insert-block="' + attrValue(target) + '"], [data-editor-add-block="' + attrValue(target) + '"]');
-      if (button) {
-        runInsert(button);
-        return true;
-      }
-      emit(form, "gosxstudio:insert-block", { target: target, label: label || target });
-      emit(form, "gosxstudio:workbench-action", { action: "insert-block", target: target, label: label || target });
-      return true;
-    }
-
     function handleCommand(detail) {
       detail = detail || {};
       if (detail.kind === "mode") {
@@ -1644,7 +1622,6 @@
         else return false;
         return true;
       }
-      if (detail.kind === "insert") return runInsertTarget(detail.target, detail.label);
       return false;
     }
 
@@ -1690,11 +1667,6 @@
         event.preventDefault();
         event.stopImmediatePropagation();
         setActivity(activityState() === "open" ? "collapsed" : "open", "toggle");
-        return;
-      }
-      var insert = event.target.closest("[data-studio-insert-block]");
-      if (insert && form.contains(insert)) {
-        runInsert(insert);
         return;
       }
     });

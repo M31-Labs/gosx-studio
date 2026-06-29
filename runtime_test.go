@@ -452,22 +452,29 @@ func TestWorkbenchRuntimeLeavesSelectionActionsToSelectionRuntime(t *testing.T) 
 		`function runSelectionAction(button)`,
 		`function runSelectionTarget(target, label)`,
 		`detail.kind === "selection-action"`,
+		`function runInsert(button)`,
+		`function runInsertTarget`,
+		`detail.kind === "insert"`,
 		`event.target.closest("[data-studio-selection-action]")`,
 		`[data-studio-selection-action="`,
+		`[data-studio-insert-block]`,
 	} {
 		if strings.Contains(script, forbidden) {
-			t.Fatalf("workbench runtime should not own selection action bridge fragment %q", forbidden)
+			t.Fatalf("workbench runtime should not own selection/insert bridge fragment %q", forbidden)
 		}
 	}
 	for _, check := range []string{
-		`function runInsert(button)`,
-		`emit(form, "gosxstudio:insert-block", detail)`,
-		`if (detail.kind === "insert") return runInsertTarget(detail.target, detail.label);`,
 		`var mode = event.target.closest("[data-studio-mode-control]")`,
+		`var viewport = event.target.closest("[data-studio-viewport]")`,
+		`var zoom = event.target.closest("button[data-studio-zoom], [role='button'][data-studio-zoom]")`,
 		`var rail = event.target.closest("[data-studio-rail-toggle]")`,
+		`if (detail.kind === "mode")`,
+		`if (detail.kind === "viewport")`,
+		`if (detail.kind === "zoom")`,
+		`if (detail.kind === "toggle")`,
 	} {
 		if !strings.Contains(script, check) {
-			t.Fatalf("workbench runtime missing non-selection chrome/insert fragment %q", check)
+			t.Fatalf("workbench runtime missing non-selection chrome fragment %q", check)
 		}
 	}
 }

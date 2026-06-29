@@ -135,6 +135,34 @@ func TestSelectionRuntimeIslandOwnsSelectionActionTelemetry(t *testing.T) {
 	}
 }
 
+func TestSelectionRuntimeIslandOwnsInsertBlockDispatch(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, contract := range []string{
+		`function insertActionLabel(button, fallback)`,
+		`function runInsert(button)`,
+		`function runInsertTarget(target, label)`,
+		`button.getAttribute("data-studio-insert-block") || button.getAttribute("data-editor-add-block") || ""`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:insert-block", { bubbles: true, detail: detail }))`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:workbench-action", {`,
+		`detail: { action: "insert-block", target: target, label: detail.label }`,
+		`var add = target ? form.querySelector('[data-editor-add-block="' + attrValue(target) + '"]') : null;`,
+		`if (add && add !== button && add.click) add.click();`,
+		`form.querySelector('[data-studio-insert-block="' + attrValue(target) + '"], [data-editor-add-block="' + attrValue(target) + '"]')`,
+		`detail: { target: target, label: label || target }`,
+		`detail: { action: "insert-block", target: target, label: label || target }`,
+		`if (kind === "insert" && runInsertTarget(detail.target, detail.label)) {`,
+		`runInsertTarget(detail.target, detail.label)`,
+		`var insert = event.target.closest && event.target.closest("[data-studio-insert-block]");`,
+		`runInsert(insert);`,
+		`if (event.preventDefault) event.preventDefault();`,
+		`event.preventDefault();`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() missing insert-block dispatch contract %q", contract)
+		}
+	}
+}
+
 func TestSelectionRuntimeIslandMirrorsPreviewActionSelectionTelemetry(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	for _, contract := range []string{

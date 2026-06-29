@@ -889,6 +889,39 @@
       }
     }
 
+    function insertActionLabel(button, fallback) {
+      return compactText(button && (button.getAttribute("aria-label") || button.textContent)) || fallback || "";
+    }
+
+    function runInsert(button) {
+      var target = button.getAttribute("data-studio-insert-block") || button.getAttribute("data-editor-add-block") || "";
+      var detail = { target: target, label: insertActionLabel(button, target), button: button };
+      form.dispatchEvent(new CustomEvent("gosxstudio:insert-block", { bubbles: true, detail: detail }));
+      form.dispatchEvent(new CustomEvent("gosxstudio:workbench-action", {
+        bubbles: true,
+        detail: { action: "insert-block", target: target, label: detail.label }
+      }));
+      var add = target ? form.querySelector('[data-editor-add-block="' + attrValue(target) + '"]') : null;
+      if (add && add !== button && add.click) add.click();
+      return true;
+    }
+
+    function runInsertTarget(target, label) {
+      target = target || "";
+      if (!target) return false;
+      var button = form.querySelector('[data-studio-insert-block="' + attrValue(target) + '"], [data-editor-add-block="' + attrValue(target) + '"]');
+      if (button) return runInsert(button);
+      form.dispatchEvent(new CustomEvent("gosxstudio:insert-block", {
+        bubbles: true,
+        detail: { target: target, label: label || target }
+      }));
+      form.dispatchEvent(new CustomEvent("gosxstudio:workbench-action", {
+        bubbles: true,
+        detail: { action: "insert-block", target: target, label: label || target }
+      }));
+      return true;
+    }
+
     function bindCommandPaletteCommands() {
       var node = form.querySelector("[data-studio-command-palette]");
       if (!node || node.dataset.gosxStudioSelectionIslandCommandsBound === "true") return;
@@ -899,6 +932,9 @@
         var target = detail.target || "";
         if (kind === "selection-action") {
           runSelectionAction(target, detail.label);
+          if (event.preventDefault) event.preventDefault();
+        }
+        if (kind === "insert" && runInsertTarget(detail.target, detail.label)) {
           if (event.preventDefault) event.preventDefault();
         }
       });
@@ -943,6 +979,12 @@
       if (selectionAction && form.contains(selectionAction)) {
         event.preventDefault();
         runSelectionAction(selectionAction.getAttribute("data-studio-selection-action"));
+        return;
+      }
+      var insert = event.target.closest && event.target.closest("[data-studio-insert-block]");
+      if (insert && form.contains(insert)) {
+        event.preventDefault();
+        runInsert(insert);
         return;
       }
       var workspaceTarget = workspaceTargetFromEvent(event);
