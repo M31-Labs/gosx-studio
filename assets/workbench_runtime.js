@@ -269,18 +269,6 @@
       return (detail.result && detail.result.targets) || [];
     }
 
-    function inspectorSource(field) {
-      if (!field) return null;
-      var source = attrValue(field);
-      return form.querySelector('[data-studio-field-source="' + source + '"], [data-editor-source="' + source + '"]');
-    }
-
-    function inspectorControl(source) {
-      if (!source) return null;
-      if (source.matches && source.matches("input, textarea, select, button, a[href], [tabindex]")) return source;
-      return source.querySelector ? source.querySelector("input, textarea, select, button, a[href], [tabindex]") : null;
-    }
-
     function previewSelectionDetail(node) {
       var payload = { target: node };
       form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-detail-resolve", { bubbles: true, detail: payload }));
@@ -488,6 +476,55 @@
       return null;
     }
 
+    function bindSelectionRuntime() {
+      var runtime = window.GoSXStudioSelectionRuntime;
+      if (runtime && typeof runtime.bind === "function") {
+        runtime.bind(document.body || document);
+        return true;
+      }
+      return false;
+    }
+
+    function previewFieldTarget(detailOrField) {
+      var detail = typeof detailOrField === "string" ? { field: detailOrField } : (detailOrField || {});
+      var payload = {
+        detail: detail
+      };
+      form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-target-resolve", { bubbles: true, detail: payload }));
+      if (payload.result) return payload.result;
+      if (bindSelectionRuntime()) {
+        payload = {
+          detail: detail
+        };
+        form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-target-resolve", { bubbles: true, detail: payload }));
+        if (payload.result) return payload.result;
+      }
+      return { field: detail.field || "", source: null, control: null, found: false };
+    }
+
+    function revealPreviewField(detail, reason) {
+      detail = detail || {};
+      if (!detail.field) return false;
+      if (form.querySelector('[data-studio-mode-control="content"], [data-studio-mode-panel="content"]')) {
+        setMode("content", { reason: reason || "preview-select" });
+      }
+      var payload = {
+        detail: detail,
+        reason: reason || ""
+      };
+      form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-reveal", { bubbles: true, detail: payload }));
+      if (payload.result) return !!payload.result.revealed;
+      if (bindSelectionRuntime()) {
+        payload = {
+          detail: detail,
+          reason: reason || ""
+        };
+        form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-reveal", { bubbles: true, detail: payload }));
+        if (payload.result) return !!payload.result.revealed;
+      }
+      return false;
+    }
+
     function submitPreviewFieldAction(detail) {
       var payload = {
         detail: detail || {}
@@ -563,8 +600,7 @@
         var dockIntent = dispatchPreviewDockActionResolve(action, detail) || { mode: action, reveal: action === "content" && !!detail.field };
         if (dockIntent.mode) setMode(dockIntent.mode, { scroll: true, reason: "preview-dock" });
         if (dockIntent.reveal) {
-          var source = inspectorSource(detail.field);
-          if (source) revealInspectorSelection(source, inspectorControl(source));
+          revealPreviewField(detail, "preview-dock");
         }
         emitPreviewDockAction(action, detail);
         return true;
@@ -587,26 +623,13 @@
         if (intent.navigate) {
           window.location.href = intent.href || "";
         } else if (intent.reveal) {
-          var fieldSourceNode = inspectorSource(detail.field);
-          if (fieldSourceNode) revealInspectorSelection(fieldSourceNode, inspectorControl(fieldSourceNode));
+          revealPreviewField(detail, "preview-dock");
         }
         emitPreviewDockAction(action, detail);
         return true;
       }
       emitPreviewDockAction(action, detail);
       return true;
-    }
-
-    function revealInspectorSelection(source, control) {
-      if (!source) return;
-      if (form.querySelector('[data-studio-mode-control="content"], [data-studio-mode-panel="content"]')) {
-        setMode("content", { reason: "preview-select" });
-      }
-      var target = (source.closest && source.closest(".field-row, [data-studio-field-row]")) || source;
-      if (target.scrollIntoView) target.scrollIntoView({ block: "center", behavior: "smooth" });
-      window.setTimeout(function () {
-        if (control && control.focus) control.focus({ preventScroll: true });
-      }, 120);
     }
 
     function dispatchPreviewSelectionApply(detail, options) {
@@ -655,14 +678,12 @@
       var selectedTargets = detail.field ? previewTargets(frame, { field: { source: detail.field, name: detail.field } }) : [];
       if (!selectedTargets.length && target) selectedTargets = [target];
       applyPreviewSelectionMarker(frame, selectedTargets);
-      var source = inspectorSource(detail.field);
-      var control = inspectorControl(source);
       var result = dispatchPreviewSelectionApply(detail, options);
       if (!result) return false;
       applyPreviewSelectionChrome(frame, detail.field || detail.blockKey || detail.nodeID || "");
       var dockSelection = previewDockSelection(detail, result);
       syncPreviewDock(frame, selectedTargets[0] || target, dockSelection);
-      if (options.reveal && source) revealInspectorSelection(source, control);
+      if (options.reveal) revealPreviewField(detail, options.reason || "preview-select");
       return true;
     }
 
@@ -768,10 +789,9 @@
     }
 
     function textControlForField(field) {
-      var source = inspectorSource(field);
-      var control = inspectorControl(source);
-      if (control && "value" in control) return control;
-      if (source && "value" in source) return source;
+      var target = previewFieldTarget(field);
+      if (target.control && "value" in target.control) return target.control;
+      if (target.source && "value" in target.source) return target.source;
       return null;
     }
 

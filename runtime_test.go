@@ -462,7 +462,10 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`return payload.result || {};`,
 		`var dockSelection = previewDockSelection(detail, result);`,
 		`syncPreviewDock(frame, selectedTargets[0] || target, dockSelection);`,
-		`if (options.reveal && source) revealInspectorSelection(source, control);`,
+		`function revealPreviewField(detail, reason)`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-reveal", { bubbles: true, detail: payload }))`,
+		`if (payload.result) return !!payload.result.revealed;`,
+		`if (options.reveal) revealPreviewField(detail, options.reason || "preview-select");`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing preview selection delegation fragment %q", check)
@@ -518,9 +521,50 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`actionFormAction: result.actionFormAction || ""`,
 		`blockKey: result.blockKey || detail.blockKey || ""`,
 		`nodeID: result.nodeID || detail.nodeID || ""`,
+		`fieldSourceNode`,
+		`inspectorSource`,
+		`inspectorControl`,
+		`revealInspectorSelection`,
 	} {
 		if strings.Contains(applyBody, forbidden) {
 			t.Fatalf("applyPreviewSelection should delegate editor preview selection state; found %q in:\n%s", forbidden, applyBody)
+		}
+	}
+}
+
+func TestWorkbenchRuntimeDelegatesPreviewFieldTargetRevealToSelectionRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`function previewFieldTarget(detailOrField)`,
+		`var detail = typeof detailOrField === "string" ? { field: detailOrField } : (detailOrField || {});`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-target-resolve", { bubbles: true, detail: payload }))`,
+		`if (payload.result) return payload.result;`,
+		`bindSelectionRuntime()`,
+		`return { field: detail.field || "", source: null, control: null, found: false };`,
+		`function revealPreviewField(detail, reason)`,
+		`setMode("content", { reason: reason || "preview-select" });`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-reveal", { bubbles: true, detail: payload }))`,
+		`if (payload.result) return !!payload.result.revealed;`,
+		`var target = previewFieldTarget(field);`,
+		`if (target.control && "value" in target.control) return target.control;`,
+		`if (target.source && "value" in target.source) return target.source;`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing preview field target/reveal delegation fragment %q", check)
+		}
+	}
+
+	for _, forbidden := range []string{
+		`function inspectorSource`,
+		`function inspectorControl`,
+		`function revealInspectorSelection`,
+		`form.querySelector('[data-studio-field-source="'`,
+		`[data-editor-source="`,
+		`.field-row, [data-studio-field-row]`,
+		`focus({ preventScroll: true })`,
+	} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should delegate concrete preview field lookup/reveal policy; found %q", forbidden)
 		}
 	}
 }
@@ -787,7 +831,7 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldActionIntentToSelectionRuntime(t *
 		`if (intent.inlineText && startInlineTextFromDetail(frame, detail, "preview-dock")) return true;`,
 		`if (intent.submit && submitPreviewFieldAction(detail)) {`,
 		`window.location.href = intent.href || "";`,
-		`if (fieldSourceNode) revealInspectorSelection(fieldSourceNode, inspectorControl(fieldSourceNode));`,
+		`revealPreviewField(detail, "preview-dock");`,
 		`emitPreviewDockAction(action, detail);`,
 		`function submitPreviewFieldAction(detail)`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-action-submit", { bubbles: true, detail: payload }))`,
@@ -836,7 +880,7 @@ func TestWorkbenchRuntimeDelegatesPreviewDockContentStyleIntentToSelectionRuntim
 		`var dockIntent = dispatchPreviewDockActionResolve(action, detail) || { mode: action, reveal: action === "content" && !!detail.field };`,
 		`if (dockIntent.mode) setMode(dockIntent.mode, { scroll: true, reason: "preview-dock" });`,
 		`if (dockIntent.reveal) {`,
-		`if (source) revealInspectorSelection(source, inspectorControl(source));`,
+		`revealPreviewField(detail, "preview-dock");`,
 		`emitPreviewDockAction(action, detail);`,
 	} {
 		if !strings.Contains(script, check) {

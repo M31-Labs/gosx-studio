@@ -923,6 +923,47 @@
       }, reduced ? 0 : 120);
     }
 
+    function previewFieldTarget(detail) {
+      detail = detail || {};
+      var field = typeof detail === "string" ? detail : (detail.field || (detail.detail && detail.detail.field) || "");
+      var source = fieldSource(field);
+      var control = fieldControl(source);
+      return {
+        field: field,
+        source: source,
+        control: control,
+        found: !!source
+      };
+    }
+
+    function revealPreviewFieldTarget(target) {
+      if (!target || !target.source) return false;
+      var reduced = selectionReducedMotion();
+      var row = target.source.closest ? target.source.closest(".field-row, [data-studio-field-row]") : null;
+      var scrollTarget = row || target.source;
+      if (scrollTarget && scrollTarget.scrollIntoView) {
+        scrollTarget.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
+      }
+      window.setTimeout(function () {
+        if (target.control && target.control.focus) target.control.focus({ preventScroll: true });
+      }, reduced ? 0 : 120);
+      return true;
+    }
+
+    function resolvePreviewFieldTarget(event) {
+      var envelope = event.detail || {};
+      envelope.result = previewFieldTarget(envelope.detail || envelope);
+    }
+
+    function revealPreviewField(event) {
+      var envelope = event.detail || {};
+      var target = previewFieldTarget(envelope.detail || envelope);
+      envelope.result = {
+        revealed: revealPreviewFieldTarget(target),
+        field: target.field
+      };
+    }
+
     function runSelectedFieldAction(field, editable) {
       var target = fieldActionTarget(field);
       if (!target.source) return false;
@@ -1264,6 +1305,8 @@
     form.addEventListener("gosxstudio:preview-selection-detail-resolve", resolvePreviewSelectionDetail);
     form.addEventListener("gosxstudio:preview-selection-apply", applyPreviewSelectionState);
     form.addEventListener("gosxstudio:preview-selection-clear", clearPreviewSelectionState);
+    form.addEventListener("gosxstudio:preview-field-target-resolve", resolvePreviewFieldTarget);
+    form.addEventListener("gosxstudio:preview-field-reveal", revealPreviewField);
     form.addEventListener("gosxstudio:preview-field-navigation-commit", emitPreviewFieldNavigation);
     form.addEventListener("gosxstudio:preview-field-action-resolve", resolvePreviewFieldAction);
     form.addEventListener("gosxstudio:preview-field-action-submit", submitPreviewFieldAction);

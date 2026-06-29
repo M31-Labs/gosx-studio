@@ -495,6 +495,35 @@ func TestSelectionRuntimeIslandOwnsPreviewSelectionApply(t *testing.T) {
 	}
 }
 
+func TestSelectionRuntimeIslandOwnsPreviewFieldTargetReveal(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, contract := range []string{
+		`form.addEventListener("gosxstudio:preview-field-target-resolve", resolvePreviewFieldTarget);`,
+		`form.addEventListener("gosxstudio:preview-field-reveal", revealPreviewField);`,
+		`function previewFieldTarget(detail)`,
+		`var field = typeof detail === "string" ? detail : (detail.field || (detail.detail && detail.detail.field) || "");`,
+		`var source = fieldSource(field);`,
+		`var control = fieldControl(source);`,
+		`found: !!source`,
+		`function revealPreviewFieldTarget(target)`,
+		`var row = target.source.closest ? target.source.closest(".field-row, [data-studio-field-row]") : null;`,
+		`var scrollTarget = row || target.source;`,
+		`scrollTarget.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });`,
+		`if (target.control && target.control.focus) target.control.focus({ preventScroll: true });`,
+		`}, reduced ? 0 : 120);`,
+		`function resolvePreviewFieldTarget(event)`,
+		`envelope.result = previewFieldTarget(envelope.detail || envelope);`,
+		`function revealPreviewField(event)`,
+		`var target = previewFieldTarget(envelope.detail || envelope);`,
+		`revealed: revealPreviewFieldTarget(target),`,
+		`field: target.field`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() missing preview field target/reveal contract %q", contract)
+		}
+	}
+}
+
 func TestSelectionRuntimeIslandOwnsPreviewSelectionClear(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	for _, contract := range []string{
