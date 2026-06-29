@@ -588,27 +588,33 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewFrameLifecycleBinding(t *testing
 	}
 }
 
-func TestPreviewRuntimeIslandJSPreviewFrameLifecycleHandlersHandoffToHost(t *testing.T) {
+func TestPreviewRuntimeIslandJSPreviewFrameLifecycleHandlersRunLocally(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
 		`function bindEditorPreviewFrameDocument(form, frame, host)`,
-		`var result = editorPreviewHostCall(host, "bindPreviewDocument", null, frame)`,
-		`return result || bindEditorPreviewDocument(form, frame, host)`,
-		`editorPreviewHostCall(host, "setPreviewStatus", null, "ready", "Ready", "load")`,
+		`return bindEditorPreviewDocument(form, frame, host)`,
 		`setEditorPreviewStatus(form, "ready", "Ready", "load")`,
-		`editorPreviewHostCall(host, "syncPreviewFrame", null, frame, "load")`,
-		`syncEditorPreviewFrame(form, frame, "load", null)`,
+		`syncEditorPreviewFrame(form, frame, "load", typeof host.shouldTransportPreviewPatch === "function" ? host.shouldTransportPreviewPatch : null)`,
 		`var route = editorPreviewURL(frame) || frame.getAttribute("src") || ""`,
-		`editorPreviewHostCall(host, "postPreviewLoadSyncPatch", null, route)`,
 		`postEditorPreviewPatch(form, "load-sync", editorPreviewPatchEnvelope("load-sync", { route: route }, null))`,
-		`editorPreviewHostCall(host, "setPreviewStatus", null, "error", "Preview failed", "error")`,
 		`setEditorPreviewStatus(form, "error", "Preview failed", "error")`,
 	} {
 		if !strings.Contains(body, fragment) {
-			t.Fatalf("IslandRuntimeJS() missing editor preview frame lifecycle host handoff fragment %q", fragment)
+			t.Fatalf("IslandRuntimeJS() missing editor preview frame lifecycle local fragment %q", fragment)
+		}
+	}
+	for _, forbidden := range []string{
+		`editorPreviewHostCall(host, "bindPreviewDocument", null, frame)`,
+		`editorPreviewHostCall(host, "setPreviewStatus", null, "ready", "Ready", "load")`,
+		`editorPreviewHostCall(host, "syncPreviewFrame", null, frame, "load")`,
+		`editorPreviewHostCall(host, "postPreviewLoadSyncPatch", null, route)`,
+		`editorPreviewHostCall(host, "setPreviewStatus", null, "error", "Preview failed", "error")`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("IslandRuntimeJS() should not hand editor preview frame lifecycle to host first; found %q", forbidden)
 		}
 	}
 }

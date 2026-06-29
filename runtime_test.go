@@ -110,7 +110,7 @@ func TestWorkbenchRuntimeLetsFieldRuntimeOwnMirroredPreviewPatches(t *testing.T)
 		`if (shouldTransportPreviewPatch(event.target, "input")) postPreviewPatch("input", {}, event.target);`,
 		`emitFieldOperation("change", event.target);`,
 		`if (shouldTransportPreviewPatch(event.target, "change")) postPreviewPatch("change", {}, event.target);`,
-		`return postPreviewPatch("load-sync", { route: route || "" }, null);`,
+		`shouldTransportPreviewPatch: shouldTransportPreviewPatch`,
 		`postPreviewPatch("transaction", event.detail || {}, null);`,
 		`postPreviewPatch("history-restore", event.detail || {}, null);`,
 	} {
@@ -214,8 +214,10 @@ func TestWorkbenchRuntimeDoesNotOwnEditorPreviewTargetLookup(t *testing.T) {
 
 func TestWorkbenchRuntimeDelegatesPreviewDocumentBindingToPreviewRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
-	body := jsFunctionBody(t, script, "bindPreviewDocument")
+	body := jsFunctionBody(t, script, "previewDocumentHost")
 	for _, forbidden := range []string{
+		`function bindPreviewDocument(frame)`,
+		`gosxstudio:editor-preview-document-bind`,
 		`function frameDocument(frame)`,
 		`function previewSelectableNode(target)`,
 		`function previewPointerEventEligible(event)`,
@@ -228,11 +230,7 @@ func TestWorkbenchRuntimeDelegatesPreviewDocumentBindingToPreviewRuntime(t *test
 		}
 	}
 	for _, check := range []string{
-		`function bindPreviewDocument(frame)`,
-		`var detail = {`,
-		`form: form,`,
-		`frame: frame,`,
-		`host: {`,
+		`function previewDocumentHost()`,
 		`previewSelectionDetail: previewSelectionDetail,`,
 		`applyPreviewSelection: applyPreviewSelection,`,
 		`finishInlineTextEdit: finishInlineTextEdit,`,
@@ -244,11 +242,9 @@ func TestWorkbenchRuntimeDelegatesPreviewDocumentBindingToPreviewRuntime(t *test
 		`handleInlineTextPaste: handleInlineTextPaste,`,
 		`handleInlineTextBlur: handleInlineTextBlur,`,
 		`updatePreviewDockPosition: updatePreviewDockPosition`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-document-bind", { bubbles: true, detail: detail }))`,
-		`return detail.result || null;`,
 	} {
 		if !strings.Contains(body, check) {
-			t.Fatalf("bindPreviewDocument missing PreviewRuntime document-bind fragment %q in:\n%s", check, body)
+			t.Fatalf("previewDocumentHost missing PreviewRuntime document-bind fragment %q in:\n%s", check, body)
 		}
 	}
 
@@ -267,7 +263,7 @@ func TestWorkbenchRuntimeDelegatesPreviewDocumentBindingToPreviewRuntime(t *test
 		`[data-studio-block-key], [data-studio-node-id]`,
 	} {
 		if strings.Contains(body, forbidden) {
-			t.Fatalf("bindPreviewDocument should not own concrete preview document binding; found %q in:\n%s", forbidden, body)
+			t.Fatalf("previewDocumentHost should not own concrete preview document binding; found %q in:\n%s", forbidden, body)
 		}
 	}
 }
@@ -279,12 +275,9 @@ func TestWorkbenchRuntimeDelegatesPreviewFrameLifecycleToPreviewRuntime(t *testi
 		`function bindPreviewFrames()`,
 		`var detail = {`,
 		`form: form,`,
-		`host: {`,
-		`setPreviewStatus: setPreviewStatus,`,
-		`syncPreviewFrame: syncPreviewFrame,`,
-		`bindPreviewDocument: bindPreviewDocument,`,
-		`postPreviewLoadSyncPatch: function (route)`,
-		`return postPreviewPatch("load-sync", { route: route || "" }, null);`,
+		`host: Object.assign({`,
+		`shouldTransportPreviewPatch: shouldTransportPreviewPatch`,
+		`}, previewDocumentHost())`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-frames-bind", { bubbles: true, detail: detail }));`,
 		`return detail.result || null;`,
 	} {
@@ -303,6 +296,10 @@ func TestWorkbenchRuntimeDelegatesPreviewFrameLifecycleToPreviewRuntime(t *testi
 		`syncPreviewFrame(frame, "load")`,
 		`bindPreviewDocument(frame)`,
 		`postPreviewPatch("load-sync", { route: previewURL(frame)`,
+		`postPreviewLoadSyncPatch`,
+		`setPreviewStatus: setPreviewStatus`,
+		`syncPreviewFrame: syncPreviewFrame`,
+		`bindPreviewDocument: bindPreviewDocument`,
 		`setPreviewStatus("error", "Preview failed", "error")`,
 	} {
 		if strings.Contains(body, forbidden) {
@@ -316,7 +313,7 @@ func TestWorkbenchRuntimeDelegatesPreviewFrameLifecycleToPreviewRuntime(t *testi
 
 func TestWorkbenchRuntimeDelegatesPreviewEventPolicyToPreviewRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
-	body := jsFunctionBody(t, script, "bindPreviewDocument")
+	body := jsFunctionBody(t, script, "previewDocumentHost")
 	for _, forbidden := range []string{
 		`function previewPointerEventEligible(event)`,
 		`function previewKeyIntent(event)`,
@@ -336,7 +333,7 @@ func TestWorkbenchRuntimeDelegatesPreviewEventPolicyToPreviewRuntime(t *testing.
 		`event.key === "F2" ? "keyboard-f2" : "keyboard-enter"`,
 	} {
 		if strings.Contains(body, forbidden) {
-			t.Fatalf("bindPreviewDocument should delegate preview event policy; found %q in:\n%s", forbidden, body)
+			t.Fatalf("previewDocumentHost should delegate preview event policy; found %q in:\n%s", forbidden, body)
 		}
 	}
 }
@@ -379,19 +376,20 @@ func TestWorkbenchRuntimeDelegatesEditorPreviewChromeToPreviewRuntimeEvents(t *t
 
 func TestWorkbenchRuntimeSkipsMirroredFieldsDuringPreviewLoadSync(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
+	body := jsFunctionBody(t, script, "bindPreviewFrames")
 	for _, check := range []string{
-		`function syncPreviewFrame(frame, reason)`,
-		`var detail = { form: form, frame: frame, reason: reason || "sync", shouldTransport: shouldTransportPreviewPatch };`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-frame-sync", { bubbles: true, detail: detail }));`,
-		`return detail.result && detail.result.count ? detail.result.count : 0;`,
+		`host: Object.assign({`,
+		`shouldTransportPreviewPatch: shouldTransportPreviewPatch`,
+		`}, previewDocumentHost())`,
 	} {
-		if !strings.Contains(script, check) {
+		if !strings.Contains(body, check) {
 			t.Fatalf("workbench runtime missing delegated load-sync fragment %q", check)
 		}
 	}
 
-	body := jsFunctionBody(t, script, "syncPreviewFrame")
 	for _, forbidden := range []string{
+		`function syncPreviewFrame(frame, reason)`,
+		`gosxstudio:editor-preview-frame-sync`,
 		`queryAll(form, "[data-studio-field-source], [data-editor-source], input[name], textarea[name], select[name]")`,
 		`type: "gosxstudio:preview-patch"`,
 		`field: fieldPatch(field)`,
@@ -399,7 +397,7 @@ func TestWorkbenchRuntimeSkipsMirroredFieldsDuringPreviewLoadSync(t *testing.T) 
 		`if (!frameDocument(frame)) return 0`,
 	} {
 		if strings.Contains(body, forbidden) {
-			t.Fatalf("syncPreviewFrame should delegate load-sync construction; found %q", forbidden)
+			t.Fatalf("bindPreviewFrames should only expose load-sync transport policy; found %q", forbidden)
 		}
 	}
 }
@@ -443,7 +441,7 @@ func TestWorkbenchRuntimeDelegatesPreviewInlineTextToInlineEditRuntime(t *testin
 		}
 	}
 
-	body := jsFunctionBody(t, script, "bindPreviewDocument")
+	body := jsFunctionBody(t, script, "previewDocumentHost")
 	for _, check := range []string{
 		"handleInlineTextInput: handleInlineTextInput",
 		"handleInlineTextKeyEvent: handleInlineTextKeyEvent",
@@ -451,7 +449,7 @@ func TestWorkbenchRuntimeDelegatesPreviewInlineTextToInlineEditRuntime(t *testin
 		"handleInlineTextBlur: handleInlineTextBlur",
 	} {
 		if !strings.Contains(body, check) {
-			t.Fatalf("bindPreviewDocument should pass inline text host callbacks, missing %q in:\n%s", check, body)
+			t.Fatalf("previewDocumentHost should pass inline text host callbacks, missing %q in:\n%s", check, body)
 		}
 	}
 	for _, forbidden := range []string{
@@ -472,7 +470,7 @@ func TestWorkbenchRuntimeDelegatesPreviewInlineTextToInlineEditRuntime(t *testin
 		`syncInlineTextEdit(frame, "paste")`,
 	} {
 		if strings.Contains(body, forbidden) {
-			t.Fatalf("bindPreviewDocument should delegate preview inline-text event policy, found %q in:\n%s", forbidden, body)
+			t.Fatalf("previewDocumentHost should delegate preview inline-text event policy, found %q in:\n%s", forbidden, body)
 		}
 	}
 }

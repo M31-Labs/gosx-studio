@@ -535,12 +535,6 @@
       return true;
     }
 
-    function syncPreviewFrame(frame, reason) {
-      var detail = { form: form, frame: frame, reason: reason || "sync", shouldTransport: shouldTransportPreviewPatch };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-frame-sync", { bubbles: true, detail: detail }));
-      return detail.result && detail.result.count ? detail.result.count : 0;
-    }
-
     function setPreviewStatus(state, label, reason) {
       var detail = { form: form, state: state, label: label, reason: reason || "" };
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-status-set", { bubbles: true, detail: detail }));
@@ -731,39 +725,28 @@
     function bindPreviewFrames() {
       var detail = {
         form: form,
-        host: {
-          setPreviewStatus: setPreviewStatus,
-          syncPreviewFrame: syncPreviewFrame,
-          bindPreviewDocument: bindPreviewDocument,
-          postPreviewLoadSyncPatch: function (route) {
-            return postPreviewPatch("load-sync", { route: route || "" }, null);
-          }
-        }
+        host: Object.assign({
+          shouldTransportPreviewPatch: shouldTransportPreviewPatch
+        }, previewDocumentHost())
       };
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-frames-bind", { bubbles: true, detail: detail }));
       return detail.result || null;
     }
 
-    function bindPreviewDocument(frame) {
-      var detail = {
-        form: form,
-        frame: frame,
-        host: {
-          previewSelectionDetail: previewSelectionDetail,
-          applyPreviewSelection: applyPreviewSelection,
-          finishInlineTextEdit: finishInlineTextEdit,
-          dispatchPreviewFieldNavigation: dispatchPreviewFieldNavigation,
-          startInlineTextFromDetail: startInlineTextFromDetail,
-          startInlineTextFromSelection: startInlineTextFromSelection,
-          handleInlineTextInput: handleInlineTextInput,
-          handleInlineTextKeyEvent: handleInlineTextKeyEvent,
-          handleInlineTextPaste: handleInlineTextPaste,
-          handleInlineTextBlur: handleInlineTextBlur,
-          updatePreviewDockPosition: updatePreviewDockPosition
-        }
+    function previewDocumentHost() {
+      return {
+        previewSelectionDetail: previewSelectionDetail,
+        applyPreviewSelection: applyPreviewSelection,
+        finishInlineTextEdit: finishInlineTextEdit,
+        dispatchPreviewFieldNavigation: dispatchPreviewFieldNavigation,
+        startInlineTextFromDetail: startInlineTextFromDetail,
+        startInlineTextFromSelection: startInlineTextFromSelection,
+        handleInlineTextInput: handleInlineTextInput,
+        handleInlineTextKeyEvent: handleInlineTextKeyEvent,
+        handleInlineTextPaste: handleInlineTextPaste,
+        handleInlineTextBlur: handleInlineTextBlur,
+        updatePreviewDockPosition: updatePreviewDockPosition
       };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-document-bind", { bubbles: true, detail: detail }));
-      return detail.result || null;
     }
 
     function modeLabel(mode) {

@@ -850,8 +850,7 @@
   }
 
   function bindEditorPreviewFrameDocument(form, frame, host) {
-    var result = editorPreviewHostCall(host, "bindPreviewDocument", null, frame);
-    return result || bindEditorPreviewDocument(form, frame, host);
+    return bindEditorPreviewDocument(form, frame, host);
   }
 
   function bindEditorPreviewFrames(form, host) {
@@ -866,22 +865,14 @@
         frame.setAttribute("data-studio-preview-src", frame.getAttribute("src") || "");
       }
       frame.addEventListener("load", function () {
-        if (editorPreviewHostCall(host, "setPreviewStatus", null, "ready", "Ready", "load") === null) {
-          setEditorPreviewStatus(form, "ready", "Ready", "load");
-        }
-        if (editorPreviewHostCall(host, "syncPreviewFrame", null, frame, "load") === null) {
-          syncEditorPreviewFrame(form, frame, "load", null);
-        }
+        setEditorPreviewStatus(form, "ready", "Ready", "load");
+        syncEditorPreviewFrame(form, frame, "load", typeof host.shouldTransportPreviewPatch === "function" ? host.shouldTransportPreviewPatch : null);
         bindEditorPreviewFrameDocument(form, frame, host);
         var route = editorPreviewURL(frame) || frame.getAttribute("src") || "";
-        if (editorPreviewHostCall(host, "postPreviewLoadSyncPatch", null, route) === null) {
-          postEditorPreviewPatch(form, "load-sync", editorPreviewPatchEnvelope("load-sync", { route: route }, null));
-        }
+        postEditorPreviewPatch(form, "load-sync", editorPreviewPatchEnvelope("load-sync", { route: route }, null));
       });
       frame.addEventListener("error", function () {
-        if (editorPreviewHostCall(host, "setPreviewStatus", null, "error", "Preview failed", "error") === null) {
-          setEditorPreviewStatus(form, "error", "Preview failed", "error");
-        }
+        setEditorPreviewStatus(form, "error", "Preview failed", "error");
       });
       bindEditorPreviewFrameDocument(form, frame, host);
       bound += 1;
