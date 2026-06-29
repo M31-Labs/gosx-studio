@@ -606,25 +606,6 @@
 
     function emitPreviewDockAction(action, detail) {
       detail = detail || {};
-      emitEditorOperation("preview_action", {
-        mutation: false,
-        reason: "preview-dock",
-        target: {
-          field: detail.field || "",
-          editable: detail.editable || "",
-          blockKey: detail.blockKey || "",
-          selection: form.getAttribute("data-studio-selection") || detail.blockKey || detail.field || "",
-          kind: form.getAttribute("data-studio-selection-kind") || "preview"
-        },
-        payload: {
-          action: action,
-          label: detail.label || "",
-          blockLabel: detail.blockLabel || "",
-          actionLabel: detail.action || "",
-          actionHref: detail.actionHref || "",
-          actionFormAction: detail.actionFormAction || ""
-        }
-      });
       emit(form, "gosxstudio:preview-action", {
         action: action,
         field: detail.field || "",

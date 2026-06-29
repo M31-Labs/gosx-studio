@@ -754,6 +754,32 @@
 
     function mirrorPreviewActionSelection(event) {
       var detail = event.detail || {};
+      selectionOperationCounter += 1;
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-operation", {
+        bubbles: true,
+        detail: {
+          id: "studio-op-" + Date.now() + "-" + selectionOperationCounter,
+          kind: "preview_action",
+          source: "gosx-studio",
+          mutation: false,
+          reason: detail.reason || "preview-dock",
+          target: {
+            field: detail.field || "",
+            editable: detail.editable || "",
+            blockKey: detail.blockKey || "",
+            selection: form.getAttribute("data-studio-selection") || detail.blockKey || detail.field || "",
+            kind: form.getAttribute("data-studio-selection-kind") || "preview"
+          },
+          payload: {
+            action: detail.action || "",
+            label: detail.label || "",
+            blockLabel: detail.blockLabel || "",
+            actionLabel: detail.actionLabel || "",
+            actionHref: detail.actionHref || "",
+            actionFormAction: detail.actionFormAction || ""
+          }
+        }
+      }));
       form.dispatchEvent(new CustomEvent("gosxstudio:selection-action", { bubbles: true, detail: {
         action: detail.action || "",
         label: detail.actionLabel || detail.label || detail.action || "",
