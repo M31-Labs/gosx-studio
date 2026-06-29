@@ -389,8 +389,12 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`function applyPreviewSelectionChrome(frame, selection)`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-chrome-apply", { bubbles: true, detail: detail }))`,
 		`applyPreviewSelectionChrome(frame, detail.field || detail.blockKey || detail.nodeID || "");`,
-		`syncPreviewDock(frame, selectedTargets[0] || target, {`,
-		`var selectedEditable = result.editable || detail.editable || "";`,
+		`function previewDockSelection(detail, result)`,
+		`var payload = { form: form, selection: detail || {}, applied: result || {} };`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-selection-resolve", { bubbles: true, detail: payload }))`,
+		`return payload.result || {};`,
+		`var dockSelection = previewDockSelection(detail, result);`,
+		`syncPreviewDock(frame, selectedTargets[0] || target, dockSelection);`,
 		`if (options.reveal && source) revealInspectorSelection(source, control);`,
 	} {
 		if !strings.Contains(script, check) {
@@ -437,6 +441,16 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`removeAttribute("data-studio-preview-selection"`,
 		`emit(form, "gosxstudio:preview-select"`,
 		`emitEditorOperation("select_preview"`,
+		`var selectedEditable = result.editable || detail.editable || "";`,
+		`field: result.field || detail.field || ""`,
+		`editable: selectedEditable`,
+		`label: result.label || detail.label || ""`,
+		`blockLabel: result.blockLabel || detail.blockLabel || ""`,
+		`action: result.action || ""`,
+		`actionHref: result.actionHref || ""`,
+		`actionFormAction: result.actionFormAction || ""`,
+		`blockKey: result.blockKey || detail.blockKey || ""`,
+		`nodeID: result.nodeID || detail.nodeID || ""`,
 	} {
 		if strings.Contains(applyBody, forbidden) {
 			t.Fatalf("applyPreviewSelection should delegate editor preview selection state; found %q in:\n%s", forbidden, applyBody)
@@ -623,7 +637,7 @@ func TestWorkbenchRuntimeDelegatesPreviewDockShowContentToPreviewRuntime(t *test
 		`var dock = previewDockForFrame(frame);`,
 		`frame.__gosxStudioPreviewDock = dock;`,
 		`frame.__gosxStudioPreviewDockTarget = target;`,
-		`var payload = { form: form, frame: frame, dock: dock, selection: { field: detail.field || "", editable: detail.editable || "", label: detail.label || "", blockLabel: detail.blockLabel || "", action: detail.action || "", actionHref: detail.actionHref || "", actionFormAction: detail.actionFormAction || "", blockKey: detail.blockKey || "", nodeID: detail.nodeID || "" } };`,
+		`var payload = { form: form, frame: frame, dock: dock, selection: detail || {} };`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-sync", { bubbles: true, detail: payload }))`,
 		`updatePreviewFieldNavigation(frame, dock, target, detail);`,
 		`syncPreviewFieldMap(frame, target, detail);`,
@@ -647,6 +661,15 @@ func TestWorkbenchRuntimeDelegatesPreviewDockShowContentToPreviewRuntime(t *test
 		`dockKindLabel(detail)`,
 		`action.textContent`,
 		`action.disabled`,
+		`selection: { field: detail.field || ""`,
+		`editable: detail.editable || ""`,
+		`label: detail.label || ""`,
+		`blockLabel: detail.blockLabel || ""`,
+		`action: detail.action || ""`,
+		`actionHref: detail.actionHref || ""`,
+		`actionFormAction: detail.actionFormAction || ""`,
+		`blockKey: detail.blockKey || ""`,
+		`nodeID: detail.nodeID || ""`,
 	} {
 		if strings.Contains(body, forbidden) {
 			t.Fatalf("syncPreviewDock should delegate concrete preview dock show/content mutation; found %q in:\n%s", forbidden, body)

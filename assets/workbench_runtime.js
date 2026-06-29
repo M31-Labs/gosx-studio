@@ -418,12 +418,18 @@
       return state;
     }
 
+    function previewDockSelection(detail, result) {
+      var payload = { form: form, selection: detail || {}, applied: result || {} };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-selection-resolve", { bubbles: true, detail: payload }));
+      return payload.result || {};
+    }
+
     function syncPreviewDock(frame, target, detail) {
       var dock = previewDockForFrame(frame);
       if (!dock || !target) return;
       frame.__gosxStudioPreviewDock = dock;
       frame.__gosxStudioPreviewDockTarget = target;
-      var payload = { form: form, frame: frame, dock: dock, selection: { field: detail.field || "", editable: detail.editable || "", label: detail.label || "", blockLabel: detail.blockLabel || "", action: detail.action || "", actionHref: detail.actionHref || "", actionFormAction: detail.actionFormAction || "", blockKey: detail.blockKey || "", nodeID: detail.nodeID || "" } };
+      var payload = { form: form, frame: frame, dock: dock, selection: detail || {} };
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-sync", { bubbles: true, detail: payload }));
       updatePreviewFieldNavigation(frame, dock, target, detail);
       syncPreviewFieldMap(frame, target, detail);
@@ -716,19 +722,9 @@
       var control = inspectorControl(source);
       var result = dispatchPreviewSelectionApply(detail, options);
       if (!result) return false;
-      var selectedEditable = result.editable || detail.editable || "";
       applyPreviewSelectionChrome(frame, detail.field || detail.blockKey || detail.nodeID || "");
-      syncPreviewDock(frame, selectedTargets[0] || target, {
-        field: result.field || detail.field || "",
-        editable: selectedEditable,
-        label: result.label || detail.label || "",
-        blockLabel: result.blockLabel || detail.blockLabel || "",
-        action: result.action || "",
-        actionHref: result.actionHref || "",
-        actionFormAction: result.actionFormAction || "",
-        blockKey: result.blockKey || detail.blockKey || "",
-        nodeID: result.nodeID || detail.nodeID || ""
-      });
+      var dockSelection = previewDockSelection(detail, result);
+      syncPreviewDock(frame, selectedTargets[0] || target, dockSelection);
       if (options.reveal && source) revealInspectorSelection(source, control);
       return true;
     }

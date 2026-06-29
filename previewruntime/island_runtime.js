@@ -308,9 +308,25 @@
     return "Field";
   }
 
+  function editorPreviewDockSelection(selection, applied) {
+    selection = selection || {};
+    applied = applied || {};
+    return {
+      field: applied.field || selection.field || "",
+      editable: applied.editable || selection.editable || "",
+      label: applied.label || selection.label || "",
+      blockLabel: applied.blockLabel || selection.blockLabel || "",
+      action: applied.action || selection.action || "",
+      actionHref: applied.actionHref || selection.actionHref || "",
+      actionFormAction: applied.actionFormAction || selection.actionFormAction || "",
+      blockKey: applied.blockKey || selection.blockKey || "",
+      nodeID: applied.nodeID || selection.nodeID || ""
+    };
+  }
+
   function syncEditorPreviewDock(dock, selection) {
     if (!dock || !dock.setAttribute) return { handled: false };
-    selection = selection || {};
+    selection = editorPreviewDockSelection(selection);
     dock.hidden = false;
     dock.setAttribute("data-gosx-studio-preview-field", selection.field || "");
     dock.setAttribute("data-gosx-studio-preview-block", selection.blockKey || selection.nodeID || "");
@@ -703,6 +719,10 @@
     doc.addEventListener("gosxstudio:editor-preview-dock-normalize", function (event) {
       var detail = event.detail || {};
       setEditorPreviewResult(detail, normalizeEditorPreviewDock(detail.dock));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-dock-selection-resolve", function (event) {
+      var detail = event.detail || {};
+      detail.result = editorPreviewDockSelection(detail.selection || detail.detail || {}, detail.applied || detail.selectionResult || {});
     });
     doc.addEventListener("gosxstudio:editor-preview-dock-sync", function (event) {
       var detail = event.detail || {};
