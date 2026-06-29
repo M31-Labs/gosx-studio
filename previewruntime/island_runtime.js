@@ -412,6 +412,16 @@
     };
   }
 
+  function editorPreviewPatchEnvelope(reason, detail, field) {
+    return {
+      type: "gosxstudio:preview-patch",
+      source: "gosx-studio",
+      reason: reason || "patch",
+      detail: detail || {},
+      field: editorPreviewFieldPatch(field)
+    };
+  }
+
   function syncEditorPreviewFrame(form, frame, reason, shouldTransport) {
     if (!form || !editorPreviewFrameDocument(frame)) return { handled: false, count: 0 };
     reason = reason || "sync";
@@ -577,6 +587,12 @@
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, detail.patch));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-patch-build-post", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      var patch = editorPreviewPatchEnvelope(detail.reason, detail.detail, detail.field);
+      setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, patch));
     });
     doc.addEventListener("gosxstudio:editor-preview-frame-sync", function (event) {
       var detail = event.detail || {};

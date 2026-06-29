@@ -149,9 +149,8 @@ func TestWorkbenchRuntimeDelegatesEditorPreviewPatchTransport(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
 		`function postPreviewPatch(reason, detail, field)`,
-		`field: fieldPatch(field)`,
-		`var payload = { form: form, frames: frames, patch: patch, reason: reason || "patch", detail: detail || {} };`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-patch-post", { bubbles: true, detail: payload }));`,
+		`var payload = { form: form, reason: reason || "patch", detail: detail || {}, field: field || null };`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-patch-build-post", { bubbles: true, detail: payload }));`,
 		`return payload.result || null;`,
 		`postPreviewPatch("transaction", event.detail || {}, null);`,
 		`postPreviewPatch("history-restore", event.detail || {}, null);`,
@@ -160,14 +159,19 @@ func TestWorkbenchRuntimeDelegatesEditorPreviewPatchTransport(t *testing.T) {
 			t.Fatalf("workbench runtime missing delegated editor preview patch transport fragment %q", check)
 		}
 	}
+	body := jsFunctionBody(t, script, "postPreviewPatch")
 	for _, forbidden := range []string{
+		`type: "gosxstudio:preview-patch"`,
+		`source: "gosx-studio"`,
+		`field: fieldPatch(field)`,
+		`var payload = { form: form, frames: frames, patch: patch`,
 		`function applyPreviewPatch(frame, patch)`,
 		`function updatePreviewTarget`,
 		`frame.contentWindow.postMessage`,
 		`new URL(frame.getAttribute("src"), window.location.href).origin`,
 		`target.setAttribute("data-gosx-studio-preview-patched"`,
 	} {
-		if strings.Contains(script, forbidden) {
+		if strings.Contains(body, forbidden) {
 			t.Fatalf("workbench runtime should delegate concrete preview patch transport; found %q", forbidden)
 		}
 	}

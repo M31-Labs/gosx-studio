@@ -897,15 +897,8 @@
     function postPreviewPatch(reason, detail, field) {
       var frames = previewFrames();
       if (!frames.length) return;
-      var patch = {
-        type: "gosxstudio:preview-patch",
-        source: "gosx-studio",
-        reason: reason || "patch",
-        detail: detail || {},
-        field: fieldPatch(field)
-      };
-      var payload = { form: form, frames: frames, patch: patch, reason: reason || "patch", detail: detail || {} };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-patch-post", { bubbles: true, detail: payload }));
+      var payload = { form: form, reason: reason || "patch", detail: detail || {}, field: field || null };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-patch-build-post", { bubbles: true, detail: payload }));
       return payload.result || null;
     }
 
