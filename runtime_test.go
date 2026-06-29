@@ -127,7 +127,7 @@ func TestWorkbenchRuntimeLetsFieldRuntimeOwnMirroredPreviewPatches(t *testing.T)
 		`if (shouldTransportPreviewPatch(event.target, "input")) postPreviewPatch("input", {}, event.target);`,
 		`emitFieldOperation("change", event.target);`,
 		`if (shouldTransportPreviewPatch(event.target, "change")) postPreviewPatch("change", {}, event.target);`,
-		`postPreviewPatch("load-sync", { route: previewURL(frame) || frame.getAttribute("src") || "" }, null);`,
+		`return postPreviewPatch("load-sync", { route: route || "" }, null);`,
 		`postPreviewPatch("transaction", event.detail || {}, null);`,
 		`postPreviewPatch("history-restore", event.detail || {}, null);`,
 	} {
@@ -295,6 +295,48 @@ func TestWorkbenchRuntimeDelegatesPreviewDocumentBindingToPreviewRuntime(t *test
 		if strings.Contains(body, forbidden) {
 			t.Fatalf("bindPreviewDocument should not own concrete preview document binding; found %q in:\n%s", forbidden, body)
 		}
+	}
+}
+
+func TestWorkbenchRuntimeDelegatesPreviewFrameLifecycleToPreviewRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	body := jsFunctionBody(t, script, "bindPreviewFrames")
+	for _, check := range []string{
+		`function bindPreviewFrames()`,
+		`var detail = {`,
+		`form: form,`,
+		`host: {`,
+		`setPreviewStatus: setPreviewStatus,`,
+		`syncPreviewFrame: syncPreviewFrame,`,
+		`bindPreviewDocument: bindPreviewDocument,`,
+		`postPreviewLoadSyncPatch: function (route)`,
+		`return postPreviewPatch("load-sync", { route: route || "" }, null);`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-frames-bind", { bubbles: true, detail: detail }));`,
+		`return detail.result || null;`,
+	} {
+		if !strings.Contains(body, check) {
+			t.Fatalf("bindPreviewFrames missing PreviewRuntime frame-bind fragment %q in:\n%s", check, body)
+		}
+	}
+
+	for _, forbidden := range []string{
+		`previewFrames().forEach`,
+		`frame.dataset.gosxStudioPreviewBound`,
+		`data-studio-preview-src`,
+		`frame.addEventListener("load"`,
+		`frame.addEventListener("error"`,
+		`previewURL(frame)`,
+		`syncPreviewFrame(frame, "load")`,
+		`bindPreviewDocument(frame)`,
+		`postPreviewPatch("load-sync", { route: previewURL(frame)`,
+		`setPreviewStatus("error", "Preview failed", "error")`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("bindPreviewFrames should not own concrete preview frame lifecycle; found %q in:\n%s", forbidden, body)
+		}
+	}
+	if strings.Contains(script, `function previewURL(frame)`) {
+		t.Fatalf("workbench runtime should not keep previewURL after delegating frame lifecycle")
 	}
 }
 

@@ -657,6 +657,46 @@
     return { handled: true, bound: true };
   }
 
+  function bindEditorPreviewFrameDocument(form, frame, host) {
+    var result = editorPreviewHostCall(host, "bindPreviewDocument", null, frame);
+    return result || bindEditorPreviewDocument(form, frame, host);
+  }
+
+  function bindEditorPreviewFrames(form, host) {
+    if (!form) return { handled: false, frames: 0, bound: 0 };
+    var frames = editorPreviewFrames(form);
+    var bound = 0;
+    frames.forEach(function (frame) {
+      if (!frame || !frame.addEventListener) return;
+      if (frame.dataset && frame.dataset.gosxStudioPreviewBound === "true") return;
+      if (frame.dataset) frame.dataset.gosxStudioPreviewBound = "true";
+      if (!frame.getAttribute("data-studio-preview-src")) {
+        frame.setAttribute("data-studio-preview-src", frame.getAttribute("src") || "");
+      }
+      frame.addEventListener("load", function () {
+        if (editorPreviewHostCall(host, "setPreviewStatus", null, "ready", "Ready", "load") === null) {
+          setEditorPreviewStatus(form, "ready", "Ready", "load");
+        }
+        if (editorPreviewHostCall(host, "syncPreviewFrame", null, frame, "load") === null) {
+          syncEditorPreviewFrame(form, frame, "load", null);
+        }
+        bindEditorPreviewFrameDocument(form, frame, host);
+        var route = editorPreviewURL(frame) || frame.getAttribute("src") || "";
+        if (editorPreviewHostCall(host, "postPreviewLoadSyncPatch", null, route) === null) {
+          postEditorPreviewPatch(form, "load-sync", editorPreviewPatchEnvelope("load-sync", { route: route }, null));
+        }
+      });
+      frame.addEventListener("error", function () {
+        if (editorPreviewHostCall(host, "setPreviewStatus", null, "error", "Preview failed", "error") === null) {
+          setEditorPreviewStatus(form, "error", "Preview failed", "error");
+        }
+      });
+      bindEditorPreviewFrameDocument(form, frame, host);
+      bound += 1;
+    });
+    return { handled: true, frames: frames.length, bound: bound };
+  }
+
   function setEditorPreviewStatus(form, state, label, reason) {
     if (!form) return { handled: false };
     editorPreviewShells(form).forEach(function (shell) {
@@ -855,6 +895,11 @@
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, bindEditorPreviewDocument(form, detail.frame, detail.host));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-frames-bind", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      setEditorPreviewResult(detail, bindEditorPreviewFrames(form, detail.host));
     });
   }
 

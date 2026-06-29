@@ -251,10 +251,6 @@
       return queryAll(form, "[data-studio-preview-frame]");
     }
 
-    function previewURL(frame) {
-      return frame.getAttribute("data-studio-preview-src") || frame.getAttribute("src") || "";
-    }
-
     function previewTargets(frame, patch) {
       var detail = { form: form, frame: frame, patch: patch };
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-targets-resolve", { bubbles: true, detail: detail }));
@@ -855,23 +851,19 @@
     }
 
     function bindPreviewFrames() {
-      previewFrames().forEach(function (frame) {
-        if (frame.dataset.gosxStudioPreviewBound === "true") return;
-        frame.dataset.gosxStudioPreviewBound = "true";
-        if (!frame.getAttribute("data-studio-preview-src")) {
-          frame.setAttribute("data-studio-preview-src", frame.getAttribute("src") || "");
+      var detail = {
+        form: form,
+        host: {
+          setPreviewStatus: setPreviewStatus,
+          syncPreviewFrame: syncPreviewFrame,
+          bindPreviewDocument: bindPreviewDocument,
+          postPreviewLoadSyncPatch: function (route) {
+            return postPreviewPatch("load-sync", { route: route || "" }, null);
+          }
         }
-        frame.addEventListener("load", function () {
-          setPreviewStatus("ready", "Ready", "load");
-          syncPreviewFrame(frame, "load");
-          bindPreviewDocument(frame);
-          postPreviewPatch("load-sync", { route: previewURL(frame) || frame.getAttribute("src") || "" }, null);
-        });
-        frame.addEventListener("error", function () {
-          setPreviewStatus("error", "Preview failed", "error");
-        });
-        bindPreviewDocument(frame);
-      });
+      };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-frames-bind", { bubbles: true, detail: detail }));
+      return detail.result || null;
     }
 
     function bindPreviewDocument(frame) {

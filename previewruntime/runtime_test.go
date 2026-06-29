@@ -546,6 +546,60 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDocumentBinding(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewFrameLifecycleBinding(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-frames-bind"`,
+		`setEditorPreviewResult(detail, bindEditorPreviewFrames(form, detail.host))`,
+		`function bindEditorPreviewFrames(form, host)`,
+		`var frames = editorPreviewFrames(form)`,
+		`if (frame.dataset && frame.dataset.gosxStudioPreviewBound === "true") return`,
+		`if (frame.dataset) frame.dataset.gosxStudioPreviewBound = "true"`,
+		`if (!frame.getAttribute("data-studio-preview-src"))`,
+		`frame.setAttribute("data-studio-preview-src", frame.getAttribute("src") || "")`,
+		`frame.addEventListener("load", function ()`,
+		`frame.addEventListener("error", function ()`,
+		`bindEditorPreviewFrameDocument(form, frame, host)`,
+		`bound += 1`,
+		`return { handled: true, frames: frames.length, bound: bound }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview frame lifecycle fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-frames-bind`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview frames-bind events")
+	}
+}
+
+func TestPreviewRuntimeIslandJSPreviewFrameLifecycleHandlersHandoffToHost(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`function bindEditorPreviewFrameDocument(form, frame, host)`,
+		`var result = editorPreviewHostCall(host, "bindPreviewDocument", null, frame)`,
+		`return result || bindEditorPreviewDocument(form, frame, host)`,
+		`editorPreviewHostCall(host, "setPreviewStatus", null, "ready", "Ready", "load")`,
+		`setEditorPreviewStatus(form, "ready", "Ready", "load")`,
+		`editorPreviewHostCall(host, "syncPreviewFrame", null, frame, "load")`,
+		`syncEditorPreviewFrame(form, frame, "load", null)`,
+		`var route = editorPreviewURL(frame) || frame.getAttribute("src") || ""`,
+		`editorPreviewHostCall(host, "postPreviewLoadSyncPatch", null, route)`,
+		`postEditorPreviewPatch(form, "load-sync", editorPreviewPatchEnvelope("load-sync", { route: route }, null))`,
+		`editorPreviewHostCall(host, "setPreviewStatus", null, "error", "Preview failed", "error")`,
+		`setEditorPreviewStatus(form, "error", "Preview failed", "error")`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview frame lifecycle host handoff fragment %q", fragment)
+		}
+	}
+}
+
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewDocumentListeners(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {
