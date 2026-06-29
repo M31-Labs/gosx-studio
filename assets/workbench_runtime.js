@@ -496,27 +496,23 @@
     }
 
     function setPreviewStatus(state, label, reason) {
-      var detail = { form: form, state: state, label: label, reason: reason || "" };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-status-set", { bubbles: true, detail: detail }));
-      return detail.result || null;
+      if (typeof window.__gosx_preview_runtime_island_setStatus !== "function") return null;
+      return window.__gosx_preview_runtime_island_setStatus(form, state, label, reason);
     }
 
     function syncPreviewRoute(route, reason) {
-      var detail = { form: form, route: route || "", reason: reason || "" };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-route-sync", { bubbles: true, detail: detail }));
-      return detail.result || null;
+      if (typeof window.__gosx_preview_runtime_island_syncRoute !== "function") return null;
+      return window.__gosx_preview_runtime_island_syncRoute(form, route, reason);
     }
 
     function refreshPreviewNow(reason, route) {
-      var detail = { form: form, route: route || "", reason: reason || "refresh" };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-refresh-now", { bubbles: true, detail: detail }));
-      return detail.result || null;
+      if (typeof window.__gosx_preview_runtime_island_refreshNow !== "function") return null;
+      return window.__gosx_preview_runtime_island_refreshNow(form, reason, route);
     }
 
     function schedulePreviewRefresh(reason, route) {
-      var detail = { form: form, route: route || "", reason: reason || "refresh" };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-refresh-schedule", { bubbles: true, detail: detail }));
-      return detail.result || null;
+      if (typeof window.__gosx_preview_runtime_island_scheduleRefresh !== "function") return null;
+      return window.__gosx_preview_runtime_island_scheduleRefresh(form, reason, route);
     }
 
     function resolvePreviewPatchTransport(field, reason) {
@@ -671,9 +667,8 @@
     }
 
     function postPreviewPatch(reason, detail, field) {
-      var payload = { form: form, reason: reason || "patch", detail: detail || {}, field: field || null };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-patch-build-post", { bubbles: true, detail: payload }));
-      return payload.result || null;
+      if (typeof window.__gosx_preview_runtime_island_postPatch !== "function") return null;
+      return window.__gosx_preview_runtime_island_postPatch(form, reason, detail, field);
     }
 
     function bindPreviewFrames() {

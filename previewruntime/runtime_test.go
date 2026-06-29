@@ -313,16 +313,20 @@ func TestIslandRuntimeJSPublishesCycleFieldGlobal(t *testing.T) {
 	}
 }
 
-func TestPreviewRuntimeIslandJSOwnsEditorPreviewChromeEvents(t *testing.T) {
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewChromeHelpers(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-status-set"`,
-		`doc.addEventListener("gosxstudio:editor-preview-route-sync"`,
-		`doc.addEventListener("gosxstudio:editor-preview-refresh-now"`,
-		`doc.addEventListener("gosxstudio:editor-preview-refresh-schedule"`,
+		`window.__gosx_preview_runtime_island_setStatus = function (form, state, label, reason)`,
+		`return setEditorPreviewStatus(form, state, label, reason);`,
+		`window.__gosx_preview_runtime_island_syncRoute = function (form, route, reason)`,
+		`return syncEditorPreviewRoute(form, route, reason);`,
+		`window.__gosx_preview_runtime_island_refreshNow = function (form, reason, route)`,
+		`return refreshEditorPreviewNow(form, reason, route);`,
+		`window.__gosx_preview_runtime_island_scheduleRefresh = function (form, reason, route)`,
+		`return scheduleEditorPreviewRefresh(form, reason, route);`,
 		`detail.form && detail.form.querySelectorAll`,
 		`closest("form[data-studio-workbench], form[data-editor-workbench]")`,
 		`"[data-gosx-studio-preview], [data-studio-preview-shell], [data-studio-canvas]"`,
@@ -347,14 +351,24 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewChromeEvents(t *testing.T) {
 		`}, 180)`,
 		`typeof WeakMap !== "undefined" ? new WeakMap() : null`,
 		`form.__gosxStudioEditorPreviewRefreshTimer`,
-		`detail.result = result`,
 	} {
 		if !strings.Contains(body, fragment) {
 			t.Fatalf("IslandRuntimeJS() missing editor preview chrome fragment %q", fragment)
 		}
 	}
-	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview`) {
-		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview chrome control events")
+	for _, forbidden := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-status-set"`,
+		`doc.addEventListener("gosxstudio:editor-preview-route-sync"`,
+		`doc.addEventListener("gosxstudio:editor-preview-refresh-now"`,
+		`doc.addEventListener("gosxstudio:editor-preview-refresh-schedule"`,
+		`dispatchEvent(new CustomEvent("gosxstudio:editor-preview-status-set"`,
+		`dispatchEvent(new CustomEvent("gosxstudio:editor-preview-route-sync"`,
+		`dispatchEvent(new CustomEvent("gosxstudio:editor-preview-refresh-now"`,
+		`dispatchEvent(new CustomEvent("gosxstudio:editor-preview-refresh-schedule"`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("IslandRuntimeJS() should use editor preview chrome helpers, found %q", forbidden)
+		}
 	}
 }
 
@@ -366,15 +380,14 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewPatchTransport(t *testing.T) {
 	for _, fragment := range []string{
 		`doc.addEventListener("gosxstudio:editor-preview-patch-apply"`,
 		`doc.addEventListener("gosxstudio:editor-preview-patch-post"`,
-		`doc.addEventListener("gosxstudio:editor-preview-patch-build-post"`,
 		`setEditorPreviewResult(detail, applyEditorPreviewPatch(detail.frame, detail.patch))`,
 		`setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, detail.patch))`,
+		`window.__gosx_preview_runtime_island_postPatch = function (form, reason, detail, field)`,
+		`return postEditorPreviewPatch(form, reason, editorPreviewPatchEnvelope(reason, detail, field));`,
 		`function editorPreviewPatchEnvelope(reason, detail, field)`,
 		`reason: reason || "patch"`,
 		`detail: detail || {}`,
 		`field: editorPreviewFieldPatch(field)`,
-		`var patch = editorPreviewPatchEnvelope(detail.reason, detail.detail, detail.field)`,
-		`setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, patch))`,
 		`function editorPreviewFrameDocument(frame)`,
 		`frame.contentDocument || (frame.contentWindow && frame.contentWindow.document) || null`,
 		`function editorPreviewPatchSelector(source)`,
@@ -405,6 +418,9 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewPatchTransport(t *testing.T) {
 	}
 	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview`) {
 		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview patch control events")
+	}
+	if strings.Contains(body, `doc.addEventListener("gosxstudio:editor-preview-patch-build-post"`) {
+		t.Fatalf("IslandRuntimeJS() should expose postPatch helper instead of patch-build-post listener")
 	}
 }
 

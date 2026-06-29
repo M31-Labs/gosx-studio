@@ -979,27 +979,23 @@
     return { handled: true };
   }
 
+  window.__gosx_preview_runtime_island_setStatus = function (form, state, label, reason) {
+    return setEditorPreviewStatus(form, state, label, reason);
+  };
+  window.__gosx_preview_runtime_island_syncRoute = function (form, route, reason) {
+    return syncEditorPreviewRoute(form, route, reason);
+  };
+  window.__gosx_preview_runtime_island_refreshNow = function (form, reason, route) {
+    return refreshEditorPreviewNow(form, reason, route);
+  };
+  window.__gosx_preview_runtime_island_scheduleRefresh = function (form, reason, route) {
+    return scheduleEditorPreviewRefresh(form, reason, route);
+  };
+  window.__gosx_preview_runtime_island_postPatch = function (form, reason, detail, field) {
+    return postEditorPreviewPatch(form, reason, editorPreviewPatchEnvelope(reason, detail, field));
+  };
+
   function bindEditorPreviewChromeEvents() {
-    doc.addEventListener("gosxstudio:editor-preview-status-set", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      setEditorPreviewResult(detail, setEditorPreviewStatus(form, detail.state, detail.label, detail.reason));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-route-sync", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      setEditorPreviewResult(detail, syncEditorPreviewRoute(form, detail.route, detail.reason));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-refresh-now", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      setEditorPreviewResult(detail, refreshEditorPreviewNow(form, detail.reason, detail.route));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-refresh-schedule", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      setEditorPreviewResult(detail, scheduleEditorPreviewRefresh(form, detail.reason, detail.route));
-    });
     doc.addEventListener("gosxstudio:editor-preview-patch-apply", function (event) {
       var detail = event.detail || {};
       setEditorPreviewResult(detail, applyEditorPreviewPatch(detail.frame, detail.patch));
@@ -1008,12 +1004,6 @@
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, detail.patch));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-patch-build-post", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      var patch = editorPreviewPatchEnvelope(detail.reason, detail.detail, detail.field);
-      setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, patch));
     });
     doc.addEventListener("gosxstudio:editor-preview-frame-sync", function (event) {
       var detail = event.detail || {};

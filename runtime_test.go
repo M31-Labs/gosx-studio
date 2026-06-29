@@ -166,9 +166,8 @@ func TestWorkbenchRuntimeDelegatesEditorPreviewPatchTransport(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
 		`function postPreviewPatch(reason, detail, field)`,
-		`var payload = { form: form, reason: reason || "patch", detail: detail || {}, field: field || null };`,
-		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-patch-build-post", { bubbles: true, detail: payload }));`,
-		`return payload.result || null;`,
+		`typeof window.__gosx_preview_runtime_island_postPatch !== "function"`,
+		`return window.__gosx_preview_runtime_island_postPatch(form, reason, detail, field);`,
 		`postPreviewPatch("transaction", event.detail || {}, null);`,
 		`postPreviewPatch("history-restore", event.detail || {}, null);`,
 	} {
@@ -185,6 +184,7 @@ func TestWorkbenchRuntimeDelegatesEditorPreviewPatchTransport(t *testing.T) {
 		`source: "gosx-studio"`,
 		`field: fieldPatch(field)`,
 		`var payload = { form: form, frames: frames, patch: patch`,
+		`gosxstudio:editor-preview-patch-build-post`,
 		`function applyPreviewPatch(frame, patch)`,
 		`function updatePreviewTarget`,
 		`frame.contentWindow.postMessage`,
@@ -350,21 +350,21 @@ func TestWorkbenchRuntimeDelegatesPreviewEventPolicyToPreviewRuntime(t *testing.
 	}
 }
 
-func TestWorkbenchRuntimeDelegatesEditorPreviewChromeToPreviewRuntimeEvents(t *testing.T) {
+func TestWorkbenchRuntimeDelegatesEditorPreviewChromeToPreviewRuntimeHelpers(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
 		`function setPreviewStatus(state, label, reason)`,
-		`{ form: form, state: state, label: label, reason: reason || "" }`,
-		`gosxstudio:editor-preview-status-set`,
+		`typeof window.__gosx_preview_runtime_island_setStatus !== "function"`,
+		`return window.__gosx_preview_runtime_island_setStatus(form, state, label, reason);`,
 		`function syncPreviewRoute(route, reason)`,
-		`{ form: form, route: route || "", reason: reason || "" }`,
-		`gosxstudio:editor-preview-route-sync`,
+		`typeof window.__gosx_preview_runtime_island_syncRoute !== "function"`,
+		`return window.__gosx_preview_runtime_island_syncRoute(form, route, reason);`,
 		`function refreshPreviewNow(reason, route)`,
-		`{ form: form, route: route || "", reason: reason || "refresh" }`,
-		`gosxstudio:editor-preview-refresh-now`,
+		`typeof window.__gosx_preview_runtime_island_refreshNow !== "function"`,
+		`return window.__gosx_preview_runtime_island_refreshNow(form, reason, route);`,
 		`function schedulePreviewRefresh(reason, route)`,
-		`gosxstudio:editor-preview-refresh-schedule`,
-		`return detail.result || null;`,
+		`typeof window.__gosx_preview_runtime_island_scheduleRefresh !== "function"`,
+		`return window.__gosx_preview_runtime_island_scheduleRefresh(form, reason, route);`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing editor preview chrome delegation fragment %q", check)
@@ -376,6 +376,10 @@ func TestWorkbenchRuntimeDelegatesEditorPreviewChromeToPreviewRuntimeEvents(t *t
 		`next.searchParams.set("_gosx_preview"`,
 		`frame.setAttribute("src", cacheBustURL`,
 		`function cacheBustURL`,
+		`gosxstudio:editor-preview-status-set`,
+		`gosxstudio:editor-preview-route-sync`,
+		`gosxstudio:editor-preview-refresh-now`,
+		`gosxstudio:editor-preview-refresh-schedule`,
 		`function openLinks`,
 		`queryAll(form, "[data-studio-selected-flow-route]")`,
 		`queryAll(shell, "[data-studio-preview-status]")`,
