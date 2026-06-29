@@ -23,6 +23,7 @@ type BackendResourceTableRow struct {
 }
 
 type BackendResourceTableCell struct {
+	Node        *gosx.Node
 	Text        string
 	Primary     string
 	Secondary   string
@@ -119,6 +120,9 @@ func renderBackendResourceTableRows(rows []BackendResourceTableRow) []gosx.Node 
 }
 
 func renderBackendResourceTableCell(cell BackendResourceTableCell) gosx.Node {
+	if cell.Node != nil {
+		return *cell.Node
+	}
 	if cell.Link.Href != "" || cell.Link.Label != "" {
 		return renderBackendResourceLink(cell.Link)
 	}

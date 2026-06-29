@@ -120,3 +120,45 @@ func TestRenderBackendResourceIndexContentOmitsPageWrapper(t *testing.T) {
 		t.Fatalf("resource index content should not render its own page wrapper:\n%s", html)
 	}
 }
+
+func TestRenderBackendResourceIndexTableCellNode(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendResourceIndexContent(BackendResourceIndexProps{
+		Kicker:  "CMS",
+		Title:   "Products",
+		Summary: "One-off inventory, storefront visibility, and checkout availability.",
+		Empty:   "No products yet.",
+		Table: &BackendResourceTable{
+			Headers: []string{"Piece", "Status", "Checkout", ""},
+			Rows: []BackendResourceTableRow{{
+				Cells: []BackendResourceTableCell{
+					{Node: backendResourceNode(gosx.El("div", gosx.Attrs(gosx.Attr("class", "table-product")),
+						gosx.El("img", gosx.Attrs(gosx.Attr("src", "/media/cup.jpg"), gosx.Attr("alt", "Cup"))),
+						gosx.El("div", nil,
+							gosx.El("strong", nil, gosx.Text("Cup <One>")),
+							gosx.El("span", nil, gosx.Text("Published")),
+							gosx.El("span", nil, gosx.Text("Bowls")),
+						),
+					))},
+					{Text: "Available", StatusClass: "status status--available"},
+					{Text: "Stripe ready", StatusClass: "status status--ready"},
+				},
+				Action: BackendResourceLink{Href: "/admin/products/product-1", Label: "Edit", GOSXLink: true},
+			}},
+		},
+	}))
+
+	for _, fragment := range []string{
+		`<td><div class="table-product"><img src="/media/cup.jpg" alt="Cup" /><div><strong>Cup &lt;One&gt;</strong><span>Published</span><span>Bowls</span></div></div></td>`,
+		`<td><span class="status status--available">Available</span></td>`,
+		`<td><span class="status status--ready">Stripe ready</span></td>`,
+		`<td><a href="/admin/products/product-1" data-gosx-link="true">Edit</a></td>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("resource index content with node cell missing %q:\n%s", fragment, html)
+		}
+	}
+}
+
+func backendResourceNode(node gosx.Node) *gosx.Node {
+	return &node
+}
