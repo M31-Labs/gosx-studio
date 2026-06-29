@@ -313,24 +313,6 @@
       hidePreviewDocks();
     }
 
-    function previewShellForFrame(frame) {
-      return frame && frame.closest ? (frame.closest("[data-gosx-studio-preview], [data-studio-preview-shell], [data-studio-canvas]") || frame.parentElement) : null;
-    }
-
-    function previewDockForFrame(frame) {
-      var shell = previewShellForFrame(frame);
-      if (!shell) return null;
-      var dock = shell.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]");
-      if (dock) return normalizePreviewDock(frame, dock);
-      return null;
-    }
-
-    function normalizePreviewDock(frame, dock) {
-      if (!dock) return null;
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-bind", { bubbles: true, detail: { form: form, frame: frame, dock: dock, host: { runPreviewDockAction: runPreviewDockAction } } }));
-      return dock;
-    }
-
     function hidePreviewDocks() {
       var detail = { form: form };
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-hide", { bubbles: true, detail: detail }));
@@ -340,9 +322,8 @@
     function updatePreviewDockPosition(frame) {
       var dock = frame && frame.__gosxStudioPreviewDock;
       var target = frame && frame.__gosxStudioPreviewDockTarget;
-      var shell = previewShellForFrame(frame);
       if (!dock || !target || dock.hidden) return null;
-      var detail = { form: form, frame: frame, dock: dock, target: target, shell: shell };
+      var detail = { form: form, frame: frame, dock: dock, target: target };
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-position-sync", { bubbles: true, detail: detail }));
       return detail.result || null;
     }
@@ -353,20 +334,6 @@
       return payload.result || { fields: [], count: 0, index: -1, current: detail && detail.field ? detail.field : "" };
     }
 
-    function updatePreviewFieldNavigation(frame, dock, target, detail) {
-      var state = previewFieldNavigationState(frame, target, detail);
-      var payload = { form: form, frame: frame, dock: dock, count: state.count, index: state.index };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-field-navigation-sync", { bubbles: true, detail: payload }));
-      return state;
-    }
-
-    function syncPreviewFieldMap(frame, target, detail) {
-      var state = previewFieldNavigationState(frame, target, detail);
-      var payload = { form: form, frame: frame, fields: state.fields, current: state.current, count: state.count };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-field-map-sync", { bubbles: true, detail: payload }));
-      return state;
-    }
-
     function previewDockSelection(detail, result) {
       var payload = { form: form, selection: detail || {}, applied: result || {} };
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-selection-resolve", { bubbles: true, detail: payload }));
@@ -374,15 +341,9 @@
     }
 
     function syncPreviewDock(frame, target, detail) {
-      var dock = previewDockForFrame(frame);
-      if (!dock || !target) return;
-      frame.__gosxStudioPreviewDock = dock;
-      frame.__gosxStudioPreviewDockTarget = target;
-      var payload = { form: form, frame: frame, dock: dock, selection: detail || {} };
-      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-sync", { bubbles: true, detail: payload }));
-      updatePreviewFieldNavigation(frame, dock, target, detail);
-      syncPreviewFieldMap(frame, target, detail);
-      updatePreviewDockPosition(frame);
+      var payload = { form: form, frame: frame, target: target, selection: detail || {}, host: { runPreviewDockAction: runPreviewDockAction } };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-selection-sync", { bubbles: true, detail: payload }));
+      return payload.result || null;
     }
 
     function previewDockDetail(dock) {

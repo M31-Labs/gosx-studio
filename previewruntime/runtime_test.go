@@ -942,6 +942,44 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockShowContent(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockSelectionSync(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-dock-selection-sync"`,
+		`var form = editorPreviewForm(detail, event)`,
+		`setEditorPreviewResult(detail, syncEditorPreviewDockSelection(form, detail.frame, detail.target, detail.selection, detail.host))`,
+		`function editorPreviewDockForFrame(frame)`,
+		`var shell = editorPreviewShellForFrame(frame)`,
+		`dock: shell.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]")`,
+		`shell: shell`,
+		`function syncEditorPreviewDockSelection(form, frame, target, selection, host)`,
+		`var dockLookup = editorPreviewDockForFrame(frame)`,
+		`var dock = dockLookup.dock`,
+		`var shell = dockLookup.shell`,
+		`if (!dock || !target) return { handled: false, dock: dock || null, state: null, bound: false, positioned: false }`,
+		`var normalizedSelection = editorPreviewDockSelection(selection)`,
+		`var bindResult = bindEditorPreviewDock(form, frame, dock, host)`,
+		`frame.__gosxStudioPreviewDock = dock`,
+		`frame.__gosxStudioPreviewDockTarget = target`,
+		`syncEditorPreviewDock(dock, normalizedSelection)`,
+		`var state = editorPreviewFieldNavigationState(frame, target, normalizedSelection)`,
+		`syncEditorPreviewDockFieldNavigation(dock, state.count, state.index)`,
+		`syncEditorPreviewFieldMap(frame, state.fields, state.current, state.count)`,
+		`var position = syncEditorPreviewDockPosition(frame, dock, target, shell)`,
+		`return { handled: true, dock: dock, state: state, bound: !!(bindResult && bindResult.bound), positioned: !!(position && position.handled) }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview dock selection sync fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-selection-sync`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock selection-sync control events")
+	}
+}
+
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockDetailExtraction(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {

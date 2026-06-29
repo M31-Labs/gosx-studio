@@ -92,6 +92,15 @@
     return frame && frame.closest ? frame.closest("[data-gosx-studio-preview], [data-studio-preview-shell], [data-studio-canvas]") : null;
   }
 
+  function editorPreviewDockForFrame(frame) {
+    var shell = editorPreviewShellForFrame(frame);
+    if (!shell) return { dock: null, shell: null };
+    return {
+      dock: shell.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]"),
+      shell: shell
+    };
+  }
+
   function editorPreviewFrameDocument(frame) {
     try {
       return frame.contentDocument || (frame.contentWindow && frame.contentWindow.document) || null;
@@ -428,6 +437,23 @@
     dock.style.top = Math.round(placement === "bottom" ? frameRect.top - shellRect.top + targetRect.bottom + 10 : top - 10) + "px";
     dock.style.left = Math.round(left) + "px";
     return { handled: true, placement: placement };
+  }
+
+  function syncEditorPreviewDockSelection(form, frame, target, selection, host) {
+    var dockLookup = editorPreviewDockForFrame(frame);
+    var dock = dockLookup.dock;
+    var shell = dockLookup.shell;
+    if (!dock || !target) return { handled: false, dock: dock || null, state: null, bound: false, positioned: false };
+    var normalizedSelection = editorPreviewDockSelection(selection);
+    var bindResult = bindEditorPreviewDock(form, frame, dock, host);
+    frame.__gosxStudioPreviewDock = dock;
+    frame.__gosxStudioPreviewDockTarget = target;
+    syncEditorPreviewDock(dock, normalizedSelection);
+    var state = editorPreviewFieldNavigationState(frame, target, normalizedSelection);
+    syncEditorPreviewDockFieldNavigation(dock, state.count, state.index);
+    syncEditorPreviewFieldMap(frame, state.fields, state.current, state.count);
+    var position = syncEditorPreviewDockPosition(frame, dock, target, shell);
+    return { handled: true, dock: dock, state: state, bound: !!(bindResult && bindResult.bound), positioned: !!(position && position.handled) };
   }
 
   function updateEditorPreviewPatchTarget(target, field) {
@@ -906,6 +932,11 @@
     doc.addEventListener("gosxstudio:editor-preview-dock-sync", function (event) {
       var detail = event.detail || {};
       setEditorPreviewResult(detail, syncEditorPreviewDock(detail.dock, detail.selection));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-dock-selection-sync", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      setEditorPreviewResult(detail, syncEditorPreviewDockSelection(form, detail.frame, detail.target, detail.selection, detail.host));
     });
     doc.addEventListener("gosxstudio:editor-preview-dock-detail-resolve", function (event) {
       var detail = event.detail || {};
