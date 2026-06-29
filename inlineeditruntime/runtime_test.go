@@ -205,6 +205,9 @@ func TestInlineEditRuntimePublishesPreviewTextSessionMethods(t *testing.T) {
 		"startPreviewTextEdit",
 		"syncPreviewTextEdit",
 		"finishPreviewTextEdit",
+		"startPreviewTextSession",
+		"syncPreviewTextSession",
+		"finishPreviewTextSession",
 		"previewTextEditState",
 	} {
 		if !strings.Contains(body, fragment) {
@@ -266,6 +269,37 @@ func TestInlineEditRuntimePreviewTextCallbacks(t *testing.T) {
 	} {
 		if !strings.Contains(body, fragment) {
 			t.Fatalf("InlineEditRuntimeScript() missing preview inline-text callback hook %q:\n%s", fragment, body)
+		}
+	}
+}
+
+func TestInlineEditRuntimeOwnsPreviewTextSessionAdapter(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"function previewTextSessionOptions(frame, host)",
+		"form: host.form || null",
+		"target: host.target || (frame && frame.__gosxStudioPreviewDockTarget)",
+		"controlForField: host.controlForField",
+		`form.getAttribute("data-studio-selection")`,
+		`form.getAttribute("data-studio-selection-kind")`,
+		"selection: selection || edit.blockKey || edit.field || \"\"",
+		`host.setStatus("dirty", "Draft changed", reason || "inline-text")`,
+		"host.setDirty(reason || \"inline-text\")",
+		"typeof host.emitOperation === \"function\"",
+		"host.emitOperation(type, operation)",
+		"typeof host.emitEditorOperation === \"function\"",
+		"host.emitEditorOperation(type, operation)",
+		"host.emitEvent(name, detail)",
+		"typeof host.onFinish === \"function\"",
+		"host.onFinish(finishedFrame, edit, reason, commit)",
+		"typeof host.updateDock === \"function\"",
+		"host.updateDock(finishedFrame, edit, reason, commit)",
+		"startPreviewTextEdit(frame, detail, reason, previewTextSessionOptions(frame, host))",
+		"syncPreviewTextEdit(frame, reason, previewTextSessionOptions(frame, host))",
+		"finishPreviewTextEdit(frame, commit, reason, previewTextSessionOptions(frame, host))",
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() missing preview text session adapter fragment %q:\n%s", fragment, body)
 		}
 	}
 }

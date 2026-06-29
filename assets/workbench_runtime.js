@@ -1159,43 +1159,33 @@
       return runtime && typeof runtime[method] === "function" ? runtime : null;
     }
 
-    function previewInlineTextOptions(frame) {
+    function emitPreviewInlineTextEvent(name, detail) {
+      emit(form, name, detail);
+    }
+
+    function previewInlineTextHost(frame) {
       return {
         form: form,
         target: frame && frame.__gosxStudioPreviewDockTarget,
         controlForField: textControlForField,
-        selection: function (edit) {
-          return {
-            selection: form.getAttribute("data-studio-selection") || edit.blockKey || edit.field || "",
-            kind: form.getAttribute("data-studio-selection-kind") || "preview-field"
-          };
-        },
-        setDirty: function (reason) {
-          setPreviewStatus("dirty", "Draft changed", reason || "inline-text");
-        },
-        emitOperation: function (type, operation) {
-          return emitEditorOperation(type, operation);
-        },
-        emitEvent: function (name, detail) {
-          emit(form, name, detail);
-        },
-        onFinish: function (finishedFrame) {
-          updatePreviewDockPosition(finishedFrame);
-        }
+        setStatus: setPreviewStatus,
+        emitEditorOperation: emitEditorOperation,
+        emitEvent: emitPreviewInlineTextEvent,
+        updateDock: updatePreviewDockPosition
       };
     }
 
     function syncInlineTextEdit(frame, reason) {
-      var runtime = previewInlineTextRuntime("syncPreviewTextEdit");
+      var runtime = previewInlineTextRuntime("syncPreviewTextSession");
       if (!runtime) return false;
-      return runtime.syncPreviewTextEdit(frame, reason, previewInlineTextOptions(frame));
+      return runtime.syncPreviewTextSession(frame, reason, previewInlineTextHost(frame));
     }
 
     function startInlineTextEdit(frame, detail, reason) {
-      var runtime = previewInlineTextRuntime("startPreviewTextEdit");
+      var runtime = previewInlineTextRuntime("startPreviewTextSession");
       if (!runtime) return false;
       detail = detail || (frame && frame.__gosxStudioPreviewDock ? previewDockDetail(frame.__gosxStudioPreviewDock) : {});
-      return runtime.startPreviewTextEdit(frame, detail, reason || "preview-dock", previewInlineTextOptions(frame));
+      return runtime.startPreviewTextSession(frame, detail, reason || "preview-dock", previewInlineTextHost(frame));
     }
 
     function startInlineTextFromDetail(frame, detail, reason) {
@@ -1212,9 +1202,9 @@
     }
 
     function finishInlineTextEdit(frame, commit, reason) {
-      var runtime = previewInlineTextRuntime("finishPreviewTextEdit");
+      var runtime = previewInlineTextRuntime("finishPreviewTextSession");
       if (!runtime) return false;
-      return runtime.finishPreviewTextEdit(frame, commit, reason, previewInlineTextOptions(frame));
+      return runtime.finishPreviewTextSession(frame, commit, reason, previewInlineTextHost(frame));
     }
 
     function postPreviewPatch(reason, detail, field) {

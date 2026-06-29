@@ -175,14 +175,15 @@ func TestWorkbenchRuntimeDelegatesPreviewInlineTextToInlineEditRuntime(t *testin
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
 		"window.GoSXStudioInlineEditRuntime",
-		"startPreviewTextEdit",
-		"syncPreviewTextEdit",
-		"finishPreviewTextEdit",
-		"previewInlineTextOptions",
+		"startPreviewTextSession",
+		"syncPreviewTextSession",
+		"finishPreviewTextSession",
+		"previewInlineTextHost",
 		"controlForField: textControlForField",
-		"emitOperation: function (type, operation)",
-		"emitEvent: function (name, detail)",
-		"onFinish: function (finishedFrame)",
+		"setStatus: setPreviewStatus",
+		"emitEditorOperation: emitEditorOperation",
+		"emitEvent: emitPreviewInlineTextEvent",
+		"updateDock: updatePreviewDockPosition",
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing InlineEditRuntime preview inline-text delegate fragment %q", check)
@@ -193,6 +194,12 @@ func TestWorkbenchRuntimeDelegatesPreviewInlineTextToInlineEditRuntime(t *testin
 		`target.setAttribute("contenteditable", "plaintext-only")`,
 		`target.removeAttribute("contenteditable")`,
 		"function inlineTextPayload",
+		"function previewInlineTextOptions",
+		"selection: function (edit)",
+		"setDirty: function",
+		"emitOperation: function",
+		"emitEvent: function",
+		"onFinish: function",
 	} {
 		if strings.Contains(script, forbidden) {
 			t.Fatalf("workbench runtime should delegate preview inline-text lifecycle, found low-level fragment %q", forbidden)

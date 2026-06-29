@@ -13,6 +13,7 @@
   //   window.GoSXStudioInlineEditRuntime = {
   //     install, deriveKeys,
   //     startPreviewTextEdit, syncPreviewTextEdit, finishPreviewTextEdit,
+  //     startPreviewTextSession, syncPreviewTextSession, finishPreviewTextSession,
   //     previewTextEditState
   //   }
   //
@@ -184,6 +185,70 @@
     } catch (error) {
       return null;
     }
+  }
+
+  function previewTextSessionOptions(frame, host) {
+    host = host || {};
+    return {
+      form: host.form || null,
+      target: host.target || (frame && frame.__gosxStudioPreviewDockTarget),
+      controlForField: host.controlForField,
+      selection: function (edit) {
+        var form = host.form || null;
+        var selection = "";
+        var kind = "";
+        if (form && typeof form.getAttribute === "function") {
+          selection = form.getAttribute("data-studio-selection") || "";
+          kind = form.getAttribute("data-studio-selection-kind") || "";
+        }
+        return {
+          selection: selection || edit.blockKey || edit.field || "",
+          kind: kind || "preview-field"
+        };
+      },
+      setDirty: function (reason) {
+        if (typeof host.setStatus === "function") {
+          try { host.setStatus("dirty", "Draft changed", reason || "inline-text"); } catch (error) { /* tolerate */ }
+        }
+        if (typeof host.setDirty === "function") {
+          try { host.setDirty(reason || "inline-text"); } catch (error) { /* tolerate */ }
+        }
+      },
+      emitOperation: function (type, operation) {
+        if (typeof host.emitOperation === "function") {
+          try { return host.emitOperation(type, operation); } catch (error) { return null; }
+        }
+        if (typeof host.emitEditorOperation === "function") {
+          try { return host.emitEditorOperation(type, operation); } catch (error) { return null; }
+        }
+        return null;
+      },
+      emitEvent: function (name, detail) {
+        if (typeof host.emitEvent !== "function") return;
+        try { host.emitEvent(name, detail); } catch (error) { return; }
+      },
+      onFinish: function (finishedFrame, edit, reason, commit) {
+        if (typeof host.onFinish === "function") {
+          try { return host.onFinish(finishedFrame, edit, reason, commit); } catch (error) { return null; }
+        }
+        if (typeof host.updateDock === "function") {
+          try { return host.updateDock(finishedFrame, edit, reason, commit); } catch (error) { return null; }
+        }
+        return null;
+      }
+    };
+  }
+
+  function startPreviewTextSession(frame, detail, reason, host) {
+    return startPreviewTextEdit(frame, detail, reason, previewTextSessionOptions(frame, host));
+  }
+
+  function syncPreviewTextSession(frame, reason, host) {
+    return syncPreviewTextEdit(frame, reason, previewTextSessionOptions(frame, host));
+  }
+
+  function finishPreviewTextSession(frame, commit, reason, host) {
+    return finishPreviewTextEdit(frame, commit, reason, previewTextSessionOptions(frame, host));
   }
 
   function startPreviewTextEdit(frame, detail, reason, opts) {
@@ -509,6 +574,9 @@
     startPreviewTextEdit: startPreviewTextEdit,
     syncPreviewTextEdit: syncPreviewTextEdit,
     finishPreviewTextEdit: finishPreviewTextEdit,
+    startPreviewTextSession: startPreviewTextSession,
+    syncPreviewTextSession: syncPreviewTextSession,
+    finishPreviewTextSession: finishPreviewTextSession,
     previewTextEditState: previewTextEditState
   };
 })();
