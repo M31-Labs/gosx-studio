@@ -445,17 +445,9 @@
     }
 
     function hidePreviewDocks() {
-      queryAll(form, "[data-gosx-studio-preview-dock]").forEach(function (dock) {
-        dock.hidden = true;
-        dock.removeAttribute("data-gosx-studio-preview-field");
-        dock.removeAttribute("data-gosx-studio-preview-block");
-        dock.removeAttribute("data-gosx-studio-preview-action-label");
-        dock.removeAttribute("data-gosx-studio-preview-action-href");
-        dock.removeAttribute("data-gosx-studio-preview-action-formaction");
-        dock.removeAttribute("data-gosx-studio-preview-block-label");
-        dock.removeAttribute("data-gosx-studio-preview-field-count");
-        dock.removeAttribute("data-gosx-studio-preview-field-index");
-      });
+      var detail = { form: form };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-hide", { bubbles: true, detail: detail }));
+      return detail.result || null;
     }
 
     function dockKindLabel(detail) {

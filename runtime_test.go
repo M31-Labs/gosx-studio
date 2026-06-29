@@ -541,6 +541,36 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 	}
 }
 
+func TestWorkbenchRuntimeDelegatesPreviewDockHideToPreviewRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	body := jsFunctionBody(t, script, "hidePreviewDocks")
+	for _, check := range []string{
+		`function hidePreviewDocks()`,
+		`var detail = { form: form };`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-hide", { bubbles: true, detail: detail }))`,
+		`return detail.result || null;`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing preview dock hide delegation fragment %q", check)
+		}
+	}
+	for _, forbidden := range []string{
+		`dock.hidden = true`,
+		`removeAttribute("data-gosx-studio-preview-field"`,
+		`removeAttribute("data-gosx-studio-preview-block"`,
+		`removeAttribute("data-gosx-studio-preview-action-label"`,
+		`removeAttribute("data-gosx-studio-preview-action-href"`,
+		`removeAttribute("data-gosx-studio-preview-action-formaction"`,
+		`removeAttribute("data-gosx-studio-preview-block-label"`,
+		`removeAttribute("data-gosx-studio-preview-field-count"`,
+		`removeAttribute("data-gosx-studio-preview-field-index"`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("hidePreviewDocks should delegate concrete preview dock hide/reset mutation; found %q in:\n%s", forbidden, body)
+		}
+	}
+}
+
 func TestWorkbenchRuntimeLeavesPreviewDockSelectionActionTelemetryToSelectionRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	body := jsFunctionBody(t, script, "emitPreviewDockAction")

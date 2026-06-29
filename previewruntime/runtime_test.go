@@ -480,6 +480,37 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionChrome(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockHide(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-dock-hide"`,
+		`var form = editorPreviewForm(detail, event)`,
+		`setEditorPreviewResult(detail, hideEditorPreviewDocks(form))`,
+		`function hideEditorPreviewDocks(form)`,
+		`var docks = queryAll(form, "[data-gosx-studio-preview-dock]")`,
+		`dock.hidden = true`,
+		`dock.removeAttribute("data-gosx-studio-preview-field")`,
+		`dock.removeAttribute("data-gosx-studio-preview-block")`,
+		`dock.removeAttribute("data-gosx-studio-preview-action-label")`,
+		`dock.removeAttribute("data-gosx-studio-preview-action-href")`,
+		`dock.removeAttribute("data-gosx-studio-preview-action-formaction")`,
+		`dock.removeAttribute("data-gosx-studio-preview-block-label")`,
+		`dock.removeAttribute("data-gosx-studio-preview-field-count")`,
+		`dock.removeAttribute("data-gosx-studio-preview-field-index")`,
+		`return { handled: true, count: docks.length }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview dock hide/reset fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-hide`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock hide control events")
+	}
+}
+
 func TestSubscriberRuntimeScriptPublishesObservers(t *testing.T) {
 	// The preview-side subscriber registers observers for each
 	// $preview.* signal family. This test guards against drift between

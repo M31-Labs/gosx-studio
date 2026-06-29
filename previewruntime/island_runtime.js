@@ -192,6 +192,23 @@
     return { handled: true, shells: shells.length, frames: 0 };
   }
 
+  function hideEditorPreviewDocks(form) {
+    if (!form) return { handled: false, count: 0 };
+    var docks = queryAll(form, "[data-gosx-studio-preview-dock]");
+    docks.forEach(function (dock) {
+      dock.hidden = true;
+      dock.removeAttribute("data-gosx-studio-preview-field");
+      dock.removeAttribute("data-gosx-studio-preview-block");
+      dock.removeAttribute("data-gosx-studio-preview-action-label");
+      dock.removeAttribute("data-gosx-studio-preview-action-href");
+      dock.removeAttribute("data-gosx-studio-preview-action-formaction");
+      dock.removeAttribute("data-gosx-studio-preview-block-label");
+      dock.removeAttribute("data-gosx-studio-preview-field-count");
+      dock.removeAttribute("data-gosx-studio-preview-field-index");
+    });
+    return { handled: true, count: docks.length };
+  }
+
   function updateEditorPreviewPatchTarget(target, field) {
     if (!target || !field) return;
     var value = field.value == null ? "" : String(field.value);
@@ -397,6 +414,11 @@
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, applyEditorPreviewSelectionChrome(form, detail.frame, detail.selection));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-dock-hide", function (event) {
+      var detail = event.detail || {};
+      var form = editorPreviewForm(detail, event);
+      setEditorPreviewResult(detail, hideEditorPreviewDocks(form));
     });
   }
 
