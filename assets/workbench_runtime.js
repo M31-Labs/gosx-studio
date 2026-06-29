@@ -296,8 +296,9 @@
     }
 
     function previewSelectableNode(target) {
-      if (!target || !target.closest) return null;
-      return target.closest("[data-studio-field], [data-editor-preview], [data-studio-field-source], [data-studio-block-key], [data-studio-node-id]");
+      var detail = { form: form, target: target };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selectable-node-resolve", { bubbles: true, detail: detail }));
+      return detail.result || null;
     }
 
     function clearPreviewFieldMap(frame) {

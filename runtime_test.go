@@ -205,6 +205,31 @@ func TestWorkbenchRuntimeDelegatesEditorPreviewTargetLookup(t *testing.T) {
 	}
 }
 
+func TestWorkbenchRuntimeDelegatesPreviewSelectableNodeResolutionToPreviewRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	body := jsFunctionBody(t, script, "previewSelectableNode")
+	for _, check := range []string{
+		`function previewSelectableNode(target)`,
+		`var detail = { form: form, target: target };`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selectable-node-resolve", { bubbles: true, detail: detail }))`,
+		`return detail.result || null;`,
+		`var target = previewSelectableNode(event.target);`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing preview selectable-node delegation fragment %q", check)
+		}
+	}
+
+	for _, forbidden := range []string{
+		`target.closest("[data-studio-field], [data-editor-preview], [data-studio-field-source], [data-studio-block-key], [data-studio-node-id]")`,
+		`[data-studio-block-key], [data-studio-node-id]`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("previewSelectableNode should delegate concrete selectable-node selector resolution; found %q in:\n%s", forbidden, body)
+		}
+	}
+}
+
 func TestWorkbenchRuntimeDelegatesEditorPreviewChromeToPreviewRuntimeEvents(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{

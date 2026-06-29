@@ -121,6 +121,11 @@
     return queryAll(frameDoc, editorPreviewPatchSelector(source));
   }
 
+  function editorPreviewSelectableNode(target) {
+    if (!target || !target.closest) return null;
+    return target.closest("[data-studio-field], [data-editor-preview], [data-studio-field-source], [data-studio-block-key], [data-studio-node-id]");
+  }
+
   function editorPreviewFieldKeyForTarget(target) {
     if (!target || !target.getAttribute) return "";
     return target.getAttribute("data-studio-field") || target.getAttribute("data-editor-preview") || target.getAttribute("data-studio-field-source") || "";
@@ -630,6 +635,10 @@
       }
       var targets = editorPreviewPatchTargets(detail.frame, detail.patch);
       detail.result = { handled: true, targets: targets, count: targets.length };
+    });
+    doc.addEventListener("gosxstudio:editor-preview-selectable-node-resolve", function (event) {
+      var detail = event.detail || {};
+      detail.result = editorPreviewSelectableNode(detail.target);
     });
     doc.addEventListener("gosxstudio:editor-preview-field-map-clear", function (event) {
       var detail = event.detail || {};

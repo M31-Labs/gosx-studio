@@ -457,6 +457,27 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewTargetLookup(t *testing.T) {
 	}
 }
 
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectableNodeResolution(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-selectable-node-resolve"`,
+		`detail.result = editorPreviewSelectableNode(detail.target)`,
+		`function editorPreviewSelectableNode(target)`,
+		`if (!target || !target.closest) return null`,
+		`return target.closest("[data-studio-field], [data-editor-preview], [data-studio-field-source], [data-studio-block-key], [data-studio-node-id]")`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview selectable-node resolver fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selectable-node-resolve`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview selectable-node resolver events")
+	}
+}
+
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewFieldMapMarkers(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {
