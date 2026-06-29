@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
 
-test("selection bridge installs Studio primary and legacy globals", () => {
+test("selection bridge installs Studio primary global", () => {
   const source = readFileSync(new URL("./canvas_selection_bridge.js", import.meta.url), "utf8");
   const attrs = new Map();
   const window = {
@@ -37,7 +37,6 @@ test("selection bridge installs Studio primary and legacy globals", () => {
 
   const runtime = window.GoSXStudioCanvasSelectionBridgeRuntime;
   assert.ok(runtime, "primary Studio runtime global should be installed");
-  assert.equal(window.__muddyCanvasSelectionBridge, runtime);
   assert.equal(typeof runtime.tick, "function");
   assert.equal(typeof runtime.selectedID, "function");
   assert.equal(typeof runtime.selectedIDs, "function");

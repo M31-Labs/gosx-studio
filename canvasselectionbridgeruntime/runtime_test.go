@@ -12,7 +12,6 @@ func TestCanvasSelectionBridgeScriptContract(t *testing.T) {
 	}
 	for _, check := range []string{
 		"window.GoSXStudioCanvasSelectionBridgeRuntime",
-		"window.__muddyCanvasSelectionBridge",
 		"$surface.event.selectedID",
 		"$surface.event.selectedIDs",
 		"__gosx_get_shared_signal",

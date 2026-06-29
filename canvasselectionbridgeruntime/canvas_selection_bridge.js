@@ -195,7 +195,7 @@
 
   // Expose a tiny status hook so live e2e/status checks can assert the bridge
   // mounted (and trigger a synchronous reconcile) without reaching into the
-  // closure. __muddyCanvasSelectionBridge is a temporary compatibility alias.
+  // closure.
   document.documentElement.setAttribute(BOUND, "true");
   var api = {
     tick: tick,
@@ -205,7 +205,6 @@
     appliedIDs: function () { return lastAppliedIDs; },
   };
   window.GoSXStudioCanvasSelectionBridgeRuntime = api;
-  window.__muddyCanvasSelectionBridge = api;
 
   // Kick an initial reconcile in case a pick already landed before this script
   // ran (e.g. server-default selection echoed into the signal).

@@ -133,7 +133,6 @@ func TestCanvasInlineRuntimeHandlersServeStudioOwnedAssets(t *testing.T) {
 			script: CanvasSelectionBridgeScript(),
 			checks: []string{
 				"window.GoSXStudioCanvasSelectionBridgeRuntime",
-				"window.__muddyCanvasSelectionBridge",
 				"$surface.event.selectedID",
 				"$surface.event.selectedIDs",
 				"GoSXStudioSiteMapRuntime",

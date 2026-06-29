@@ -118,9 +118,7 @@ func CanvasContextualPanelScript() []byte {
 }
 
 // CanvasSelectionBridgeScript returns the opt-in full-WASM CanvasBoard
-// selection bridge. It publishes window.GoSXStudioCanvasSelectionBridgeRuntime
-// and keeps window.__muddyCanvasSelectionBridge as a temporary compatibility
-// alias for legacy e2e/status hooks.
+// selection bridge. It publishes window.GoSXStudioCanvasSelectionBridgeRuntime.
 func CanvasSelectionBridgeScript() []byte {
 	return canvasselectionbridgeruntime.CanvasSelectionBridgeScript()
 }
