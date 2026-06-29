@@ -3,14 +3,16 @@ package studio
 import "m31labs.dev/gosx"
 
 type BackendSearchProps struct {
-	Kicker   string
-	Title    string
-	Summary  string
-	Query    string
-	Empty    string
-	Class    string
-	Searched bool
-	Results  []BackendSearchResult
+	Kicker      string
+	Title       string
+	Summary     string
+	Query       string
+	Empty       string
+	Class       string
+	FormAction  string
+	IncludeForm bool
+	Searched    bool
+	Results     []BackendSearchResult
 }
 
 type BackendSearchResult struct {
@@ -36,10 +38,12 @@ func RenderBackendSearch(props BackendSearchProps) gosx.Node {
 }
 
 func RenderBackendSearchContent(props BackendSearchProps) gosx.Node {
-	return gosx.Fragment(
-		RenderBackendSearchHeading(props),
-		RenderBackendSearchResults(props),
-	)
+	children := []gosx.Node{RenderBackendSearchHeading(props)}
+	if props.IncludeForm {
+		children = append(children, RenderBackendSearchForm(props))
+	}
+	children = append(children, RenderBackendSearchResults(props))
+	return gosx.Fragment(children...)
 }
 
 func RenderBackendSearchHeading(props BackendSearchProps) gosx.Node {
@@ -72,6 +76,26 @@ func RenderBackendSearchResults(props BackendSearchProps) gosx.Node {
 		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(empty)))
 	}
 	return gosx.El("section", gosx.Attrs(gosx.Attr("class", "panel")), gosx.Fragment(children...))
+}
+
+func RenderBackendSearchForm(props BackendSearchProps) gosx.Node {
+	action := props.FormAction
+	if action == "" {
+		action = "/admin/search"
+	}
+	return gosx.El("section", gosx.Attrs(gosx.Attr("class", "panel")),
+		gosx.El("form", gosx.Attrs(
+			gosx.Attr("class", "admin-form admin-form--single"),
+			gosx.Attr("method", "get"),
+			gosx.Attr("action", action),
+		),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "field-row")),
+				gosx.El("label", gosx.Attrs(gosx.Attr("for", "q")), gosx.Text("Search")),
+				gosx.El("input", gosx.Attrs(gosx.Attr("id", "q"), gosx.Attr("name", "q"), gosx.Attr("value", props.Query))),
+			),
+			gosx.El("button", gosx.Attrs(gosx.Attr("class", "button button--primary"), gosx.Attr("type", "submit")), gosx.Text("Search")),
+		),
+	)
 }
 
 func renderBackendSearchResultCards(results []BackendSearchResult) []gosx.Node {

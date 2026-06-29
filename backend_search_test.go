@@ -82,3 +82,72 @@ func TestRenderBackendSearchSplitNodes(t *testing.T) {
 		t.Fatalf("results node missing default empty state:\n%s", results)
 	}
 }
+
+func TestRenderBackendSearchPageIncludesFormWhenRequested(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendSearch(BackendSearchProps{
+		Kicker:      "CMS",
+		Title:       "Search",
+		Summary:     "Find products, media, content, orders, and messages.",
+		Query:       "cup <blue>",
+		IncludeForm: true,
+		Searched:    true,
+		Results: []BackendSearchResult{{
+			Href:     "/admin/products/product-1",
+			Kind:     "Product",
+			Title:    "Blue <Cup>",
+			Detail:   "blue-cup",
+			GOSXLink: true,
+		}},
+	}))
+
+	for _, fragment := range []string{
+		`<div class="admin-page" data-gosx-studio-backend-search-renderer="gosx-studio">`,
+		`<section class="admin-heading"><p class="kicker">CMS</p><h1>Search</h1><p>Find products, media, content, orders, and messages.</p></section>`,
+		`<section class="panel"><form class="admin-form admin-form--single" method="get" action="/admin/search">`,
+		`<label for="q">Search</label><input id="q" name="q" value="cup &lt;blue&gt;" />`,
+		`<button class="button button--primary" type="submit">Search</button>`,
+		`<section class="panel"><div class="panel__header"><h2>Results</h2><span class="status">cup &lt;blue&gt;</span></div><div class="resource-grid">`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("search page with form missing %q:\n%s", fragment, html)
+		}
+	}
+
+	assertSearchFragmentOrder(t, html,
+		`<section class="admin-heading">`,
+		`<section class="panel"><form class="admin-form admin-form--single"`,
+		`<section class="panel"><div class="panel__header"><h2>Results</h2>`,
+	)
+}
+
+func TestRenderBackendSearchFormSupportsCustomAction(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendSearchForm(BackendSearchProps{
+		Query:      "clay",
+		FormAction: "/custom/search",
+	}))
+
+	for _, fragment := range []string{
+		`<section class="panel"><form class="admin-form admin-form--single" method="get" action="/custom/search">`,
+		`<input id="q" name="q" value="clay" />`,
+		`<button class="button button--primary" type="submit">Search</button>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("search form missing %q:\n%s", fragment, html)
+		}
+	}
+}
+
+func assertSearchFragmentOrder(t *testing.T, html string, fragments ...string) {
+	t.Helper()
+	last := -1
+	for _, fragment := range fragments {
+		next := strings.Index(html, fragment)
+		if next == -1 {
+			t.Fatalf("search html missing ordered fragment %q:\n%s", fragment, html)
+		}
+		if next < last {
+			t.Fatalf("search fragment %q rendered out of order:\n%s", fragment, html)
+		}
+		last = next
+	}
+}
