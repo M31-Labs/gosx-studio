@@ -63,13 +63,17 @@ func RenderBlockLayoutEngineSegments(view map[string]any, options BlockLayoutEng
 	return BlockLayoutEngineSegments{
 		RootOpen:     renderBlockLayoutEngineRootOpen(options),
 		Header:       renderBlockLayoutEngineHeader(view, options),
-		EngineHost:   renderBlockLayoutEngineHost(options),
+		EngineHost:   RenderBlockLayoutEngineHost(options),
 		LayersOpen:   renderBlockLayoutEngineSlotOpen("studio-block-layout-engine__layers", "data-studio-block-layout-layers"),
 		LayersClose:  gosx.RawHTML("</div>"),
 		LibraryOpen:  renderBlockLayoutEngineSlotOpen("studio-block-layout-engine__library", "data-studio-block-layout-library"),
 		LibraryClose: gosx.RawHTML("</div>"),
 		RootClose:    gosx.RawHTML("</section>"),
 	}
+}
+
+func RenderBlockLayoutEngineHost(options BlockLayoutEngineOptions) gosx.Node {
+	return renderBlockLayoutEngineHost(options)
 }
 
 func RenderBlockLayoutEngine(view map[string]any, options BlockLayoutEngineOptions) gosx.Node {

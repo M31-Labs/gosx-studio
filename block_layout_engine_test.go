@@ -188,3 +188,33 @@ func TestBlockLayoutEngineHostFromMapNormalizesCapabilities(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderBlockLayoutEngineHostOwnsRuntimeHostContract(t *testing.T) {
+	host := BlockLayoutEngineHostFromMap(map[string]any{
+		"key":          " blocks ",
+		"name":         "LayoutEngine",
+		"mountId":      "layout-engine",
+		"class":        "layout-host",
+		"capabilities": " pointer keyboard text-input ",
+	})
+	html := gosx.RenderHTML(RenderBlockLayoutEngineHost(BlockLayoutEngineOptions{
+		EngineHost:   host,
+		EngineSource: "host-app",
+	}))
+
+	for _, fragment := range []string{
+		`id="layout-engine"`,
+		`class="layout-host"`,
+		`data-gosx-engine="LayoutEngine"`,
+		`data-gosx-engine-kind="surface"`,
+		`data-gosx-studio-engine="blocks"`,
+		`data-studio-engine-role="blocks"`,
+		`data-studio-engine-source="host-app"`,
+		`data-studio-block-layout-engine-surface="true"`,
+		`data-gosx-engine-capabilities="pointer keyboard text-input"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("block-layout engine host missing %q:\n%s", fragment, html)
+		}
+	}
+}
