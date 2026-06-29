@@ -637,12 +637,6 @@
         actionFormAction: detail.actionFormAction || "",
         reason: "preview-dock"
       });
-      emit(form, "gosxstudio:selection-action", {
-        action: action,
-        label: detail.action || detail.label || action,
-        selection: form.getAttribute("data-studio-selection") || detail.blockKey || detail.field || "",
-        kind: form.getAttribute("data-studio-selection-kind") || "preview"
-      });
     }
 
     function isFormSubmitControl(node) {

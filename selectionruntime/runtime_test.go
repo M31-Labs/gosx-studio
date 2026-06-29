@@ -55,6 +55,19 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 	}
 }
 
+func jsFunctionBody(t *testing.T, script, name string) string {
+	t.Helper()
+	start := strings.Index(script, "function "+name+"(")
+	if start < 0 {
+		t.Fatalf("script missing function %s", name)
+	}
+	next := strings.Index(script[start+len("function "+name+"("):], "\n    function ")
+	if next < 0 {
+		return script[start:]
+	}
+	return script[start : start+len("function "+name+"(")+next]
+}
+
 func TestIslandRuntimeJSPublishesIslandGlobal(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {
@@ -118,6 +131,34 @@ func TestSelectionRuntimeIslandOwnsSelectionActionTelemetry(t *testing.T) {
 	} {
 		if !strings.Contains(body, contract) {
 			t.Fatalf("IslandRuntimeJS() missing selection-action telemetry contract %q", contract)
+		}
+	}
+}
+
+func TestSelectionRuntimeIslandMirrorsPreviewActionSelectionTelemetry(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, contract := range []string{
+		`form.addEventListener("gosxstudio:preview-action", mirrorPreviewActionSelection);`,
+		`function mirrorPreviewActionSelection(event)`,
+		`var detail = event.detail || {};`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:selection-action", { bubbles: true, detail: {`,
+		`action: detail.action || ""`,
+		`label: detail.actionLabel || detail.label || detail.action || ""`,
+		`selection: form.getAttribute("data-studio-selection") || detail.blockKey || detail.field || ""`,
+		`kind: form.getAttribute("data-studio-selection-kind") || "preview"`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() missing preview-action selection mirror contract %q", contract)
+		}
+	}
+	mirrorBody := jsFunctionBody(t, body, "mirrorPreviewActionSelection")
+	for _, forbidden := range []string{
+		`gosxstudio:workbench-action`,
+		`gosxstudio:preview-action`,
+		`gosxstudio:selection-action", mirrorPreviewActionSelection`,
+	} {
+		if strings.Contains(mirrorBody, forbidden) {
+			t.Fatalf("preview-action mirror should only dispatch selection-action telemetry; found %q in:\n%s", forbidden, mirrorBody)
 		}
 	}
 }

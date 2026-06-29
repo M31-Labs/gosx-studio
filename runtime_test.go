@@ -291,6 +291,24 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 	}
 }
 
+func TestWorkbenchRuntimeLeavesPreviewDockSelectionActionTelemetryToSelectionRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	body := jsFunctionBody(t, script, "emitPreviewDockAction")
+	for _, check := range []string{
+		`emitEditorOperation("preview_action", {`,
+		`emit(form, "gosxstudio:preview-action", {`,
+		`actionLabel: detail.action || ""`,
+		`reason: "preview-dock"`,
+	} {
+		if !strings.Contains(body, check) {
+			t.Fatalf("emitPreviewDockAction missing preview action contract %q in:\n%s", check, body)
+		}
+	}
+	if strings.Contains(body, `"gosxstudio:selection-action"`) {
+		t.Fatalf("emitPreviewDockAction should not dispatch selection-action telemetry:\n%s", body)
+	}
+}
+
 func TestWorkbenchRuntimeLeavesSelectionActionsToSelectionRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, forbidden := range []string{

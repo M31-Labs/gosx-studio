@@ -699,6 +699,16 @@
       form.dispatchEvent(new CustomEvent("gosxstudio:workbench-action", { bubbles: true, detail: detail }));
     }
 
+    function mirrorPreviewActionSelection(event) {
+      var detail = event.detail || {};
+      form.dispatchEvent(new CustomEvent("gosxstudio:selection-action", { bubbles: true, detail: {
+        action: detail.action || "",
+        label: detail.actionLabel || detail.label || detail.action || "",
+        selection: form.getAttribute("data-studio-selection") || detail.blockKey || detail.field || "",
+        kind: form.getAttribute("data-studio-selection-kind") || "preview"
+      } }));
+    }
+
     function runSelectionAction(action, labelOverride) {
       emitSelectionAction(action, labelOverride);
       var row = selectedRow();
@@ -875,6 +885,7 @@
         updateSelection(selectedKey());
       }
     });
+    form.addEventListener("gosxstudio:preview-action", mirrorPreviewActionSelection);
     form.addEventListener("gosxstudio:preview-selection-apply", applyPreviewSelectionState);
     form.addEventListener("gosxstudio:preview-selection-clear", clearPreviewSelectionState);
 
