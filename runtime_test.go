@@ -110,6 +110,29 @@ func TestWorkbenchRuntimeLetsFieldRuntimeOwnMirroredPreviewPatches(t *testing.T)
 	}
 }
 
+func TestWorkbenchRuntimeDoesNotTransportNoFieldPreviewPatches(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	guard := `if (!patch.field) {
+        if (reason !== "load-sync") setPreviewStatus("dirty", "Live preview pending", reason || "patch");
+        emit(form, "gosxstudio:preview-patch", patch);
+        return;
+      }
+      frames.forEach(function (frame) {`
+	if !strings.Contains(script, guard) {
+		t.Fatalf("workbench runtime missing no-field preview patch transport guard")
+	}
+	for _, check := range []string{
+		`applyPreviewPatch(frame, patch);`,
+		`frame.contentWindow.postMessage(patch, new URL(frame.getAttribute("src"), window.location.href).origin);`,
+		`if (reason !== "load-sync") setPreviewStatus("dirty", "Live preview pending", reason || "patch");`,
+		`emit(form, "gosxstudio:preview-patch", patch);`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing concrete field preview patch transport/status fragment %q", check)
+		}
+	}
+}
+
 func TestWorkbenchRuntimeSkipsMirroredFieldsDuringPreviewLoadSync(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{

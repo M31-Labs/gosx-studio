@@ -1165,6 +1165,11 @@
         detail: detail || {},
         field: fieldPatch(field)
       };
+      if (!patch.field) {
+        if (reason !== "load-sync") setPreviewStatus("dirty", "Live preview pending", reason || "patch");
+        emit(form, "gosxstudio:preview-patch", patch);
+        return;
+      }
       frames.forEach(function (frame) {
         if (!frame.contentWindow || !frame.getAttribute("src")) return;
         applyPreviewPatch(frame, patch);
