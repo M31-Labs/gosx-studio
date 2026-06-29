@@ -381,6 +381,69 @@
     return { handled: true, commands: actions.length };
   }
 
+  function runEditorPreviewDockAction(detail, event) {
+    detail = detail || {};
+    var form = editorPreviewForm(detail, event);
+    var frame = detail.frame;
+    var action = detail.action || "";
+    var host = detail.host || {};
+    var dock = frame && frame.__gosxStudioPreviewDock;
+    if (!dock || !action) return { handled: false, action: action, detail: {}, result: false };
+    var dockDetail = editorPreviewDockDetail(form, dock);
+    if (action === "clear") {
+      editorPreviewHostCall(host, "clearPreviewSelections", null);
+      editorPreviewHostCall(host, "dispatchPreviewSelectionClear", null, "preview-dock");
+      editorPreviewHostCall(host, "emitPreviewDockAction", null, action, dockDetail);
+      return { handled: true, action: action, detail: dockDetail, result: true };
+    }
+    if (action === "content" || action === "style") {
+      var dockIntent = editorPreviewHostCall(host, "dispatchPreviewDockActionResolve", null, action, dockDetail) || { mode: action, reveal: action === "content" && !!dockDetail.field };
+      if (dockIntent.mode) editorPreviewHostCall(host, "setMode", null, dockIntent.mode, { scroll: true, reason: "preview-dock" });
+      if (dockIntent.reveal) {
+        editorPreviewHostCall(host, "revealPreviewField", null, dockDetail, "preview-dock");
+      }
+      editorPreviewHostCall(host, "emitPreviewDockAction", null, action, dockDetail);
+      return { handled: true, action: action, detail: dockDetail, result: true };
+    }
+    if (action === "prev-field" || action === "next-field") {
+      var navigation = runEditorPreviewFieldNavigation({
+        form: form,
+        frame: frame,
+        direction: action === "next-field" ? 1 : -1,
+        reason: "preview-dock",
+        host: host
+      }, event);
+      if (navigation && navigation.navigated) {
+        dockDetail = editorPreviewDockDetail(form, dock);
+        editorPreviewHostCall(host, "emitPreviewDockAction", null, action, dockDetail);
+        return { handled: true, action: action, detail: dockDetail, result: true, navigation: navigation };
+      }
+      editorPreviewHostCall(host, "emitPreviewDockAction", null, action, dockDetail);
+      return { handled: true, action: action, detail: dockDetail, result: false, navigation: navigation };
+    }
+    if (action === "field-action") {
+      var intent = editorPreviewHostCall(host, "dispatchPreviewFieldActionResolve", null, dockDetail) || { reveal: !!dockDetail.field };
+      if (intent.inlineText && editorPreviewHostCall(host, "startInlineTextFromDetail", false, frame, dockDetail, "preview-dock")) {
+        return { handled: true, action: action, detail: dockDetail, result: true };
+      }
+      if (intent.submit && editorPreviewHostCall(host, "submitPreviewFieldAction", false, dockDetail)) {
+        editorPreviewHostCall(host, "emitPreviewDockAction", null, action, dockDetail);
+        return { handled: true, action: action, detail: dockDetail, result: true };
+      }
+      if (intent.navigate) {
+        if (editorPreviewHostCall(host, "navigateToHref", null, intent.href || "") === null) {
+          window.location.href = intent.href || "";
+        }
+      } else if (intent.reveal) {
+        editorPreviewHostCall(host, "revealPreviewField", null, dockDetail, "preview-dock");
+      }
+      editorPreviewHostCall(host, "emitPreviewDockAction", null, action, dockDetail);
+      return { handled: true, action: action, detail: dockDetail, result: true };
+    }
+    editorPreviewHostCall(host, "emitPreviewDockAction", null, action, dockDetail);
+    return { handled: true, action: action, detail: dockDetail, result: true };
+  }
+
   function bindEditorPreviewDock(form, frame, dock, host) {
     var normalize = normalizeEditorPreviewDock(dock);
     if (!dock || !dock.addEventListener) {
@@ -396,9 +459,7 @@
         event.preventDefault();
         var command = button.getAttribute("data-gosx-studio-preview-command") || button.getAttribute("data-studio-preview-action") || "";
         var actionHost = dock.__gosxStudioPreviewDockHost || host;
-        if (actionHost && typeof actionHost.runPreviewDockAction === "function") {
-          actionHost.runPreviewDockAction(dock.__gosxStudioPreviewDockFrame || frame, command);
-        }
+        runEditorPreviewDockAction({ form: form, frame: dock.__gosxStudioPreviewDockFrame || frame, action: command, host: actionHost }, event);
       });
       return { handled: true, bound: true, commands: normalize.commands || 0 };
     }
@@ -1018,6 +1079,10 @@
       var detail = event.detail || {};
       var form = editorPreviewForm(detail, event);
       setEditorPreviewResult(detail, bindEditorPreviewDock(form, detail.frame, detail.dock, detail.host));
+    });
+    doc.addEventListener("gosxstudio:editor-preview-dock-action-run", function (event) {
+      var detail = event.detail || {};
+      setEditorPreviewResult(detail, runEditorPreviewDockAction(detail, event));
     });
     doc.addEventListener("gosxstudio:editor-preview-dock-selection-resolve", function (event) {
       var detail = event.detail || {};

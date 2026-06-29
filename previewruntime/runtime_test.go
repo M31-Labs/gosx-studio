@@ -1051,8 +1051,7 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockBinding(t *testing.T) {
 		`if (!button || !dock.contains(button)) return`,
 		`event.preventDefault()`,
 		`var command = button.getAttribute("data-gosx-studio-preview-command") || button.getAttribute("data-studio-preview-action") || ""`,
-		`if (actionHost && typeof actionHost.runPreviewDockAction === "function")`,
-		`actionHost.runPreviewDockAction(dock.__gosxStudioPreviewDockFrame || frame, command)`,
+		`runEditorPreviewDockAction({ form: form, frame: dock.__gosxStudioPreviewDockFrame || frame, action: command, host: actionHost }, event)`,
 		`return { handled: true, bound: true, commands: normalize.commands || 0 }`,
 		`return { handled: true, bound: false, commands: normalize.commands || 0 }`,
 	} {
@@ -1062,6 +1061,56 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockBinding(t *testing.T) {
 	}
 	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-bind`) {
 		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock bind control events")
+	}
+	if strings.Contains(body, `runPreviewDockAction`) {
+		t.Fatalf("IslandRuntimeJS() dock binding should not call Workbench runPreviewDockAction")
+	}
+}
+
+func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockActionRun(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	if body == "" {
+		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
+	}
+	for _, fragment := range []string{
+		`doc.addEventListener("gosxstudio:editor-preview-dock-action-run"`,
+		`setEditorPreviewResult(detail, runEditorPreviewDockAction(detail, event))`,
+		`function runEditorPreviewDockAction(detail, event)`,
+		`var form = editorPreviewForm(detail, event)`,
+		`var frame = detail.frame`,
+		`var action = detail.action || ""`,
+		`var host = detail.host || {}`,
+		`var dock = frame && frame.__gosxStudioPreviewDock`,
+		`if (!dock || !action) return { handled: false, action: action, detail: {}, result: false }`,
+		`var dockDetail = editorPreviewDockDetail(form, dock)`,
+		`if (action === "clear")`,
+		`editorPreviewHostCall(host, "clearPreviewSelections", null)`,
+		`editorPreviewHostCall(host, "dispatchPreviewSelectionClear", null, "preview-dock")`,
+		`editorPreviewHostCall(host, "emitPreviewDockAction", null, action, dockDetail)`,
+		`if (action === "content" || action === "style")`,
+		`var dockIntent = editorPreviewHostCall(host, "dispatchPreviewDockActionResolve", null, action, dockDetail) || { mode: action, reveal: action === "content" && !!dockDetail.field }`,
+		`editorPreviewHostCall(host, "setMode", null, dockIntent.mode, { scroll: true, reason: "preview-dock" })`,
+		`editorPreviewHostCall(host, "revealPreviewField", null, dockDetail, "preview-dock")`,
+		`if (action === "prev-field" || action === "next-field")`,
+		`var navigation = runEditorPreviewFieldNavigation({`,
+		`direction: action === "next-field" ? 1 : -1`,
+		`reason: "preview-dock"`,
+		`dockDetail = editorPreviewDockDetail(form, dock)`,
+		`return { handled: true, action: action, detail: dockDetail, result: false, navigation: navigation }`,
+		`if (action === "field-action")`,
+		`var intent = editorPreviewHostCall(host, "dispatchPreviewFieldActionResolve", null, dockDetail) || { reveal: !!dockDetail.field }`,
+		`editorPreviewHostCall(host, "startInlineTextFromDetail", false, frame, dockDetail, "preview-dock")`,
+		`editorPreviewHostCall(host, "submitPreviewFieldAction", false, dockDetail)`,
+		`editorPreviewHostCall(host, "navigateToHref", null, intent.href || "")`,
+		`window.location.href = intent.href || ""`,
+		`return { handled: true, action: action, detail: dockDetail, result: true }`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing editor preview dock action-run fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-action-run`) {
+		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview dock action-run control events")
 	}
 }
 

@@ -421,6 +421,11 @@
       return !!(payload.result && payload.result.navigated);
     }
 
+    function navigatePreviewDockHref(href) {
+      window.location.href = href || "";
+      return true;
+    }
+
     function dispatchPreviewFieldNavigation(detail, navigation) {
       var payload = {
         detail: detail || {},
@@ -441,50 +446,34 @@
       return null;
     }
 
+    function previewDockActionHost() {
+      return {
+        clearPreviewSelections: clearPreviewSelections,
+        dispatchPreviewSelectionClear: dispatchPreviewSelectionClear,
+        emitPreviewDockAction: emitPreviewDockAction,
+        dispatchPreviewDockActionResolve: dispatchPreviewDockActionResolve,
+        setMode: setMode,
+        revealPreviewField: revealPreviewField,
+        finishInlineTextEdit: finishInlineTextEdit,
+        previewSelectionDetail: previewSelectionDetail,
+        applyPreviewSelection: applyPreviewSelection,
+        dispatchPreviewFieldNavigation: dispatchPreviewFieldNavigation,
+        dispatchPreviewFieldActionResolve: dispatchPreviewFieldActionResolve,
+        startInlineTextFromDetail: startInlineTextFromDetail,
+        submitPreviewFieldAction: submitPreviewFieldAction,
+        navigateToHref: navigatePreviewDockHref
+      };
+    }
+
     function runPreviewDockAction(frame, action) {
-      var dock = frame && frame.__gosxStudioPreviewDock;
-      if (!dock || !action) return false;
-      var detail = previewDockDetail(dock);
-      if (action === "clear") {
-        clearPreviewSelections();
-        dispatchPreviewSelectionClear("preview-dock");
-        emitPreviewDockAction(action, detail);
-        return true;
-      }
-      if (action === "content" || action === "style") {
-        var dockIntent = dispatchPreviewDockActionResolve(action, detail) || { mode: action, reveal: action === "content" && !!detail.field };
-        if (dockIntent.mode) setMode(dockIntent.mode, { scroll: true, reason: "preview-dock" });
-        if (dockIntent.reveal) {
-          revealPreviewField(detail, "preview-dock");
-        }
-        emitPreviewDockAction(action, detail);
-        return true;
-      }
-      if (action === "prev-field" || action === "next-field") {
-        if (navigatePreviewField(frame, action === "next-field" ? 1 : -1, "preview-dock")) {
-          emitPreviewDockAction(action, previewDockDetail(dock));
-          return true;
-        }
-        emitPreviewDockAction(action, detail);
-        return false;
-      }
-      if (action === "field-action") {
-        var intent = dispatchPreviewFieldActionResolve(detail) || { reveal: !!detail.field };
-        if (intent.inlineText && startInlineTextFromDetail(frame, detail, "preview-dock")) return true;
-        if (intent.submit && submitPreviewFieldAction(detail)) {
-          emitPreviewDockAction(action, detail);
-          return true;
-        }
-        if (intent.navigate) {
-          window.location.href = intent.href || "";
-        } else if (intent.reveal) {
-          revealPreviewField(detail, "preview-dock");
-        }
-        emitPreviewDockAction(action, detail);
-        return true;
-      }
-      emitPreviewDockAction(action, detail);
-      return true;
+      var payload = {
+        form: form,
+        frame: frame,
+        action: action || "",
+        host: previewDockActionHost()
+      };
+      form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-action-run", { bubbles: true, detail: payload }));
+      return !!(payload.result && payload.result.result);
     }
 
     function dispatchPreviewSelectionApply(detail, options) {
@@ -536,11 +525,9 @@
         selection: detail,
         detail: detail,
         options: options,
-        host: {
-          finishInlineTextEdit: finishInlineTextEdit,
-          dispatchPreviewSelectionApply: dispatchPreviewSelectionApply,
-          runPreviewDockAction: runPreviewDockAction
-        }
+        host: Object.assign({
+          dispatchPreviewSelectionApply: dispatchPreviewSelectionApply
+        }, previewDockActionHost())
       };
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-apply-sync", { bubbles: true, detail: payload }));
       if (!payload.result || !payload.result.handled || !payload.result.applied) return false;

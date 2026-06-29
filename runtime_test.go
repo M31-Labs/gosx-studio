@@ -492,9 +492,10 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`var runtime = window.GoSXStudioSelectionRuntime;`,
 		`runtime.bind(document.body || document);`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-selection-apply-sync", { bubbles: true, detail: payload }))`,
+		`host: Object.assign({`,
+		`dispatchPreviewSelectionApply: dispatchPreviewSelectionApply`,
+		`}, previewDockActionHost())`,
 		`finishInlineTextEdit: finishInlineTextEdit,`,
-		`dispatchPreviewSelectionApply: dispatchPreviewSelectionApply,`,
-		`runPreviewDockAction: runPreviewDockAction`,
 		`if (!payload.result || !payload.result.handled || !payload.result.applied) return false;`,
 		`function revealPreviewField(detail, reason)`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-reveal", { bubbles: true, detail: payload }))`,
@@ -816,12 +817,10 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldActionIntentToSelectionRuntime(t *
 		`if (payload.result) return payload.result;`,
 		`var runtime = window.GoSXStudioSelectionRuntime;`,
 		`runtime.bind(document.body || document);`,
-		`var intent = dispatchPreviewFieldActionResolve(detail) || { reveal: !!detail.field };`,
-		`if (intent.inlineText && startInlineTextFromDetail(frame, detail, "preview-dock")) return true;`,
-		`if (intent.submit && submitPreviewFieldAction(detail)) {`,
-		`window.location.href = intent.href || "";`,
-		`revealPreviewField(detail, "preview-dock");`,
-		`emitPreviewDockAction(action, detail);`,
+		`dispatchPreviewFieldActionResolve: dispatchPreviewFieldActionResolve`,
+		`startInlineTextFromDetail: startInlineTextFromDetail`,
+		`submitPreviewFieldAction: submitPreviewFieldAction`,
+		`navigateToHref: navigatePreviewDockHref`,
 		`function submitPreviewFieldAction(detail)`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-action-submit", { bubbles: true, detail: payload }))`,
 		`if (payload.result) return !!payload.result;`,
@@ -846,6 +845,13 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldActionIntentToSelectionRuntime(t *
 
 	actionBody := jsFunctionBody(t, script, "runPreviewDockAction")
 	for _, forbidden := range []string{
+		`if (action === "field-action")`,
+		`dispatchPreviewFieldActionResolve(detail)`,
+		`startInlineTextFromDetail(frame, detail, "preview-dock")`,
+		`submitPreviewFieldAction(detail)`,
+		`window.location.href`,
+		`revealPreviewField(detail, "preview-dock")`,
+		`emitPreviewDockAction(action, detail)`,
 		`detail.editable === "text"`,
 		`detail.actionFormAction && submitPreviewFieldAction`,
 		`if (detail.actionHref)`,
@@ -866,11 +872,10 @@ func TestWorkbenchRuntimeDelegatesPreviewDockContentStyleIntentToSelectionRuntim
 		`runtime.bind(document.body || document);`,
 		`action: action || ""`,
 		`detail: detail || {}`,
-		`var dockIntent = dispatchPreviewDockActionResolve(action, detail) || { mode: action, reveal: action === "content" && !!detail.field };`,
-		`if (dockIntent.mode) setMode(dockIntent.mode, { scroll: true, reason: "preview-dock" });`,
-		`if (dockIntent.reveal) {`,
-		`revealPreviewField(detail, "preview-dock");`,
-		`emitPreviewDockAction(action, detail);`,
+		`dispatchPreviewDockActionResolve: dispatchPreviewDockActionResolve`,
+		`setMode: setMode`,
+		`revealPreviewField: revealPreviewField`,
+		`emitPreviewDockAction: emitPreviewDockAction`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing preview dock content/style intent delegation fragment %q", check)
@@ -879,6 +884,11 @@ func TestWorkbenchRuntimeDelegatesPreviewDockContentStyleIntentToSelectionRuntim
 
 	actionBody := jsFunctionBody(t, script, "runPreviewDockAction")
 	for _, forbidden := range []string{
+		`if (action === "content" || action === "style")`,
+		`dispatchPreviewDockActionResolve(action, detail)`,
+		`setMode(dockIntent.mode`,
+		`revealPreviewField(detail, "preview-dock")`,
+		`emitPreviewDockAction(action, detail)`,
 		`if (action === "content") {
         setMode("content"`,
 		`if (action === "style") {
@@ -886,6 +896,51 @@ func TestWorkbenchRuntimeDelegatesPreviewDockContentStyleIntentToSelectionRuntim
 	} {
 		if strings.Contains(actionBody, forbidden) {
 			t.Fatalf("preview dock content/style branch should use resolved intent, found %q in:\n%s", forbidden, actionBody)
+		}
+	}
+}
+
+func TestWorkbenchRuntimeDispatchesPreviewDockActionRunToPreviewRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	body := jsFunctionBody(t, script, "runPreviewDockAction")
+	for _, check := range []string{
+		`function previewDockActionHost()`,
+		`clearPreviewSelections: clearPreviewSelections`,
+		`dispatchPreviewSelectionClear: dispatchPreviewSelectionClear`,
+		`emitPreviewDockAction: emitPreviewDockAction`,
+		`dispatchPreviewDockActionResolve: dispatchPreviewDockActionResolve`,
+		`setMode: setMode`,
+		`revealPreviewField: revealPreviewField`,
+		`finishInlineTextEdit: finishInlineTextEdit`,
+		`previewSelectionDetail: previewSelectionDetail`,
+		`applyPreviewSelection: applyPreviewSelection`,
+		`dispatchPreviewFieldNavigation: dispatchPreviewFieldNavigation`,
+		`dispatchPreviewFieldActionResolve: dispatchPreviewFieldActionResolve`,
+		`startInlineTextFromDetail: startInlineTextFromDetail`,
+		`submitPreviewFieldAction: submitPreviewFieldAction`,
+		`navigateToHref: navigatePreviewDockHref`,
+		`function runPreviewDockAction(frame, action)`,
+		`form: form`,
+		`frame: frame`,
+		`action: action || ""`,
+		`host: previewDockActionHost()`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:editor-preview-dock-action-run", { bubbles: true, detail: payload }))`,
+		`return !!(payload.result && payload.result.result);`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing preview dock action dispatcher fragment %q", check)
+		}
+	}
+	for _, forbidden := range []string{
+		`if (action === "clear")`,
+		`if (action === "content" || action === "style")`,
+		`if (action === "field-action")`,
+		`window.location.href`,
+		`navigatePreviewField(frame, action === "next-field" ? 1 : -1`,
+		`previewDockDetail(dock)`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("runPreviewDockAction should be a thin preview-runtime dispatcher; found %q in:\n%s", forbidden, body)
 		}
 	}
 }
@@ -898,7 +953,8 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 		`if (payload.result) return true;`,
 		`var runtime = window.GoSXStudioSelectionRuntime;`,
 		`runtime.bind(document.body || document);`,
-		`dispatchPreviewSelectionClear("preview-dock");`,
+		`clearPreviewSelections: clearPreviewSelections`,
+		`dispatchPreviewSelectionClear: dispatchPreviewSelectionClear`,
 		`dispatchPreviewSelectionClear("keyboard-escape");`,
 	} {
 		if !strings.Contains(script, check) {
@@ -939,12 +995,11 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 	}
 
 	dockBody := jsFunctionBody(t, script, "runPreviewDockAction")
-	clearIdx := strings.Index(dockBody, `clearPreviewSelections();`)
-	delegateIdx := strings.Index(dockBody, `dispatchPreviewSelectionClear("preview-dock");`)
-	if clearIdx < 0 || delegateIdx < 0 || clearIdx > delegateIdx {
-		t.Fatalf("preview dock clear should clear iframe/dock state before delegating editor selection clear:\n%s", dockBody)
-	}
 	for _, forbidden := range []string{
+		`if (action === "clear")`,
+		`clearPreviewSelections();`,
+		`dispatchPreviewSelectionClear("preview-dock");`,
+		`emitPreviewDockAction(action, detail);`,
 		`clearInspectorSelection();`,
 		`form.removeAttribute("data-studio-selection");`,
 		`form.removeAttribute("data-studio-selection-kind");`,
