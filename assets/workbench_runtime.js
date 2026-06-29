@@ -651,6 +651,35 @@
       return null;
     }
 
+    function previewDockActionResolvePayload(action, detail) {
+      detail = detail || {};
+      return {
+        action: action || "",
+        field: detail.field || "",
+        editable: detail.editable || "",
+        label: detail.label || "",
+        blockKey: detail.blockKey || "",
+        blockLabel: detail.blockLabel || "",
+        actionLabel: detail.action || "",
+        actionHref: detail.actionHref || "",
+        actionFormAction: detail.actionFormAction || ""
+      };
+    }
+
+    function dispatchPreviewDockActionResolve(action, detail) {
+      var payload = previewDockActionResolvePayload(action, detail);
+      form.dispatchEvent(new CustomEvent("gosxstudio:preview-dock-action-resolve", { bubbles: true, detail: payload }));
+      if (payload.result) return payload.result;
+      var runtime = window.GoSXStudioSelectionRuntime;
+      if (runtime && typeof runtime.bind === "function") {
+        runtime.bind(document.body || document);
+        payload = previewDockActionResolvePayload(action, detail);
+        form.dispatchEvent(new CustomEvent("gosxstudio:preview-dock-action-resolve", { bubbles: true, detail: payload }));
+        if (payload.result) return payload.result;
+      }
+      return null;
+    }
+
     function isFormSubmitControl(node) {
       if (!node) return false;
       var tag = String(node.tagName || "").toLowerCase();
@@ -780,15 +809,13 @@
         emitPreviewDockAction(action, detail);
         return true;
       }
-      if (action === "content") {
-        setMode("content", { scroll: true, reason: "preview-dock" });
-        var source = inspectorSource(detail.field);
-        if (source) revealInspectorSelection(source, inspectorControl(source));
-        emitPreviewDockAction(action, detail);
-        return true;
-      }
-      if (action === "style") {
-        setMode("style", { scroll: true, reason: "preview-dock" });
+      if (action === "content" || action === "style") {
+        var dockIntent = dispatchPreviewDockActionResolve(action, detail) || { mode: action, reveal: action === "content" && !!detail.field };
+        if (dockIntent.mode) setMode(dockIntent.mode, { scroll: true, reason: "preview-dock" });
+        if (dockIntent.reveal) {
+          var source = inspectorSource(detail.field);
+          if (source) revealInspectorSelection(source, inspectorControl(source));
+        }
         emitPreviewDockAction(action, detail);
         return true;
       }

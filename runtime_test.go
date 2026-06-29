@@ -308,6 +308,48 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldActionIntentToSelectionRuntime(t *
 	}
 }
 
+func TestWorkbenchRuntimeDelegatesPreviewDockContentStyleIntentToSelectionRuntime(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`function dispatchPreviewDockActionResolve(action, detail)`,
+		`function previewDockActionResolvePayload(action, detail)`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-dock-action-resolve", { bubbles: true, detail: payload }))`,
+		`if (payload.result) return payload.result;`,
+		`var runtime = window.GoSXStudioSelectionRuntime;`,
+		`runtime.bind(document.body || document);`,
+		`action: action || ""`,
+		`field: detail.field || ""`,
+		`editable: detail.editable || ""`,
+		`label: detail.label || ""`,
+		`blockKey: detail.blockKey || ""`,
+		`blockLabel: detail.blockLabel || ""`,
+		`actionLabel: detail.action || ""`,
+		`actionHref: detail.actionHref || ""`,
+		`actionFormAction: detail.actionFormAction || ""`,
+		`var dockIntent = dispatchPreviewDockActionResolve(action, detail) || { mode: action, reveal: action === "content" && !!detail.field };`,
+		`if (dockIntent.mode) setMode(dockIntent.mode, { scroll: true, reason: "preview-dock" });`,
+		`if (dockIntent.reveal) {`,
+		`if (source) revealInspectorSelection(source, inspectorControl(source));`,
+		`emitPreviewDockAction(action, detail);`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing preview dock content/style intent delegation fragment %q", check)
+		}
+	}
+
+	actionBody := jsFunctionBody(t, script, "runPreviewDockAction")
+	for _, forbidden := range []string{
+		`if (action === "content") {
+        setMode("content"`,
+		`if (action === "style") {
+        setMode("style"`,
+	} {
+		if strings.Contains(actionBody, forbidden) {
+			t.Fatalf("preview dock content/style branch should use resolved intent, found %q in:\n%s", forbidden, actionBody)
+		}
+	}
+}
+
 func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{

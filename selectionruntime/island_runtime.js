@@ -563,6 +563,32 @@
       };
     }
 
+    function resolvePreviewDockAction(event) {
+      var envelope = event.detail || {};
+      var action = envelope.action || "";
+      var field = envelope.field || "";
+      var editable = envelope.editable || "";
+      var label = envelope.label || "";
+      var blockKey = envelope.blockKey || "";
+      var blockLabel = envelope.blockLabel || "";
+      var actionLabel = envelope.actionLabel || "";
+      var actionHref = envelope.actionHref || "";
+      var actionFormAction = envelope.actionFormAction || "";
+      envelope.result = {
+        mode: action === "content" ? "content" : action === "style" ? "style" : "",
+        reveal: action === "content" && !!field,
+        action: action,
+        field: field,
+        editable: editable,
+        label: label,
+        blockKey: blockKey,
+        blockLabel: blockLabel,
+        actionLabel: actionLabel,
+        actionHref: actionHref,
+        actionFormAction: actionFormAction
+      };
+    }
+
     function applyPreviewSelectionState(event) {
       var envelope = event.detail || {};
       var detail = envelope.detail || {};
@@ -994,6 +1020,7 @@
     form.addEventListener("gosxstudio:preview-selection-clear", clearPreviewSelectionState);
     form.addEventListener("gosxstudio:preview-field-navigation-commit", emitPreviewFieldNavigation);
     form.addEventListener("gosxstudio:preview-field-action-resolve", resolvePreviewFieldAction);
+    form.addEventListener("gosxstudio:preview-dock-action-resolve", resolvePreviewDockAction);
 
     bindCommandPaletteCommands();
     if (form.getAttribute("data-studio-mode") === "advanced") ensureWorkspaceSelection();

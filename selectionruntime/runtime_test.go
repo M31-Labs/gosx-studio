@@ -276,6 +276,51 @@ func TestSelectionRuntimeIslandOwnsPreviewFieldActionResolve(t *testing.T) {
 	}
 }
 
+func TestSelectionRuntimeIslandOwnsPreviewDockActionResolve(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, contract := range []string{
+		`form.addEventListener("gosxstudio:preview-dock-action-resolve", resolvePreviewDockAction);`,
+		`function resolvePreviewDockAction(event)`,
+		`var envelope = event.detail || {};`,
+		`var action = envelope.action || "";`,
+		`var field = envelope.field || "";`,
+		`var editable = envelope.editable || "";`,
+		`var label = envelope.label || "";`,
+		`var blockKey = envelope.blockKey || "";`,
+		`var blockLabel = envelope.blockLabel || "";`,
+		`var actionLabel = envelope.actionLabel || "";`,
+		`var actionHref = envelope.actionHref || "";`,
+		`var actionFormAction = envelope.actionFormAction || "";`,
+		`mode: action === "content" ? "content" : action === "style" ? "style" : ""`,
+		`reveal: action === "content" && !!field`,
+		`action: action`,
+		`field: field`,
+		`editable: editable`,
+		`label: label`,
+		`blockKey: blockKey`,
+		`blockLabel: blockLabel`,
+		`actionLabel: actionLabel`,
+		`actionHref: actionHref`,
+		`actionFormAction: actionFormAction`,
+	} {
+		if !strings.Contains(body, contract) {
+			t.Fatalf("IslandRuntimeJS() missing preview dock action resolve contract %q", contract)
+		}
+	}
+
+	handlerBody := jsFunctionBody(t, body, "resolvePreviewDockAction")
+	for _, forbidden := range []string{
+		`form.dispatchEvent`,
+		`gosxstudio:preview-action`,
+		`gosxstudio:selection-action`,
+		`gosxstudio:editor-operation`,
+	} {
+		if strings.Contains(handlerBody, forbidden) {
+			t.Fatalf("preview dock action resolve should only set envelope.result; found %q in:\n%s", forbidden, handlerBody)
+		}
+	}
+}
+
 func TestSelectionRuntimeIslandOwnsPreviewSelectionApply(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	for _, contract := range []string{
