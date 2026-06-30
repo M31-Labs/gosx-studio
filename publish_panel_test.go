@@ -26,6 +26,9 @@ func TestRenderPublishPanelFull(t *testing.T) {
 		`<section class="studio-publish-panel__pending" aria-label="Unpublished changes"><header><h3>What will change</h3><p>2 unpublished changes</p></header><ul class="revision-diff-list"><li><span>Changed</span><code>site.title</code></li><li><span>Added</span><code>home.sections.hero</code></li></ul></section>`,
 		`<section class="studio-publish-panel__preview-share" data-studio-publish-preview-share="true">`,
 		`<div class="studio-publish-panel__preview-share-slot" data-studio-publish-preview-share-slot="true"><section data-studio-preview-share="true">Preview node</section></div>`,
+		`<section class="studio-publish-panel__environments" aria-label="Publishing environments" data-studio-publish-environments="true">`,
+		`<article class="studio-publish-environment studio-publish-environment--ready" data-studio-publish-environment="staging" data-studio-publish-environment-state="ready"><div><strong>Staging</strong><output>Ready</output></div><a class="studio-publish-environment__value" href="https://staging.example.test" target="_blank" rel="noreferrer" data-gosx-link="true" data-studio-publish-environment-value="true">https://staging.example.test</a><p>Review the release candidate.</p></article>`,
+		`<article class="studio-publish-environment studio-publish-environment--tbd" data-studio-publish-environment="production" data-studio-publish-environment-state="tbd"><div><strong>Production</strong><output>TBD</output></div><span class="studio-publish-environment__value" data-studio-publish-environment-value="true">TBD</span><p>Production domain is not ready yet.</p></article>`,
 		`<input id="publishAt" name="lifecyclePublishAt" type="datetime-local" value="2026-06-29T10:30" form="websiteEditorForm" data-studio-field-source="lifecycle.schedule.publishAt" data-studio-field-editable="lifecycle" />`,
 		`<button class="button button--secondary" type="submit" form="websiteEditorForm" formaction="/schedule" formmethod="post" data-admin-confirm="Schedule this draft?" data-studio-submit-action="schedule" data-studio-field-action-formaction="/schedule">Schedule</button>`,
 		`<div class="studio-publish-panel__decision" aria-label="Release decision"><article class="studio-publish-review__decision studio-publish-review__decision--next">`,
@@ -66,8 +69,10 @@ func TestRenderPublishPanelMinimalOmitsOptionalSections(t *testing.T) {
 	view["hasSchedule"] = false
 	view["hasChecks"] = false
 	view["hasImpacts"] = false
+	view["hasEnvironments"] = false
 	view["checks"] = nil
 	view["impacts"] = nil
+	view["environments"] = nil
 
 	html := gosx.RenderHTML(RenderPublishPanel(view, PublishPanelOptions{}))
 
@@ -90,6 +95,8 @@ func TestRenderPublishPanelMinimalOmitsOptionalSections(t *testing.T) {
 		`data-studio-submit-action="discard"`,
 		`data-studio-submit-action="schedule"`,
 		`class="studio-publish-panel__pending"`,
+		`data-studio-publish-environments="true"`,
+		`data-studio-publish-environment=`,
 		`data-studio-publish-check=`,
 		`data-studio-publish-impact=`,
 		"<form",
@@ -131,11 +138,13 @@ func publishPanelTestView() map[string]any {
 		"nextCountLabel":     "0",
 		"hasChecks":          true,
 		"hasImpacts":         true,
+		"hasEnvironments":    true,
 		"pendingChanges":     []map[string]any{{"kindLabel": "Changed", "path": "site.title"}, {"kindLabel": "Added", "path": "home.sections.hero"}},
 		"approval":           publishPanelDecisionTestView("studio-publish-review__decision studio-publish-review__decision--next", "Owner approval", "Approval pending", "Noni should review the preview.", "Next", true),
 		"schedule":           publishPanelDecisionTestView("studio-publish-review__decision studio-publish-review__decision--ready", "Publish timing", "Manual publish", "No future publish time is set.", "Ready", false),
 		"checks":             []map[string]any{{"key": "media", "class": "studio-publish-review__card studio-publish-review__card--watch", "label": "Media alt text", "scope": "Media", "statusLabel": "Watch", "summary": "Needs review", "detail": "One image needs alt text.", "hasHref": true, "href": "/admin/media", "actionLabel": "Review media"}},
 		"impacts":            []map[string]any{{"key": "sections", "class": "studio-publish-review__impact studio-publish-review__impact--ready", "label": "Home sections", "scope": "Homepage", "value": "5 enabled", "detail": "Homepage structure changes."}},
+		"environments":       []map[string]any{{"key": "staging", "label": "Staging", "url": "https://staging.example.test", "state": "ready", "stateLabel": "Ready", "hasHref": true, "detail": "Review the release candidate."}, {"key": "production", "label": "Production", "value": "TBD", "state": "tbd", "stateLabel": "TBD", "detail": "Production domain is not ready yet."}},
 	}
 }
 

@@ -1,6 +1,10 @@
 package studio
 
-import "m31labs.dev/gosx"
+import (
+	"strings"
+
+	"m31labs.dev/gosx"
+)
 
 type PublishPanelOptions struct {
 	RootAttrs           map[string]any
@@ -31,6 +35,11 @@ func RenderPublishPanel(view map[string]any, options PublishPanelOptions) gosx.N
 	}
 	children = append(children,
 		renderPublishPanelPreviewShare(options.PreviewShareNode),
+	)
+	if workbenchMapBool(view, "hasEnvironments") {
+		children = append(children, renderPublishPanelEnvironments(workbenchViewMapList(view, "environments")))
+	}
+	children = append(children,
 		renderPublishPanelSchedule(view),
 		renderPublishPanelDecision(view),
 		renderPublishPanelSummary(view),
@@ -146,6 +155,112 @@ func renderPublishPanelPreviewShare(node gosx.Node) gosx.Node {
 			gosx.Attr("data-studio-publish-preview-share-slot", "true"),
 		), gosx.Fragment(children...)),
 	)
+}
+
+func renderPublishPanelEnvironments(environments []map[string]any) gosx.Node {
+	nodes := make([]gosx.Node, 0, len(environments))
+	for _, environment := range environments {
+		state := publishEnvironmentState(environment)
+		value := publishEnvironmentValue(environment)
+		if state == "tbd" && value == "" {
+			value = "TBD"
+		}
+		valueNode := gosx.El("span", gosx.Attrs(
+			gosx.Attr("class", "studio-publish-environment__value"),
+			gosx.Attr("data-studio-publish-environment-value", "true"),
+		), gosx.Text(value))
+		if publishEnvironmentHasHref(environment, state) {
+			valueNode = gosx.El("a", gosx.Attrs(
+				gosx.Attr("class", "studio-publish-environment__value"),
+				gosx.Attr("href", publishEnvironmentHref(environment)),
+				gosx.Attr("target", "_blank"),
+				gosx.Attr("rel", "noreferrer"),
+				gosx.Attr("data-gosx-link", "true"),
+				gosx.Attr("data-studio-publish-environment-value", "true"),
+			), gosx.Text(value))
+		}
+		nodes = append(nodes, gosx.El("article", gosx.Attrs(
+			gosx.Attr("class", publishEnvironmentClass(environment, state)),
+			gosx.Attr("data-studio-publish-environment", workbenchMapString(environment, "key")),
+			gosx.Attr("data-studio-publish-environment-state", state),
+		),
+			gosx.El("div", nil,
+				gosx.El("strong", nil, gosx.Text(workbenchMapString(environment, "label"))),
+				gosx.El("output", nil, gosx.Text(publishEnvironmentStateLabel(environment, state))),
+			),
+			valueNode,
+			gosx.El("p", nil, gosx.Text(workbenchMapString(environment, "detail"))),
+		))
+	}
+	return gosx.El("section", gosx.Attrs(
+		gosx.Attr("class", "studio-publish-panel__environments"),
+		gosx.Attr("aria-label", "Publishing environments"),
+		gosx.Attr("data-studio-publish-environments", "true"),
+	),
+		gosx.El("header", nil,
+			gosx.El("h3", nil, gosx.Text("Publishing environments")),
+			gosx.El("p", nil, gosx.Text("Open the deployed staging or production storefront for release review.")),
+		),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-publish-environment-list")), gosx.Fragment(nodes...)),
+	)
+}
+
+func publishEnvironmentClass(environment map[string]any, state string) string {
+	className := workbenchMapString(environment, "class")
+	if className != "" {
+		return className
+	}
+	return "studio-publish-environment studio-publish-environment--" + state
+}
+
+func publishEnvironmentState(environment map[string]any) string {
+	value := strings.ToLower(publishEnvironmentValue(environment))
+	if value == "" || value == "tbd" {
+		return "tbd"
+	}
+	state := strings.ToLower(workbenchMapString(environment, "state"))
+	switch state {
+	case "ready", "tbd":
+		return state
+	}
+	return "ready"
+}
+
+func publishEnvironmentStateLabel(environment map[string]any, state string) string {
+	if label := workbenchMapString(environment, "stateLabel"); label != "" {
+		return label
+	}
+	if state == "tbd" {
+		return "TBD"
+	}
+	return "Ready"
+}
+
+func publishEnvironmentValue(environment map[string]any) string {
+	if value := workbenchMapString(environment, "value"); value != "" {
+		return value
+	}
+	return workbenchMapString(environment, "url")
+}
+
+func publishEnvironmentHref(environment map[string]any) string {
+	if href := workbenchMapString(environment, "href"); href != "" {
+		return href
+	}
+	return workbenchMapString(environment, "url")
+}
+
+func publishEnvironmentHasHref(environment map[string]any, state string) bool {
+	if state == "tbd" {
+		return false
+	}
+	if publishEnvironmentHref(environment) == "" {
+		return false
+	}
+	if _, ok := environment["hasHref"]; !ok {
+		return true
+	}
+	return workbenchMapBool(environment, "hasHref")
 }
 
 func renderPublishPanelSchedule(view map[string]any) gosx.Node {
