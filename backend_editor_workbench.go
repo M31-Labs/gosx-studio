@@ -54,7 +54,9 @@ type BackendEditorWorkbenchPanelStackProps struct {
 	BrandFields                 map[string]any
 	BrandMediaPicker            gosx.Node
 	NavigationPanel             gosx.Node
+	NavigationPanelView         map[string]any
 	CheckoutPanel               gosx.Node
+	CheckoutPanelView           map[string]any
 	PublishPanel                gosx.Node
 	PublishPanelView            map[string]any
 	PreviewSharePanel           map[string]any
@@ -190,6 +192,14 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 	brandPanel := RenderBrandPanel(props.BrandPanel, props.BrandFields, BrandPanelOptions{
 		MediaPickerNode: props.BrandMediaPicker,
 	})
+	navigationPanel := props.NavigationPanel
+	if workbenchNodeEmpty(navigationPanel) {
+		navigationPanel = RenderNavigationPanel(props.NavigationPanelView, NavigationPanelOptions{})
+	}
+	checkoutPanel := props.CheckoutPanel
+	if workbenchNodeEmpty(checkoutPanel) {
+		checkoutPanel = RenderCheckoutPanel(props.CheckoutPanelView, CheckoutPanelOptions{})
+	}
 	advancedPanel := RenderAdvancedPanel(props.AdvancedPanel, AdvancedPanelOptions{
 		GroupNodes: map[string]gosx.Node{
 			"flows":      props.FlowDesigner,
@@ -224,8 +234,8 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 		HomeInspector:   props.HomeInspector,
 		LookPanel:       props.LookPanel,
 		BrandPanel:      brandPanel,
-		NavigationPanel: props.NavigationPanel,
-		CheckoutPanel:   props.CheckoutPanel,
+		NavigationPanel: navigationPanel,
+		CheckoutPanel:   checkoutPanel,
 		PublishPanel:    publishPanel,
 		AdvancedPanel:   advancedPanel,
 	})

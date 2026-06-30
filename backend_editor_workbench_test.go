@@ -406,6 +406,92 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsPublishPanelComposition(t *te
 	)
 }
 
+func TestRenderBackendEditorWorkbenchPanelStackOwnsNavigationAndCheckoutComposition(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Website editor"}, WorkbenchShellViewOptions{})
+	navigationPanel := map[string]any{
+		"class":       "panel editor-panel editor-panel--navigation studio-navigation-panel",
+		"panelKey":    "navigation",
+		"headerClass": "editor-panel__header",
+		"kicker":      "Structure",
+		"title":       "Navigation",
+		"help":        "Choose storefront links.",
+		"empty":       "No links yet.",
+		"hasItems":    false,
+	}
+	checkoutPanel := map[string]any{
+		"class":          "panel editor-panel editor-panel--checkout studio-checkout-panel",
+		"panelKey":       "checkout",
+		"headerClass":    "editor-panel__header",
+		"kicker":         "Commerce",
+		"title":          "Checkout",
+		"help":           "Choose checkout behavior.",
+		"enabledName":    "checkoutEnabled",
+		"enabledValue":   "true",
+		"enabledLabel":   "Enable checkout",
+		"labelID":        "checkoutLabel",
+		"labelName":      "checkoutLabel",
+		"labelFieldText": "Button label",
+		"buttonLabel":    "Save checkout",
+		"empty":          "No products yet.",
+		"hasProducts":    false,
+	}
+
+	html := gosx.RenderHTML(RenderBackendEditorWorkbenchPanelStack(BackendEditorWorkbenchPanelStackProps{
+		View:                  view,
+		SiteNavigator:         gosx.El("section", gosx.Attrs(gosx.Attr("data-site-navigator", "true")), gosx.Text("Pages")),
+		HomeLayers:            map[string]any{"kicker": "Home", "title": "Sections"},
+		BlockLayoutEngineHost: gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
+		NavigationPanelView:   navigationPanel,
+		CheckoutPanelView:     checkoutPanel,
+	}))
+
+	for _, fragment := range []string{
+		`data-gosx-studio-navigation-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-checkout-panel-renderer="gosx-studio"`,
+		`data-studio-navigation-panel="true"`,
+		`data-studio-checkout-panel="true"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("backend editor panel stack missing Studio-owned panel fragment %q:\n%s", fragment, html)
+		}
+	}
+	assertOrder(t, html,
+		`data-gosx-studio-navigation-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-checkout-panel-renderer="gosx-studio"`,
+	)
+}
+
+func TestRenderBackendEditorWorkbenchPanelStackKeepsExplicitNavigationAndCheckoutOverrides(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Website editor"}, WorkbenchShellViewOptions{})
+	html := gosx.RenderHTML(RenderBackendEditorWorkbenchPanelStack(BackendEditorWorkbenchPanelStackProps{
+		View:                  view,
+		SiteNavigator:         gosx.El("section", gosx.Attrs(gosx.Attr("data-site-navigator", "true")), gosx.Text("Pages")),
+		HomeLayers:            map[string]any{"kicker": "Home", "title": "Sections"},
+		BlockLayoutEngineHost: gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
+		NavigationPanel:       gosx.El("section", gosx.Attrs(gosx.Attr("data-custom-navigation-panel", "true")), gosx.Text("Custom navigation")),
+		NavigationPanelView:   map[string]any{"class": "studio-navigation-panel", "panelKey": "navigation"},
+		CheckoutPanel:         gosx.El("section", gosx.Attrs(gosx.Attr("data-custom-checkout-panel", "true")), gosx.Text("Custom checkout")),
+		CheckoutPanelView:     map[string]any{"class": "studio-checkout-panel", "panelKey": "checkout"},
+	}))
+
+	for _, fragment := range []string{
+		`data-custom-navigation-panel="true"`,
+		`data-custom-checkout-panel="true"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("explicit panel override missing %q:\n%s", fragment, html)
+		}
+	}
+	for _, fragment := range []string{
+		`data-gosx-studio-navigation-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-checkout-panel-renderer="gosx-studio"`,
+	} {
+		if strings.Contains(html, fragment) {
+			t.Fatalf("explicit panel override should not render default panel %q:\n%s", fragment, html)
+		}
+	}
+}
+
 func TestRenderBackendEditorWorkbenchPanelStackKeepsExplicitPublishPanelOverride(t *testing.T) {
 	view := WorkbenchShellView(WorkbenchShellSource{Title: "Website editor"}, WorkbenchShellViewOptions{})
 	html := gosx.RenderHTML(RenderBackendEditorWorkbenchPanelStack(BackendEditorWorkbenchPanelStackProps{
