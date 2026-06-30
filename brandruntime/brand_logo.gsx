@@ -16,12 +16,9 @@
 //
 // The companion island for the iframe-crossing brand mutation
 // (updateHeaderLogo) lives in brand_header_logo.gsx. bindLogo calls into
-// updateHeaderLogo on every input change, so the two islands ship together.
-//
-// During the additive shipping window (Section B of the slice plan), the
-// BridgeShim only invokes this island when ShellConfig.FeatureFlags has
-// Post 2026-05-27 the legacy JS bundle is gone; the island path is the
-// only path. See Phase 3 burn-down.
+// updateHeaderLogo on every input change, publishing
+// $preview.brand.headerLogo for the preview frame and $brand.headerLogo for
+// editor-frame consumers.
 
 package brandruntime
 

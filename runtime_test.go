@@ -1435,8 +1435,6 @@ func TestEngineRuntimeIncludesBrandRuntimeIslandBundle(t *testing.T) {
 	for _, fragment := range []string{
 		"__gosx_brand_runtime_island_bindLogo",
 		"__gosx_brand_runtime_island_updateHeaderLogo",
-		"brand-runtime-islands",
-		"data-gosx-studio-feature-flag-brand-runtime-islands",
 	} {
 		if !strings.Contains(engines, fragment) {
 			t.Fatalf("engine runtime missing brandruntime fragment %q", fragment)
