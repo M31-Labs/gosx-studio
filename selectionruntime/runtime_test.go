@@ -8,11 +8,10 @@ import (
 // The selectionruntime package is the Go-side surface for the Phase 3 slice-2
 // burn-down of GoSXStudioSelectionRuntime. It owns:
 //   1. The feature-flag key consumers add to studio.ShellConfig.FeatureFlags
-//      to flip the island path (legacy bundle deleted 2026-05-27)
-//      to the .gsx-authored island in this package.
-//   2. The JS shim that the legacy bundle appends so the
-//      window.GoSXStudioSelectionRuntime methods delegate to the island when
-//      the flag is on.
+//      or emit as a host probe attribute. The binding path is always the
+//      .gsx-authored island in this package.
+//   2. The JS shim that installs window.GoSXStudioSelectionRuntime and
+//      delegates its methods directly to the island.
 //   3. The island runtime JS that publishes window.__gosx_selection_runtime_*
 //      globals the BridgeShim delegates to.
 //
@@ -41,16 +40,29 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 		t.Fatal("BridgeShim() must return a non-empty JS snippet")
 	}
 	// The shim must reference the global the island publishes itself at,
-	// must reference window.GoSXStudioSelectionRuntime (the public global
-	// it shims), and must reference the feature flag so the legacy path
-	// stays reachable when the flag is off.
+	// must reference window.GoSXStudioSelectionRuntime (the public global it
+	// shims), and must install bind as a direct delegate.
 	for _, fragment := range []string{
 		"window.GoSXStudioSelectionRuntime",
 		"__gosx_selection_runtime_island_bind",
-		FeatureFlagKey,
+		"function delegate(islandGlobal)",
+		"return island.apply(null, arguments);",
+		`bind: delegate("__gosx_selection_runtime_island_bind")`,
 	} {
 		if !strings.Contains(shim, fragment) {
 			t.Fatalf("BridgeShim() missing %q:\n%s", fragment, shim)
+		}
+	}
+	for _, fragment := range []string{
+		"flag" + "Enabled",
+		"FLAG" + "_ATTR",
+		"bind" + "SelectionSurface",
+		"fallback" + " branch",
+		"fallback" + " path",
+		"legacy" + " bundle",
+	} {
+		if strings.Contains(shim, fragment) {
+			t.Fatalf("BridgeShim() must not contain stale selection gate/fallback fragment %q:\n%s", fragment, shim)
 		}
 	}
 }
@@ -77,12 +89,12 @@ func TestIslandRuntimeJSPublishesIslandGlobal(t *testing.T) {
 	if !strings.Contains(body, "window.__gosx_selection_runtime_island_bind ") {
 		t.Fatalf("IslandRuntimeJS() missing global assignment %q", "window.__gosx_selection_runtime_island_bind ")
 	}
-	// The island runtime must preserve the legacy bindSelectionSurface DOM
-	// attribute contract — selection-action commandbar, workspace targets,
-	// field-source focus, style-scope readouts, and the idempotency-guard
-	// dataset key. Each entry below maps to one of the five sub-behaviors
-	// enumerated in selection_bind.gsx; if a fragment is missing the
-	// corresponding sub-behavior is silently broken.
+	// The island runtime must preserve the selection DOM attribute contract:
+	// selection-action commandbar, workspace targets, field-source focus,
+	// style-scope readouts, and the idempotency-guard dataset key. Each entry
+	// below maps to one of the five sub-behaviors enumerated in
+	// selection_bind.gsx; if a fragment is missing the corresponding
+	// sub-behavior is silently broken.
 	for _, contract := range []string{
 		// Sub-behavior 1: block selection
 		"data-block-studio-block",

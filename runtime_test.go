@@ -1367,8 +1367,6 @@ func TestEngineRuntimeIncludesSelectionRuntimeIslandBundle(t *testing.T) {
 	engines := string(EngineRuntimeScript())
 	for _, fragment := range []string{
 		"__gosx_selection_runtime_island_bind",
-		"selection-runtime-islands",
-		"data-gosx-studio-feature-flag-selection-runtime-islands",
 	} {
 		if !strings.Contains(engines, fragment) {
 			t.Fatalf("engine runtime missing selectionruntime fragment %q", fragment)

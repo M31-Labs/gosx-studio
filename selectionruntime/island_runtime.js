@@ -3,10 +3,12 @@
 // The .gsx island (selection_bind.gsx) is a mount-point marker in the
 // editor DOM. This script publishes the
 // window.__gosx_selection_runtime_island_bind global that
-// selectionruntime.BridgeShim delegates to when the
-// "selection-runtime-islands" feature flag is on. It is emitted into the
-// studio runtime bundle by selectionruntime.IslandRuntimeJS() (see
-// runtime.go) and runs before BridgeShim() at bundle init time.
+// selectionruntime.BridgeShim delegates to directly. The
+// "selection-runtime-islands" feature flag remains a stable host
+// probe/attribute, but SelectionRuntime binding has no feature-flag-off path.
+// This script is emitted into the studio runtime bundle by
+// selectionruntime.IslandRuntimeJS() (see runtime.go) and runs before
+// BridgeShim() at bundle init time.
 //
 // The single function below replaces window.GoSXStudioSelectionRuntime.bind
 // while preserving exact observable behavior of the legacy
@@ -1319,7 +1321,6 @@
 
   // Publish the island global. The name is the contract referenced by
   // selectionruntime.IslandGlobals in runtime.go; the BridgeShim there
-  // delegates window.GoSXStudioSelectionRuntime.bind calls here when the
-  // feature flag is on.
+  // delegates window.GoSXStudioSelectionRuntime.bind calls here directly.
   window.__gosx_selection_runtime_island_bind = bindSelectionSurfaceIsland;
 })();
