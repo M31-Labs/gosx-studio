@@ -9,8 +9,9 @@ import (
 
 func TestRenderBackendSettingsPagePreservesSettingsFormContract(t *testing.T) {
 	html := gosx.RenderHTML(RenderBackendSettingsPage(BackendSettingsProps{
-		SaveAction: "/admin/settings/__actions/save",
-		CSRFToken:  "csrf-token",
+		RevisionHistory: gosx.El("section", gosx.Attrs(gosx.Attr("data-test-settings-revisions", "true")), gosx.Text("Revision history")),
+		SaveAction:      "/admin/settings/__actions/save",
+		CSRFToken:       "csrf-token",
 		SaveStatus: BackendSettingsStatus{
 			OK:      true,
 			Message: "Settings saved.",
@@ -94,6 +95,8 @@ func TestRenderBackendSettingsPagePreservesSettingsFormContract(t *testing.T) {
 		`<input name="shippingOptionMin0" value="0" type="number" min="0" placeholder="Min subtotal" />`,
 		`<input name="shippingOptionMax0" value="9999" type="number" min="0" placeholder="Max subtotal" />`,
 		`<button class="button button--primary" type="submit">Save settings</button>`,
+		`<section data-test-settings-revisions="true">Revision history</section>`,
+		`<script src="/media-picker.js" defer></script>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("settings renderer missing %q:\n%s", fragment, html)
@@ -114,5 +117,8 @@ func TestRenderBackendSettingsSplitNodes(t *testing.T) {
 	}
 	if !strings.Contains(form, `<form class="panel admin-form" method="post" action="">`) || strings.Contains(form, `data-gosx-studio-backend-settings-renderer`) {
 		t.Fatalf("settings form is not split cleanly:\n%s", form)
+	}
+	if strings.Contains(form, `/media-picker.js`) || strings.Contains(form, `data-test-settings-revisions`) {
+		t.Fatalf("settings form should not include page-level slots/scripts:\n%s", form)
 	}
 }

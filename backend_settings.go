@@ -4,6 +4,7 @@ import "m31labs.dev/gosx"
 
 type BackendSettingsProps struct {
 	Class            string
+	RevisionHistory  gosx.Node
 	SaveAction       string
 	CSRFToken        string
 	SaveStatus       BackendSettingsStatus
@@ -86,7 +87,13 @@ func RenderBackendSettingsContent(props BackendSettingsProps) gosx.Node {
 		RenderBackendSettingsHeading(),
 		RenderBackendSettingsMediaDatalist(props.Media),
 		RenderBackendSettingsForm(props),
+		props.RevisionHistory,
+		RenderBackendSettingsScripts(),
 	)
+}
+
+func RenderBackendSettingsScripts() gosx.Node {
+	return gosx.El("script", gosx.Attrs(gosx.Attr("src", "/media-picker.js"), gosx.Attr("defer", true)))
 }
 
 func RenderBackendSettingsHeading() gosx.Node {
