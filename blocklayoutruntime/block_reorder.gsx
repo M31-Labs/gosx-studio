@@ -27,11 +27,8 @@
 //   window.__gosx_blocklayout_runtime_island_moveRow
 //   window.__gosx_blocklayout_runtime_island_renumber
 //   window.__gosx_blocklayout_runtime_island_commitReorder
-// that the slice-4 BridgeShim delegates to when the
-// "block-layout-runtime-islands" feature flag is on.
+// that the slice-4 BridgeShim delegates to directly.
 //
-// During the additive shipping window (Section G of the slice plan), the
-// BridgeShim only invokes these islands when ShellConfig.FeatureFlags has
 // Post 2026-05-27 the legacy JS bundle is gone; the island path is the
 // only path. See Phase 3 burn-down.
 

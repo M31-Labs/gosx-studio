@@ -1416,8 +1416,6 @@ func TestEngineRuntimeIncludesBlockLayoutRuntimeIslandBundle(t *testing.T) {
 		"__gosx_blocklayout_runtime_island_commitReorder",
 		"__gosx_blocklayout_runtime_island_updateBlockLibraryState",
 		"__gosx_blocklayout_runtime_island_updateVisibilityState",
-		"block-layout-runtime-islands",
-		"data-gosx-studio-feature-flag-block-layout-runtime-islands",
 	} {
 		if !strings.Contains(engines, fragment) {
 			t.Fatalf("engine runtime missing blocklayoutruntime fragment %q", fragment)
