@@ -56,6 +56,10 @@ type BackendEditorWorkbenchPanelStackProps struct {
 	NavigationPanel             gosx.Node
 	CheckoutPanel               gosx.Node
 	PublishPanel                gosx.Node
+	PublishPanelView            map[string]any
+	PreviewSharePanel           map[string]any
+	ActivityPanel               map[string]any
+	RevisionHistory             map[string]any
 	AdvancedPanel               map[string]any
 	FlowDesigner                gosx.Node
 	AdvancedToolsPanel          gosx.Node
@@ -196,6 +200,15 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 			"settings":   props.AdvancedSettingsPanel,
 		},
 	})
+	publishPanel := props.PublishPanel
+	if workbenchNodeEmpty(publishPanel) {
+		publishPanel = RenderBackendEditorPublishPanelStack(BackendEditorPublishPanelStackProps{
+			PublishPanel:    props.PublishPanelView,
+			PreviewShare:    props.PreviewSharePanel,
+			ActivityPanel:   props.ActivityPanel,
+			RevisionHistory: props.RevisionHistory,
+		})
+	}
 
 	return RenderBackendEditorWorkbenchContent(BackendEditorWorkbenchContentProps{
 		View:            props.View,
@@ -213,8 +226,23 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 		BrandPanel:      brandPanel,
 		NavigationPanel: props.NavigationPanel,
 		CheckoutPanel:   props.CheckoutPanel,
-		PublishPanel:    props.PublishPanel,
+		PublishPanel:    publishPanel,
 		AdvancedPanel:   advancedPanel,
+	})
+}
+
+type BackendEditorPublishPanelStackProps struct {
+	PublishPanel    map[string]any
+	PreviewShare    map[string]any
+	ActivityPanel   map[string]any
+	RevisionHistory map[string]any
+}
+
+func RenderBackendEditorPublishPanelStack(props BackendEditorPublishPanelStackProps) gosx.Node {
+	return RenderPublishPanel(props.PublishPanel, PublishPanelOptions{
+		PreviewShareNode:    RenderPreviewSharePanel(props.PreviewShare, PreviewSharePanelOptions{}),
+		ActivityPanelNode:   RenderActivityPanel(props.ActivityPanel, ActivityPanelOptions{}),
+		RevisionHistoryNode: RenderRevisionHistoryPanel(props.RevisionHistory, RevisionHistoryPanelOptions{}),
 	})
 }
 

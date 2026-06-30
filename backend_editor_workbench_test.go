@@ -294,6 +294,141 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 	)
 }
 
+func TestRenderBackendEditorWorkbenchPanelStackOwnsPublishPanelComposition(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{
+		Title:      "Website editor",
+		SaveAction: "/admin/editor/__actions/save",
+		Canvas: CanvasSurface{
+			RouteLabel:     "Home",
+			SelectionLabel: "Hero selected",
+			Zoom:           "100",
+		},
+	}, WorkbenchShellViewOptions{
+		CSRFToken: "csrf-token",
+	})
+	publishPanel := publishPanelTestView()
+	previewShare := map[string]any{
+		"class":        "studio-preview-share",
+		"kicker":       "Preview",
+		"title":        "Share draft",
+		"status":       "Ready",
+		"state":        "ready",
+		"detail":       "Copy a signed preview for review.",
+		"inputLabel":   "Signed preview URL",
+		"copyLabel":    "Copy",
+		"openLabel":    "Open preview",
+		"href":         "https://noni.example.test/?preview=token",
+		"hasHref":      true,
+		"resource":     "settings/site",
+		"audience":     "reviewer",
+		"expiresLabel": "Jun 28, 2026 10:00 UTC",
+	}
+	activityPanel := map[string]any{
+		"class":         "studio-activity-drawer",
+		"kicker":        "Activity",
+		"title":         "Readiness",
+		"score":         "1/1 ready",
+		"toggleLabel":   "Hide",
+		"togglePressed": true,
+		"readiness": map[string]any{
+			"readyCount": "1",
+			"watchCount": "0",
+			"nextCount":  "0",
+			"items": []map[string]any{{
+				"key":         "content",
+				"class":       "studio-readiness-card studio-readiness-card--ready",
+				"label":       "Content",
+				"summary":     "Homepage ready",
+				"statusLabel": "Ready",
+			}},
+		},
+		"comments": map[string]any{
+			"class":      "studio-comments",
+			"kicker":     "Discuss",
+			"title":      "Comments",
+			"countLabel": "0 open",
+			"emptyTitle": "No comments",
+			"empty":      "Review notes will appear here.",
+		},
+		"proposals": map[string]any{
+			"class":      "studio-proposals",
+			"kicker":     "Review",
+			"title":      "Proposals",
+			"countLabel": "0 pending",
+			"emptyTitle": "No proposals",
+			"empty":      "Suggestions will appear here.",
+		},
+	}
+	revisionHistory := map[string]any{
+		"class":       "editor-panel",
+		"panelKey":    "versions",
+		"headerClass": "editor-panel__header",
+		"title":       "Version history",
+		"empty":       "No previous versions yet.",
+		"hasItems":    false,
+	}
+
+	html := gosx.RenderHTML(RenderBackendEditorWorkbenchPanelStack(BackendEditorWorkbenchPanelStackProps{
+		View:                  view,
+		AuthoringURL:          "/admin/editor/__actions/authoring",
+		SiteNavigator:         gosx.El("section", gosx.Attrs(gosx.Attr("data-site-navigator", "true")), gosx.Text("Pages")),
+		HomeLayers:            map[string]any{"kicker": "Home", "title": "Sections", "empty": "No sections."},
+		HomeLayerSelection:    gosx.El("select", gosx.Attrs(gosx.Attr("data-home-layer-selection", "true"))),
+		BlockLayoutEngineHost: gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
+		BlockLibraryPanel:     gosx.El("section", gosx.Attrs(gosx.Attr("data-block-library", "true")), gosx.Text("Library")),
+		SiteMapEngine:         gosx.El("section", gosx.Attrs(gosx.Attr("data-site-map-engine", "true")), gosx.Text("Site map")),
+		SiteMapCanvas:         gosx.El("section", gosx.Attrs(gosx.Attr("data-site-map-canvas", "true")), gosx.Text("Canvas")),
+		InspectorChrome:       gosx.El("section", gosx.Attrs(gosx.Attr("data-inspector-chrome", "true")), gosx.Text("Inspector")),
+		PublishPanelView:      publishPanel,
+		PreviewSharePanel:     previewShare,
+		ActivityPanel:         activityPanel,
+		RevisionHistory:       revisionHistory,
+	}))
+
+	for _, fragment := range []string{
+		`data-gosx-studio-publish-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-preview-share-renderer="gosx-studio"`,
+		`data-gosx-studio-activity-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-revision-history-renderer="gosx-studio"`,
+		`data-studio-publish-preview-share-slot="true"><section class="studio-preview-share"`,
+		`data-studio-publish-activity-slot="true"><section class="studio-activity-drawer"`,
+		`data-studio-publish-history-slot="true"><section class="editor-panel"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("backend editor publish stack missing %q:\n%s", fragment, html)
+		}
+	}
+	assertOrder(t, html,
+		`data-gosx-studio-publish-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-preview-share-renderer="gosx-studio"`,
+		`data-gosx-studio-activity-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-revision-history-renderer="gosx-studio"`,
+	)
+}
+
+func TestRenderBackendEditorWorkbenchPanelStackKeepsExplicitPublishPanelOverride(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Website editor"}, WorkbenchShellViewOptions{})
+	html := gosx.RenderHTML(RenderBackendEditorWorkbenchPanelStack(BackendEditorWorkbenchPanelStackProps{
+		View:                  view,
+		SiteNavigator:         gosx.El("section", gosx.Attrs(gosx.Attr("data-site-navigator", "true")), gosx.Text("Pages")),
+		HomeLayers:            map[string]any{"kicker": "Home", "title": "Sections"},
+		BlockLayoutEngineHost: gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
+		PublishPanel:          gosx.El("section", gosx.Attrs(gosx.Attr("data-custom-publish-panel", "true")), gosx.Text("Custom publish")),
+		PublishPanelView:      publishPanelTestView(),
+		PreviewSharePanel: map[string]any{
+			"class":   "studio-preview-share",
+			"hasHref": false,
+		},
+	}))
+
+	if !strings.Contains(html, `data-custom-publish-panel="true"`) {
+		t.Fatalf("explicit publish panel override missing:\n%s", html)
+	}
+	if strings.Contains(html, `data-gosx-studio-publish-panel-renderer="gosx-studio"`) {
+		t.Fatalf("explicit publish panel override should not render default publish stack:\n%s", html)
+	}
+}
+
 func TestRenderBackendEditorWorkbenchDefaultChrome(t *testing.T) {
 	view := WorkbenchShellView(WorkbenchShellSource{
 		Title:      "Website editor",
