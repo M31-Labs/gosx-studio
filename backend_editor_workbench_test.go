@@ -417,6 +417,177 @@ func TestRenderBackendEditorWorkbenchPanelStackKeepsExplicitBrandMediaPickerOver
 	}
 }
 
+func TestRenderBackendEditorWorkbenchPanelStackOwnsNavigatorPickerAndInspectorChrome(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Website editor"}, WorkbenchShellViewOptions{})
+
+	html := gosx.RenderHTML(RenderBackendEditorWorkbenchPanelStack(BackendEditorWorkbenchPanelStackProps{
+		View: view,
+		SiteNavigatorView: map[string]any{
+			"mode":     "home",
+			"kicker":   "Website",
+			"title":    "Site areas",
+			"label":    "Site areas",
+			"empty":    "No site areas.",
+			"hasItems": true,
+			"items": []map[string]any{{
+				"key":     "home",
+				"group":   "site",
+				"label":   "Home",
+				"href":    "/admin/editor",
+				"class":   "is-active",
+				"summary": "Homepage",
+			}},
+		},
+		HomeLayers: map[string]any{
+			"class":                "studio-nav-panel studio-nav-panel--layers",
+			"kicker":               "Home",
+			"title":                "Layers",
+			"mode":                 "home",
+			"blockStudioKey":       "homepage",
+			"listClass":            "home-section-list",
+			"defaultSelectedKey":   "hero",
+			"defaultSelectedLabel": "Hero",
+			"hasItems":             true,
+			"items": []map[string]any{{
+				"key":   "hero",
+				"label": "Hero",
+			}},
+		},
+		BlockLayoutEngineHost: gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
+		InspectorChromeView: map[string]any{
+			"kicker":         "Inspect",
+			"modeLabel":      "Home",
+			"selectionLabel": "Hero",
+			"scopeLabel":     "Scope",
+			"crumbs": []map[string]any{
+				{"label": "Website"},
+				{"label": "Home", "dynamicMode": true},
+				{"label": "Hero", "dynamicSelection": true},
+			},
+		},
+	}))
+
+	for _, fragment := range []string{
+		`data-gosx-studio-site-navigator-renderer="gosx-studio"`,
+		`data-studio-site-page="home"`,
+		`data-studio-home-layer-picker="true"`,
+		`data-studio-home-layer-selected="hero"`,
+		`data-studio-selection-label="true" aria-live="polite">Hero</output>`,
+		`data-gosx-studio-inspector-chrome-renderer="gosx-studio"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("backend editor panel stack missing Studio-composed fragment %q:\n%s", fragment, html)
+		}
+	}
+	assertOrder(t, html,
+		`data-gosx-studio-left-rail-slot="true"`,
+		`data-gosx-studio-site-navigator-renderer="gosx-studio"`,
+		`data-gosx-studio-block-layout-engine-renderer="gosx-studio"`,
+		`data-studio-home-layer-picker="true"`,
+		`data-gosx-studio-right-rail-slot="true"`,
+		`data-gosx-studio-inspector-chrome-renderer="gosx-studio"`,
+	)
+}
+
+func TestRenderBackendEditorWorkbenchPanelStackKeepsExplicitNavigatorPickerAndInspectorChromeOverrides(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Website editor"}, WorkbenchShellViewOptions{})
+
+	html := gosx.RenderHTML(RenderBackendEditorWorkbenchPanelStack(BackendEditorWorkbenchPanelStackProps{
+		View: view,
+		SiteNavigator: gosx.El("section", gosx.Attrs(
+			gosx.Attr("data-custom-site-navigator", "true"),
+		), gosx.Text("Custom nav")),
+		SiteNavigatorView: map[string]any{
+			"mode":     "home",
+			"hasItems": true,
+			"items":    []map[string]any{{"key": "home", "label": "Home", "href": "/admin/editor"}},
+		},
+		HomeLayers: map[string]any{
+			"kicker":               "Home",
+			"title":                "Layers",
+			"defaultSelectedKey":   "hero",
+			"defaultSelectedLabel": "Hero",
+			"items":                []map[string]any{{"key": "hero", "label": "Hero"}},
+		},
+		HomeLayerSelection: gosx.El("div", gosx.Attrs(
+			gosx.Attr("data-custom-home-layer-selection", "true"),
+		), gosx.Text("Custom picker")),
+		HomeLayerSelectionView: map[string]any{
+			"defaultSelectedKey":   "hero",
+			"defaultSelectedLabel": "Hero",
+			"items":                []map[string]any{{"key": "hero", "label": "Hero"}},
+		},
+		BlockLayoutEngineHost: gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
+		InspectorChrome: gosx.El("section", gosx.Attrs(
+			gosx.Attr("data-custom-inspector-chrome", "true"),
+		), gosx.Text("Custom inspector")),
+		InspectorChromeView: map[string]any{
+			"kicker":         "Inspect",
+			"modeLabel":      "Home",
+			"selectionLabel": "Hero",
+		},
+	}))
+
+	for _, fragment := range []string{
+		`data-custom-site-navigator="true"`,
+		`data-custom-home-layer-selection="true"`,
+		`data-custom-inspector-chrome="true"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("explicit chrome override missing %q:\n%s", fragment, html)
+		}
+	}
+	for _, fragment := range []string{
+		`data-gosx-studio-site-navigator-renderer="gosx-studio"`,
+		`data-studio-home-layer-picker="true"`,
+		`data-gosx-studio-inspector-chrome-renderer="gosx-studio"`,
+	} {
+		if strings.Contains(html, fragment) {
+			t.Fatalf("explicit chrome override should not render default fragment %q:\n%s", fragment, html)
+		}
+	}
+}
+
+func TestNavigatorAndHomeLayerSelectionPropsFromMap(t *testing.T) {
+	siteNavigator := SiteNavigatorPropsFromMap(map[string]any{
+		"mode":     "home",
+		"kicker":   "Website",
+		"title":    "Site areas",
+		"label":    "Site areas",
+		"empty":    "No site areas.",
+		"hasItems": true,
+		"items": []map[string]any{{
+			"key":     "products",
+			"group":   "store",
+			"label":   "Products",
+			"href":    "/admin/products",
+			"class":   "store-link",
+			"summary": "Catalog",
+		}},
+	})
+	if siteNavigator.Mode != "home" || siteNavigator.Title != "Site areas" || !siteNavigator.HasItems {
+		t.Fatalf("site navigator props = %#v", siteNavigator)
+	}
+	if len(siteNavigator.Items) != 1 || siteNavigator.Items[0].Key != "products" || siteNavigator.Items[0].Group != "store" {
+		t.Fatalf("site navigator items = %#v", siteNavigator.Items)
+	}
+
+	homeLayerSelection := HomeLayerSelectionPropsFromMap(map[string]any{
+		"defaultSelectedKey":   "hero",
+		"defaultSelectedLabel": "Hero",
+		"items": []map[string]any{{
+			"key":   "hero",
+			"label": "Hero",
+		}},
+	})
+	if homeLayerSelection.DefaultSelectedKey != "hero" || homeLayerSelection.DefaultSelectedLabel != "Hero" {
+		t.Fatalf("home layer selection props = %#v", homeLayerSelection)
+	}
+	if len(homeLayerSelection.Items) != 1 || homeLayerSelection.Items[0].Label != "Hero" {
+		t.Fatalf("home layer selection items = %#v", homeLayerSelection.Items)
+	}
+}
+
 func TestRenderBackendEditorWorkbenchPanelStackKeepsExplicitAdvancedGroupOverrides(t *testing.T) {
 	view := WorkbenchShellView(WorkbenchShellSource{Title: "Website editor"}, WorkbenchShellViewOptions{})
 	advancedPanel := map[string]any{

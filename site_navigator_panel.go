@@ -25,6 +25,18 @@ type SiteNavigatorPanelOptions struct {
 	RootAttrs map[string]any
 }
 
+func SiteNavigatorPropsFromMap(view map[string]any) SiteNavigatorProps {
+	return SiteNavigatorProps{
+		Mode:     workbenchMapString(view, "mode"),
+		Kicker:   workbenchMapString(view, "kicker"),
+		Title:    workbenchMapString(view, "title"),
+		Label:    workbenchMapString(view, "label"),
+		Empty:    workbenchMapString(view, "empty"),
+		HasItems: workbenchMapBool(view, "hasItems"),
+		Items:    siteNavigatorItemsFromMap(view),
+	}
+}
+
 func RenderSiteNavigatorPanel(props SiteNavigatorProps, options SiteNavigatorPanelOptions) gosx.Node {
 	view := map[string]any{
 		"mode":     props.Mode,
@@ -126,6 +138,22 @@ func siteNavigatorItemViews(items []SiteNavigatorItem) []map[string]any {
 			"href":    item.Href,
 			"class":   item.Class,
 			"summary": item.Summary,
+		})
+	}
+	return out
+}
+
+func siteNavigatorItemsFromMap(view map[string]any) []SiteNavigatorItem {
+	items := workbenchViewMapList(view, "items")
+	out := make([]SiteNavigatorItem, 0, len(items))
+	for _, item := range items {
+		out = append(out, SiteNavigatorItem{
+			Key:     workbenchMapString(item, "key"),
+			Group:   workbenchMapString(item, "group"),
+			Label:   workbenchMapString(item, "label"),
+			Href:    workbenchMapString(item, "href"),
+			Class:   workbenchMapString(item, "class"),
+			Summary: workbenchMapString(item, "summary"),
 		})
 	}
 	return out

@@ -68,7 +68,7 @@ func TestRenderHomeLayerSelectionUsesTypedProps(t *testing.T) {
 	}))
 
 	for _, fragment := range []string{
-		`<div class="studio-home-layer-picker" data-studio-home-layer-selected="hero">`,
+		`<div class="studio-home-layer-picker" data-studio-home-layer-picker="true" data-studio-home-layer-selected="hero">`,
 		`<output data-studio-selection-label="true" aria-live="polite">Hero</output>`,
 		`<div class="studio-home-layer-picker__list" role="toolbar" aria-label="Select home section">`,
 		`<button type="button" data-studio-home-layer-pick="hero" aria-pressed>Hero</button>`,

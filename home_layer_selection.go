@@ -13,6 +13,14 @@ type HomeLayerSelectionProps struct {
 	Items                []HomeLayerSelectionItem
 }
 
+func HomeLayerSelectionPropsFromMap(view map[string]any) HomeLayerSelectionProps {
+	return HomeLayerSelectionProps{
+		DefaultSelectedKey:   workbenchMapString(view, "defaultSelectedKey"),
+		DefaultSelectedLabel: workbenchMapString(view, "defaultSelectedLabel"),
+		Items:                homeLayerSelectionItemsFromMap(view),
+	}
+}
+
 func RenderHomeLayerSelection(props HomeLayerSelectionProps) gosx.Node {
 	children := []gosx.Node{
 		gosx.El("output", gosx.Attrs(
@@ -23,8 +31,21 @@ func RenderHomeLayerSelection(props HomeLayerSelectionProps) gosx.Node {
 	}
 	return gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", "studio-home-layer-picker"),
+		gosx.Attr("data-studio-home-layer-picker", "true"),
 		gosx.Attr("data-studio-home-layer-selected", props.DefaultSelectedKey),
 	), gosx.Fragment(children...))
+}
+
+func homeLayerSelectionItemsFromMap(view map[string]any) []HomeLayerSelectionItem {
+	items := workbenchViewMapList(view, "items")
+	out := make([]HomeLayerSelectionItem, 0, len(items))
+	for _, item := range items {
+		out = append(out, HomeLayerSelectionItem{
+			Key:   workbenchMapString(item, "key"),
+			Label: workbenchMapString(item, "label"),
+		})
+	}
+	return out
 }
 
 func renderHomeLayerSelectionButtons(items []HomeLayerSelectionItem, selectedKey string) gosx.Node {

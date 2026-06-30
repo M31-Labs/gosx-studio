@@ -41,14 +41,17 @@ type BackendEditorWorkbenchPanelStackProps struct {
 	CanvasStatus gosx.Node
 
 	SiteNavigator                   gosx.Node
+	SiteNavigatorView               map[string]any
 	HomeLayers                      map[string]any
 	HomeLayerSelection              gosx.Node
+	HomeLayerSelectionView          map[string]any
 	BlockLayoutEngineHost           gosx.Node
 	BlockLibraryPanel               gosx.Node
 	BlockLibraryPanelView           map[string]any
 	SiteMapEngine                   gosx.Node
 	SiteMapCanvas                   gosx.Node
 	InspectorChrome                 gosx.Node
+	InspectorChromeView             map[string]any
 	HomeInspector                   gosx.Node
 	HomeInspectorView               map[string]any
 	HomeInspectorContentFields      map[string]any
@@ -190,8 +193,20 @@ func RenderBackendEditorWorkbenchContent(props BackendEditorWorkbenchContentProp
 }
 
 func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelStackProps) gosx.Node {
+	siteNavigator := props.SiteNavigator
+	if workbenchNodeEmpty(siteNavigator) {
+		siteNavigator = RenderSiteNavigatorPanel(SiteNavigatorPropsFromMap(props.SiteNavigatorView), SiteNavigatorPanelOptions{})
+	}
+	homeLayerSelection := props.HomeLayerSelection
+	if workbenchNodeEmpty(homeLayerSelection) {
+		homeLayerSelectionView := props.HomeLayerSelectionView
+		if len(homeLayerSelectionView) == 0 {
+			homeLayerSelectionView = props.HomeLayers
+		}
+		homeLayerSelection = RenderHomeLayerSelection(HomeLayerSelectionPropsFromMap(homeLayerSelectionView))
+	}
 	homeLayersPanel := RenderHomeLayersPanel(props.HomeLayers, HomeLayersPanelOptions{
-		PickerNode: props.HomeLayerSelection,
+		PickerNode: homeLayerSelection,
 	})
 	blockLibraryPanel := props.BlockLibraryPanel
 	if workbenchNodeEmpty(blockLibraryPanel) {
@@ -204,6 +219,10 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 		Kicker:         "Home",
 		Title:          "Sections",
 	})
+	inspectorChrome := props.InspectorChrome
+	if workbenchNodeEmpty(inspectorChrome) {
+		inspectorChrome = RenderInspectorChromePanel(props.InspectorChromeView, InspectorChromePanelOptions{})
+	}
 	homeInspector := props.HomeInspector
 	if workbenchNodeEmpty(homeInspector) {
 		homeInspector = RenderHomeInspectorPanel(props.HomeInspectorView, props.HomeInspectorContentFields, HomeInspectorPanelOptions{})
@@ -277,11 +296,11 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 		Toolbar:         props.Toolbar,
 		CanvasBar:       props.CanvasBar,
 		CanvasStatus:    props.CanvasStatus,
-		SiteNavigator:   props.SiteNavigator,
+		SiteNavigator:   siteNavigator,
 		BlockLayout:     blockLayout,
 		SiteMapEngine:   props.SiteMapEngine,
 		SiteMapCanvas:   props.SiteMapCanvas,
-		InspectorChrome: props.InspectorChrome,
+		InspectorChrome: inspectorChrome,
 		HomeInspector:   homeInspector,
 		LookPanel:       lookPanel,
 		BrandPanel:      brandPanel,
