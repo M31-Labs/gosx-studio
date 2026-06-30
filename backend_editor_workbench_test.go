@@ -190,6 +190,30 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 			"logoAlt":     "Logo",
 		},
 	}
+	brandMediaPicker := map[string]any{
+		"kicker":          "Assets",
+		"title":           "Brand media",
+		"summary":         "Choose brand assets.",
+		"filterLabel":     "Filter media",
+		"assetLabel":      "Brand assets",
+		"emptyLabel":      "No media yet.",
+		"uploadHref":      "/admin/media",
+		"formID":          "editorWorkbenchForm",
+		"saveAction":      "/admin/editor/__actions/save",
+		"logoPickName":    "studioPickLogoUrl",
+		"faviconPickName": "studioPickFaviconUrl",
+		"hasAssets":       true,
+		"assets": []map[string]any{{
+			"id":          "asset-logo",
+			"url":         "/logo.png",
+			"alt":         "Logo",
+			"filename":    "logo.png",
+			"cardClass":   "studio-brand-media-card",
+			"filterGroup": "ready",
+			"statusLabel": "Ready",
+			"actionLabel": "Use logo.png",
+		}},
+	}
 	advancedPanel := map[string]any{
 		"kicker":          "Advanced",
 		"title":           "Controls",
@@ -224,7 +248,7 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 		LookPanel:             gosx.El("section", gosx.Attrs(gosx.Attr("data-look-panel", "true")), gosx.Text("Look")),
 		BrandPanel:            brandPanel,
 		BrandFields:           brandFields,
-		BrandMediaPicker:      gosx.El("section", gosx.Attrs(gosx.Attr("data-brand-media-picker", "true")), gosx.Text("Media")),
+		BrandMediaPickerView:  brandMediaPicker,
 		NavigationPanel:       gosx.El("section", gosx.Attrs(gosx.Attr("data-navigation-panel", "true")), gosx.Text("Navigation")),
 		CheckoutPanel:         gosx.El("section", gosx.Attrs(gosx.Attr("data-checkout-panel", "true")), gosx.Text("Checkout")),
 		PublishPanel:          gosx.El("section", gosx.Attrs(gosx.Attr("data-publish-panel", "true")), gosx.Text("Publish")),
@@ -288,6 +312,7 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 		`data-gosx-studio-home-layers-panel-renderer="gosx-studio"`,
 		`data-gosx-studio-block-layout-engine-renderer="gosx-studio"`,
 		`data-gosx-studio-brand-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-brand-media-picker-renderer="gosx-studio"`,
 		`data-gosx-studio-advanced-panel-renderer="gosx-studio"`,
 	} {
 		if !strings.Contains(html, fragment) {
@@ -299,7 +324,9 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 		`<header class="studio-panel-heading"><div><p class="kicker">Home</p><h2>Sections</h2></div><select data-home-layer-selection="true"></select></header>`,
 		`<div class="studio-block-layout-engine__layers" data-studio-block-layout-layers="true"><section class="" data-studio-mode-panel="" data-studio-engine-source="gosx" data-gosx-studio-home-layers-panel-renderer="gosx-studio">`,
 		`<div class="studio-block-layout-engine__library" data-studio-block-layout-library="true"><section data-block-library="true">Library</section></div>`,
-		`<section class="studio-brand-panel__group-slot studio-brand-media-picker-slot" data-studio-brand-group-slot="files" data-studio-brand-group-selected="false"><section data-brand-media-picker="true">Media</section></section>`,
+		`<section class="studio-brand-panel__group-slot studio-brand-media-picker-slot" data-studio-brand-group-slot="files" data-studio-brand-group-selected="false"><section class="studio-brand-media-picker"`,
+		`data-studio-media-picker-island="brand"`,
+		`data-studio-media-asset="asset-logo"`,
 		`data-gosx-studio-flow-designer-panel-renderer="gosx-studio"`,
 		`data-gosx-studio-advanced-tools-panel-renderer="gosx-studio"`,
 		`data-gosx-studio-advanced-settings-panel-renderer="gosx-studio"`,
@@ -329,7 +356,7 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 		`data-site-map-canvas="true"`,
 		`data-gosx-studio-right-rail-slot="true"`,
 		`data-gosx-studio-brand-panel-renderer="gosx-studio"`,
-		`data-brand-media-picker="true"`,
+		`data-gosx-studio-brand-media-picker-renderer="gosx-studio"`,
 		`data-gosx-studio-advanced-panel-renderer="gosx-studio"`,
 		`data-gosx-studio-flow-designer-panel-renderer="gosx-studio"`,
 		`data-gosx-studio-advanced-tools-panel-renderer="gosx-studio"`,
@@ -338,6 +365,56 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 		`data-type-field-list="true"`,
 		`data-gosx-studio-advanced-settings-panel-renderer="gosx-studio"`,
 	)
+}
+
+func TestRenderBackendEditorWorkbenchPanelStackKeepsExplicitBrandMediaPickerOverride(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Website editor"}, WorkbenchShellViewOptions{})
+	brandPanel := map[string]any{
+		"kicker":          "Brand",
+		"title":           "Identity",
+		"summary":         "Brand system",
+		"previewLabel":    "Preview",
+		"groupLabel":      "Brand groups",
+		"defaultGroupKey": "files",
+		"groups": []map[string]any{{
+			"key":      "files",
+			"inputID":  "brandFiles",
+			"label":    "Files",
+			"summary":  "Media",
+			"selected": true,
+		}},
+	}
+	brandFields := map[string]any{
+		"preview": map[string]any{
+			"cornerLabel": "Logo",
+			"buttonLabel": "Adjust logo",
+			"logoURL":     "/logo.png",
+			"logoAlt":     "Logo",
+		},
+	}
+
+	html := gosx.RenderHTML(RenderBackendEditorWorkbenchPanelStack(BackendEditorWorkbenchPanelStackProps{
+		View:                  view,
+		SiteNavigator:         gosx.El("section", gosx.Attrs(gosx.Attr("data-site-navigator", "true")), gosx.Text("Pages")),
+		HomeLayers:            map[string]any{"kicker": "Home", "title": "Sections"},
+		BlockLayoutEngineHost: gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
+		BrandPanel:            brandPanel,
+		BrandFields:           brandFields,
+		BrandMediaPicker:      gosx.El("section", gosx.Attrs(gosx.Attr("data-custom-brand-media-picker", "true")), gosx.Text("Custom media")),
+		BrandMediaPickerView: map[string]any{
+			"kicker":     "Assets",
+			"title":      "Brand media",
+			"summary":    "Choose brand assets.",
+			"uploadHref": "/admin/media",
+		},
+	}))
+
+	if !strings.Contains(html, `data-custom-brand-media-picker="true"`) {
+		t.Fatalf("explicit brand media picker override missing:\n%s", html)
+	}
+	if strings.Contains(html, `data-gosx-studio-brand-media-picker-renderer="gosx-studio"`) {
+		t.Fatalf("explicit brand media picker override should not render default picker:\n%s", html)
+	}
 }
 
 func TestRenderBackendEditorWorkbenchPanelStackKeepsExplicitAdvancedGroupOverrides(t *testing.T) {

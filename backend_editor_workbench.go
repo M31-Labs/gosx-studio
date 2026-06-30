@@ -57,6 +57,7 @@ type BackendEditorWorkbenchPanelStackProps struct {
 	BrandPanel                      map[string]any
 	BrandFields                     map[string]any
 	BrandMediaPicker                gosx.Node
+	BrandMediaPickerView            map[string]any
 	NavigationPanel                 gosx.Node
 	NavigationPanelView             map[string]any
 	CheckoutPanel                   gosx.Node
@@ -211,8 +212,12 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 	if workbenchNodeEmpty(lookPanel) {
 		lookPanel = RenderLookPanel(props.LookPanelView, LookPanelOptions{})
 	}
+	brandMediaPicker := props.BrandMediaPicker
+	if workbenchNodeEmpty(brandMediaPicker) {
+		brandMediaPicker = RenderBrandMediaPicker(props.BrandMediaPickerView, BrandMediaPickerOptions{})
+	}
 	brandPanel := RenderBrandPanel(props.BrandPanel, props.BrandFields, BrandPanelOptions{
-		MediaPickerNode: props.BrandMediaPicker,
+		MediaPickerNode: brandMediaPicker,
 	})
 	navigationPanel := props.NavigationPanel
 	if workbenchNodeEmpty(navigationPanel) {
