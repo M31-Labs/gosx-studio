@@ -3,11 +3,10 @@
 // Phase 3 slice-1 island implementation of the JS function bindFieldMirroring in
 // the legacy bundle (removed 2026-05-27).
 //
-// The legacy implementation scans the inspector for inputs with
-// data-editor-source / data-editor-frame-attr-target, attaches input event
-// listeners, and on every keystroke calls
-// window.GoSXStudioPreviewRuntime.applyTextUpdate(...) — which mutates the
-// preview iframe's DOM directly through cross-frame element queries.
+// The legacy implementation scanned the inspector for inputs with
+// data-editor-source / data-editor-frame-attr-target, attached input event
+// listeners, and on every keystroke updated the preview iframe's DOM
+// directly through cross-frame element queries.
 //
 // Under Phase 3, per ADR 0008
 // (~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md),
@@ -19,12 +18,8 @@
 // 16ms / 60fps frame budgets).
 //
 // This island is the editor-side writer. The reader lives in slice 6
-// (preview_subscriber.gsx) — until slice 6 ships, mirroring writes still
-// fan out through the legacy GoSXStudioPreviewRuntime.applyTextUpdate path
-// to preserve preview behavior. The risks-and-gotchas section of the slice
-// plan calls this out: "FieldRuntime calls into PreviewRuntime indirectly
-// (mirroring writes preview signals). PreviewRuntime is slice 6 — it's
-// still JS during slice 1."
+// (preview_subscriber.gsx); signal writes are the sole mirroring delivery
+// mechanism now that the old PreviewRuntime branch has been removed.
 
 package fieldruntime
 

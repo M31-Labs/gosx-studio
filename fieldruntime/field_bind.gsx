@@ -11,10 +11,8 @@
 // window.__gosx_field_runtime_island_bind that delegates to the mirroring
 // and clipboard islands' implementations.
 //
-// During the additive shipping window (Section C of the slice plan), the
-// BridgeShim only invokes this island when ShellConfig.FeatureFlags has
-// Post 2026-05-27 the legacy JS bundle is gone; the island path is the
-// only path. See Phase 3 burn-down.
+// Post 2026-05-27 the legacy JS bundle is gone; BridgeShim delegates to
+// this island directly. See Phase 3 burn-down.
 
 package fieldruntime
 

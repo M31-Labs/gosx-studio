@@ -3,9 +3,9 @@
 // The .gsx islands (field_bind.gsx, field_mirror.gsx, field_clipboard.gsx)
 // are mount-point markers in the editor DOM. This script publishes the
 // window.__gosx_field_runtime_island_* globals that fieldruntime.BridgeShim
-// delegates to when the "field-runtime-islands" feature flag is on. It is
-// emitted into the studio runtime bundle by fieldruntime.IslandRuntimeJS()
-// (see runtime.go) and runs before BridgeShim() at bundle init time.
+// delegates to directly. It is emitted into the studio runtime bundle by
+// fieldruntime.IslandRuntimeJS() (see runtime.go) and runs before
+// BridgeShim() at bundle init time.
 //
 // Each function below replaces a method on window.GoSXStudioFieldRuntime
 // while preserving exact observable behavior:
@@ -19,8 +19,8 @@
 //     signal via the cross-frame relay (per ADR 0009) and applies the
 //     textContent / attribute update inside the iframe. Slice 6's
 //     transitional cleanup (Section G.1 of the slice-6 plan) removed the
-//     legacy GoSXStudioPreviewRuntime.applyTextUpdate fallback — the
-//     signal write is the sole delivery mechanism now.
+//     old GoSXStudioPreviewRuntime.applyTextUpdate branch — the signal
+//     write is the sole delivery mechanism now.
 //
 //   bindClipboard(root)
 //     Idempotently installs the document-level click handler for
@@ -134,9 +134,9 @@
   // Bridge.EnableCrossFrameRelay) routes writes whose name starts with
   // "$preview." to the storefront iframe's Bridge, where slice 6's
   // preview_subscriber observes them and applies the matching DOM
-  // mutation. Before the bridge boots, the call is a no-op — but the
-  // BridgeShim's flag gate ensures we only run this path when the host
-  // has opted in (which implies the bridge is mounted).
+  // mutation. Before the bridge boots, the call is a no-op; a later bind
+  // or preview-frame load refresh can write the current value once the
+  // shared-signal bridge is available.
   function writeSharedSignal(name, value) {
     try {
       var setter = window.__gosx_set_shared_signal_json;
@@ -278,7 +278,7 @@
 
   // Publish the island globals. The names are the contract referenced by
   // fieldruntime.IslandGlobals in runtime.go; the BridgeShim there delegates
-  // window.GoSXStudioFieldRuntime calls here when the feature flag is on.
+  // window.GoSXStudioFieldRuntime calls here directly.
   window.__gosx_field_runtime_island_bind = bindFieldRuntimeIsland;
   window.__gosx_field_runtime_island_bindMirroring = bindFieldMirroringIsland;
   window.__gosx_field_runtime_island_bindClipboard = bindFieldClipboardIsland;

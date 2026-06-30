@@ -1348,8 +1348,6 @@ func TestEngineRuntimeIncludesFieldRuntimeIslandBundle(t *testing.T) {
 		"__gosx_field_runtime_island_bind",
 		"__gosx_field_runtime_island_bindMirroring",
 		"__gosx_field_runtime_island_bindClipboard",
-		"field-runtime-islands",
-		"data-gosx-studio-feature-flag-field-runtime-islands",
 		"data-studio-field-source",
 	} {
 		if !strings.Contains(engines, fragment) {

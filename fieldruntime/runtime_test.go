@@ -50,19 +50,36 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 	if shim == "" {
 		t.Fatal("BridgeShim() must return a non-empty JS snippet")
 	}
-	// The shim must reference the global the islands publish themselves at,
-	// must reference window.GoSXStudioFieldRuntime (the public global it
-	// shims), and must reference the feature flag so the legacy path stays
-	// reachable when the flag is off.
+	// The shim must reference the global the islands publish themselves at
+	// and window.GoSXStudioFieldRuntime (the public global it shims). It
+	// must delegate directly; FeatureFlagKey is retained for host probes,
+	// not for runtime gating.
 	for _, fragment := range []string{
 		"window.GoSXStudioFieldRuntime",
 		"__gosx_field_runtime_island_bind",
 		"__gosx_field_runtime_island_bindMirroring",
 		"__gosx_field_runtime_island_bindClipboard",
-		FeatureFlagKey,
+		`return island.apply(null, arguments);`,
 	} {
 		if !strings.Contains(shim, fragment) {
 			t.Fatalf("BridgeShim() missing %q:\n%s", fragment, shim)
+		}
+	}
+	for _, stale := range []string{
+		"flag" + "Enabled",
+		"FLAG" + "_ATTR",
+		"feature flag is" + " on",
+		"BridgeShim only" + " invokes",
+		"fallback" + " branch",
+		"fallback" + " path",
+		"legacy" + " fallback",
+		"applyTextUpdate" + " fallback",
+		"still JS during" + " slice 1",
+		FeatureFlagKey,
+		"data-gosx-studio-feature-flag-field-runtime-islands",
+	} {
+		if strings.Contains(shim, stale) {
+			t.Fatalf("BridgeShim() contains stale feature-gate/fallback fragment %q:\n%s", stale, shim)
 		}
 	}
 }

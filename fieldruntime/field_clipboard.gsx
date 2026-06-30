@@ -17,7 +17,7 @@
 // transient user affordances with browser-API side effects. The island is
 // therefore a mount-point pattern; the runtime bundle's island_runtime.js
 // publishes window.__gosx_field_runtime_island_bindClipboard, which the
-// BridgeShim in runtime.go delegates to when the feature flag is on.
+// BridgeShim in runtime.go delegates to directly.
 
 package fieldruntime
 

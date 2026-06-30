@@ -27,9 +27,9 @@ import (
 var islandRuntimeJS []byte
 
 // FeatureFlagKey is the studio.ShellConfig.FeatureFlags key for the
-// FieldRuntime island path. Post-2026-05-27 the legacy fallback is gone
-// and the flag is kept only for host-probe API stability — the island
-// path runs regardless of its value.
+// FieldRuntime island path. Post-2026-05-27 the legacy bundle path is
+// gone and the flag is kept only for host-probe API stability — the
+// island path runs regardless of its value.
 //
 // Phase 3 naming convention: "<contract>-runtime-islands". Slices 2..7 each
 // declare their own constant of the same shape.
@@ -52,9 +52,9 @@ var IslandGlobals = struct {
 
 // BridgeShim returns the JavaScript snippet that gosx-studio's runtime
 // bundle appends to install window.GoSXStudioFieldRuntime. Each method
-// dispatches to the corresponding IslandGlobals entry on window. If the
-// island is not yet mounted, the shim returns undefined (the legacy JS
-// fallback was deleted on 2026-05-27).
+// dispatches directly to the corresponding IslandGlobals entry on window.
+// If the island is not yet mounted, the shim returns undefined (the legacy
+// JS fallback was deleted on 2026-05-27).
 func BridgeShim() []byte {
 	return []byte(bridgeShimJS)
 }
@@ -86,29 +86,9 @@ func Bundle() []byte {
 const bridgeShimJS = `;(function () {
   // Phase 3 slice-1 FieldRuntime island bridge.
   // See gosx-studio/fieldruntime/runtime.go for the contract.
-  // Feature flag: ` + FeatureFlagKey + `
   if (typeof window === "undefined") return;
-  // The consumer surfaces ShellConfig.FeatureFlags via a
-  // data-gosx-studio-feature-flag-<key>="true" attribute on the document
-  // root (or any ancestor of the editor mount). This keeps the flag
-  // decision out of cookies / query params at the bundle level so SSR and
-  // CSR observations agree. The attribute name below MUST be the literal
-  // "data-gosx-studio-feature-flag-field-runtime-islands" so a grep over
-  // the bundle finds it; the test
-  // TestEngineRuntimeIncludesFieldRuntimeIslandBundle enforces this.
-  var FLAG_ATTR = "data-gosx-studio-feature-flag-field-runtime-islands";
-  function flagEnabled() {
-    try {
-      if (document.documentElement && document.documentElement.getAttribute(FLAG_ATTR) === "true") return true;
-      var marked = document.querySelector("[" + FLAG_ATTR + "='true']");
-      return !!marked;
-    } catch (e) {
-      return false;
-    }
-  }
   function delegate(islandGlobal) {
     return function () {
-      if (!flagEnabled()) return undefined;
       var island = window[islandGlobal];
       if (typeof island === "function") {
         return island.apply(null, arguments);
@@ -116,14 +96,10 @@ const bridgeShimJS = `;(function () {
       return undefined;
     };
   }
-  // Install the runtime object. Pre-2026-05-27 the BridgeShim wrapped the
-  // legacy bundle's bindFieldRuntime / bindFieldMirroring / bindFieldClipboard
-  // functions as a fallback path; with the legacy bundle deleted in Phase 3
-  // Section E those identifiers are undefined and the fallback branch was
-  // dead code. v0.5.0 removes the dead branch — the island global is the
-  // only path. The literal island-global names below MUST match
-  // fieldruntime.IslandGlobals in runtime.go — the test
-  // TestBridgeShimDelegatesToIslandGlobals enforces this.
+  // Install the runtime object. The literal island-global names below MUST
+  // match fieldruntime.IslandGlobals in runtime.go — the test
+  // TestBridgeShimDelegatesToIslandGlobals enforces this. The island global
+  // is the only delivery path; an unmounted island returns undefined.
   window.GoSXStudioFieldRuntime = {
     bind: delegate("__gosx_field_runtime_island_bind"),
     bindMirroring: delegate("__gosx_field_runtime_island_bindMirroring"),
