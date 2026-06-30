@@ -41,8 +41,9 @@ import { revealModeIfPresent, startMuddyCanvasHTMLSurface } from "./reference_ap
 //       run (timestamp + random nonce, HTML-safe chars only) so no assertion can
 //       false-pass on stale/seed content; the restore assertion polls/awaits.
 //
-// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1 and a Muddy build rebuilt against the
-// gosx/gosx-studio under test (`go run ./cmd/muddy-noni` via the shared harness).
+// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1. The shared harness refreshes
+// Muddy's ignored dist assets and boots the server against the gosx/gosx-studio
+// under test.
 
 const CANVAS_SELECTOR = "canvas[data-gosx-canvas-wasm-free='true']";
 const BOARD_SELECTOR = "[data-studio-site-map-board='true']";

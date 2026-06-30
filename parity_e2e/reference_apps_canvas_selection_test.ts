@@ -35,8 +35,9 @@ import {
 // inspector's observable text, so it passes only if the bridge truly updated
 // the inspector live.
 //
-// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1 and a Muddy dist rebuilt against the
-// gosx/gosx-studio under test (`gosx build --dev .` in muddy-noni-commerce).
+// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1. The shared harness refreshes
+// Muddy's ignored dist assets and boots the server against the gosx/gosx-studio
+// under test.
 
 const CANVAS_SELECTOR = "canvas[data-gosx-surface-kind='canvas2d']";
 const BOARD_SELECTOR = "[data-studio-site-map-board='true']";

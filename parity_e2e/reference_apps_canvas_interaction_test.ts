@@ -26,9 +26,9 @@ import {
 // hardcoded, so the test follows whatever the editor actually renders. Each
 // interaction either passes against live evidence or is reported honestly.
 //
-// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1 and a Muddy dist rebuilt against the
-// gosx under test (`gosx build --dev .` in muddy-noni-commerce) — without the
-// rebuild the served bundle/WASM lack __gosx_canvas_event and the handlers.
+// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1. The shared harness refreshes
+// Muddy's ignored dist assets and boots the server against the gosx/gosx-studio
+// under test.
 
 const CANVAS_SELECTOR = "canvas[data-gosx-surface-kind='canvas2d']";
 

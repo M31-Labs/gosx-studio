@@ -40,8 +40,9 @@ import { revealModeIfPresent, startMuddyCanvasHTMLSurface } from "./reference_ap
 //       seed content; we also assert it is absent from the storefront BEFORE
 //       publish.
 //
-// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1 and a Muddy build rebuilt against the
-// gosx/gosx-studio under test (`go run ./cmd/muddy-noni` via the shared harness).
+// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1. The shared harness refreshes
+// Muddy's ignored dist assets and boots the server against the gosx/gosx-studio
+// under test.
 
 const CHECKOUT_PANEL = "[data-studio-checkout-panel='true']";
 const CHECKOUT_PRODUCT = `${CHECKOUT_PANEL} select[name='checkoutProductId']`;

@@ -8,6 +8,9 @@ import { createServer } from "node:net";
 const workRoot = path.resolve(__dirname, "../..");
 const muddyRepo = process.env.GOSX_STUDIO_MUDDY_REPO ?? path.join(workRoot, "muddy-noni-commerce");
 const pajaritosRepo = process.env.GOSX_STUDIO_PAJARITOS_REPO ?? path.join(workRoot, "pajaritos-forest-school");
+const defaultGoBin = "/home/draco/go/bin";
+
+let muddyDistBuildPromise: Promise<void> | null = null;
 
 export type ClickAuthoringOptions = {
   noWaitAfter?: boolean;
@@ -469,6 +472,7 @@ export function authoringParam(response: { request(): { postData(): string | nul
 }
 
 export async function startMuddy(request: APIRequestContext, extraEnv?: Record<string, string>): Promise<ServerHandle> {
+  await ensureMuddyDist();
   const port = await freePort();
   const tempDir = mkdtempSync(path.join(tmpdir(), "gosx-studio-muddy-e2e-"));
   mkdirSync(path.join(tempDir, "media"), { recursive: true });
@@ -489,6 +493,36 @@ export async function startMuddy(request: APIRequestContext, extraEnv?: Record<s
     },
     tempDir,
   });
+}
+
+function ensureMuddyDist(): Promise<void> {
+  if (!muddyDistBuildPromise) {
+    muddyDistBuildPromise = buildMuddyDist().catch((error) => {
+      muddyDistBuildPromise = null;
+      throw error;
+    });
+  }
+  return muddyDistBuildPromise;
+}
+
+async function buildMuddyDist(): Promise<void> {
+  const gosxBin = process.env.GOSX_STUDIO_GOSX_BIN ?? "gosx";
+  const env = {
+    ...process.env,
+    GOWORK: "off",
+    PATH: process.env.GOSX_STUDIO_GOSX_BIN ? process.env.PATH : withPathEntry(process.env.PATH, defaultGoBin),
+  };
+  await runLoggedCommand(gosxBin, ["build", "--dev", "."], {
+    cwd: muddyRepo,
+    env,
+    label: "Muddy GoSX dist build",
+  });
+}
+
+function withPathEntry(currentPath: string | undefined, entry: string): string {
+  const parts = (currentPath ?? "").split(path.delimiter).filter(Boolean);
+  if (parts.includes(entry)) return currentPath ?? entry;
+  return [entry, ...parts].join(path.delimiter);
 }
 
 // startMuddyCanvas boots Muddy/Noni with explicit co-render mode
@@ -561,6 +595,37 @@ type ServerOptions = {
   env: Record<string, string>;
   tempDir: string;
 };
+
+type LoggedCommandOptions = {
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  label: string;
+};
+
+async function runLoggedCommand(command: string, args: string[], options: LoggedCommandOptions): Promise<void> {
+  const proc = spawn(command, args, {
+    cwd: options.cwd,
+    env: options.env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  proc.stdout?.on("data", (chunk: Buffer) => stdout.push(chunk.toString()));
+  proc.stderr?.on("data", (chunk: Buffer) => stderr.push(chunk.toString()));
+
+  return new Promise((resolve, reject) => {
+    proc.on("error", (error) => {
+      reject(new Error(`${options.label} failed to start: ${error.message}\n\nstdout:\n${stdout.join("")}\n\nstderr:\n${stderr.join("")}`));
+    });
+    proc.on("exit", (code, signal) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`${options.label} failed with ${signal ? `signal ${signal}` : `exit code ${code}`}\n\nCommand: ${command} ${args.join(" ")}\nCwd: ${options.cwd}\n\nstdout:\n${stdout.join("")}\n\nstderr:\n${stderr.join("")}`));
+    });
+  });
+}
 
 async function startGoServer(request: APIRequestContext, options: ServerOptions): Promise<ServerHandle> {
   const proc = spawn("go", ["run", options.command], {

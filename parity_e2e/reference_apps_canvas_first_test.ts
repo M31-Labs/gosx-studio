@@ -33,8 +33,9 @@ import { startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
 // NOT pages-only or the iframe is still present, the offending assertion fails
 // with the observed evidence rather than being weakened.
 //
-// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1 and a Muddy dist rebuilt against the
-// gosx/gosx-studio under test (`gosx build .` in muddy-noni-commerce).
+// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1. The shared harness refreshes
+// Muddy's ignored dist assets and boots the server against the gosx/gosx-studio
+// under test.
 
 const BUNDLE_SELECTOR = "[data-gosx-canvas-bundle]";
 const BOARD_SELECTOR = "[data-studio-site-map-board='true']";

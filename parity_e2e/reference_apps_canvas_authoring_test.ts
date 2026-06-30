@@ -44,8 +44,9 @@ import {
 // before any authoring is driven, and the canvas-graph assertion reads the live
 // __gosx_render_canvas bundle — nothing is hardcoded.
 //
-// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1 and a Muddy dist rebuilt against the
-// gosx/gosx-studio under test (`gosx build --dev .` in muddy-noni-commerce).
+// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1. The shared harness refreshes
+// Muddy's ignored dist assets and boots the server against the gosx/gosx-studio
+// under test.
 
 const CANVAS_SELECTOR = "canvas[data-gosx-surface-kind='canvas2d']";
 const BOARD_SELECTOR = "[data-studio-site-map-board='true']";

@@ -46,8 +46,9 @@ import {
 // interaction genuinely does not work WASM-free, the offending assertion is left
 // test.fixme with the observed evidence rather than faked.
 //
-// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1 and a Muddy dist rebuilt against the
-// gosx/gosx-studio under test (`gosx build --dev .` in muddy-noni-commerce).
+// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1. The reference-app harness rebuilds
+// Muddy's ignored dist assets against the gosx/gosx-studio under test before
+// booting the server.
 
 const CANVAS_SELECTOR = "canvas[data-gosx-canvas-wasm-free='true']";
 const BOARD_SELECTOR = "[data-studio-site-map-board='true']";

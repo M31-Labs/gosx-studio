@@ -55,8 +55,9 @@ import { revealModeIfPresent, startMuddyCanvasHTMLSurface } from "./reference_ap
 // they survive the server's html escaping round-trip byte-for-byte in both the
 // contenteditable textContent and the public storefront HTML.
 //
-// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1 and a Muddy build rebuilt against the
-// gosx/gosx-studio under test (`go run ./cmd/muddy-noni` via the shared harness).
+// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1. The shared harness refreshes
+// Muddy's ignored dist assets and boots the server against the gosx/gosx-studio
+// under test.
 
 const CANVAS_SELECTOR = "canvas[data-gosx-canvas-wasm-free='true']";
 const BOARD_SELECTOR = "[data-studio-site-map-board='true']";
