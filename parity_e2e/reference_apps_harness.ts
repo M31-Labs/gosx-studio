@@ -565,7 +565,7 @@ type ServerOptions = {
 async function startGoServer(request: APIRequestContext, options: ServerOptions): Promise<ServerHandle> {
   const proc = spawn("go", ["run", options.command], {
     cwd: options.cwd,
-    env: { ...process.env, ...options.env },
+    env: { ...process.env, GOWORK: "off", ...options.env },
     stdio: ["ignore", "pipe", "pipe"],
   });
   const logs: string[] = [];
