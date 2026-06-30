@@ -1007,20 +1007,6 @@
     return runEditorPreviewDockAction(detail, null);
   };
 
-  function bindEditorPreviewChromeEvents() {
-    doc.addEventListener("gosxstudio:editor-preview-patch-apply", function (event) {
-      var detail = event.detail || {};
-      setEditorPreviewResult(detail, applyEditorPreviewPatch(detail.frame, detail.patch));
-    });
-    doc.addEventListener("gosxstudio:editor-preview-patch-post", function (event) {
-      var detail = event.detail || {};
-      var form = editorPreviewForm(detail, event);
-      setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, detail.patch));
-    });
-  }
-
-  bindEditorPreviewChromeEvents();
-
   // monotonicCounter — used by requestInlineEdit / cycleField to mint a
   // unique request id every call. The subscriber side observes the id
   // change (not the value content) so repeated identical detail payloads

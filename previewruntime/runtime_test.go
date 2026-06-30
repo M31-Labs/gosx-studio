@@ -390,10 +390,6 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewPatchTransport(t *testing.T) {
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`doc.addEventListener("gosxstudio:editor-preview-patch-apply"`,
-		`doc.addEventListener("gosxstudio:editor-preview-patch-post"`,
-		`setEditorPreviewResult(detail, applyEditorPreviewPatch(detail.frame, detail.patch))`,
-		`setEditorPreviewResult(detail, postEditorPreviewPatch(form, detail.reason, detail.patch))`,
 		`window.__gosx_preview_runtime_island_postPatch = function (form, reason, detail, field)`,
 		`return postEditorPreviewPatch(form, reason, editorPreviewPatchEnvelope(reason, detail, field));`,
 		`function editorPreviewPatchEnvelope(reason, detail, field)`,
@@ -428,6 +424,8 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewPatchTransport(t *testing.T) {
 			t.Fatalf("IslandRuntimeJS() missing editor preview patch transport fragment %q", fragment)
 		}
 	}
+	assertRetiredEditorPreviewRuntimeEventAbsent(t, body, "gosxstudio:editor-preview-patch-apply")
+	assertRetiredEditorPreviewRuntimeEventAbsent(t, body, "gosxstudio:editor-preview-patch-post")
 	if strings.Contains(body, `dispatchEvent(new CustomEvent("gosxstudio:editor-preview`) {
 		t.Fatalf("IslandRuntimeJS() must not recursively dispatch editor preview patch control events")
 	}
