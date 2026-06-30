@@ -62,6 +62,7 @@ type BackendEditorWorkbenchPanelStackProps struct {
 	AdvancedWorkspaceFieldPanel gosx.Node
 	AdvancedCalendarFieldPanel  gosx.Node
 	AdvancedTypeFieldPanel      gosx.Node
+	AdvancedSettingsPanel       gosx.Node
 }
 
 func RenderBackendEditorWorkbench(props BackendEditorWorkbenchProps) gosx.Node {
@@ -192,6 +193,7 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 			"schema":     props.AdvancedWorkspaceFieldPanel,
 			"schedule":   props.AdvancedCalendarFieldPanel,
 			"typography": props.AdvancedTypeFieldPanel,
+			"settings":   props.AdvancedSettingsPanel,
 		},
 	})
 

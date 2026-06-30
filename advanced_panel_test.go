@@ -15,6 +15,7 @@ func TestRenderAdvancedPanelFull(t *testing.T) {
 			"schema":     gosx.El("section", gosx.Attrs(gosx.Attr("data-schema-placeholder", "true")), gosx.Text("Schema")),
 			"schedule":   gosx.El("section", gosx.Attrs(gosx.Attr("data-schedule-placeholder", "true")), gosx.Text("Schedule")),
 			"typography": gosx.El("section", gosx.Attrs(gosx.Attr("data-type-placeholder", "true")), gosx.Text("Type")),
+			"settings":   gosx.El("section", gosx.Attrs(gosx.Attr("data-settings-placeholder", "true")), gosx.Text("Settings")),
 		},
 	}))
 
@@ -23,12 +24,14 @@ func TestRenderAdvancedPanelFull(t *testing.T) {
 		`<header class="studio-advanced-panel__head"><div><p class="kicker">Advanced</p><h2>Tool drawer</h2><p>Keep tools grouped.</p></div></header>`,
 		`<input class="studio-advanced-panel__group-input" id="studioAdvancedGroupFlows" type="radio" name="studioAdvancedGroup" value="flows" checked aria-label="Flows" />`,
 		`<label class="studio-advanced-panel__group" for="studioAdvancedGroupTypography" data-studio-advanced-group-label="typography"><strong>Fonts</strong><small>Fonts and custom CSS.</small></label>`,
+		`<label class="studio-advanced-panel__group" for="studioAdvancedGroupSettings" data-studio-advanced-group-label="settings"><strong>SEO</strong><small>SEO, domains, and integrations.</small></label>`,
 		`<section class="studio-advanced-panel__group-slot" data-studio-advanced-group-slot="flows" data-studio-advanced-group-selected="true">`,
 		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="flows"><section data-flow-placeholder="true">Flow designer</section></div>`,
 		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="tools"><section data-tools-placeholder="true">Tools</section></div>`,
 		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="schema"><section data-schema-placeholder="true">Schema</section></div>`,
 		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="schedule"><section data-schedule-placeholder="true">Schedule</section></div>`,
 		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="typography"><section data-type-placeholder="true">Type</section></div>`,
+		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="settings"><section data-settings-placeholder="true">Settings</section></div>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("advanced panel missing %q:\n%s", fragment, html)
@@ -61,6 +64,9 @@ func TestRenderAdvancedPanelSegmentsKeepHostedChildrenInsideRoot(t *testing.T) {
 		segments.TypographySlotOpen,
 		gosx.El("section", gosx.Attrs(gosx.Attr("data-type-placeholder", "true")), gosx.Text("Type")),
 		segments.TypographySlotClose,
+		segments.SettingsSlotOpen,
+		gosx.El("section", gosx.Attrs(gosx.Attr("data-settings-placeholder", "true")), gosx.Text("Settings")),
+		segments.SettingsSlotClose,
 		segments.RootClose,
 	))
 
@@ -69,6 +75,7 @@ func TestRenderAdvancedPanelSegmentsKeepHostedChildrenInsideRoot(t *testing.T) {
 		`class="studio-advanced-panel__group-input"`,
 		`<section class="studio-advanced-panel__group-slot" data-studio-advanced-group-slot="flows" data-studio-advanced-group-selected="true"><header><h3>Flows</h3><p>Contact and request forms.</p></header><div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="flows"><section data-flow-placeholder="true">Flow designer</section></div></section>`,
 		`<section class="studio-advanced-panel__group-slot" data-studio-advanced-group-slot="tools" data-studio-advanced-group-selected="false"><header><h3>Tools</h3><p>Back-office destinations.</p></header><div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="tools"><section data-tools-placeholder="true">Tools</section></div></section>`,
+		`<section class="studio-advanced-panel__group-slot" data-studio-advanced-group-slot="settings" data-studio-advanced-group-selected="false"><header><h3>SEO</h3><p>SEO, domains, and integrations.</p></header><div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="settings"><section data-settings-placeholder="true">Settings</section></div></section>`,
 		`</section>`,
 	} {
 		if !strings.Contains(html, fragment) {
@@ -141,6 +148,64 @@ func TestRenderAdvancedToolsPanelPopulatedAndEmpty(t *testing.T) {
 	}
 }
 
+func TestRenderAdvancedSettingsPanelPopulatedAndEmpty(t *testing.T) {
+	populatedView := map[string]any{
+		"class":           "editor-panel studio-advanced-settings-panel",
+		"key":             "settings",
+		"mode":            "advanced",
+		"kicker":          "Advanced",
+		"title":           "SEO and integrations",
+		"summary":         "Search metadata and connected destinations.",
+		"empty":           "No settings fields are registered.",
+		"hasFields":       true,
+		"fieldList":       gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-advanced-settings-panel__fields")), gosx.Text("Fields")),
+		"statusGridClass": "studio-advanced-settings-panel__status-grid",
+		"statusCards": []map[string]any{{
+			"key":     "redirects",
+			"class":   "studio-advanced-settings-panel__status-card is-disabled",
+			"title":   "Redirects",
+			"summary": "No redirect store is connected.",
+			"status":  "Unavailable",
+		}},
+	}
+	populated := gosx.RenderHTML(RenderAdvancedSettingsPanel(populatedView, AdvancedSettingsPanelOptions{}))
+	for _, fragment := range []string{
+		`data-gosx-studio-advanced-settings-panel-renderer="gosx-studio"`,
+		`<section class="editor-panel studio-advanced-settings-panel" data-panel-key="settings" data-studio-panel="settings" data-studio-mode-panel="advanced" data-studio-engine-source="gosx" data-gosx-studio-advanced-settings-panel-renderer="gosx-studio">`,
+		`<p class="studio-advanced-settings-panel__summary">Search metadata and connected destinations.</p>`,
+		`<div class="studio-advanced-settings-panel__fields">Fields</div>`,
+		`data-studio-advanced-settings-status-grid="true"`,
+		`data-studio-advanced-settings-status="redirects"`,
+		`<small>Unavailable</small>`,
+	} {
+		if !strings.Contains(populated, fragment) {
+			t.Fatalf("populated advanced settings panel missing %q:\n%s", fragment, populated)
+		}
+	}
+
+	emptyView := map[string]any{
+		"class": "editor-panel studio-advanced-settings-panel",
+		"key":   "settings",
+		"mode":  "advanced",
+		"title": "SEO and integrations",
+		"empty": "No settings fields are registered.",
+	}
+	empty := gosx.RenderHTML(RenderAdvancedSettingsPanel(emptyView, AdvancedSettingsPanelOptions{}))
+	for _, fragment := range []string{
+		`data-gosx-studio-advanced-settings-panel-renderer="gosx-studio"`,
+		`<p class="empty">No settings fields are registered.</p>`,
+	} {
+		if !strings.Contains(empty, fragment) {
+			t.Fatalf("empty advanced settings panel missing %q:\n%s", fragment, empty)
+		}
+	}
+	for _, notWant := range []string{"<form", "csrf_token"} {
+		if strings.Contains(populated, notWant) || strings.Contains(empty, notWant) {
+			t.Fatalf("advanced settings panel must not include %q:\npopulated=%s\nempty=%s", notWant, populated, empty)
+		}
+	}
+}
+
 func TestRenderAdvancedFieldPanelPopulatedAndEmpty(t *testing.T) {
 	populatedView := advancedFieldPanelTestView(true)
 	populated := gosx.RenderHTML(RenderAdvancedFieldPanel(populatedView, AdvancedFieldPanelOptions{}))
@@ -184,6 +249,7 @@ func advancedPanelTestView() map[string]any {
 			{"key": "schema", "inputID": "studioAdvancedGroupSchema", "label": "Fields", "summary": "Workspace field details."},
 			{"key": "schedule", "inputID": "studioAdvancedGroupSchedule", "label": "Schedule", "summary": "Calendar availability details."},
 			{"key": "typography", "inputID": "studioAdvancedGroupTypography", "label": "Fonts", "summary": "Fonts and custom CSS."},
+			{"key": "settings", "inputID": "studioAdvancedGroupSettings", "label": "SEO", "summary": "SEO, domains, and integrations."},
 		},
 	}
 }

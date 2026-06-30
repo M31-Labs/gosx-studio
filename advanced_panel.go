@@ -24,6 +24,8 @@ type AdvancedPanelSegments struct {
 	ScheduleSlotClose   gosx.Node
 	TypographySlotOpen  gosx.Node
 	TypographySlotClose gosx.Node
+	SettingsSlotOpen    gosx.Node
+	SettingsSlotClose   gosx.Node
 	RootClose           gosx.Node
 }
 
@@ -32,6 +34,10 @@ type AdvancedToolsPanelOptions struct {
 }
 
 type AdvancedFieldPanelOptions struct {
+	RootAttrs map[string]any
+}
+
+type AdvancedSettingsPanelOptions struct {
 	RootAttrs map[string]any
 }
 
@@ -58,6 +64,8 @@ func RenderAdvancedPanelSegments(view map[string]any, options AdvancedPanelOptio
 		ScheduleSlotClose:   gosx.RawHTML("</div></section>"),
 		TypographySlotOpen:  renderAdvancedPanelGroupSlotOpen(groups["typography"]),
 		TypographySlotClose: gosx.RawHTML("</div></section>"),
+		SettingsSlotOpen:    renderAdvancedPanelGroupSlotOpen(groups["settings"]),
+		SettingsSlotClose:   gosx.RawHTML("</div></section>"),
 		RootClose:           gosx.RawHTML("</section>"),
 	}
 }
@@ -116,6 +124,38 @@ func RenderAdvancedFieldPanel(view map[string]any, options AdvancedFieldPanelOpt
 	return gosx.El("section", gosx.Attrs(attrs...), gosx.Fragment(children...))
 }
 
+func RenderAdvancedSettingsPanel(view map[string]any, options AdvancedSettingsPanelOptions) gosx.Node {
+	attrs := []any{
+		gosx.Attr("class", workbenchMapString(view, "class")),
+		gosx.Attr("data-panel-key", workbenchMapString(view, "key")),
+		gosx.Attr("data-studio-panel", workbenchMapString(view, "key")),
+		gosx.Attr("data-studio-mode-panel", workbenchMapString(view, "mode")),
+		gosx.Attr("data-studio-engine-source", "gosx"),
+		gosx.Attr("data-gosx-studio-advanced-settings-panel-renderer", "gosx-studio"),
+	}
+	attrs = appendBlockLibraryPanelAttrs(attrs, options.RootAttrs)
+
+	children := []gosx.Node{
+		gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-panel-heading")),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchMapString(view, "kicker"))),
+			gosx.El("h2", nil, gosx.Text(workbenchMapString(view, "title"))),
+		),
+	}
+	if summary := workbenchMapString(view, "summary"); summary != "" {
+		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "studio-advanced-settings-panel__summary")), gosx.Text(summary)))
+	}
+	fieldList, ok := view["fieldList"].(gosx.Node)
+	if ok && !workbenchNodeEmpty(fieldList) && workbenchMapBool(view, "hasFields") {
+		children = append(children, fieldList)
+	} else {
+		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(workbenchMapString(view, "empty"))))
+	}
+	if statusCards := renderAdvancedSettingsStatusCards(view); !workbenchNodeEmpty(statusCards) {
+		children = append(children, statusCards)
+	}
+	return gosx.El("section", gosx.Attrs(attrs...), gosx.Fragment(children...))
+}
+
 func advancedPanelRootAttrs(view map[string]any, rootAttrs map[string]any) []any {
 	attrs := []any{
 		gosx.Attr("class", "editor-panel editor-panel--advanced-studio studio-advanced-panel"),
@@ -128,6 +168,30 @@ func advancedPanelRootAttrs(view map[string]any, rootAttrs map[string]any) []any
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, rootAttrs)
 	return attrs
+}
+
+func renderAdvancedSettingsStatusCards(view map[string]any) gosx.Node {
+	cards := workbenchViewMapList(view, "statusCards")
+	if len(cards) == 0 {
+		return gosx.Fragment()
+	}
+	nodes := make([]gosx.Node, 0, len(cards)+1)
+	for _, card := range cards {
+		nodes = append(nodes, gosx.El("article", gosx.Attrs(
+			gosx.Attr("class", workbenchMapString(card, "class")),
+			gosx.Attr("data-studio-advanced-settings-status", workbenchMapString(card, "key")),
+		),
+			gosx.El("div", nil,
+				gosx.El("strong", nil, gosx.Text(workbenchMapString(card, "title"))),
+				gosx.El("p", nil, gosx.Text(workbenchMapString(card, "summary"))),
+			),
+			gosx.El("small", nil, gosx.Text(workbenchMapString(card, "status"))),
+		))
+	}
+	return gosx.El("div", gosx.Attrs(
+		gosx.Attr("class", FirstNonEmpty(workbenchMapString(view, "statusGridClass"), "studio-advanced-settings-panel__status-grid")),
+		gosx.Attr("data-studio-advanced-settings-status-grid", "true"),
+	), gosx.Fragment(nodes...))
 }
 
 func renderAdvancedPanelControls(view map[string]any) gosx.Node {

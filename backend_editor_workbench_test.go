@@ -202,6 +202,7 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 			{"key": "schema", "inputID": "advancedSchema", "label": "Schema", "summary": "Workspace"},
 			{"key": "schedule", "inputID": "advancedSchedule", "label": "Schedule", "summary": "Calendar"},
 			{"key": "typography", "inputID": "advancedType", "label": "Type", "summary": "Typography"},
+			{"key": "settings", "inputID": "advancedSettings", "label": "SEO", "summary": "Settings"},
 		},
 	}
 
@@ -233,6 +234,7 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 		AdvancedWorkspaceFieldPanel: gosx.El("section", gosx.Attrs(gosx.Attr("data-advanced-workspace", "true")), gosx.Text("Workspace")),
 		AdvancedCalendarFieldPanel:  gosx.El("section", gosx.Attrs(gosx.Attr("data-advanced-calendar", "true")), gosx.Text("Calendar")),
 		AdvancedTypeFieldPanel:      gosx.El("section", gosx.Attrs(gosx.Attr("data-advanced-type", "true")), gosx.Text("Type")),
+		AdvancedSettingsPanel:       gosx.El("section", gosx.Attrs(gosx.Attr("data-advanced-settings", "true")), gosx.Text("Settings")),
 	}))
 
 	for _, fragment := range []string{
@@ -261,6 +263,7 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="schema"><section data-advanced-workspace="true">Workspace</section></div>`,
 		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="schedule"><section data-advanced-calendar="true">Calendar</section></div>`,
 		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="typography"><section data-advanced-type="true">Type</section></div>`,
+		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="settings"><section data-advanced-settings="true">Settings</section></div>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("backend editor panel stack did not nest %q:\n%s", fragment, html)
@@ -287,6 +290,7 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 		`data-advanced-workspace="true"`,
 		`data-advanced-calendar="true"`,
 		`data-advanced-type="true"`,
+		`data-advanced-settings="true"`,
 	)
 }
 
