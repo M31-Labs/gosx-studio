@@ -4,9 +4,8 @@
 // gosx-studio/assets/preview-runtime.js:1118). This script runs on the
 // editor page; it publishes the
 // window.__gosx_preview_runtime_island_<method> globals that
-// previewruntime.BridgeShim delegates to when the
-// "preview-runtime-islands" feature flag is on. Each writer publishes to
-// a $preview.* shared signal via window.__gosx_set_shared_signal_json;
+// previewruntime.BridgeShim delegates to directly. Each writer publishes
+// to a $preview.* shared signal via window.__gosx_set_shared_signal_json;
 // the cross-frame postMessage relay (ADR 0009, shipped in
 // gosx/client/bridge/cross_frame.go + gosx/client/js/relay.js) routes the
 // write to the storefront iframe, where subscriber_runtime.js applies
@@ -18,13 +17,10 @@
 //
 // Bundle order: this file is embedded by previewruntime.IslandRuntimeJS();
 // previewruntime.Bundle() concatenates this file then BridgeShim, and
-// gosx-studio/runtime.go appends Bundle() to EngineRuntimeScript() AFTER
-// preview-runtime.js (the legacy 1130-line bridge). At runtime, the legacy
-// preview-runtime.js IIFE runs first and installs
-// window.GoSXStudioPreviewRuntime; this island_runtime.js then runs and
-// publishes the __gosx_preview_runtime_island_* globals; finally
-// BridgeShim runs and replaces window.GoSXStudioPreviewRuntime with the
-// flag-aware delegating shim.
+// gosx-studio/runtime.go appends Bundle() to EngineRuntimeScript(). This
+// island_runtime.js runs first and publishes the
+// __gosx_preview_runtime_island_* globals; finally BridgeShim runs and
+// exposes window.GoSXStudioPreviewRuntime as a direct delegating shim.
 
 ;(function () {
   if (typeof window === "undefined") return;
@@ -38,10 +34,8 @@
   // to the iframe's Bridge, where subscriber_runtime.js's
   // __gosx_observe_shared_signal subscribers fire.
   //
-  // If the bridge is not ready, the write is a no-op — but during the
-  // additive shipping window, BridgeShim's legacy fallback still keeps the
-  // preview live via window.GoSXStudioPreviewRuntime (the IIFE-exported
-  // legacy implementation in preview-runtime.js).
+  // If the bridge is not ready, the write is a no-op. The next host call
+  // can publish once the shared-signal bridge is available.
   function writeSharedSignal(name, value) {
     try {
       var setter = window.__gosx_set_shared_signal_json;
@@ -49,7 +43,7 @@
         setter(name, JSON.stringify(value));
       }
     } catch (error) {
-      // Bridge not ready yet — legacy fallback keeps the preview live.
+      // Bridge not ready yet; defer to the next host-driven publish.
     }
   }
 

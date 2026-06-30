@@ -32,13 +32,11 @@ func assertRetiredEditorPreviewRuntimeEventAbsent(t *testing.T, script, eventNam
 
 // The previewruntime package is the Go-side surface for the Phase 3 slice-6
 // architectural burn-down of GoSXStudioPreviewRuntime. It owns:
-//  1. The feature-flag key consumers add to studio.ShellConfig.FeatureFlags
-//     to flip the island path (legacy bundle deleted 2026-05-27)
-//     to the .gsx-authored subscriber + island writer in this package.
+//  1. The feature-flag key consumers can keep in
+//     studio.ShellConfig.FeatureFlags as a stable host probe/string contract.
 //  2. The JS shim that gosx-studio's runtime bundle appends so the
-//     window.GoSXStudioPreviewRuntime methods publish to $preview.* shared
-//     signals when the flag is on (and fall back to the legacy 1130-line
-//     bridge when off).
+//     window.GoSXStudioPreviewRuntime methods delegate directly to island
+//     globals that publish to $preview.* shared signals.
 //  3. The editor-side island_runtime.js that publishes
 //     window.__gosx_preview_runtime_island_* globals the BridgeShim
 //     delegates to.
@@ -73,14 +71,14 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 	if shim == "" {
 		t.Fatal("BridgeShim() must return a non-empty JS snippet")
 	}
-	// The shim must reference each method-specific island global, the
-	// public global it shims (window.GoSXStudioPreviewRuntime), and the
-	// feature flag so the legacy path stays reachable when the flag is
-	// off. The IslandGlobals struct holds the canonical names; any drift
-	// between the struct and the shim is caught here.
+	// The shim must reference each method-specific island global and the
+	// public global it exposes (window.GoSXStudioPreviewRuntime). The
+	// IslandGlobals struct holds the canonical names; any drift between the
+	// struct and the shim is caught here.
 	for _, fragment := range []string{
 		"window.GoSXStudioPreviewRuntime",
-		"data-gosx-studio-feature-flag-preview-runtime-islands",
+		"return island.apply(null, arguments)",
+		"return undefined",
 		IslandGlobals.Mount,
 		IslandGlobals.SetBlockVisibility,
 		IslandGlobals.ApplyTextUpdate,
@@ -95,6 +93,20 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 	} {
 		if !strings.Contains(shim, fragment) {
 			t.Fatalf("BridgeShim() missing %q:\n%s", fragment, shim)
+		}
+	}
+	for _, stale := range []string{
+		"FLAG" + "_ATTR",
+		"flag" + "Enabled",
+		"data-gosx-studio-feature-flag-" + "preview-runtime-islands",
+		"if (!" + "flag" + "Enabled()) return undefined",
+		"legacy " + "path",
+		"legacy " + "fallback",
+		"fallback " + "branch",
+		"fallback " + "path",
+	} {
+		if strings.Contains(shim, stale) {
+			t.Fatalf("BridgeShim() contains stale gate/fallback fragment %q:\n%s", stale, shim)
 		}
 	}
 }
@@ -1524,11 +1536,9 @@ func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	if bundle == "" {
 		t.Fatal("Bundle() must return a non-empty JS snippet")
 	}
-	// Island runtime must come before the BridgeShim — the shim
-	// consults the globals the island runtime publishes. Order matters:
-	// if the shim ran first it would close over an undefined global and
-	// every dispatch would fall through to the legacy path, silently
-	// disabling the slice.
+	// Island runtime must come before the BridgeShim — the shim consults
+	// the globals the island runtime publishes. Order matters so direct
+	// calls can observe any globals published during bundle initialization.
 	islandIdx := strings.Index(bundle, IslandGlobals.Mount+" ")
 	shimIdx := strings.Index(bundle, "window.GoSXStudioPreviewRuntime =")
 	if islandIdx < 0 || shimIdx < 0 {

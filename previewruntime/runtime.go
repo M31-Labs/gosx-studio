@@ -9,8 +9,8 @@
 //
 //  1. **Editor-side writer** — IslandRuntimeJS() publishes
 //     window.__gosx_preview_runtime_island_<method> globals that the
-//     BridgeShim delegates to when the FeatureFlagKey flag is on. Each
-//     writer publishes to a `$preview.*` shared signal (via
+//     BridgeShim delegates to directly. Each writer publishes to a
+//     `$preview.*` shared signal (via
 //     window.__gosx_set_shared_signal_json) instead of mutating iframe DOM
 //     directly.
 //
@@ -21,18 +21,16 @@
 //     per ADR 0009) and applies the corresponding DOM mutations locally,
 //     inside the iframe.
 //
-// Both implementations ship additively for at least seven days of CI green
-// (see ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-6-previewruntime.md
-// Section I). After the deletion window closes, the legacy
-// the legacy bundle (removed 2026-05-27) (1,130 lines) is DELETED entirely
-// — not just shrunk — as a follow-up commit.
+// The legacy PreviewRuntime bundle was removed on 2026-05-27. The public
+// window.GoSXStudioPreviewRuntime object now comes from BridgeShim and
+// delegates directly to the editor-side island globals.
 //
 // # The 10 methods + signal-namespace mapping
 //
 // The catalog below mirrors the table in the slice plan (which itself
 // mirrors the parity matrix PreviewRuntime row). Each method's editor-side
 // writer publishes to a $preview.* signal; each preview-side subscriber
-// applies the same DOM action the legacy the legacy bundle performed.
+// applies the same DOM action the legacy bundle performed.
 //
 //  1. mount(root)
 //     Signal target: $preview.mount.epoch (number).
@@ -107,10 +105,10 @@
 //     requestInlineEdit at the legacy bundle:1049.
 //
 //  10. cycleField(detail)
-//      Signal target: $preview.editor.fieldCycle.requestId (number).
-//      Subscriber action: same fan-out as requestInlineEdit but calls
-//      controller.cycleField(detail). Mirrors cycleField at preview-
-//      runtime.js:1058.
+//     Signal target: $preview.editor.fieldCycle.requestId (number).
+//     Subscriber action: same fan-out as requestInlineEdit but calls
+//     controller.cycleField(detail). Mirrors cycleField at preview-
+//     runtime.js:1058.
 //
 // Per ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md
 // (Decision section, restored 2026-05-26 by ADR 0009) the $preview.*
@@ -136,10 +134,10 @@ var islandRuntimeJS []byte
 //go:embed subscriber_runtime.js
 var subscriberRuntimeJS []byte
 
-// FeatureFlagKey is the studio.ShellConfig.FeatureFlags key consumers set
-// to activate the .gsx-island PreviewRuntime path. Default value (omitted
-// from a host's flag map) keeps the legacy JS implementation active in
-// the legacy bundle (removed 2026-05-27).
+// FeatureFlagKey is retained as the studio.ShellConfig.FeatureFlags host
+// probe/string contract for PreviewRuntime islands. The BridgeShim no
+// longer reads this key or gates runtime calls on the corresponding
+// data-gosx-studio-feature-flag-* attribute.
 //
 // Phase 3 naming convention: "<contract>-runtime-islands". Slices 1, 2, 3,
 // 4, 5, 7 each declare their own constant of the same shape.
@@ -147,8 +145,8 @@ const FeatureFlagKey = "preview-runtime-islands"
 
 // IslandGlobals lists the window globals the editor-side island writer
 // publishes itself at when it loads. The shim returned by BridgeShim looks
-// these up at call time so an absent global falls back to the legacy
-// implementation in the legacy bundle.
+// these up at call time; unmounted islands return undefined from the public
+// runtime method.
 //
 // Naming convention: window.__gosx_preview_runtime_island_<methodName>.
 // PreviewRuntime declares ten public methods (mount, setBlockVisibility,
@@ -156,16 +154,16 @@ const FeatureFlagKey = "preview-runtime-islands"
 // updateHeaderLogo, requestInlineEdit, cycleField), so the struct holds
 // ten fields.
 var IslandGlobals = struct {
-	Mount             string
+	Mount              string
 	SetBlockVisibility string
-	ApplyTextUpdate   string
-	ApplyTheme        string
-	ApplyStyleImpact  string
-	ApplyCSS          string
-	ApplyFonts        string
-	UpdateHeaderLogo  string
-	RequestInlineEdit string
-	CycleField        string
+	ApplyTextUpdate    string
+	ApplyTheme         string
+	ApplyStyleImpact   string
+	ApplyCSS           string
+	ApplyFonts         string
+	UpdateHeaderLogo   string
+	RequestInlineEdit  string
+	CycleField         string
 }{
 	Mount:              "__gosx_preview_runtime_island_mount",
 	SetBlockVisibility: "__gosx_preview_runtime_island_setBlockVisibility",
@@ -180,22 +178,11 @@ var IslandGlobals = struct {
 }
 
 // BridgeShim returns the JavaScript snippet that gosx-studio's runtime
-// bundle appends to gate window.GoSXStudioPreviewRuntime through the
-// FeatureFlagKey flag.
+// bundle appends to expose window.GoSXStudioPreviewRuntime.
 //
-// When the host has marked FeatureFlagKey true (read by the consumer and
-// surfaced to the page via the data-gosx-studio-feature-flag-preview-
-// runtime-islands="true" attribute), the shim dispatches each method to
-// its IslandGlobals entry on window. When the flag is off or the island
-// global is missing (the writer never loaded), the shim falls back to the
-// legacy implementation that lived in the now-deleted legacy bundle.
-//
-// The shim references the legacy implementations by their preview-
-// runtime.js IIFE-exported names (window.GoSXStudioPreviewRuntime.mount /
-// .setBlockVisibility / etc.) — the IIFE has already run by the time the
-// shim runs, so window.GoSXStudioPreviewRuntime is the legacy object the
-// shim wraps. Slice-6 deletion (after the 7-day window) removes the
-// legacy fallback branch.
+// The shim dispatches each method directly to its corresponding IslandGlobals
+// entry on window. If an island global is missing because the island has not
+// mounted, that public runtime method returns undefined.
 func BridgeShim() []byte {
 	return []byte(bridgeShimJS)
 }
@@ -240,29 +227,10 @@ func Bundle() []byte {
 const bridgeShimJS = `;(function () {
   // Phase 3 slice-6 PreviewRuntime island bridge.
   // See gosx-studio/previewruntime/runtime.go for the contract.
-  // Feature flag: ` + FeatureFlagKey + `
+  // Host probe key retained for ShellConfig contracts: ` + FeatureFlagKey + `
   if (typeof window === "undefined") return;
-  // The consumer surfaces ShellConfig.FeatureFlags via a
-  // data-gosx-studio-feature-flag-<key>="true" attribute on the document
-  // root (or any ancestor of the editor mount). This keeps the flag
-  // decision out of cookies / query params at the bundle level so SSR and
-  // CSR observations agree. The attribute name below MUST be the literal
-  // "data-gosx-studio-feature-flag-preview-runtime-islands" so a grep over
-  // the bundle finds it; the test
-  // TestBridgeShimDelegatesToIslandGlobals enforces this.
-  var FLAG_ATTR = "data-gosx-studio-feature-flag-preview-runtime-islands";
-  function flagEnabled() {
-    try {
-      if (document.documentElement && document.documentElement.getAttribute(FLAG_ATTR) === "true") return true;
-      var marked = document.querySelector("[" + FLAG_ATTR + "='true']");
-      return !!marked;
-    } catch (e) {
-      return false;
-    }
-  }
   function delegate(islandGlobal) {
     return function () {
-      if (!flagEnabled()) return undefined;
       var island = window[islandGlobal];
       if (typeof island === "function") {
         return island.apply(null, arguments);
@@ -270,14 +238,9 @@ const bridgeShimJS = `;(function () {
       return undefined;
     };
   }
-  // Install the runtime object. Pre-2026-05-27 the BridgeShim wrapped the
-  // legacy preview-runtime.js bundle's PreviewRuntime methods (mount /
-  // setBlockVisibility / applyTextUpdate / applyTheme / applyStyleImpact /
-  // applyCSS / applyFonts / updateHeaderLogo / requestInlineEdit /
-  // cycleField) as fallback paths; with the legacy bundle deleted in Phase
-  // 3 Section E those identifiers are undefined and the fallback branches
-  // were dead code. v0.5.0 removes the dead branches — the island global
-  // is the only path. The island-global names below MUST match
+  // Install the runtime object. The island global is the only execution
+  // path; if a global has not mounted yet, that method returns undefined.
+  // The literal island-global names below MUST match
   // previewruntime.IslandGlobals in runtime.go — the test
   // TestBridgeShimDelegatesToIslandGlobals enforces this.
   window.GoSXStudioPreviewRuntime = {

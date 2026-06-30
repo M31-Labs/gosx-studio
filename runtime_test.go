@@ -1489,8 +1489,6 @@ func TestEngineRuntimeIncludesPreviewRuntimeIslandBundle(t *testing.T) {
 		"__gosx_preview_runtime_island_updateHeaderLogo",
 		"__gosx_preview_runtime_island_requestInlineEdit",
 		"__gosx_preview_runtime_island_cycleField",
-		"preview-runtime-islands",
-		"data-gosx-studio-feature-flag-preview-runtime-islands",
 		"$preview.mount.epoch",
 		"$preview.block.",
 		"$preview.text.",
