@@ -461,6 +461,65 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNavigationAndCheckoutComposit
 	)
 }
 
+func TestRenderBackendEditorWorkbenchPanelStackOwnsBlockLookAndHomeInspectorComposition(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Website editor"}, WorkbenchShellViewOptions{})
+
+	html := gosx.RenderHTML(RenderBackendEditorWorkbenchPanelStack(BackendEditorWorkbenchPanelStackProps{
+		View:                  view,
+		SiteNavigator:         gosx.El("section", gosx.Attrs(gosx.Attr("data-site-navigator", "true")), gosx.Text("Pages")),
+		HomeLayers:            map[string]any{"kicker": "Home", "title": "Sections"},
+		BlockLayoutEngineHost: gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
+		BlockLibraryPanelView: map[string]any{
+			"class":     "editor-panel editor-panel--library",
+			"key":       "blocks",
+			"mode":      "home",
+			"title":     "Sections",
+			"listClass": "editor-block-library",
+			"hasItems":  false,
+			"empty":     "No sections are available.",
+		},
+		HomeInspectorView: map[string]any{
+			"class":           "editor-panel editor-panel--home-inspector studio-home-inspector",
+			"id":              "studioHomeInspector",
+			"panelKey":        "inspector",
+			"mode":            "home",
+			"defaultGroupKey": "copy",
+			"groups": []map[string]any{{
+				"key":      "copy",
+				"label":    "Copy",
+				"selected": true,
+			}},
+		},
+		HomeInspectorContentFields: map[string]any{"fields": []map[string]any{}, "hasFields": false},
+		LookPanelView: map[string]any{
+			"class":           "editor-panel editor-panel--look studio-look-panel",
+			"panelKey":        "look",
+			"defaultGroupKey": "theme",
+			"groups": []map[string]any{{
+				"key":      "theme",
+				"label":    "Theme",
+				"selected": true,
+			}},
+		},
+	}))
+
+	for _, fragment := range []string{
+		`data-gosx-studio-block-library-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-look-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-home-inspector-panel-renderer="gosx-studio"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("backend editor panel stack missing Studio-owned default panel %q:\n%s", fragment, html)
+		}
+	}
+	assertOrder(t, html,
+		`data-gosx-studio-block-layout-engine-renderer="gosx-studio"`,
+		`data-gosx-studio-block-library-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-home-inspector-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-look-panel-renderer="gosx-studio"`,
+	)
+}
+
 func TestRenderBackendEditorWorkbenchPanelStackKeepsExplicitNavigationAndCheckoutOverrides(t *testing.T) {
 	view := WorkbenchShellView(WorkbenchShellSource{Title: "Website editor"}, WorkbenchShellViewOptions{})
 	html := gosx.RenderHTML(RenderBackendEditorWorkbenchPanelStack(BackendEditorWorkbenchPanelStackProps{
@@ -485,6 +544,42 @@ func TestRenderBackendEditorWorkbenchPanelStackKeepsExplicitNavigationAndCheckou
 	for _, fragment := range []string{
 		`data-gosx-studio-navigation-panel-renderer="gosx-studio"`,
 		`data-gosx-studio-checkout-panel-renderer="gosx-studio"`,
+	} {
+		if strings.Contains(html, fragment) {
+			t.Fatalf("explicit panel override should not render default panel %q:\n%s", fragment, html)
+		}
+	}
+}
+
+func TestRenderBackendEditorWorkbenchPanelStackKeepsExplicitBlockLookAndHomeInspectorOverrides(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Website editor"}, WorkbenchShellViewOptions{})
+	html := gosx.RenderHTML(RenderBackendEditorWorkbenchPanelStack(BackendEditorWorkbenchPanelStackProps{
+		View:                       view,
+		SiteNavigator:              gosx.El("section", gosx.Attrs(gosx.Attr("data-site-navigator", "true")), gosx.Text("Pages")),
+		HomeLayers:                 map[string]any{"kicker": "Home", "title": "Sections"},
+		BlockLayoutEngineHost:      gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
+		BlockLibraryPanel:          gosx.El("section", gosx.Attrs(gosx.Attr("data-custom-block-library-panel", "true")), gosx.Text("Custom library")),
+		BlockLibraryPanelView:      map[string]any{"class": "editor-panel editor-panel--library", "key": "blocks"},
+		HomeInspector:              gosx.El("section", gosx.Attrs(gosx.Attr("data-custom-home-inspector-panel", "true")), gosx.Text("Custom inspector")),
+		HomeInspectorView:          map[string]any{"class": "studio-home-inspector", "panelKey": "inspector"},
+		HomeInspectorContentFields: map[string]any{"hasFields": false},
+		LookPanel:                  gosx.El("section", gosx.Attrs(gosx.Attr("data-custom-look-panel", "true")), gosx.Text("Custom look")),
+		LookPanelView:              map[string]any{"class": "studio-look-panel", "panelKey": "look"},
+	}))
+
+	for _, fragment := range []string{
+		`data-custom-block-library-panel="true"`,
+		`data-custom-home-inspector-panel="true"`,
+		`data-custom-look-panel="true"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("explicit panel override missing %q:\n%s", fragment, html)
+		}
+	}
+	for _, fragment := range []string{
+		`data-gosx-studio-block-library-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-look-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-home-inspector-panel-renderer="gosx-studio"`,
 	} {
 		if strings.Contains(html, fragment) {
 			t.Fatalf("explicit panel override should not render default panel %q:\n%s", fragment, html)

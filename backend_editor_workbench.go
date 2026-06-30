@@ -45,11 +45,15 @@ type BackendEditorWorkbenchPanelStackProps struct {
 	HomeLayerSelection          gosx.Node
 	BlockLayoutEngineHost       gosx.Node
 	BlockLibraryPanel           gosx.Node
+	BlockLibraryPanelView       map[string]any
 	SiteMapEngine               gosx.Node
 	SiteMapCanvas               gosx.Node
 	InspectorChrome             gosx.Node
 	HomeInspector               gosx.Node
+	HomeInspectorView           map[string]any
+	HomeInspectorContentFields  map[string]any
 	LookPanel                   gosx.Node
+	LookPanelView               map[string]any
 	BrandPanel                  map[string]any
 	BrandFields                 map[string]any
 	BrandMediaPicker            gosx.Node
@@ -182,13 +186,25 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 	homeLayersPanel := RenderHomeLayersPanel(props.HomeLayers, HomeLayersPanelOptions{
 		PickerNode: props.HomeLayerSelection,
 	})
+	blockLibraryPanel := props.BlockLibraryPanel
+	if workbenchNodeEmpty(blockLibraryPanel) {
+		blockLibraryPanel = RenderBlockLibraryPanel(props.BlockLibraryPanelView, BlockLibraryPanelOptions{})
+	}
 	blockLayout := RenderBlockLayoutEngine(props.HomeLayers, BlockLayoutEngineOptions{
 		EngineHostNode: props.BlockLayoutEngineHost,
 		LayersNode:     homeLayersPanel,
-		LibraryNode:    props.BlockLibraryPanel,
+		LibraryNode:    blockLibraryPanel,
 		Kicker:         "Home",
 		Title:          "Sections",
 	})
+	homeInspector := props.HomeInspector
+	if workbenchNodeEmpty(homeInspector) {
+		homeInspector = RenderHomeInspectorPanel(props.HomeInspectorView, props.HomeInspectorContentFields, HomeInspectorPanelOptions{})
+	}
+	lookPanel := props.LookPanel
+	if workbenchNodeEmpty(lookPanel) {
+		lookPanel = RenderLookPanel(props.LookPanelView, LookPanelOptions{})
+	}
 	brandPanel := RenderBrandPanel(props.BrandPanel, props.BrandFields, BrandPanelOptions{
 		MediaPickerNode: props.BrandMediaPicker,
 	})
@@ -231,8 +247,8 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 		SiteMapEngine:   props.SiteMapEngine,
 		SiteMapCanvas:   props.SiteMapCanvas,
 		InspectorChrome: props.InspectorChrome,
-		HomeInspector:   props.HomeInspector,
-		LookPanel:       props.LookPanel,
+		HomeInspector:   homeInspector,
+		LookPanel:       lookPanel,
 		BrandPanel:      brandPanel,
 		NavigationPanel: navigationPanel,
 		CheckoutPanel:   checkoutPanel,
