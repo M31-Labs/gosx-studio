@@ -13,6 +13,9 @@ type BackendEditorPageProps struct {
 	RevisionRestored  bool
 	WorkbenchShell    gosx.Node
 	SupportNodes      []gosx.Node
+	EngineHosts       []map[string]any
+	EngineRuntime     StudioEngineRuntime
+	EngineHostsNode   gosx.Node
 	Scripts           BackendEditorScripts
 }
 
@@ -44,13 +47,26 @@ func RenderBackendEditorPage(props BackendEditorPageProps) gosx.Node {
 		RenderBackendEditorMediaDatalist(props.Media),
 		RenderBackendEditorStatuses(props),
 		props.WorkbenchShell,
-		gosx.Fragment(props.SupportNodes...),
+		gosx.Fragment(backendEditorSupportNodes(props)...),
 		RenderBackendEditorRuntimeScripts(props.Scripts),
 	}
 	return gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", className),
 		gosx.Attr("data-gosx-studio-backend-editor-renderer", "gosx-studio"),
 	), gosx.Fragment(children...))
+}
+
+func backendEditorSupportNodes(props BackendEditorPageProps) []gosx.Node {
+	nodes := append([]gosx.Node{}, props.SupportNodes...)
+	if !props.EngineHostsNode.IsZero() {
+		return append(nodes, props.EngineHostsNode)
+	}
+	if len(props.EngineHosts) > 0 {
+		nodes = append(nodes, RenderStudioEngineHosts(props.EngineHosts, StudioEngineHostsOptions{
+			EngineRuntime: props.EngineRuntime,
+		}))
+	}
+	return nodes
 }
 
 func RenderBackendEditorMediaDatalist(media []BackendEditorMediaAsset) gosx.Node {

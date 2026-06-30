@@ -118,6 +118,75 @@ func TestRenderBackendEditorPageDefaultsAndSplitNodes(t *testing.T) {
 	}
 }
 
+func TestRenderBackendEditorPageRendersEngineHostsFromProps(t *testing.T) {
+	runtime := &recordingStudioEngineRuntime{}
+	html := gosx.RenderHTML(RenderBackendEditorPage(BackendEditorPageProps{
+		WorkbenchShell: gosx.El("section", gosx.Attrs(gosx.Attr("data-workbench", "true"))),
+		SupportNodes: []gosx.Node{
+			gosx.El("form", gosx.Attrs(gosx.Attr("data-site-map-authoring", "true"))),
+			gosx.El("form", gosx.Attrs(gosx.Attr("data-style-palette", "true"))),
+		},
+		EngineHosts: []map[string]any{{
+			"key":          "flow-designer",
+			"name":         FlowDesignerName,
+			"mountId":      "gosx-studio-flow-engine",
+			"class":        "studio-flow-engine-host",
+			"capabilities": []string{"canvas", "pointer"},
+		}},
+		EngineRuntime: runtime,
+	}))
+
+	if len(runtime.calls) != 1 {
+		t.Fatalf("runtime call count = %d, want 1", len(runtime.calls))
+	}
+	for _, fragment := range []string{
+		`<form data-site-map-authoring="true"></form>`,
+		`<form data-style-palette="true"></form>`,
+		`<div class="studio-engine-hosts" aria-hidden="true" data-gosx-studio-engines="true" data-gosx-studio-engine-hosts-renderer="gosx-studio">`,
+		`id="gosx-studio-flow-engine"`,
+		`data-gosx-engine="GoSXStudioFlowDesigner"`,
+		`data-gosx-engine-kind="surface"`,
+		`data-gosx-studio-engine="flow-designer"`,
+		`data-gosx-engine-capabilities="canvas pointer"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("editor page engine host render missing %q:\n%s", fragment, html)
+		}
+	}
+	assertOrder(t, html,
+		`<section data-workbench="true"></section>`,
+		`<form data-site-map-authoring="true"></form>`,
+		`<form data-style-palette="true"></form>`,
+		`<div class="studio-engine-hosts"`,
+		`data-gosx-studio-workbench-runtime="true"`,
+	)
+}
+
+func TestRenderBackendEditorPageEngineHostsNodeOverridesHostViews(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendEditorPage(BackendEditorPageProps{
+		SupportNodes: []gosx.Node{
+			gosx.El("form", gosx.Attrs(gosx.Attr("data-style-palette", "true"))),
+		},
+		EngineHosts: []map[string]any{{
+			"key":     "flow-designer",
+			"name":    FlowDesignerName,
+			"mountId": "gosx-studio-flow-engine",
+		}},
+		EngineHostsNode: gosx.El("div", gosx.Attrs(gosx.Attr("data-explicit-engine-hosts", "true"))),
+	}))
+
+	if !strings.Contains(html, `<div data-explicit-engine-hosts="true"></div>`) {
+		t.Fatalf("explicit engine hosts node missing:\n%s", html)
+	}
+	if strings.Contains(html, `data-gosx-studio-engine-hosts-renderer="gosx-studio"`) {
+		t.Fatalf("engine host views should not render when explicit node is supplied:\n%s", html)
+	}
+	assertOrder(t, html,
+		`<form data-style-palette="true"></form>`,
+		`<div data-explicit-engine-hosts="true"></div>`,
+	)
+}
+
 func assertOrder(t *testing.T, html string, fragments ...string) {
 	t.Helper()
 	last := -1
