@@ -1390,8 +1390,6 @@ func TestEngineRuntimeIncludesStyleRuntimeIslandBundle(t *testing.T) {
 		"__gosx_style_runtime_island_restoreImpact",
 		"__gosx_style_runtime_island_setControlValue",
 		"__gosx_style_runtime_island_resetControlValue",
-		"style-runtime-islands",
-		"data-gosx-studio-feature-flag-style-runtime-islands",
 	} {
 		if !strings.Contains(engines, fragment) {
 			t.Fatalf("engine runtime missing styleruntime fragment %q", fragment)

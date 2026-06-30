@@ -7,12 +7,10 @@ import (
 
 // The styleruntime package is the Go-side surface for the Phase 3 slice-5
 // burn-down of GoSXStudioStyleRuntime. It owns:
-//  1. The feature-flag key consumers add to studio.ShellConfig.FeatureFlags
-//     to flip the island path (legacy bundle deleted 2026-05-27)
-//     to the .gsx-authored islands in this package.
-//  2. The JS shim that the legacy bundle appends so the
-//     window.GoSXStudioStyleRuntime methods delegate to the islands when the
-//     flag is on.
+//  1. The retained feature-flag key string consumers can probe for Phase 3
+//     runtime-island host markers.
+//  2. The JS shim that publishes window.GoSXStudioStyleRuntime methods as
+//     direct delegates to the islands.
 //  3. The island runtime JS that publishes window.__gosx_style_runtime_*
 //     globals the BridgeShim delegates to.
 //
@@ -42,13 +40,15 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 	if shim == "" {
 		t.Fatal("BridgeShim() must return a non-empty JS snippet")
 	}
-	// The shim must reference each method-specific island global, the public
-	// global it shims (window.GoSXStudioStyleRuntime), and the feature flag
-	// so the legacy path stays reachable when the flag is off. The
-	// IslandGlobals struct holds the canonical names; any drift between the
-	// struct and the shim is caught here.
+	// The shim must reference each method-specific island global and the
+	// public global it shims (window.GoSXStudioStyleRuntime). The IslandGlobals
+	// struct holds the canonical names; any drift between the struct and the
+	// shim is caught here.
 	for _, fragment := range []string{
 		"window.GoSXStudioStyleRuntime",
+		"function delegate(islandGlobal)",
+		"return island.apply(null, arguments);",
+		"return undefined;",
 		IslandGlobals.BindTheme,
 		IslandGlobals.BindWorkbench,
 		IslandGlobals.BindCSS,
@@ -59,10 +59,22 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 		IslandGlobals.RestoreImpact,
 		IslandGlobals.SetControlValue,
 		IslandGlobals.ResetControlValue,
-		FeatureFlagKey,
 	} {
 		if !strings.Contains(shim, fragment) {
 			t.Fatalf("BridgeShim() missing %q:\n%s", fragment, shim)
+		}
+	}
+	for _, fragment := range []string{
+		"FLAG" + "_ATTR",
+		"flag" + "Enabled",
+		"data-gosx-studio-feature-flag-style" + "-runtime-islands",
+		"legacy " + "path",
+		"legacy " + "fallback",
+		"fallback " + "branch",
+		"fallback " + "path",
+	} {
+		if strings.Contains(shim, fragment) {
+			t.Fatalf("BridgeShim() must not contain stale gate/fallback fragment %q:\n%s", fragment, shim)
 		}
 	}
 }
@@ -453,8 +465,8 @@ func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	}
 	// Island runtime must come before the BridgeShim — the shim consults
 	// the globals the island runtime publishes. Order matters: if the shim
-	// ran first it would close over an undefined global and every dispatch
-	// would fall through to the legacy path, silently disabling the slice.
+	// ran first then early host calls could return undefined before the
+	// island globals were published.
 	islandIdx := strings.Index(bundle, IslandGlobals.BindTheme+" ")
 	shimIdx := strings.Index(bundle, "window.GoSXStudioStyleRuntime =")
 	if islandIdx < 0 || shimIdx < 0 {
@@ -464,4 +476,3 @@ func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 		t.Fatalf("Bundle() must place island runtime before shim (island=%d shim=%d)", islandIdx, shimIdx)
 	}
 }
-
