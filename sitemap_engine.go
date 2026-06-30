@@ -25,6 +25,7 @@ type SiteMapEngineOptions struct {
 	ModePanel    string
 	PanelKey     string
 	EngineSource string
+	LayoutAction string
 
 	EngineRuntime SiteMapEngineRuntime
 	EngineHost    SiteMapEngineHostOptions
@@ -107,6 +108,9 @@ func renderSiteMapEngineRootOpen(options SiteMapEngineOptions) gosx.Node {
 		gosx.Attr("data-studio-panel", FirstNonEmpty(options.PanelKey, "site-map")),
 		gosx.Attr("data-studio-engine-source", FirstNonEmpty(options.EngineSource, "gosx")),
 		gosx.Attr("data-gosx-studio-site-map-engine-renderer", "gosx-studio"),
+	}
+	if strings.TrimSpace(options.LayoutAction) != "" {
+		attrs = append(attrs, gosx.Attr("data-gosx-studio-site-map-layout-action", strings.TrimSpace(options.LayoutAction)))
 	}
 	return renderSiteMapEngineOpenTag("section", attrs)
 }
