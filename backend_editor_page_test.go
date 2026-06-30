@@ -162,6 +162,118 @@ func TestRenderBackendEditorPageRendersEngineHostsFromProps(t *testing.T) {
 	)
 }
 
+func TestRenderBackendEditorPageRendersStylePanelFromProps(t *testing.T) {
+	runtime := &recordingStudioEngineRuntime{}
+	html := gosx.RenderHTML(RenderBackendEditorPage(BackendEditorPageProps{
+		WorkbenchShell: gosx.El("section", gosx.Attrs(gosx.Attr("data-workbench", "true"))),
+		SupportNodes: []gosx.Node{
+			gosx.El("form", gosx.Attrs(gosx.Attr("data-site-map-authoring", "true"))),
+		},
+		StylePanelView: map[string]any{
+			"palette": []map[string]any{{
+				"key":      "accent",
+				"name":     "colorAccent",
+				"label":    "Accent",
+				"cssVar":   "--color-accent",
+				"value":    "#b5651d",
+				"fallback": "#b5651d",
+			}},
+			"fonts": []map[string]any{{
+				"role":      "display",
+				"label":     "Display",
+				"nameField": "displayFont",
+				"urlField":  "displayFontUrl",
+				"family":    "Fraunces",
+				"url":       "https://fonts.example.com/fraunces.woff2",
+			}},
+		},
+		StylePanelFormID:    "editorStylePaletteForm",
+		StylePanelAction:    "/admin/editor/__actions/authoring",
+		StylePanelCSRFToken: "csrf-token",
+		EngineHosts: []map[string]any{{
+			"key":     "flow-designer",
+			"name":    FlowDesignerName,
+			"mountId": "gosx-studio-flow-engine",
+		}},
+		EngineRuntime: runtime,
+	}))
+
+	if len(runtime.calls) != 1 {
+		t.Fatalf("runtime call count = %d, want 1", len(runtime.calls))
+	}
+	for _, fragment := range []string{
+		`<form data-site-map-authoring="true"></form>`,
+		`data-gosx-studio-style-panel="true"`,
+		`id="editorStylePaletteForm"`,
+		`action="/admin/editor/__actions/authoring"`,
+		`name="csrf_token" value="csrf-token"`,
+		`data-editor-color-token="--color-accent"`,
+		`data-editor-font-name="display"`,
+		`data-gosx-studio-engine-hosts-renderer="gosx-studio"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("editor page style panel render missing %q:\n%s", fragment, html)
+		}
+	}
+	assertOrder(t, html,
+		`<section data-workbench="true"></section>`,
+		`<form data-site-map-authoring="true"></form>`,
+		`data-gosx-studio-style-panel="true"`,
+		`data-gosx-studio-engine-hosts-renderer="gosx-studio"`,
+		`data-gosx-studio-workbench-runtime="true"`,
+	)
+}
+
+func TestRenderBackendEditorPageSkipsEmptyStylePanelProps(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendEditorPage(BackendEditorPageProps{
+		StylePanelView: map[string]any{
+			"palette": []map[string]any{{
+				"key":      "accent",
+				"name":     "colorAccent",
+				"label":    "Accent",
+				"cssVar":   "--color-accent",
+				"value":    "#b5651d",
+				"fallback": "#b5651d",
+			}},
+		},
+	}))
+
+	if strings.Contains(html, `data-gosx-studio-style-panel="true"`) {
+		t.Fatalf("style panel should not render without an action:\n%s", html)
+	}
+}
+
+func TestRenderBackendEditorPageStylePanelNodeOverridesView(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendEditorPage(BackendEditorPageProps{
+		SupportNodes: []gosx.Node{
+			gosx.El("form", gosx.Attrs(gosx.Attr("data-site-map-authoring", "true"))),
+		},
+		StylePanelView: map[string]any{
+			"palette": []map[string]any{{
+				"key":      "accent",
+				"name":     "colorAccent",
+				"label":    "Accent",
+				"cssVar":   "--color-accent",
+				"value":    "#b5651d",
+				"fallback": "#b5651d",
+			}},
+		},
+		StylePanelAction: "/admin/editor/__actions/authoring",
+		StylePanelNode:   gosx.El("form", gosx.Attrs(gosx.Attr("data-explicit-style-panel", "true"))),
+	}))
+
+	if !strings.Contains(html, `<form data-explicit-style-panel="true"></form>`) {
+		t.Fatalf("explicit style panel node missing:\n%s", html)
+	}
+	if strings.Contains(html, `data-gosx-studio-style-panel="true"`) {
+		t.Fatalf("style panel view should not render when explicit node is supplied:\n%s", html)
+	}
+	assertOrder(t, html,
+		`<form data-site-map-authoring="true"></form>`,
+		`<form data-explicit-style-panel="true"></form>`,
+	)
+}
+
 func TestRenderBackendEditorPageEngineHostsNodeOverridesHostViews(t *testing.T) {
 	html := gosx.RenderHTML(RenderBackendEditorPage(BackendEditorPageProps{
 		SupportNodes: []gosx.Node{

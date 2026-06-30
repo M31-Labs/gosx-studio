@@ -3,20 +3,25 @@ package studio
 import "m31labs.dev/gosx"
 
 type BackendEditorPageProps struct {
-	Class             string
-	Media             []BackendEditorMediaAsset
-	SaveStatus        BackendEditorActionStatus
-	AuthoringStatus   BackendEditorActionStatus
-	PublishStatus     BackendEditorActionStatus
-	PublishFlowStatus BackendEditorActionStatus
-	RestoreStatus     BackendEditorActionStatus
-	RevisionRestored  bool
-	WorkbenchShell    gosx.Node
-	SupportNodes      []gosx.Node
-	EngineHosts       []map[string]any
-	EngineRuntime     StudioEngineRuntime
-	EngineHostsNode   gosx.Node
-	Scripts           BackendEditorScripts
+	Class               string
+	Media               []BackendEditorMediaAsset
+	SaveStatus          BackendEditorActionStatus
+	AuthoringStatus     BackendEditorActionStatus
+	PublishStatus       BackendEditorActionStatus
+	PublishFlowStatus   BackendEditorActionStatus
+	RestoreStatus       BackendEditorActionStatus
+	RevisionRestored    bool
+	WorkbenchShell      gosx.Node
+	SupportNodes        []gosx.Node
+	StylePanelView      map[string]any
+	StylePanelFormID    string
+	StylePanelAction    string
+	StylePanelCSRFToken string
+	StylePanelNode      gosx.Node
+	EngineHosts         []map[string]any
+	EngineRuntime       StudioEngineRuntime
+	EngineHostsNode     gosx.Node
+	Scripts             BackendEditorScripts
 }
 
 type BackendEditorMediaAsset struct {
@@ -58,6 +63,9 @@ func RenderBackendEditorPage(props BackendEditorPageProps) gosx.Node {
 
 func backendEditorSupportNodes(props BackendEditorPageProps) []gosx.Node {
 	nodes := append([]gosx.Node{}, props.SupportNodes...)
+	if stylePanel := backendEditorStylePanelNode(props); !stylePanel.IsZero() {
+		nodes = append(nodes, stylePanel)
+	}
 	if !props.EngineHostsNode.IsZero() {
 		return append(nodes, props.EngineHostsNode)
 	}
@@ -67,6 +75,20 @@ func backendEditorSupportNodes(props BackendEditorPageProps) []gosx.Node {
 		}))
 	}
 	return nodes
+}
+
+func backendEditorStylePanelNode(props BackendEditorPageProps) gosx.Node {
+	if !props.StylePanelNode.IsZero() {
+		return props.StylePanelNode
+	}
+	if len(props.StylePanelView) == 0 || props.StylePanelAction == "" {
+		return gosx.Node{}
+	}
+	formID := props.StylePanelFormID
+	if formID == "" {
+		formID = "editorStylePaletteForm"
+	}
+	return RenderStylePanel(props.StylePanelView, formID, props.StylePanelAction, props.StylePanelCSRFToken)
 }
 
 func RenderBackendEditorMediaDatalist(media []BackendEditorMediaAsset) gosx.Node {
