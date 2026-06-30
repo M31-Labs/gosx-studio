@@ -1463,8 +1463,6 @@ func TestEngineRuntimeIncludesWorkbenchRuntimeIslandBundle(t *testing.T) {
 		"__gosx_workbench_runtime_island_saveLayout",
 		"__gosx_workbench_runtime_island_currentRailWidth",
 		"__gosx_workbench_runtime_island_setRailWidth",
-		"workbench-runtime-islands",
-		"data-gosx-studio-feature-flag-workbench-runtime-islands",
 	} {
 		if !strings.Contains(engines, fragment) {
 			t.Fatalf("engine runtime missing workbenchruntime fragment %q", fragment)

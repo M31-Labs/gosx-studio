@@ -5,9 +5,8 @@
 // workbench_style_state.gsx) are mount-point markers in the editor DOM.
 // This script publishes the fifteen
 // window.__gosx_workbench_runtime_island_<method> globals that
-// workbenchruntime.BridgeShim delegates to when the
-// "workbench-runtime-islands" feature flag is on. It is emitted into the
-// studio runtime bundle by workbenchruntime.IslandRuntimeJS() (see
+// workbenchruntime.BridgeShim delegates to directly. It is emitted into
+// the studio runtime bundle by workbenchruntime.IslandRuntimeJS() (see
 // runtime.go) and runs before BridgeShim() at bundle init time.
 //
 // The fifteen functions below replace window.GoSXStudioWorkbenchRuntime.{
@@ -24,9 +23,8 @@
 //
 // # Idempotency
 //
-// Idempotency guards use distinct dataset keys from the legacy
-// implementation so both code paths can run on the same DOM during the
-// additive shipping window without double-binding:
+// Idempotency guards use dataset keys scoped to the island implementation
+// so repeated host calls do not double-bind:
 //
 //   gosxStudioResizerIslandBound        — per resizer handle (bindRailResizers)
 //   gosxStudioWorkbenchChromeIslandBound — per editor-workbench form (bindChrome)
@@ -274,9 +272,9 @@
   // studio-engines.js:194. Binds the [data-studio-resizer] pointer drag +
   // ArrowLeft/ArrowRight keyboard nudges on rail handles.
   //
-  // Idempotency: each handle gets [data-gosx-studio-resizer-island-bound]
-  // distinct from the legacy [data-gosx-studio-resizer-bound] so both
-  // paths can coexist during the additive shipping window.
+  // Idempotency: each handle gets
+  // [data-gosx-studio-resizer-island-bound] so repeated host calls do not
+  // stack pointer or keyboard listeners.
   function bindRailResizersIsland(root) {
     var form = editorWorkbench(root);
     var stage = workbenchStage(form);
@@ -377,9 +375,9 @@
   // rail-width-change/commit events, applies the persisted layout, and
   // seeds the workbench mode / viewport / zoom on initial bind.
   //
-  // Idempotency: per-form [data-gosx-studio-workbench-chrome-island-bound]
-  // distinct from the legacy [data-gosx-studio-workbench-chrome-bound] so
-  // both paths can coexist during the additive shipping window.
+  // Idempotency: per-form
+  // [data-gosx-studio-workbench-chrome-island-bound] so repeated host
+  // calls do not stack delegated click or layout listeners.
   function bindChromeIsland(root) {
     var form = editorWorkbench(root);
     if (!form || form.dataset.gosxStudioWorkbenchChromeIslandBound === "true") return;

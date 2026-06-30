@@ -10,12 +10,11 @@ import (
 
 // The workbenchruntime package is the Go-side surface for the Phase 3 slice-7
 // burn-down of GoSXStudioWorkbenchRuntime. It owns:
-//  1. The feature-flag key consumers add to studio.ShellConfig.FeatureFlags
-//     to flip the island path (legacy bundle deleted 2026-05-27)
-//     to the .gsx-authored islands in this package.
-//  2. The JS shim that the legacy bundle appends so the
-//     window.GoSXStudioWorkbenchRuntime methods delegate to the islands when
-//     the flag is on.
+//  1. The feature-flag key retained as a studio.ShellConfig host probe/string
+//     contract for the .gsx-authored islands in this package.
+//  2. The JS shim that the runtime bundle appends so the
+//     window.GoSXStudioWorkbenchRuntime methods delegate directly to the
+//     islands.
 //  3. The island runtime JS that publishes window.__gosx_workbench_runtime_*
 //     globals the BridgeShim delegates to.
 //
@@ -28,9 +27,9 @@ func TestFeatureFlagKey(t *testing.T) {
 	if FeatureFlagKey == "" {
 		t.Fatal("FeatureFlagKey must be set")
 	}
-	// Naming convention: "<contract>-runtime-islands". Every Phase 3 slice
-	// reuses this convention so the consumer's URL-param handling can flip
-	// each contract's flag through a single helper.
+	// Naming convention: "<contract>-runtime-islands". The key remains a
+	// host-visible probe/string contract even though BridgeShim no longer
+	// gates calls on it.
 	if FeatureFlagKey != "workbench-runtime-islands" {
 		t.Fatalf("FeatureFlagKey must be %q per Phase 3 slice-7 contract; got %q", "workbench-runtime-islands", FeatureFlagKey)
 	}
@@ -44,13 +43,16 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 	if shim == "" {
 		t.Fatal("BridgeShim() must return a non-empty JS snippet")
 	}
-	// The shim must reference each method-specific island global, the
-	// public global it shims (window.GoSXStudioWorkbenchRuntime), and the
-	// feature flag so the legacy path stays reachable when the flag is off.
-	// The IslandGlobals struct holds the canonical names; any drift between
+	// The shim must reference each method-specific island global and the
+	// public global it shims (window.GoSXStudioWorkbenchRuntime). The
+	// IslandGlobals struct holds the canonical names; any drift between
 	// the struct and the shim is caught here.
 	for _, fragment := range []string{
 		"window.GoSXStudioWorkbenchRuntime",
+		"function delegate(islandGlobal)",
+		"var island = window[islandGlobal]",
+		"return island.apply(null, arguments)",
+		"return undefined",
 		IslandGlobals.BindRailResizers,
 		IslandGlobals.BindChrome,
 		IslandGlobals.SetMode,
@@ -66,10 +68,22 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 		IslandGlobals.SaveLayout,
 		IslandGlobals.CurrentRailWidth,
 		IslandGlobals.SetRailWidth,
-		FeatureFlagKey,
 	} {
 		if !strings.Contains(shim, fragment) {
 			t.Fatalf("BridgeShim() missing %q:\n%s", fragment, shim)
+		}
+	}
+	for _, stale := range []string{
+		"FLAG" + "_ATTR",
+		"flag" + "Enabled",
+		"data-gosx-studio-feature-flag-" + "workbench-runtime-islands",
+		"if (!" + "flag" + "Enabled()) return undefined",
+		"legacy " + "path",
+		"fallback " + "branch",
+		"fallback " + "path",
+	} {
+		if strings.Contains(shim, stale) {
+			t.Fatalf("BridgeShim() contains stale gate/fallback fragment %q:\n%s", stale, shim)
 		}
 	}
 }
@@ -222,8 +236,8 @@ func TestIslandRuntimeJSPublishesSyncViewportGlobal(t *testing.T) {
 		// the viewport island is not managing it.
 		"editor-preview-shell",
 		"data-studio-preview-viewport",
-		// Viewport-island opt-out marker so the inline island can prevent
-		// double-writes during the additive shipping window.
+		// Viewport-island opt-out marker so the mounted viewport island can
+		// own preview-shell writes without duplicate syncs.
 		"data-studio-viewport-island",
 		// Viewport label readout selector.
 		"data-studio-viewport-label",
@@ -1012,9 +1026,8 @@ func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 		t.Fatal("Bundle() must return a non-empty JS snippet")
 	}
 	// Island runtime must come before the BridgeShim — the shim consults
-	// the globals the island runtime publishes. Order matters: if the shim
-	// ran first it would close over an undefined global and every dispatch
-	// would fall through to the legacy path, silently disabling the slice.
+	// the globals the island runtime publishes. Order matters so the public
+	// runtime can delegate immediately when the island globals are present.
 	// (The island file ends with the closing IIFE wrapper, which always
 	// precedes the shim's leading ";(function () {" marker.)
 	islandHeader := "island_runtime.js"

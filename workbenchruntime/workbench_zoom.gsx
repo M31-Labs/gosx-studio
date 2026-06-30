@@ -21,12 +21,8 @@
 // zoom-toolbar switcher that writes data-studio-zoom-current on a
 // .studio-zoombar root and toggles aria-pressed on its [data-studio-zoom]
 // buttons. Slice 7's WorkbenchZoom island is the canonical gosx-studio-side
-// home for that contract. When the workbench-runtime-islands feature flag
-// is on, muddy-noni renders WorkbenchZoom as the mount-point instead of
-// the inline island. The inline island stays as the flag-off fallback
-// during the additive shipping window so production traffic keeps using
-// the legacy path until the deletion window closes (see slice plan Section
-// F).
+// home for that contract. The host renders WorkbenchZoom as the mount-point
+// and the WorkbenchRuntime bridge delegates directly to the island globals.
 //
 // See the slice plan at
 // ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-7-workbenchruntime.md
