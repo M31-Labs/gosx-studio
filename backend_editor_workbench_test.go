@@ -207,34 +207,76 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 	}
 
 	html := gosx.RenderHTML(RenderBackendEditorWorkbenchPanelStack(BackendEditorWorkbenchPanelStackProps{
-		View:                        view,
-		AuthoringURL:                "/admin/editor/__actions/authoring",
-		Toolbar:                     gosx.El("div", gosx.Attrs(gosx.Attr("data-editor-toolbar", "true")), gosx.Text("Toolbar")),
-		CanvasBar:                   gosx.El("div", gosx.Attrs(gosx.Attr("data-editor-canvas-bar", "true")), gosx.Text("Canvas bar")),
-		CanvasStatus:                gosx.El("div", gosx.Attrs(gosx.Attr("data-editor-canvas-status", "true")), gosx.Text("Ready")),
-		SiteNavigator:               gosx.El("section", gosx.Attrs(gosx.Attr("data-site-navigator", "true")), gosx.Text("Pages")),
-		HomeLayers:                  map[string]any{"kicker": "Home", "title": "Sections", "empty": "No sections."},
-		HomeLayerSelection:          gosx.El("select", gosx.Attrs(gosx.Attr("data-home-layer-selection", "true"))),
-		BlockLayoutEngineHost:       gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
-		BlockLibraryPanel:           gosx.El("section", gosx.Attrs(gosx.Attr("data-block-library", "true")), gosx.Text("Library")),
-		SiteMapEngine:               gosx.El("section", gosx.Attrs(gosx.Attr("data-site-map-engine", "true")), gosx.Text("Site map")),
-		SiteMapCanvas:               gosx.El("section", gosx.Attrs(gosx.Attr("data-site-map-canvas", "true")), gosx.Text("Canvas")),
-		InspectorChrome:             gosx.El("section", gosx.Attrs(gosx.Attr("data-inspector-chrome", "true")), gosx.Text("Inspector")),
-		HomeInspector:               gosx.El("section", gosx.Attrs(gosx.Attr("data-home-inspector", "true")), gosx.Text("Home")),
-		LookPanel:                   gosx.El("section", gosx.Attrs(gosx.Attr("data-look-panel", "true")), gosx.Text("Look")),
-		BrandPanel:                  brandPanel,
-		BrandFields:                 brandFields,
-		BrandMediaPicker:            gosx.El("section", gosx.Attrs(gosx.Attr("data-brand-media-picker", "true")), gosx.Text("Media")),
-		NavigationPanel:             gosx.El("section", gosx.Attrs(gosx.Attr("data-navigation-panel", "true")), gosx.Text("Navigation")),
-		CheckoutPanel:               gosx.El("section", gosx.Attrs(gosx.Attr("data-checkout-panel", "true")), gosx.Text("Checkout")),
-		PublishPanel:                gosx.El("section", gosx.Attrs(gosx.Attr("data-publish-panel", "true")), gosx.Text("Publish")),
-		AdvancedPanel:               advancedPanel,
-		FlowDesigner:                gosx.El("section", gosx.Attrs(gosx.Attr("data-flow-designer", "true")), gosx.Text("Flows")),
-		AdvancedToolsPanel:          gosx.El("section", gosx.Attrs(gosx.Attr("data-advanced-tools", "true")), gosx.Text("Tools")),
-		AdvancedWorkspaceFieldPanel: gosx.El("section", gosx.Attrs(gosx.Attr("data-advanced-workspace", "true")), gosx.Text("Workspace")),
-		AdvancedCalendarFieldPanel:  gosx.El("section", gosx.Attrs(gosx.Attr("data-advanced-calendar", "true")), gosx.Text("Calendar")),
-		AdvancedTypeFieldPanel:      gosx.El("section", gosx.Attrs(gosx.Attr("data-advanced-type", "true")), gosx.Text("Type")),
-		AdvancedSettingsPanel:       gosx.El("section", gosx.Attrs(gosx.Attr("data-advanced-settings", "true")), gosx.Text("Settings")),
+		View:                  view,
+		AuthoringURL:          "/admin/editor/__actions/authoring",
+		Toolbar:               gosx.El("div", gosx.Attrs(gosx.Attr("data-editor-toolbar", "true")), gosx.Text("Toolbar")),
+		CanvasBar:             gosx.El("div", gosx.Attrs(gosx.Attr("data-editor-canvas-bar", "true")), gosx.Text("Canvas bar")),
+		CanvasStatus:          gosx.El("div", gosx.Attrs(gosx.Attr("data-editor-canvas-status", "true")), gosx.Text("Ready")),
+		SiteNavigator:         gosx.El("section", gosx.Attrs(gosx.Attr("data-site-navigator", "true")), gosx.Text("Pages")),
+		HomeLayers:            map[string]any{"kicker": "Home", "title": "Sections", "empty": "No sections."},
+		HomeLayerSelection:    gosx.El("select", gosx.Attrs(gosx.Attr("data-home-layer-selection", "true"))),
+		BlockLayoutEngineHost: gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
+		BlockLibraryPanel:     gosx.El("section", gosx.Attrs(gosx.Attr("data-block-library", "true")), gosx.Text("Library")),
+		SiteMapEngine:         gosx.El("section", gosx.Attrs(gosx.Attr("data-site-map-engine", "true")), gosx.Text("Site map")),
+		SiteMapCanvas:         gosx.El("section", gosx.Attrs(gosx.Attr("data-site-map-canvas", "true")), gosx.Text("Canvas")),
+		InspectorChrome:       gosx.El("section", gosx.Attrs(gosx.Attr("data-inspector-chrome", "true")), gosx.Text("Inspector")),
+		HomeInspector:         gosx.El("section", gosx.Attrs(gosx.Attr("data-home-inspector", "true")), gosx.Text("Home")),
+		LookPanel:             gosx.El("section", gosx.Attrs(gosx.Attr("data-look-panel", "true")), gosx.Text("Look")),
+		BrandPanel:            brandPanel,
+		BrandFields:           brandFields,
+		BrandMediaPicker:      gosx.El("section", gosx.Attrs(gosx.Attr("data-brand-media-picker", "true")), gosx.Text("Media")),
+		NavigationPanel:       gosx.El("section", gosx.Attrs(gosx.Attr("data-navigation-panel", "true")), gosx.Text("Navigation")),
+		CheckoutPanel:         gosx.El("section", gosx.Attrs(gosx.Attr("data-checkout-panel", "true")), gosx.Text("Checkout")),
+		PublishPanel:          gosx.El("section", gosx.Attrs(gosx.Attr("data-publish-panel", "true")), gosx.Text("Publish")),
+		AdvancedPanel:         advancedPanel,
+		FlowDesignerView:      map[string]any{"defaultFlowKey": "contact"},
+		AdvancedToolsPanelView: map[string]any{
+			"class": "editor-panel editor-panel--advanced-tools",
+			"key":   "advanced-tools",
+			"mode":  "advanced",
+			"title": "Tools",
+			"empty": "No tools.",
+		},
+		AdvancedWorkspaceFieldPanelView: map[string]any{
+			"class":     "editor-panel editor-panel--advanced-fields",
+			"key":       "workspace-fields",
+			"mode":      "advanced",
+			"kicker":    "Workspace",
+			"title":     "Workspace fields",
+			"empty":     "No workspace fields.",
+			"hasFields": true,
+			"fieldList": gosx.El("div", gosx.Attrs(gosx.Attr("data-workspace-field-list", "true")), gosx.Text("Workspace fields")),
+		},
+		AdvancedCalendarFieldPanelView: map[string]any{
+			"class":     "editor-panel editor-panel--advanced-fields",
+			"key":       "calendar-fields",
+			"mode":      "advanced",
+			"kicker":    "Calendar",
+			"title":     "Calendar fields",
+			"empty":     "No calendar fields.",
+			"hasFields": true,
+			"fieldList": gosx.El("div", gosx.Attrs(gosx.Attr("data-calendar-field-list", "true")), gosx.Text("Calendar fields")),
+		},
+		AdvancedTypeFieldPanelView: map[string]any{
+			"class":     "editor-panel editor-panel--advanced-fields",
+			"key":       "type-fields",
+			"mode":      "advanced",
+			"kicker":    "Type",
+			"title":     "Type fields",
+			"empty":     "No type fields.",
+			"hasFields": true,
+			"fieldList": gosx.El("div", gosx.Attrs(gosx.Attr("data-type-field-list", "true")), gosx.Text("Type fields")),
+		},
+		AdvancedSettingsPanelView: map[string]any{
+			"class":     "editor-panel editor-panel--advanced-settings",
+			"key":       "advanced-settings",
+			"mode":      "advanced",
+			"kicker":    "Settings",
+			"title":     "Advanced settings",
+			"empty":     "No settings.",
+			"hasFields": true,
+			"fieldList": gosx.El("div", gosx.Attrs(gosx.Attr("data-settings-field-list", "true")), gosx.Text("Settings fields")),
+		},
 	}))
 
 	for _, fragment := range []string{
@@ -258,16 +300,20 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 		`<div class="studio-block-layout-engine__layers" data-studio-block-layout-layers="true"><section class="" data-studio-mode-panel="" data-studio-engine-source="gosx" data-gosx-studio-home-layers-panel-renderer="gosx-studio">`,
 		`<div class="studio-block-layout-engine__library" data-studio-block-layout-library="true"><section data-block-library="true">Library</section></div>`,
 		`<section class="studio-brand-panel__group-slot studio-brand-media-picker-slot" data-studio-brand-group-slot="files" data-studio-brand-group-selected="false"><section data-brand-media-picker="true">Media</section></section>`,
-		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="flows"><section data-flow-designer="true">Flows</section></div>`,
-		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="tools"><section data-advanced-tools="true">Tools</section></div>`,
-		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="schema"><section data-advanced-workspace="true">Workspace</section></div>`,
-		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="schedule"><section data-advanced-calendar="true">Calendar</section></div>`,
-		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="typography"><section data-advanced-type="true">Type</section></div>`,
-		`<div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="settings"><section data-advanced-settings="true">Settings</section></div>`,
+		`data-gosx-studio-flow-designer-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-advanced-tools-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-advanced-settings-panel-renderer="gosx-studio"`,
+		`data-workspace-field-list="true"`,
+		`data-calendar-field-list="true"`,
+		`data-type-field-list="true"`,
+		`data-settings-field-list="true"`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("backend editor panel stack did not nest %q:\n%s", fragment, html)
 		}
+	}
+	if got := strings.Count(html, `data-gosx-studio-advanced-field-panel-renderer="gosx-studio"`); got != 3 {
+		t.Fatalf("backend editor panel stack should render three Studio advanced field panels, got %d:\n%s", got, html)
 	}
 
 	assertOrder(t, html,
@@ -285,13 +331,75 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 		`data-gosx-studio-brand-panel-renderer="gosx-studio"`,
 		`data-brand-media-picker="true"`,
 		`data-gosx-studio-advanced-panel-renderer="gosx-studio"`,
-		`data-flow-designer="true"`,
-		`data-advanced-tools="true"`,
-		`data-advanced-workspace="true"`,
-		`data-advanced-calendar="true"`,
-		`data-advanced-type="true"`,
-		`data-advanced-settings="true"`,
+		`data-gosx-studio-flow-designer-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-advanced-tools-panel-renderer="gosx-studio"`,
+		`data-workspace-field-list="true"`,
+		`data-calendar-field-list="true"`,
+		`data-type-field-list="true"`,
+		`data-gosx-studio-advanced-settings-panel-renderer="gosx-studio"`,
 	)
+}
+
+func TestRenderBackendEditorWorkbenchPanelStackKeepsExplicitAdvancedGroupOverrides(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Website editor"}, WorkbenchShellViewOptions{})
+	advancedPanel := map[string]any{
+		"kicker":          "Advanced",
+		"title":           "Controls",
+		"summary":         "Advanced controls",
+		"groupLabel":      "Advanced groups",
+		"defaultGroupKey": "flows",
+		"groups": []map[string]any{
+			{"key": "flows", "inputID": "advancedFlows", "label": "Flows", "summary": "Automation", "selected": true},
+			{"key": "tools", "inputID": "advancedTools", "label": "Tools", "summary": "Tools"},
+			{"key": "schema", "inputID": "advancedSchema", "label": "Schema", "summary": "Workspace"},
+			{"key": "schedule", "inputID": "advancedSchedule", "label": "Schedule", "summary": "Calendar"},
+			{"key": "typography", "inputID": "advancedType", "label": "Type", "summary": "Typography"},
+			{"key": "settings", "inputID": "advancedSettings", "label": "SEO", "summary": "Settings"},
+		},
+	}
+
+	html := gosx.RenderHTML(RenderBackendEditorWorkbenchPanelStack(BackendEditorWorkbenchPanelStackProps{
+		View:                            view,
+		SiteNavigator:                   gosx.El("section", gosx.Attrs(gosx.Attr("data-site-navigator", "true")), gosx.Text("Pages")),
+		HomeLayers:                      map[string]any{"kicker": "Home", "title": "Sections"},
+		BlockLayoutEngineHost:           gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
+		AdvancedPanel:                   advancedPanel,
+		FlowDesigner:                    gosx.El("section", gosx.Attrs(gosx.Attr("data-custom-flow-designer", "true")), gosx.Text("Custom flows")),
+		FlowDesignerView:                map[string]any{"defaultFlowKey": "contact"},
+		AdvancedToolsPanel:              gosx.El("section", gosx.Attrs(gosx.Attr("data-custom-advanced-tools", "true")), gosx.Text("Custom tools")),
+		AdvancedToolsPanelView:          map[string]any{"class": "editor-panel editor-panel--advanced-tools"},
+		AdvancedWorkspaceFieldPanel:     gosx.El("section", gosx.Attrs(gosx.Attr("data-custom-advanced-workspace", "true")), gosx.Text("Custom workspace")),
+		AdvancedWorkspaceFieldPanelView: map[string]any{"class": "editor-panel editor-panel--advanced-fields"},
+		AdvancedCalendarFieldPanel:      gosx.El("section", gosx.Attrs(gosx.Attr("data-custom-advanced-calendar", "true")), gosx.Text("Custom calendar")),
+		AdvancedCalendarFieldPanelView:  map[string]any{"class": "editor-panel editor-panel--advanced-fields"},
+		AdvancedTypeFieldPanel:          gosx.El("section", gosx.Attrs(gosx.Attr("data-custom-advanced-type", "true")), gosx.Text("Custom type")),
+		AdvancedTypeFieldPanelView:      map[string]any{"class": "editor-panel editor-panel--advanced-fields"},
+		AdvancedSettingsPanel:           gosx.El("section", gosx.Attrs(gosx.Attr("data-custom-advanced-settings", "true")), gosx.Text("Custom settings")),
+		AdvancedSettingsPanelView:       map[string]any{"class": "editor-panel editor-panel--advanced-settings"},
+	}))
+
+	for _, fragment := range []string{
+		`data-custom-flow-designer="true"`,
+		`data-custom-advanced-tools="true"`,
+		`data-custom-advanced-workspace="true"`,
+		`data-custom-advanced-calendar="true"`,
+		`data-custom-advanced-type="true"`,
+		`data-custom-advanced-settings="true"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("explicit advanced group override missing %q:\n%s", fragment, html)
+		}
+	}
+	for _, fragment := range []string{
+		`data-gosx-studio-flow-designer-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-advanced-tools-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-advanced-field-panel-renderer="gosx-studio"`,
+		`data-gosx-studio-advanced-settings-panel-renderer="gosx-studio"`,
+	} {
+		if strings.Contains(html, fragment) {
+			t.Fatalf("explicit advanced group override should not render default panel %q:\n%s", fragment, html)
+		}
+	}
 }
 
 func TestRenderBackendEditorWorkbenchPanelStackOwnsPublishPanelComposition(t *testing.T) {

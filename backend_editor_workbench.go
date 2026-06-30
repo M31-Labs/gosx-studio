@@ -40,39 +40,45 @@ type BackendEditorWorkbenchPanelStackProps struct {
 	CanvasBar    gosx.Node
 	CanvasStatus gosx.Node
 
-	SiteNavigator               gosx.Node
-	HomeLayers                  map[string]any
-	HomeLayerSelection          gosx.Node
-	BlockLayoutEngineHost       gosx.Node
-	BlockLibraryPanel           gosx.Node
-	BlockLibraryPanelView       map[string]any
-	SiteMapEngine               gosx.Node
-	SiteMapCanvas               gosx.Node
-	InspectorChrome             gosx.Node
-	HomeInspector               gosx.Node
-	HomeInspectorView           map[string]any
-	HomeInspectorContentFields  map[string]any
-	LookPanel                   gosx.Node
-	LookPanelView               map[string]any
-	BrandPanel                  map[string]any
-	BrandFields                 map[string]any
-	BrandMediaPicker            gosx.Node
-	NavigationPanel             gosx.Node
-	NavigationPanelView         map[string]any
-	CheckoutPanel               gosx.Node
-	CheckoutPanelView           map[string]any
-	PublishPanel                gosx.Node
-	PublishPanelView            map[string]any
-	PreviewSharePanel           map[string]any
-	ActivityPanel               map[string]any
-	RevisionHistory             map[string]any
-	AdvancedPanel               map[string]any
-	FlowDesigner                gosx.Node
-	AdvancedToolsPanel          gosx.Node
-	AdvancedWorkspaceFieldPanel gosx.Node
-	AdvancedCalendarFieldPanel  gosx.Node
-	AdvancedTypeFieldPanel      gosx.Node
-	AdvancedSettingsPanel       gosx.Node
+	SiteNavigator                   gosx.Node
+	HomeLayers                      map[string]any
+	HomeLayerSelection              gosx.Node
+	BlockLayoutEngineHost           gosx.Node
+	BlockLibraryPanel               gosx.Node
+	BlockLibraryPanelView           map[string]any
+	SiteMapEngine                   gosx.Node
+	SiteMapCanvas                   gosx.Node
+	InspectorChrome                 gosx.Node
+	HomeInspector                   gosx.Node
+	HomeInspectorView               map[string]any
+	HomeInspectorContentFields      map[string]any
+	LookPanel                       gosx.Node
+	LookPanelView                   map[string]any
+	BrandPanel                      map[string]any
+	BrandFields                     map[string]any
+	BrandMediaPicker                gosx.Node
+	NavigationPanel                 gosx.Node
+	NavigationPanelView             map[string]any
+	CheckoutPanel                   gosx.Node
+	CheckoutPanelView               map[string]any
+	PublishPanel                    gosx.Node
+	PublishPanelView                map[string]any
+	PreviewSharePanel               map[string]any
+	ActivityPanel                   map[string]any
+	RevisionHistory                 map[string]any
+	AdvancedPanel                   map[string]any
+	FlowDesigner                    gosx.Node
+	FlowDesignerView                map[string]any
+	AdvancedToolsPanel              gosx.Node
+	AdvancedToolsPanelView          map[string]any
+	AdvancedWorkspaceFieldPanel     gosx.Node
+	AdvancedWorkspaceFieldPanelView map[string]any
+	AdvancedCalendarFieldPanel      gosx.Node
+	AdvancedCalendarFieldPanelView  map[string]any
+	AdvancedTypeFieldPanel          gosx.Node
+	AdvancedTypeFieldPanelView      map[string]any
+	AdvancedSettingsPanel           gosx.Node
+	AdvancedSettingsPanelView       map[string]any
 }
 
 func RenderBackendEditorWorkbench(props BackendEditorWorkbenchProps) gosx.Node {
@@ -216,14 +222,38 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 	if workbenchNodeEmpty(checkoutPanel) {
 		checkoutPanel = RenderCheckoutPanel(props.CheckoutPanelView, CheckoutPanelOptions{})
 	}
+	flowDesigner := props.FlowDesigner
+	if workbenchNodeEmpty(flowDesigner) {
+		flowDesigner = RenderFlowDesignerPanel(props.FlowDesignerView, FlowDesignerPanelOptions{})
+	}
+	advancedToolsPanel := props.AdvancedToolsPanel
+	if workbenchNodeEmpty(advancedToolsPanel) {
+		advancedToolsPanel = RenderAdvancedToolsPanel(props.AdvancedToolsPanelView, AdvancedToolsPanelOptions{})
+	}
+	advancedWorkspaceFieldPanel := props.AdvancedWorkspaceFieldPanel
+	if workbenchNodeEmpty(advancedWorkspaceFieldPanel) {
+		advancedWorkspaceFieldPanel = RenderAdvancedFieldPanel(props.AdvancedWorkspaceFieldPanelView, AdvancedFieldPanelOptions{})
+	}
+	advancedCalendarFieldPanel := props.AdvancedCalendarFieldPanel
+	if workbenchNodeEmpty(advancedCalendarFieldPanel) {
+		advancedCalendarFieldPanel = RenderAdvancedFieldPanel(props.AdvancedCalendarFieldPanelView, AdvancedFieldPanelOptions{})
+	}
+	advancedTypeFieldPanel := props.AdvancedTypeFieldPanel
+	if workbenchNodeEmpty(advancedTypeFieldPanel) {
+		advancedTypeFieldPanel = RenderAdvancedFieldPanel(props.AdvancedTypeFieldPanelView, AdvancedFieldPanelOptions{})
+	}
+	advancedSettingsPanel := props.AdvancedSettingsPanel
+	if workbenchNodeEmpty(advancedSettingsPanel) {
+		advancedSettingsPanel = RenderAdvancedSettingsPanel(props.AdvancedSettingsPanelView, AdvancedSettingsPanelOptions{})
+	}
 	advancedPanel := RenderAdvancedPanel(props.AdvancedPanel, AdvancedPanelOptions{
 		GroupNodes: map[string]gosx.Node{
-			"flows":      props.FlowDesigner,
-			"tools":      props.AdvancedToolsPanel,
-			"schema":     props.AdvancedWorkspaceFieldPanel,
-			"schedule":   props.AdvancedCalendarFieldPanel,
-			"typography": props.AdvancedTypeFieldPanel,
-			"settings":   props.AdvancedSettingsPanel,
+			"flows":      flowDesigner,
+			"tools":      advancedToolsPanel,
+			"schema":     advancedWorkspaceFieldPanel,
+			"schedule":   advancedCalendarFieldPanel,
+			"typography": advancedTypeFieldPanel,
+			"settings":   advancedSettingsPanel,
 		},
 	})
 	publishPanel := props.PublishPanel
