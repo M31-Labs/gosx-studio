@@ -156,13 +156,11 @@ func RenderSiteNavigatorList(view map[string]any, options SiteNavigatorPanelOpti
 
 // --- Unexported shims for not-yet-moved root files ---
 //
-// sitemap_authoring_panels.go, sitemap_view.go, and sitemap_engine.go also
-// carried unexported helpers that root-only files (not moved until later
-// slices) call by their original lowercase names: inspector.go
-// (siteMapHiddenInputs, siteMapInputViews — panels territory, Slice 6),
-// inspector_fields.go (siteMapMapList — panels territory, Slice 6),
-// plugin_test.go (authoringSiteMapComponentTemplateViews — stays at root
-// pending a later cleanup slice, see spec §1 core row), control_locked_test.go
+// sitemap_authoring_panels.go and sitemap_engine.go also carried unexported
+// helpers that root-only files (not moved until later slices) call by their
+// original lowercase names: plugin_test.go
+// (authoringSiteMapComponentTemplateViews — stays at root pending a later
+// cleanup slice, see spec §1 core row), control_locked_test.go
 // (authoringSiteMapControlViews, authoringSiteMapEditableControlView,
 // authoringSiteMapStaticControlViews — same), and canvas_test_fixtures_test.go
 // (siteMapEngineCapabilityNames — same). The sitemap package exports the
@@ -170,10 +168,13 @@ func RenderSiteNavigatorList(view map[string]any, options SiteNavigatorPanelOpti
 // canvas/block_layout_engine.go precedent from Slice 4); these vars keep
 // those call sites compiling unchanged, and will disappear once those files
 // move to their own subpackages in later slices.
+//
+// siteMapHiddenInputs, siteMapInputViews, and siteMapMapList (formerly
+// shimmed here for inspector.go/inspector_fields.go) were removed in Slice 6:
+// those files moved to the panels package, which carries its own frozen
+// copies of the same helpers (panels/support.go) rather than importing
+// sitemap (a forbidden peer import per the DAG).
 var (
-	siteMapHiddenInputs                    = sitemap.SiteMapHiddenInputs
-	siteMapInputViews                      = sitemap.SiteMapInputViews
-	siteMapMapList                         = sitemap.SiteMapMapList
 	authoringSiteMapComponentTemplateViews = sitemap.AuthoringSiteMapComponentTemplateViews
 	authoringSiteMapControlViews           = sitemap.AuthoringSiteMapControlViews
 	authoringSiteMapEditableControlView    = sitemap.AuthoringSiteMapEditableControlView

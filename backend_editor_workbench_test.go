@@ -1138,3 +1138,65 @@ func TestRenderBackendEditorWorkbenchSlotHelpers(t *testing.T) {
 		}
 	}
 }
+
+// publishPanelTestView and publishPanelDecisionTestView are frozen,
+// byte-identical copies of panels/publish_panel_test.go's test fixtures
+// (unexported, so unreachable across the package boundary) needed by this
+// file's PublishPanelView fixture above. publish_panel.go moved to the
+// panels package in Slice 6 of the package restructure (see
+// .tiller/scratch/gosx-studio-restructure-spec-v0.1.md), but
+// backend_editor_workbench_test.go stays at root pending Slice 8 (shell), so
+// it carries its own copy of the fixture rather than importing panels'
+// unexported test helper (which it could not reach anyway).
+func publishPanelTestView() map[string]any {
+	return map[string]any{
+		"status":             "draft",
+		"kicker":             "Publish",
+		"panelTitle":         "Release center",
+		"summary":            "Ready for owner review.",
+		"countLabel":         "2/3 clear",
+		"hasDraft":           true,
+		"draftStatusLabel":   "Unpublished changes ready",
+		"previewHref":        "/preview",
+		"formID":             "websiteEditorForm",
+		"publishAction":      "/publish",
+		"hasPublishAction":   true,
+		"discardAction":      "/discard",
+		"hasDiscardAction":   true,
+		"hasPendingChanges":  true,
+		"draftSummary":       "2 unpublished changes",
+		"scheduleInputID":    "publishAt",
+		"scheduleInputName":  "lifecyclePublishAt",
+		"scheduleInputValue": "2026-06-29T10:30",
+		"scheduleHelp":       "Leave blank to publish manually.",
+		"scheduleAction":     "/schedule",
+		"hasScheduleAction":  true,
+		"hasApproval":        true,
+		"hasSchedule":        true,
+		"readyCountLabel":    "2",
+		"watchCountLabel":    "1",
+		"nextCountLabel":     "0",
+		"hasChecks":          true,
+		"hasImpacts":         true,
+		"hasEnvironments":    true,
+		"pendingChanges":     []map[string]any{{"kindLabel": "Changed", "path": "site.title"}, {"kindLabel": "Added", "path": "home.sections.hero"}},
+		"approval":           publishPanelDecisionTestView("studio-publish-review__decision studio-publish-review__decision--next", "Owner approval", "Approval pending", "Noni should review the preview.", "Next", true),
+		"schedule":           publishPanelDecisionTestView("studio-publish-review__decision studio-publish-review__decision--ready", "Publish timing", "Manual publish", "No future publish time is set.", "Ready", false),
+		"checks":             []map[string]any{{"key": "media", "class": "studio-publish-review__card studio-publish-review__card--watch", "label": "Media alt text", "scope": "Media", "statusLabel": "Watch", "summary": "Needs review", "detail": "One image needs alt text.", "hasHref": true, "href": "/admin/media", "actionLabel": "Review media"}},
+		"impacts":            []map[string]any{{"key": "sections", "class": "studio-publish-review__impact studio-publish-review__impact--ready", "label": "Home sections", "scope": "Homepage", "value": "5 enabled", "detail": "Homepage structure changes."}},
+		"environments":       []map[string]any{{"key": "staging", "label": "Staging", "url": "https://staging.example.test", "state": "ready", "stateLabel": "Ready", "hasHref": true, "detail": "Review the release candidate."}, {"key": "production", "label": "Production", "value": "TBD", "state": "tbd", "stateLabel": "TBD", "detail": "Production domain is not ready yet."}},
+	}
+}
+
+func publishPanelDecisionTestView(className, label, summary, detail, statusLabel string, href bool) map[string]any {
+	return map[string]any{
+		"class":       className,
+		"label":       label,
+		"summary":     summary,
+		"detail":      detail,
+		"statusLabel": statusLabel,
+		"hasHref":     href,
+		"href":        "#approval",
+		"actionLabel": "Request approval",
+	}
+}
