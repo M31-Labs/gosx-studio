@@ -1,20 +1,25 @@
 package studio
 
-// Plugin is a compiled-in bundle of editor-surfacing artifacts. The wedge keeps
-// this minimal: a plugin contributes ComponentTemplates that appear in the
-// editor's block palette once registered into a host SiteMap's Library. There is
-// no dynamic loader, manifest, or interface — plugins are linked into the binary.
+// Plugin is a compiled-in bundle of editor-surfacing artifacts. A plugin
+// contributes ComponentTemplates that appear in the editor's block palette
+// (CompositionLibrary.RegisterPlugin) and, on the Plugin v2 island channel,
+// client runtime Islands that are bundled and served alongside the built-in
+// runtimes (PluginRegistry.Register). Plugins are linked into the binary — there
+// is no dynamic loader; per-tenant enablement is a FeatureFlags concern.
 //
-// Feature, ResourceAdapters, and RuntimeContracts are reserved for forward
-// compatibility (so later tasks can attach a plugin's feature surface and
-// runtime wiring) but are unused by registration today.
+// Feature, ResourceAdapters, and RuntimeContracts remain reserved for the
+// forthcoming Plugin v2 channels (feature/adapter merge + served runtime
+// manifest); Islands is live today via PluginRegistry.
 type Plugin struct {
 	Key       string
 	Label     string
 	Summary   string
 	Templates []ComponentTemplate
 
-	// Forward-compat (optional, unused by RegisterPlugin):
+	// Plugin v2 island channel (live via PluginRegistry.Register):
+	Islands []PluginIsland
+
+	// Forward-compat (optional, unused by RegisterPlugin / PluginRegistry today):
 	Feature          Feature
 	ResourceAdapters []ResourceAdapter
 	RuntimeContracts []RuntimeContract

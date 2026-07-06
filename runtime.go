@@ -35,7 +35,23 @@ var runtimeFS embed.FS
 // ~/.hyphae/spaces/m31labs-gosx/plans/gosx-vm-unification-and-editor-bridge-burn-down.md
 // Phase 3 Section E for the burn-down history.
 func EngineRuntimeScript() []byte {
-	slices := [][]byte{
+	return concatRuntimeSlices(builtinRuntimeSlices())
+}
+
+// EngineRuntimeScriptWithPlugins returns the built-in island bundle followed by
+// every client island contributed by plugins registered in reg, in registration
+// order. With a nil or empty registry the output is byte-identical to
+// EngineRuntimeScript(), so non-plugin hosts are unaffected. A plugin-aware host
+// serves this instead of EngineRuntimeScript() and mounts reg.IslandRoutes().
+func EngineRuntimeScriptWithPlugins(reg *PluginRegistry) []byte {
+	return concatRuntimeSlices(append(builtinRuntimeSlices(), reg.IslandBundles()...))
+}
+
+// builtinRuntimeSlices returns the ordered built-in island bundles. Extracted so
+// EngineRuntimeScript and EngineRuntimeScriptWithPlugins share one source of
+// truth for the built-in set and its order.
+func builtinRuntimeSlices() [][]byte {
+	return [][]byte{
 		fieldruntime.Bundle(),
 		selectionruntime.Bundle(),
 		brandruntime.Bundle(),
@@ -48,6 +64,11 @@ func EngineRuntimeScript() []byte {
 		inspectorruntime.Bundle(),
 		inlineeditruntime.Bundle(),
 	}
+}
+
+// concatRuntimeSlices joins non-empty island bundles, each terminated by a
+// newline (the historical engine-bundle framing).
+func concatRuntimeSlices(slices [][]byte) []byte {
 	total := 0
 	for _, slice := range slices {
 		if len(slice) > 0 {
@@ -69,32 +90,16 @@ func Stylesheet() []byte {
 	return readRuntime("assets/studio.css")
 }
 
-func WorkbenchRuntimeScript() []byte {
-	return readRuntime("assets/workbench_runtime.js")
-}
-
-func CommandRuntimeScript() []byte {
-	return readRuntime("assets/command_palette.js")
-}
-
-func StateRuntimeScript() []byte {
-	return readRuntime("assets/state_runtime.js")
-}
-
 func EngineRuntimeHandler() http.Handler {
 	return ScriptHandler("studio-engines.js", EngineRuntimeScript())
 }
 
-func WorkbenchRuntimeHandler() http.Handler {
-	return ScriptHandler("workbench-runtime.js", WorkbenchRuntimeScript())
-}
-
-func CommandRuntimeHandler() http.Handler {
-	return ScriptHandler("command-palette.js", CommandRuntimeScript())
-}
-
-func StateRuntimeHandler() http.Handler {
-	return ScriptHandler("state-runtime.js", StateRuntimeScript())
+// EngineRuntimeHandlerWithPlugins serves the engine bundle including the islands
+// contributed by plugins registered in reg. A plugin-aware host mounts this in
+// place of EngineRuntimeHandler() and also mounts reg.IslandRoutes() so each
+// island is additionally reachable on its own URL.
+func EngineRuntimeHandlerWithPlugins(reg *PluginRegistry) http.Handler {
+	return ScriptHandler("studio-engines.js", EngineRuntimeScriptWithPlugins(reg))
 }
 
 // CanvasInlineEditScript returns the CanvasBoard inline-edit bridge. The bridge
@@ -178,6 +183,24 @@ func PreviewSubscriberScript() []byte {
 	return previewruntime.PreviewSubscriberScript()
 }
 
+// WorkbenchRuntimeScript returns the legacy Studio workbench chrome runtime.
+// It remains separate from EngineRuntimeScript because existing hosts mount it
+// through WorkbenchRuntimePath while backend admin/editor ownership moves into
+// this module.
+func WorkbenchRuntimeScript() []byte {
+	return readRuntime("assets/workbench_runtime.js")
+}
+
+// CommandRuntimeScript returns the Studio command palette runtime.
+func CommandRuntimeScript() []byte {
+	return readRuntime("assets/command_palette.js")
+}
+
+// StateRuntimeScript returns the Studio save/state indicator runtime.
+func StateRuntimeScript() []byte {
+	return readRuntime("assets/state_runtime.js")
+}
+
 // AuthoringRuntimeScript returns the browser runtime that reacts to successful
 // Studio authoring action results. It is included in EngineRuntimeScript for
 // hosts that serve the Studio engine bundle, and is exposed separately for
@@ -198,6 +221,18 @@ func SiteMapRuntimeScript() []byte {
 // a <script defer> tag emitted by the preview-mode bootstrap.
 func PreviewSubscriberHandler() http.Handler {
 	return ScriptHandler("preview-subscriber.js", PreviewSubscriberScript())
+}
+
+func WorkbenchRuntimeHandler() http.Handler {
+	return ScriptHandler("workbench-runtime.js", WorkbenchRuntimeScript())
+}
+
+func CommandRuntimeHandler() http.Handler {
+	return ScriptHandler("command-palette.js", CommandRuntimeScript())
+}
+
+func StateRuntimeHandler() http.Handler {
+	return ScriptHandler("state-runtime.js", StateRuntimeScript())
 }
 
 func StylesheetHandler() http.Handler {
