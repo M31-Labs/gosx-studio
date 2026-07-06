@@ -181,13 +181,3 @@ func RenderStudioEngineHosts(hosts []map[string]any, options StudioEngineHostsOp
 	return canvas.RenderStudioEngineHosts(hosts, options)
 }
 
-// --- Unexported shims for not-yet-moved root files ---
-//
-// block_layout_engine.go also carried an unexported "open tag" render helper
-// that three still-root-resident panel files (brand_panel.go,
-// home_layers_panel.go, advanced_panel.go — panels package territory, Slice
-// 6) call by its original lowercase name. canvas exports the equivalent
-// implementation as RenderBlockLayoutEngineOpenTag (see that package's doc
-// comment); this var keeps those call sites compiling unchanged, and will
-// disappear once those files move to their own subpackage in a later slice.
-var renderBlockLayoutEngineOpenTag = canvas.RenderBlockLayoutEngineOpenTag
