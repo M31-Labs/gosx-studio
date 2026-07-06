@@ -1,6 +1,9 @@
 package panels
 
-import "m31labs.dev/gosx"
+import (
+	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/core"
+)
 
 type BrandMediaPickerAssetItem struct {
 	ID          string
@@ -57,12 +60,12 @@ func brandMediaPickerRootAttrs(view map[string]any, options BrandMediaPickerOpti
 func renderBrandMediaPickerHead(view map[string]any) gosx.Node {
 	return gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-brand-media-picker__head")),
 		gosx.El("div", nil,
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchMapString(view, "kicker"))),
-			gosx.El("h3", nil, gosx.Text(workbenchMapString(view, "title"))),
-			gosx.El("p", nil, gosx.Text(workbenchMapString(view, "summary"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.WorkbenchViewString(view, "kicker"))),
+			gosx.El("h3", nil, gosx.Text(core.WorkbenchViewString(view, "title"))),
+			gosx.El("p", nil, gosx.Text(core.WorkbenchViewString(view, "summary"))),
 		),
 		gosx.El("a", gosx.Attrs(
-			gosx.Attr("href", workbenchMapString(view, "uploadHref")),
+			gosx.Attr("href", core.WorkbenchViewString(view, "uploadHref")),
 			gosx.Attr("data-gosx-link", "true"),
 		), gosx.Text("Upload")),
 	)
@@ -72,7 +75,7 @@ func renderBrandMediaPickerFilters(view map[string]any) gosx.Node {
 	return gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", "studio-brand-media-picker__filters"),
 		gosx.Attr("role", "toolbar"),
-		gosx.Attr("aria-label", workbenchMapString(view, "filterLabel")),
+		gosx.Attr("aria-label", core.WorkbenchViewString(view, "filterLabel")),
 	),
 		gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("aria-pressed", "true")), gosx.Text("All")),
 		gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("aria-pressed", "false")), gosx.Text("Ready")),
@@ -83,53 +86,53 @@ func renderBrandMediaPickerFilters(view map[string]any) gosx.Node {
 func renderBrandMediaPickerEmpty(view map[string]any) gosx.Node {
 	return gosx.El("p", gosx.Attrs(
 		gosx.Attr("class", "studio-brand-media-picker__empty"),
-		gosx.Attr("hidden", workbenchMapBool(view, "hasAssets")),
-	), gosx.Text(workbenchMapString(view, "emptyLabel")))
+		gosx.Attr("hidden", core.WorkbenchViewBool(view, "hasAssets")),
+	), gosx.Text(core.WorkbenchViewString(view, "emptyLabel")))
 }
 
 func renderBrandMediaPickerGrid(view map[string]any) gosx.Node {
-	assets := workbenchViewMapList(view, "assets")
+	assets := core.WorkbenchViewMapList(view, "assets")
 	children := make([]gosx.Node, 0, len(assets))
 	for _, asset := range assets {
 		children = append(children, renderBrandMediaPickerAsset(view, asset))
 	}
 	return gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", "studio-brand-media-picker__grid"),
-		gosx.Attr("aria-label", workbenchMapString(view, "assetLabel")),
+		gosx.Attr("aria-label", core.WorkbenchViewString(view, "assetLabel")),
 	), gosx.Fragment(children...))
 }
 
 func renderBrandMediaPickerAsset(view, asset map[string]any) gosx.Node {
 	return gosx.El("article", gosx.Attrs(
-		gosx.Attr("class", workbenchMapString(asset, "cardClass")),
-		gosx.Attr("data-studio-media-asset", workbenchMapString(asset, "id")),
-		gosx.Attr("data-studio-media-filter-group", workbenchMapString(asset, "filterGroup")),
+		gosx.Attr("class", core.WorkbenchViewString(asset, "cardClass")),
+		gosx.Attr("data-studio-media-asset", core.WorkbenchViewString(asset, "id")),
+		gosx.Attr("data-studio-media-filter-group", core.WorkbenchViewString(asset, "filterGroup")),
 	),
 		gosx.El("img", gosx.Attrs(
-			gosx.Attr("src", workbenchMapString(asset, "url")),
-			gosx.Attr("alt", workbenchMapString(asset, "alt")),
+			gosx.Attr("src", core.WorkbenchViewString(asset, "url")),
+			gosx.Attr("alt", core.WorkbenchViewString(asset, "alt")),
 		)),
 		gosx.El("div", nil,
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(asset, "filename"))),
-			gosx.El("span", nil, gosx.Text(workbenchMapString(asset, "statusLabel"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(asset, "filename"))),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(asset, "statusLabel"))),
 		),
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "studio-brand-media-picker__actions"),
-			gosx.Attr("aria-label", workbenchMapString(asset, "actionLabel")),
+			gosx.Attr("aria-label", core.WorkbenchViewString(asset, "actionLabel")),
 		),
 			gosx.El("button", gosx.Attrs(
 				gosx.Attr("type", "submit"),
-				gosx.Attr("form", workbenchMapString(view, "formID")),
-				gosx.Attr("formaction", workbenchMapString(view, "saveAction")),
-				gosx.Attr("name", workbenchMapString(view, "logoPickName")),
-				gosx.Attr("value", workbenchMapString(asset, "url")),
+				gosx.Attr("form", core.WorkbenchViewString(view, "formID")),
+				gosx.Attr("formaction", core.WorkbenchViewString(view, "saveAction")),
+				gosx.Attr("name", core.WorkbenchViewString(view, "logoPickName")),
+				gosx.Attr("value", core.WorkbenchViewString(asset, "url")),
 			), gosx.Text("Use logo")),
 			gosx.El("button", gosx.Attrs(
 				gosx.Attr("type", "submit"),
-				gosx.Attr("form", workbenchMapString(view, "formID")),
-				gosx.Attr("formaction", workbenchMapString(view, "saveAction")),
-				gosx.Attr("name", workbenchMapString(view, "faviconPickName")),
-				gosx.Attr("value", workbenchMapString(asset, "url")),
+				gosx.Attr("form", core.WorkbenchViewString(view, "formID")),
+				gosx.Attr("formaction", core.WorkbenchViewString(view, "saveAction")),
+				gosx.Attr("name", core.WorkbenchViewString(view, "faviconPickName")),
+				gosx.Attr("value", core.WorkbenchViewString(asset, "url")),
 			), gosx.Text("Use icon")),
 		),
 	)

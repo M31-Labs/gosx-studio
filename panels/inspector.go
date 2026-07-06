@@ -25,9 +25,9 @@ import (
 //
 // formID and inputName must match the <form id> and the visible widget's name.
 func RenderInspectorControl(control map[string]any, formID, inputName string) gosx.Node {
-	kind := workbenchMapString(control, "kind")
-	value := workbenchMapString(control, "value")
-	actionLabel := core.FirstNonEmpty(workbenchMapString(control, "actionLabel"), "Save field")
+	kind := core.WorkbenchViewString(control, "kind")
+	value := core.WorkbenchViewString(control, "value")
+	actionLabel := core.FirstNonEmpty(core.WorkbenchViewString(control, "actionLabel"), "Save field")
 	hiddenInputs := siteMapHiddenInputs(formID, siteMapInputViews(control, "formInputs"), inputName)
 
 	widget := inspectorWidget(kind, value, formID, inputName, control)
@@ -226,8 +226,8 @@ func inspectorControlOptions(control map[string]any) []map[string]string {
 		out := make([]map[string]string, 0, len(typed))
 		for _, item := range typed {
 			out = append(out, map[string]string{
-				"value": workbenchMapString(item, "value"),
-				"label": workbenchMapString(item, "label"),
+				"value": core.WorkbenchViewString(item, "value"),
+				"label": core.WorkbenchViewString(item, "label"),
 			})
 		}
 		return out

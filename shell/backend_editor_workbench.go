@@ -1,6 +1,12 @@
-package studio
+package shell
 
-import "m31labs.dev/gosx"
+import (
+	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/canvas"
+	"m31labs.dev/gosx-studio/core"
+	"m31labs.dev/gosx-studio/panels"
+	"m31labs.dev/gosx-studio/sitemap"
+)
 
 type BackendEditorWorkbenchProps struct {
 	View         map[string]any
@@ -50,9 +56,9 @@ type BackendEditorWorkbenchPanelStackProps struct {
 	BlockLibraryPanelView           map[string]any
 	SiteMapEngine                   gosx.Node
 	SiteMapView                     map[string]any
-	SiteMapEngineOptions            SiteMapEngineOptions
+	SiteMapEngineOptions            sitemap.SiteMapEngineOptions
 	SiteMapCanvas                   gosx.Node
-	SiteMapCanvasSurfaceOptions     SiteMapCanvasSurfaceOptions
+	SiteMapCanvasSurfaceOptions     canvas.SiteMapCanvasSurfaceOptions
 	InspectorChrome                 gosx.Node
 	InspectorChromeView             map[string]any
 	HomeInspector                   gosx.Node
@@ -90,15 +96,15 @@ type BackendEditorWorkbenchPanelStackProps struct {
 
 func RenderBackendEditorWorkbench(props BackendEditorWorkbenchProps) gosx.Node {
 	toolbar := props.Toolbar
-	if workbenchNodeEmpty(toolbar) {
+	if core.WorkbenchNodeEmpty(toolbar) {
 		toolbar = RenderBackendEditorWorkbenchToolbar(props.View)
 	}
 	canvasBar := props.CanvasBar
-	if workbenchNodeEmpty(canvasBar) {
+	if core.WorkbenchNodeEmpty(canvasBar) {
 		canvasBar = RenderBackendEditorWorkbenchCanvasBar(props.View)
 	}
 	canvasStatus := props.CanvasStatus
-	if workbenchNodeEmpty(canvasStatus) {
+	if core.WorkbenchNodeEmpty(canvasStatus) {
 		canvasStatus = RenderBackendEditorWorkbenchCanvasStatus(props.View)
 	}
 
@@ -110,10 +116,10 @@ func RenderBackendEditorWorkbench(props BackendEditorWorkbenchProps) gosx.Node {
 		Board:          []gosx.Node{RenderBackendEditorBoard(props.Board...)},
 		RightRail:      []gosx.Node{RenderBackendEditorRightRail(props.RightRail...)},
 	}
-	if !workbenchNodeEmpty(canvasBar) {
+	if !core.WorkbenchNodeEmpty(canvasBar) {
 		options.CanvasBar = []gosx.Node{canvasBar}
 	}
-	if !workbenchNodeEmpty(canvasStatus) {
+	if !core.WorkbenchNodeEmpty(canvasStatus) {
 		options.CanvasStatus = []gosx.Node{canvasStatus}
 	}
 	return gosx.El("div", gosx.Attrs(gosx.Attr("data-gosx-studio-frame-slot", "true")),
@@ -197,25 +203,25 @@ func RenderBackendEditorWorkbenchContent(props BackendEditorWorkbenchContentProp
 
 func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelStackProps) gosx.Node {
 	siteNavigator := props.SiteNavigator
-	if workbenchNodeEmpty(siteNavigator) {
-		siteNavigator = RenderSiteNavigatorPanel(SiteNavigatorPropsFromMap(props.SiteNavigatorView), SiteNavigatorPanelOptions{})
+	if core.WorkbenchNodeEmpty(siteNavigator) {
+		siteNavigator = sitemap.RenderSiteNavigatorPanel(sitemap.SiteNavigatorPropsFromMap(props.SiteNavigatorView), sitemap.SiteNavigatorPanelOptions{})
 	}
 	homeLayerSelection := props.HomeLayerSelection
-	if workbenchNodeEmpty(homeLayerSelection) {
+	if core.WorkbenchNodeEmpty(homeLayerSelection) {
 		homeLayerSelectionView := props.HomeLayerSelectionView
 		if len(homeLayerSelectionView) == 0 {
 			homeLayerSelectionView = props.HomeLayers
 		}
-		homeLayerSelection = RenderHomeLayerSelection(HomeLayerSelectionPropsFromMap(homeLayerSelectionView))
+		homeLayerSelection = panels.RenderHomeLayerSelection(panels.HomeLayerSelectionPropsFromMap(homeLayerSelectionView))
 	}
-	homeLayersPanel := RenderHomeLayersPanel(props.HomeLayers, HomeLayersPanelOptions{
+	homeLayersPanel := panels.RenderHomeLayersPanel(props.HomeLayers, panels.HomeLayersPanelOptions{
 		PickerNode: homeLayerSelection,
 	})
 	blockLibraryPanel := props.BlockLibraryPanel
-	if workbenchNodeEmpty(blockLibraryPanel) {
-		blockLibraryPanel = RenderBlockLibraryPanel(props.BlockLibraryPanelView, BlockLibraryPanelOptions{})
+	if core.WorkbenchNodeEmpty(blockLibraryPanel) {
+		blockLibraryPanel = panels.RenderBlockLibraryPanel(props.BlockLibraryPanelView, panels.BlockLibraryPanelOptions{})
 	}
-	blockLayout := RenderBlockLayoutEngine(props.HomeLayers, BlockLayoutEngineOptions{
+	blockLayout := canvas.RenderBlockLayoutEngine(props.HomeLayers, canvas.BlockLayoutEngineOptions{
 		EngineHostNode: props.BlockLayoutEngineHost,
 		LayersNode:     homeLayersPanel,
 		LibraryNode:    blockLibraryPanel,
@@ -223,57 +229,57 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 		Title:          "Sections",
 	})
 	inspectorChrome := props.InspectorChrome
-	if workbenchNodeEmpty(inspectorChrome) {
-		inspectorChrome = RenderInspectorChromePanel(props.InspectorChromeView, InspectorChromePanelOptions{})
+	if core.WorkbenchNodeEmpty(inspectorChrome) {
+		inspectorChrome = panels.RenderInspectorChromePanel(props.InspectorChromeView, panels.InspectorChromePanelOptions{})
 	}
 	homeInspector := props.HomeInspector
-	if workbenchNodeEmpty(homeInspector) {
-		homeInspector = RenderHomeInspectorPanel(props.HomeInspectorView, props.HomeInspectorContentFields, HomeInspectorPanelOptions{})
+	if core.WorkbenchNodeEmpty(homeInspector) {
+		homeInspector = panels.RenderHomeInspectorPanel(props.HomeInspectorView, props.HomeInspectorContentFields, panels.HomeInspectorPanelOptions{})
 	}
 	lookPanel := props.LookPanel
-	if workbenchNodeEmpty(lookPanel) {
-		lookPanel = RenderLookPanel(props.LookPanelView, LookPanelOptions{})
+	if core.WorkbenchNodeEmpty(lookPanel) {
+		lookPanel = panels.RenderLookPanel(props.LookPanelView, panels.LookPanelOptions{})
 	}
 	brandMediaPicker := props.BrandMediaPicker
-	if workbenchNodeEmpty(brandMediaPicker) {
-		brandMediaPicker = RenderBrandMediaPicker(props.BrandMediaPickerView, BrandMediaPickerOptions{})
+	if core.WorkbenchNodeEmpty(brandMediaPicker) {
+		brandMediaPicker = panels.RenderBrandMediaPicker(props.BrandMediaPickerView, panels.BrandMediaPickerOptions{})
 	}
-	brandPanel := RenderBrandPanel(props.BrandPanel, props.BrandFields, BrandPanelOptions{
+	brandPanel := panels.RenderBrandPanel(props.BrandPanel, props.BrandFields, panels.BrandPanelOptions{
 		MediaPickerNode: brandMediaPicker,
 	})
 	navigationPanel := props.NavigationPanel
-	if workbenchNodeEmpty(navigationPanel) {
-		navigationPanel = RenderNavigationPanel(props.NavigationPanelView, NavigationPanelOptions{})
+	if core.WorkbenchNodeEmpty(navigationPanel) {
+		navigationPanel = panels.RenderNavigationPanel(props.NavigationPanelView, panels.NavigationPanelOptions{})
 	}
 	checkoutPanel := props.CheckoutPanel
-	if workbenchNodeEmpty(checkoutPanel) {
-		checkoutPanel = RenderCheckoutPanel(props.CheckoutPanelView, CheckoutPanelOptions{})
+	if core.WorkbenchNodeEmpty(checkoutPanel) {
+		checkoutPanel = panels.RenderCheckoutPanel(props.CheckoutPanelView, panels.CheckoutPanelOptions{})
 	}
 	flowDesigner := props.FlowDesigner
-	if workbenchNodeEmpty(flowDesigner) {
-		flowDesigner = RenderFlowDesignerPanel(props.FlowDesignerView, FlowDesignerPanelOptions{})
+	if core.WorkbenchNodeEmpty(flowDesigner) {
+		flowDesigner = panels.RenderFlowDesignerPanel(props.FlowDesignerView, panels.FlowDesignerPanelOptions{})
 	}
 	advancedToolsPanel := props.AdvancedToolsPanel
-	if workbenchNodeEmpty(advancedToolsPanel) {
-		advancedToolsPanel = RenderAdvancedToolsPanel(props.AdvancedToolsPanelView, AdvancedToolsPanelOptions{})
+	if core.WorkbenchNodeEmpty(advancedToolsPanel) {
+		advancedToolsPanel = panels.RenderAdvancedToolsPanel(props.AdvancedToolsPanelView, panels.AdvancedToolsPanelOptions{})
 	}
 	advancedWorkspaceFieldPanel := props.AdvancedWorkspaceFieldPanel
-	if workbenchNodeEmpty(advancedWorkspaceFieldPanel) {
-		advancedWorkspaceFieldPanel = RenderAdvancedFieldPanel(props.AdvancedWorkspaceFieldPanelView, AdvancedFieldPanelOptions{})
+	if core.WorkbenchNodeEmpty(advancedWorkspaceFieldPanel) {
+		advancedWorkspaceFieldPanel = panels.RenderAdvancedFieldPanel(props.AdvancedWorkspaceFieldPanelView, panels.AdvancedFieldPanelOptions{})
 	}
 	advancedCalendarFieldPanel := props.AdvancedCalendarFieldPanel
-	if workbenchNodeEmpty(advancedCalendarFieldPanel) {
-		advancedCalendarFieldPanel = RenderAdvancedFieldPanel(props.AdvancedCalendarFieldPanelView, AdvancedFieldPanelOptions{})
+	if core.WorkbenchNodeEmpty(advancedCalendarFieldPanel) {
+		advancedCalendarFieldPanel = panels.RenderAdvancedFieldPanel(props.AdvancedCalendarFieldPanelView, panels.AdvancedFieldPanelOptions{})
 	}
 	advancedTypeFieldPanel := props.AdvancedTypeFieldPanel
-	if workbenchNodeEmpty(advancedTypeFieldPanel) {
-		advancedTypeFieldPanel = RenderAdvancedFieldPanel(props.AdvancedTypeFieldPanelView, AdvancedFieldPanelOptions{})
+	if core.WorkbenchNodeEmpty(advancedTypeFieldPanel) {
+		advancedTypeFieldPanel = panels.RenderAdvancedFieldPanel(props.AdvancedTypeFieldPanelView, panels.AdvancedFieldPanelOptions{})
 	}
 	advancedSettingsPanel := props.AdvancedSettingsPanel
-	if workbenchNodeEmpty(advancedSettingsPanel) {
-		advancedSettingsPanel = RenderAdvancedSettingsPanel(props.AdvancedSettingsPanelView, AdvancedSettingsPanelOptions{})
+	if core.WorkbenchNodeEmpty(advancedSettingsPanel) {
+		advancedSettingsPanel = panels.RenderAdvancedSettingsPanel(props.AdvancedSettingsPanelView, panels.AdvancedSettingsPanelOptions{})
 	}
-	advancedPanel := RenderAdvancedPanel(props.AdvancedPanel, AdvancedPanelOptions{
+	advancedPanel := panels.RenderAdvancedPanel(props.AdvancedPanel, panels.AdvancedPanelOptions{
 		GroupNodes: map[string]gosx.Node{
 			"flows":      flowDesigner,
 			"tools":      advancedToolsPanel,
@@ -284,7 +290,7 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 		},
 	})
 	publishPanel := props.PublishPanel
-	if workbenchNodeEmpty(publishPanel) {
+	if core.WorkbenchNodeEmpty(publishPanel) {
 		publishPanel = RenderBackendEditorPublishPanelStack(BackendEditorPublishPanelStackProps{
 			PublishPanel:    props.PublishPanelView,
 			PreviewShare:    props.PreviewSharePanel,
@@ -293,12 +299,12 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 		})
 	}
 	siteMapEngine := props.SiteMapEngine
-	if workbenchNodeEmpty(siteMapEngine) && len(props.SiteMapView) > 0 {
-		siteMapEngine = RenderSiteMapEngine(props.SiteMapView, props.SiteMapEngineOptions).Surface
+	if core.WorkbenchNodeEmpty(siteMapEngine) && len(props.SiteMapView) > 0 {
+		siteMapEngine = sitemap.RenderSiteMapEngine(props.SiteMapView, props.SiteMapEngineOptions).Surface
 	}
 	siteMapCanvas := props.SiteMapCanvas
-	if workbenchNodeEmpty(siteMapCanvas) && len(props.SiteMapView) > 0 {
-		siteMapCanvas = RenderSiteMapCanvasSurface(props.SiteMapView, props.SiteMapCanvasSurfaceOptions)
+	if core.WorkbenchNodeEmpty(siteMapCanvas) && len(props.SiteMapView) > 0 {
+		siteMapCanvas = canvas.RenderSiteMapCanvasSurface(props.SiteMapView, props.SiteMapCanvasSurfaceOptions)
 	}
 
 	return RenderBackendEditorWorkbenchContent(BackendEditorWorkbenchContentProps{
@@ -330,10 +336,10 @@ type BackendEditorPublishPanelStackProps struct {
 }
 
 func RenderBackendEditorPublishPanelStack(props BackendEditorPublishPanelStackProps) gosx.Node {
-	return RenderPublishPanel(props.PublishPanel, PublishPanelOptions{
-		PreviewShareNode:    RenderPreviewSharePanel(props.PreviewShare, PreviewSharePanelOptions{}),
-		ActivityPanelNode:   RenderActivityPanel(props.ActivityPanel, ActivityPanelOptions{}),
-		RevisionHistoryNode: RenderRevisionHistoryPanel(props.RevisionHistory, RevisionHistoryPanelOptions{}),
+	return panels.RenderPublishPanel(props.PublishPanel, panels.PublishPanelOptions{
+		PreviewShareNode:    panels.RenderPreviewSharePanel(props.PreviewShare, panels.PreviewSharePanelOptions{}),
+		ActivityPanelNode:   panels.RenderActivityPanel(props.ActivityPanel, panels.ActivityPanelOptions{}),
+		RevisionHistoryNode: panels.RenderRevisionHistoryPanel(props.RevisionHistory, panels.RevisionHistoryPanelOptions{}),
 	})
 }
 

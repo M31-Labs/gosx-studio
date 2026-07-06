@@ -1,9 +1,11 @@
-package studio
+package shell
 
 import (
 	"strings"
 
 	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/core"
+	"m31labs.dev/gosx-studio/panels"
 )
 
 type WorkbenchFrameOptions struct {
@@ -78,7 +80,7 @@ func RenderWorkbenchFrame(view map[string]any, options WorkbenchFrameOptions) go
 	formChildren = append(formChildren, options.BeforeToolbar...)
 	if !options.DisableToolbar {
 		toolbar := options.Toolbar
-		if workbenchNodeEmpty(toolbar) {
+		if core.WorkbenchNodeEmpty(toolbar) {
 			toolbar = RenderWorkbenchToolbar(view, WorkbenchToolbarOptions{})
 		}
 		formChildren = appendWorkbenchNode(formChildren, toolbar)
@@ -97,7 +99,7 @@ func RenderWorkbenchFrameSegments(view map[string]any, options WorkbenchFrameOpt
 		FormOpen:         renderWorkbenchFrameOpenTag("form", workbenchFrameFormAttrs(view, options)),
 		CSRFInput:        renderWorkbenchFrameCSRF(view, options),
 		StageOpen:        renderWorkbenchFrameOpenTag("div", workbenchFrameStageAttrs(options)),
-		LeftRailOpen:     renderWorkbenchFrameOpenTag("aside", workbenchFrameRailAttrs(FirstNonEmpty(options.LeftRailClass, "studio-left-rail"), "left")),
+		LeftRailOpen:     renderWorkbenchFrameOpenTag("aside", workbenchFrameRailAttrs(core.FirstNonEmpty(options.LeftRailClass, "studio-left-rail"), "left")),
 		LeftRailClose:    gosx.RawHTML("</aside>"),
 		LeftResizer:      RenderWorkbenchRailResizer(view, "left", WorkbenchRailResizerOptions{}),
 		MainOpen:         renderWorkbenchFrameOpenTag("section", workbenchFrameMainAttrs(view, options)),
@@ -107,7 +109,7 @@ func RenderWorkbenchFrameSegments(view map[string]any, options WorkbenchFrameOpt
 		CanvasShellClose: gosx.RawHTML("</div>"),
 		MainClose:        gosx.RawHTML("</section>"),
 		RightResizer:     RenderWorkbenchRailResizer(view, "right", WorkbenchRailResizerOptions{}),
-		RightRailOpen:    renderWorkbenchFrameOpenTag("aside", workbenchFrameRailAttrs(FirstNonEmpty(options.RightRailClass, "editor-sidebar"), "right")),
+		RightRailOpen:    renderWorkbenchFrameOpenTag("aside", workbenchFrameRailAttrs(core.FirstNonEmpty(options.RightRailClass, "editor-sidebar"), "right")),
 		RightRailClose:   gosx.RawHTML("</aside>"),
 		StageClose:       gosx.RawHTML("</div>"),
 		FormClose:        gosx.RawHTML("</form>"),
@@ -117,28 +119,28 @@ func RenderWorkbenchFrameSegments(view map[string]any, options WorkbenchFrameOpt
 
 func RenderWorkbenchRailResizer(view map[string]any, side string, options WorkbenchRailResizerOptions) gosx.Node {
 	resizer := workbenchFrameResizerView(view, side)
-	side = NormalizeKey(FirstNonEmpty(options.Side, workbenchMapString(resizer, "side"), side, "left"))
-	className := FirstNonEmpty(options.Class, "studio-rail-resizer studio-rail-resizer--"+side)
+	side = core.NormalizeKey(core.FirstNonEmpty(options.Side, core.WorkbenchViewString(resizer, "side"), side, "left"))
+	className := core.FirstNonEmpty(options.Class, "studio-rail-resizer studio-rail-resizer--"+side)
 	return gosx.El("button", gosx.Attrs(
 		gosx.Attr("class", className),
 		gosx.Attr("type", "button"),
 		gosx.Attr("role", "separator"),
 		gosx.Attr("aria-orientation", "vertical"),
-		gosx.Attr("aria-label", FirstNonEmpty(options.Label, workbenchMapString(resizer, "label"), "Resize rail")),
-		gosx.Attr("aria-valuemin", FirstNonEmpty(options.Min, workbenchMapString(resizer, "min"))),
-		gosx.Attr("aria-valuemax", FirstNonEmpty(options.Max, workbenchMapString(resizer, "max"))),
-		gosx.Attr("aria-valuenow", FirstNonEmpty(options.Default, workbenchMapString(resizer, "default"))),
+		gosx.Attr("aria-label", core.FirstNonEmpty(options.Label, core.WorkbenchViewString(resizer, "label"), "Resize rail")),
+		gosx.Attr("aria-valuemin", core.FirstNonEmpty(options.Min, core.WorkbenchViewString(resizer, "min"))),
+		gosx.Attr("aria-valuemax", core.FirstNonEmpty(options.Max, core.WorkbenchViewString(resizer, "max"))),
+		gosx.Attr("aria-valuenow", core.FirstNonEmpty(options.Default, core.WorkbenchViewString(resizer, "default"))),
 		gosx.Attr("data-studio-resizer", side),
-		gosx.Attr("data-studio-rail-min", FirstNonEmpty(options.Min, workbenchMapString(resizer, "min"))),
-		gosx.Attr("data-studio-rail-max", FirstNonEmpty(options.Max, workbenchMapString(resizer, "max"))),
-		gosx.Attr("data-studio-rail-default", FirstNonEmpty(options.Default, workbenchMapString(resizer, "default"))),
+		gosx.Attr("data-studio-rail-min", core.FirstNonEmpty(options.Min, core.WorkbenchViewString(resizer, "min"))),
+		gosx.Attr("data-studio-rail-max", core.FirstNonEmpty(options.Max, core.WorkbenchViewString(resizer, "max"))),
+		gosx.Attr("data-studio-rail-default", core.FirstNonEmpty(options.Default, core.WorkbenchViewString(resizer, "default"))),
 		gosx.Attr("data-gosx-studio-rail-resizer-renderer", "gosx-studio"),
 	))
 }
 
 func renderWorkbenchFrameStage(view map[string]any, options WorkbenchFrameOptions) gosx.Node {
 	children := []gosx.Node{
-		renderWorkbenchFrameRail("aside", FirstNonEmpty(options.LeftRailClass, "studio-left-rail"), "left", options.LeftRail),
+		renderWorkbenchFrameRail("aside", core.FirstNonEmpty(options.LeftRailClass, "studio-left-rail"), "left", options.LeftRail),
 	}
 	if options.ResizableRails {
 		children = append(children, RenderWorkbenchRailResizer(view, "left", WorkbenchRailResizerOptions{}))
@@ -147,7 +149,7 @@ func renderWorkbenchFrameStage(view map[string]any, options WorkbenchFrameOption
 	if options.ResizableRails {
 		children = append(children, RenderWorkbenchRailResizer(view, "right", WorkbenchRailResizerOptions{}))
 	}
-	children = append(children, renderWorkbenchFrameRail("aside", FirstNonEmpty(options.RightRailClass, "editor-sidebar"), "right", options.RightRail))
+	children = append(children, renderWorkbenchFrameRail("aside", core.FirstNonEmpty(options.RightRailClass, "editor-sidebar"), "right", options.RightRail))
 
 	return gosx.El("div", gosx.Attrs(workbenchFrameStageAttrs(options)...), gosx.Fragment(children...))
 }
@@ -177,7 +179,7 @@ func renderWorkbenchFrameCanvasShell(view map[string]any, options WorkbenchFrame
 }
 
 func RenderWorkbenchPreviewDockShell(view map[string]any) gosx.Node {
-	previewShell := workbenchViewMap(view, "previewShell")
+	previewShell := core.WorkbenchViewMap(view, "previewShell")
 	if len(previewShell) == 0 {
 		return gosx.Fragment()
 	}
@@ -204,51 +206,51 @@ func RenderWorkbenchPreviewDockShell(view map[string]any) gosx.Node {
 }
 
 func renderWorkbenchFrameCSRF(view map[string]any, options WorkbenchFrameOptions) gosx.Node {
-	if !workbenchViewBool(view, "hasCSRF") {
+	if !core.WorkbenchViewBool(view, "hasCSRF") {
 		return gosx.Fragment()
 	}
-	token := workbenchViewString(view, "csrfToken")
+	token := core.WorkbenchViewString(view, "csrfToken")
 	if token == "" {
 		return gosx.Fragment()
 	}
 	return gosx.El("input", gosx.Attrs(
 		gosx.Attr("type", "hidden"),
-		gosx.Attr("name", FirstNonEmpty(options.CSRFName, "csrf_token")),
+		gosx.Attr("name", core.FirstNonEmpty(options.CSRFName, "csrf_token")),
 		gosx.Attr("value", token),
 	))
 }
 
 func workbenchFrameRootAttrs(view map[string]any, options WorkbenchFrameOptions) []any {
 	attrs := []any{
-		gosx.Attr("class", FirstNonEmpty(options.Class, workbenchViewString(view, "class"), "gosx-studio-workbench")),
+		gosx.Attr("class", core.FirstNonEmpty(options.Class, core.WorkbenchViewString(view, "class"), "gosx-studio-workbench")),
 		gosx.Attr("data-gosx-studio-workbench", "true"),
 		gosx.Attr("data-gosx-studio-frame-renderer", "gosx-studio"),
 	}
-	attrs = appendWorkbenchFrameAttrs(attrs, workbenchViewMap(view, "featureFlagAttrs"))
+	attrs = appendWorkbenchFrameAttrs(attrs, core.WorkbenchViewMap(view, "featureFlagAttrs"))
 	return appendWorkbenchFrameAttrs(attrs, options.RootAttrs)
 }
 
 func workbenchFrameFormAttrs(view map[string]any, options WorkbenchFrameOptions) []any {
 	attrs := []any{}
-	if formID := FirstNonEmpty(options.FormID, workbenchViewString(view, "formID")); formID != "" {
+	if formID := core.FirstNonEmpty(options.FormID, core.WorkbenchViewString(view, "formID")); formID != "" {
 		attrs = append(attrs, gosx.Attr("id", formID))
 	}
 	attrs = append(attrs,
-		gosx.Attr("class", FirstNonEmpty(options.FormClass, workbenchViewString(view, "formClass"), "gosx-studio-workbench__form gosx-studio")),
-		gosx.Attr("method", FirstNonEmpty(options.Method, workbenchViewString(view, "method"), "post")),
+		gosx.Attr("class", core.FirstNonEmpty(options.FormClass, core.WorkbenchViewString(view, "formClass"), "gosx-studio-workbench__form gosx-studio")),
+		gosx.Attr("method", core.FirstNonEmpty(options.Method, core.WorkbenchViewString(view, "method"), "post")),
 	)
-	if action := FirstNonEmpty(options.Action, workbenchViewString(view, "action")); action != "" {
+	if action := core.FirstNonEmpty(options.Action, core.WorkbenchViewString(view, "action")); action != "" {
 		attrs = append(attrs, gosx.Attr("action", action))
 	}
 	attrs = append(attrs,
 		gosx.Attr("data-studio-workbench", "true"),
 		gosx.Attr("data-editor-workbench", "true"),
 		gosx.Attr("data-gosx-studio-state", "true"),
-		gosx.Attr("data-studio-shell", workbenchViewString(view, "shellKey")),
-		gosx.Attr("data-studio-block-count", workbenchViewString(view, "blockCount")),
-		gosx.Attr("data-studio-media-count", workbenchViewString(view, "mediaCount")),
-		gosx.Attr("data-studio-revision-count", workbenchViewString(view, "revisionCount")),
-		gosx.Attr("data-studio-mode", workbenchViewString(view, "mode")),
+		gosx.Attr("data-studio-shell", core.WorkbenchViewString(view, "shellKey")),
+		gosx.Attr("data-studio-block-count", core.WorkbenchViewString(view, "blockCount")),
+		gosx.Attr("data-studio-media-count", core.WorkbenchViewString(view, "mediaCount")),
+		gosx.Attr("data-studio-revision-count", core.WorkbenchViewString(view, "revisionCount")),
+		gosx.Attr("data-studio-mode", core.WorkbenchViewString(view, "mode")),
 	)
 	if !options.DisableClientState {
 		attrs = append(attrs, gosx.Attr("data-gosx-studio-client", "true"))
@@ -256,20 +258,20 @@ func workbenchFrameFormAttrs(view map[string]any, options WorkbenchFrameOptions)
 	if !options.DisableAutosave {
 		attrs = append(attrs,
 			gosx.Attr("data-gosx-studio-autosave", "true"),
-			gosx.Attr("data-gosx-studio-autosave-delay", workbenchViewString(view, "autosaveDelay")),
-			gosx.Attr("data-gosx-studio-autosave-url", workbenchViewString(view, "autosaveURL")),
+			gosx.Attr("data-gosx-studio-autosave-delay", core.WorkbenchViewString(view, "autosaveDelay")),
+			gosx.Attr("data-gosx-studio-autosave-url", core.WorkbenchViewString(view, "autosaveURL")),
 		)
 	}
-	if token := workbenchViewString(view, "csrfToken"); token != "" {
+	if token := core.WorkbenchViewString(view, "csrfToken"); token != "" {
 		attrs = append(attrs, gosx.Attr("data-gosx-csrf-token", token))
 	}
-	if authoringURL := FirstNonEmpty(options.AuthoringURL, workbenchViewString(view, "authoringURL")); authoringURL != "" {
+	if authoringURL := core.FirstNonEmpty(options.AuthoringURL, core.WorkbenchViewString(view, "authoringURL")); authoringURL != "" {
 		attrs = append(attrs, gosx.Attr("data-gosx-studio-authoring-url", authoringURL))
 	}
-	if styleSystemID := workbenchViewString(view, "styleSystemID"); styleSystemID != "" {
+	if styleSystemID := core.WorkbenchViewString(view, "styleSystemID"); styleSystemID != "" {
 		attrs = append(attrs, gosx.Attr("data-studio-style-system", styleSystemID))
 	}
-	if styleSystemValid := workbenchViewString(view, "styleSystemValid"); styleSystemValid != "" {
+	if styleSystemValid := core.WorkbenchViewString(view, "styleSystemValid"); styleSystemValid != "" {
 		attrs = append(attrs, gosx.Attr("data-studio-style-valid", styleSystemValid))
 	}
 	return appendWorkbenchFrameAttrs(attrs, options.FormAttrs)
@@ -277,7 +279,7 @@ func workbenchFrameFormAttrs(view map[string]any, options WorkbenchFrameOptions)
 
 func workbenchFrameStageAttrs(options WorkbenchFrameOptions) []any {
 	return []any{
-		gosx.Attr("class", FirstNonEmpty(options.StageClass, "editor-stage")),
+		gosx.Attr("class", core.FirstNonEmpty(options.StageClass, "editor-stage")),
 		gosx.Attr("data-studio-layout", "true"),
 		gosx.Attr("data-gosx-studio-stage-renderer", "gosx-studio"),
 	}
@@ -293,26 +295,26 @@ func workbenchFrameRailAttrs(className, side string) []any {
 
 func workbenchFrameMainAttrs(view map[string]any, options WorkbenchFrameOptions) []any {
 	return []any{
-		gosx.Attr("class", FirstNonEmpty(options.MainClass, "editor-canvas")),
-		gosx.Attr("aria-label", FirstNonEmpty(workbenchViewString(view, "canvasAriaLabel"), workbenchViewString(view, "routeLabel"), "Studio canvas")),
-		gosx.Attr("data-panel-key", FirstNonEmpty(workbenchViewString(view, "canvasPanelKey"), NormalizeKey(workbenchViewString(view, "routeLabel")), "canvas")),
+		gosx.Attr("class", core.FirstNonEmpty(options.MainClass, "editor-canvas")),
+		gosx.Attr("aria-label", core.FirstNonEmpty(core.WorkbenchViewString(view, "canvasAriaLabel"), core.WorkbenchViewString(view, "routeLabel"), "Studio canvas")),
+		gosx.Attr("data-panel-key", core.FirstNonEmpty(core.WorkbenchViewString(view, "canvasPanelKey"), core.NormalizeKey(core.WorkbenchViewString(view, "routeLabel")), "canvas")),
 		gosx.Attr("data-gosx-studio-main-renderer", "gosx-studio"),
 	}
 }
 
 func workbenchFrameCanvasShellAttrs(view map[string]any, options WorkbenchFrameOptions) []any {
 	return []any{
-		gosx.Attr("class", FirstNonEmpty(options.CanvasShellClass, "studio-canvas-shell")),
+		gosx.Attr("class", core.FirstNonEmpty(options.CanvasShellClass, "studio-canvas-shell")),
 		gosx.Attr("data-studio-canvas", "true"),
 		gosx.Attr("data-studio-preview-shell", "true"),
-		gosx.Attr("data-studio-canvas-zoom", FirstNonEmpty(workbenchViewString(view, "zoom"), "fit")),
+		gosx.Attr("data-studio-canvas-zoom", core.FirstNonEmpty(core.WorkbenchViewString(view, "zoom"), "fit")),
 		gosx.Attr("data-gosx-studio-canvas-shell-renderer", "gosx-studio"),
 	}
 }
 
 func workbenchFrameBoardAttrs(options WorkbenchFrameOptions) []any {
 	return []any{
-		gosx.Attr("class", FirstNonEmpty(options.BoardClass, "studio-canvas-board")),
+		gosx.Attr("class", core.FirstNonEmpty(options.BoardClass, "studio-canvas-board")),
 		gosx.Attr("data-gosx-studio-board-renderer", "gosx-studio"),
 	}
 }
@@ -326,42 +328,15 @@ func renderWorkbenchFrameOpenTag(tag string, attrs []any) gosx.Node {
 
 func workbenchFrameResizerView(view map[string]any, side string) map[string]any {
 	if side == "right" {
-		return workbenchViewMap(view, "rightResizer")
+		return core.WorkbenchViewMap(view, "rightResizer")
 	}
-	return workbenchViewMap(view, "leftResizer")
+	return core.WorkbenchViewMap(view, "leftResizer")
 }
 
-func workbenchViewMap(view map[string]any, key string) map[string]any {
-	if view == nil {
-		return nil
-	}
-	switch typed := view[key].(type) {
-	case map[string]any:
-		return typed
-	case map[string]string:
-		out := make(map[string]any, len(typed))
-		for key, value := range typed {
-			out[key] = value
-		}
-		return out
-	default:
-		return nil
-	}
-}
-
-func workbenchViewBool(view map[string]any, key string) bool {
-	if view == nil {
-		return false
-	}
-	switch typed := view[key].(type) {
-	case bool:
-		return typed
-	case string:
-		return strings.EqualFold(strings.TrimSpace(typed), "true")
-	default:
-		return false
-	}
-}
+// workbenchViewMap/workbenchViewBool moved to core as the exported
+// WorkbenchViewMap/WorkbenchViewBool helpers in Slice 8 (see
+// core/workbench_view.go). Callers in this package now reference core.Workbench*
+// directly.
 
 func appendWorkbenchFrameAttrs(attrs []any, values map[string]any) []any {
 	for key, value := range values {
@@ -375,7 +350,7 @@ func appendWorkbenchFrameAttrs(attrs []any, values map[string]any) []any {
 }
 
 func workbenchPreviewDockAttrs(previewShell map[string]any) []any {
-	attrs := blockLibraryPanelMapAttrs(workbenchViewMap(previewShell, "dockAttrs"))
+	attrs := panels.BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(previewShell, "dockAttrs"))
 	attrs = append(attrs,
 		gosx.Attr("hidden", "hidden"),
 		gosx.Attr("role", "toolbar"),
@@ -387,13 +362,13 @@ func workbenchPreviewDockAttrs(previewShell map[string]any) []any {
 }
 
 func workbenchPreviewDockTitleAttrs(previewShell map[string]any) []any {
-	attrs := blockLibraryPanelMapAttrs(workbenchViewMap(previewShell, "dockTitleAttrs"))
+	attrs := panels.BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(previewShell, "dockTitleAttrs"))
 	attrs = append(attrs, gosx.Attr("data-gosx-studio-preview-dock-label", "true"))
 	return attrs
 }
 
 func workbenchPreviewFieldCountAttrs(previewShell map[string]any) []any {
-	attrs := blockLibraryPanelMapAttrs(workbenchViewMap(previewShell, "fieldCountAttrs"))
+	attrs := panels.BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(previewShell, "fieldCountAttrs"))
 	attrs = append(attrs,
 		gosx.Attr("hidden", "hidden"),
 		gosx.Attr("data-gosx-studio-preview-field-meter", "true"),
@@ -407,7 +382,7 @@ func workbenchPreviewDockButton(previewShell map[string]any, attrKey, command, l
 		gosx.Attr("data-gosx-studio-preview-command", command),
 	}
 	if attrKey != "" {
-		attrs = append(attrs, blockLibraryPanelMapAttrs(workbenchViewMap(previewShell, attrKey))...)
+		attrs = append(attrs, panels.BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(previewShell, attrKey))...)
 	}
 	return gosx.El("button", gosx.Attrs(attrs...), gosx.Text(label))
 }

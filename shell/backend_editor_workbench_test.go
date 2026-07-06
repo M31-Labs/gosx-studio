@@ -1,10 +1,13 @@
-package studio
+package shell
 
 import (
 	"strings"
 	"testing"
 
 	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/canvas"
+	"m31labs.dev/gosx-studio/panels"
+	"m31labs.dev/gosx-studio/sitemap"
 )
 
 func TestRenderBackendEditorWorkbenchOwnsFrameAndSlotComposition(t *testing.T) {
@@ -377,18 +380,18 @@ func TestRenderBackendEditorWorkbenchPanelStackRendersSiteMapSurfacesFromProps(t
 		HomeLayers:            map[string]any{"kicker": "Home", "title": "Sections"},
 		BlockLayoutEngineHost: gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
 		SiteMapView:           siteMapView,
-		SiteMapEngineOptions: SiteMapEngineOptions{
+		SiteMapEngineOptions: sitemap.SiteMapEngineOptions{
 			LayoutAction: "/admin/editor/__actions/siteMapLayout",
-			EngineHost: SiteMapEngineHostFromMap(map[string]any{
+			EngineHost: sitemap.SiteMapEngineHostFromMap(map[string]any{
 				"key":     "site-map",
 				"name":    SiteMapEngineName,
 				"mountId": "gosx-studio-site-map-engine",
 			}),
 			HideAuthoringForms: true,
 		},
-		SiteMapCanvasSurfaceOptions: SiteMapCanvasSurfaceOptions{
-			Mode: SiteMapCanvasSurfaceCanvasDefault,
-			Canvas: SiteMapCanvasOptions{
+		SiteMapCanvasSurfaceOptions: canvas.SiteMapCanvasSurfaceOptions{
+			Mode: canvas.SiteMapCanvasSurfaceCanvasDefault,
+			Canvas: canvas.SiteMapCanvasOptions{
 				Class:       "studio-site-map-canvas editor-site-map-canvas",
 				CanvasClass: "editor-site-map-canvas__surface",
 			},
@@ -425,11 +428,11 @@ func TestRenderBackendEditorWorkbenchPanelStackKeepsExplicitSiteMapOverrides(t *
 		HomeLayers:            map[string]any{"kicker": "Home", "title": "Sections"},
 		BlockLayoutEngineHost: gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
 		SiteMapView:           siteMapCanvasTestView(),
-		SiteMapEngineOptions: SiteMapEngineOptions{
+		SiteMapEngineOptions: sitemap.SiteMapEngineOptions{
 			LayoutAction: "/admin/editor/__actions/siteMapLayout",
 		},
-		SiteMapCanvasSurfaceOptions: SiteMapCanvasSurfaceOptions{
-			Mode: SiteMapCanvasSurfaceCanvasDefault,
+		SiteMapCanvasSurfaceOptions: canvas.SiteMapCanvasSurfaceOptions{
+			Mode: canvas.SiteMapCanvasSurfaceCanvasDefault,
 		},
 		SiteMapEngine: gosx.El("section", gosx.Attrs(gosx.Attr("data-explicit-site-map-engine", "true")), gosx.Text("Explicit engine")),
 		SiteMapCanvas: gosx.El("section", gosx.Attrs(gosx.Attr("data-explicit-site-map-canvas", "true")), gosx.Text("Explicit canvas")),
@@ -635,7 +638,7 @@ func TestRenderBackendEditorWorkbenchPanelStackKeepsExplicitNavigatorPickerAndIn
 }
 
 func TestNavigatorAndHomeLayerSelectionPropsFromMap(t *testing.T) {
-	siteNavigator := SiteNavigatorPropsFromMap(map[string]any{
+	siteNavigator := sitemap.SiteNavigatorPropsFromMap(map[string]any{
 		"mode":     "home",
 		"kicker":   "Website",
 		"title":    "Site areas",
@@ -658,7 +661,7 @@ func TestNavigatorAndHomeLayerSelectionPropsFromMap(t *testing.T) {
 		t.Fatalf("site navigator items = %#v", siteNavigator.Items)
 	}
 
-	homeLayerSelection := HomeLayerSelectionPropsFromMap(map[string]any{
+	homeLayerSelection := panels.HomeLayerSelectionPropsFromMap(map[string]any{
 		"defaultSelectedKey":   "hero",
 		"defaultSelectedLabel": "Hero",
 		"items": []map[string]any{{

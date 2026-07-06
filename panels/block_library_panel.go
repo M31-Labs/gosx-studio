@@ -15,23 +15,23 @@ type BlockLibraryPanelOptions struct {
 
 func RenderBlockLibraryPanel(view map[string]any, options BlockLibraryPanelOptions) gosx.Node {
 	attrs := []any{
-		gosx.Attr("class", workbenchMapString(view, "class")),
-		gosx.Attr("data-panel-key", workbenchMapString(view, "key")),
-		gosx.Attr("data-studio-mode-panel", workbenchMapString(view, "mode")),
+		gosx.Attr("class", core.WorkbenchViewString(view, "class")),
+		gosx.Attr("data-panel-key", core.WorkbenchViewString(view, "key")),
+		gosx.Attr("data-studio-mode-panel", core.WorkbenchViewString(view, "mode")),
 		gosx.Attr("data-studio-engine-source", "gosx"),
 		gosx.Attr("data-gosx-studio-block-library-panel-renderer", "gosx-studio"),
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, options.RootAttrs)
 
 	children := []gosx.Node{
-		gosx.El("h2", nil, gosx.Text(workbenchMapString(view, "title"))),
+		gosx.El("h2", nil, gosx.Text(core.WorkbenchViewString(view, "title"))),
 	}
-	items := workbenchViewMapList(view, "items")
-	if len(items) == 0 && !workbenchMapBool(view, "hasItems") {
-		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(workbenchMapString(view, "empty"))))
+	items := core.WorkbenchViewMapList(view, "items")
+	if len(items) == 0 && !core.WorkbenchViewBool(view, "hasItems") {
+		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(core.WorkbenchViewString(view, "empty"))))
 	}
-	if len(items) > 0 || workbenchMapBool(view, "hasItems") {
-		children = append(children, gosx.El("div", gosx.Attrs(gosx.Attr("class", workbenchMapString(view, "listClass"))), gosx.Fragment(renderBlockLibraryPanelItems(items)...)))
+	if len(items) > 0 || core.WorkbenchViewBool(view, "hasItems") {
+		children = append(children, gosx.El("div", gosx.Attrs(gosx.Attr("class", core.WorkbenchViewString(view, "listClass"))), gosx.Fragment(renderBlockLibraryPanelItems(items)...)))
 	}
 	return gosx.El("section", gosx.Attrs(attrs...), gosx.Fragment(children...))
 }
@@ -39,9 +39,9 @@ func RenderBlockLibraryPanel(view map[string]any, options BlockLibraryPanelOptio
 func renderBlockLibraryPanelItems(items []map[string]any) []gosx.Node {
 	nodes := make([]gosx.Node, 0, len(items))
 	for _, item := range items {
-		nodes = append(nodes, gosx.El("button", gosx.Attrs(BlockLibraryPanelMapAttrs(workbenchViewMap(item, "attrs"))...),
-			gosx.El("span", nil, gosx.Text(workbenchMapString(item, "label"))),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(item, "buttonLabel"))),
+		nodes = append(nodes, gosx.El("button", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(item, "attrs"))...),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(item, "label"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(item, "buttonLabel"))),
 		))
 	}
 	return nodes

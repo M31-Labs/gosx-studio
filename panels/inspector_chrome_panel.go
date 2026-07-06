@@ -1,6 +1,9 @@
 package panels
 
-import "m31labs.dev/gosx"
+import (
+	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/core"
+)
 
 type InspectorChromePanelOptions struct {
 	RootAttrs map[string]any
@@ -18,29 +21,29 @@ func RenderInspectorChromePanel(view map[string]any, options InspectorChromePane
 	return gosx.El("section", gosx.Attrs(attrs...),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-inspector-head")),
 			gosx.El("div", nil,
-				gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchMapString(view, "kicker"))),
-				gosx.El("strong", gosx.Attrs(gosx.Attr("data-studio-mode-label", "true")), gosx.Text(workbenchMapString(view, "modeLabel"))),
+				gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.WorkbenchViewString(view, "kicker"))),
+				gosx.El("strong", gosx.Attrs(gosx.Attr("data-studio-mode-label", "true")), gosx.Text(core.WorkbenchViewString(view, "modeLabel"))),
 			),
 			gosx.El("output", gosx.Attrs(
 				gosx.Attr("data-studio-selection-label", "true"),
 				gosx.Attr("aria-live", "polite"),
-			), gosx.Text(workbenchMapString(view, "selectionLabel"))),
+			), gosx.Text(core.WorkbenchViewString(view, "selectionLabel"))),
 		),
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "studio-scope-strip"),
-			gosx.Attr("aria-label", workbenchMapString(view, "scopeLabel")),
-		), gosx.Fragment(renderInspectorChromeCrumbs(workbenchViewMapList(view, "crumbs"))...)),
+			gosx.Attr("aria-label", core.WorkbenchViewString(view, "scopeLabel")),
+		), gosx.Fragment(renderInspectorChromeCrumbs(core.WorkbenchViewMapList(view, "crumbs"))...)),
 	)
 }
 
 func renderInspectorChromeCrumbs(crumbs []map[string]any) []gosx.Node {
 	nodes := make([]gosx.Node, 0, len(crumbs))
 	for _, crumb := range crumbs {
-		label := workbenchMapString(crumb, "label")
+		label := core.WorkbenchViewString(crumb, "label")
 		switch {
-		case workbenchMapBool(crumb, "dynamicSelection"):
+		case core.WorkbenchViewBool(crumb, "dynamicSelection"):
 			nodes = append(nodes, gosx.El("output", gosx.Attrs(gosx.Attr("data-studio-selection-label", "true")), gosx.Text(label)))
-		case workbenchMapBool(crumb, "dynamicMode"):
+		case core.WorkbenchViewBool(crumb, "dynamicMode"):
 			nodes = append(nodes, gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-mode-label", "true")), gosx.Text(label)))
 		default:
 			nodes = append(nodes, gosx.El("span", nil, gosx.Text(label)))

@@ -1,8 +1,10 @@
-package studio
+package shell
 
 import (
 	"strconv"
 	"strings"
+
+	"m31labs.dev/gosx-studio/core"
 )
 
 type WorkbenchShellSource struct {
@@ -49,7 +51,7 @@ type WorkbenchShellViewOptions struct {
 	PreviewURL         string
 	PreviewTitle       string
 	PreviewFrameTitle  string
-	PreviewShell       CanvasPreviewShell
+	PreviewShell       core.CanvasPreviewShell
 	ZoomLevels         []WorkbenchZoomLevel
 	LeftResizer        WorkbenchRailResizer
 	RightResizer       WorkbenchRailResizer
@@ -100,45 +102,45 @@ func WorkbenchShellViewForShell(shell Shell, options WorkbenchShellViewOptions) 
 
 func WorkbenchShellView(source WorkbenchShellSource, options WorkbenchShellViewOptions) map[string]any {
 	source = normalizeWorkbenchShellSource(source)
-	action := FirstNonEmpty(options.Action, source.SaveAction)
-	previewURL := FirstNonEmpty(options.PreviewURL, source.PreviewURL, "/")
-	zoom := FirstNonEmpty(NormalizeKey(options.Zoom), source.Canvas.Zoom, "fit")
-	routeLabel := FirstNonEmpty(options.RouteLabel, source.Canvas.RouteLabel, source.Title, "Preview")
-	selectionLabel := FirstNonEmpty(options.SelectionLabel, source.Canvas.SelectionLabel, "No selection")
-	viewportKey := FirstNonEmpty(options.ViewportKey, activeWorkbenchViewportKey(source.Viewports))
-	viewportLabel := FirstNonEmpty(options.ViewportLabel, activeWorkbenchViewportLabel(source.Viewports))
+	action := core.FirstNonEmpty(options.Action, source.SaveAction)
+	previewURL := core.FirstNonEmpty(options.PreviewURL, source.PreviewURL, "/")
+	zoom := core.FirstNonEmpty(core.NormalizeKey(options.Zoom), source.Canvas.Zoom, "fit")
+	routeLabel := core.FirstNonEmpty(options.RouteLabel, source.Canvas.RouteLabel, source.Title, "Preview")
+	selectionLabel := core.FirstNonEmpty(options.SelectionLabel, source.Canvas.SelectionLabel, "No selection")
+	viewportKey := core.FirstNonEmpty(options.ViewportKey, activeWorkbenchViewportKey(source.Viewports))
+	viewportLabel := core.FirstNonEmpty(options.ViewportLabel, activeWorkbenchViewportLabel(source.Viewports))
 	view := map[string]any{
-		"class":              FirstNonEmpty(options.Class, "gosx-studio-workbench"),
-		"formClass":          FirstNonEmpty(options.FormClass, "gosx-studio-workbench__form gosx-studio"),
+		"class":              core.FirstNonEmpty(options.Class, "gosx-studio-workbench"),
+		"formClass":          core.FirstNonEmpty(options.FormClass, "gosx-studio-workbench__form gosx-studio"),
 		"formID":             strings.TrimSpace(options.FormID),
-		"method":             FirstNonEmpty(options.Method, "post"),
+		"method":             core.FirstNonEmpty(options.Method, "post"),
 		"action":             action,
 		"hasAction":          action != "",
 		"csrfToken":          strings.TrimSpace(options.CSRFToken),
 		"hasCSRF":            strings.TrimSpace(options.CSRFToken) != "",
-		"shellKey":           NormalizeKey(source.Title),
+		"shellKey":           core.NormalizeKey(source.Title),
 		"blockCount":         strconv.Itoa(source.BlockCount),
 		"mediaCount":         strconv.Itoa(source.MediaCount),
 		"revisionCount":      strconv.Itoa(source.RevisionCount),
 		"metrics":            shellMetricViews(NormalizeMetrics(source.Metrics)),
 		"modes":              shellModeViews(NormalizeModes(source.Modes)),
-		"autosaveURL":        FirstNonEmpty(options.AutosaveURL, action),
+		"autosaveURL":        core.FirstNonEmpty(options.AutosaveURL, action),
 		"autosaveDelay":      strconv.Itoa(firstPositive(options.AutosaveDelay, 1400)),
-		"mode":               FirstNonEmpty(options.Mode, activeWorkbenchModeKey(source.Modes)),
+		"mode":               core.FirstNonEmpty(options.Mode, activeWorkbenchModeKey(source.Modes)),
 		"styleSystemID":      strings.TrimSpace(options.StyleSystemID),
-		"styleSystemValid":   BoolAttr(options.StyleSystemValid),
-		"toolbarKicker":      FirstNonEmpty(options.ToolbarKicker, "Website"),
-		"toolbarTitle":       FirstNonEmpty(options.ToolbarTitle, source.Title, "Editor"),
-		"modebarLabel":       FirstNonEmpty(options.ModebarLabel, "Editor mode"),
-		"metricLabel":        FirstNonEmpty(options.MetricLabel, "Workspace details"),
-		"commandLauncher":    FirstNonEmpty(options.CommandLauncher, "Find"),
-		"commandTitle":       FirstNonEmpty(options.CommandTitle, "Editor tools"),
-		"commandSearchHint":  FirstNonEmpty(options.CommandSearchHint, "Find editing areas, sections, previews, and advanced tools"),
+		"styleSystemValid":   core.BoolAttr(options.StyleSystemValid),
+		"toolbarKicker":      core.FirstNonEmpty(options.ToolbarKicker, "Website"),
+		"toolbarTitle":       core.FirstNonEmpty(options.ToolbarTitle, source.Title, "Editor"),
+		"modebarLabel":       core.FirstNonEmpty(options.ModebarLabel, "Editor mode"),
+		"metricLabel":        core.FirstNonEmpty(options.MetricLabel, "Workspace details"),
+		"commandLauncher":    core.FirstNonEmpty(options.CommandLauncher, "Find"),
+		"commandTitle":       core.FirstNonEmpty(options.CommandTitle, "Editor tools"),
+		"commandSearchHint":  core.FirstNonEmpty(options.CommandSearchHint, "Find editing areas, sections, previews, and advanced tools"),
 		"commands":           cloneWorkbenchCommandViews(options.Commands),
 		"hasCommands":        len(options.Commands) > 0,
-		"previewHref":        FirstNonEmpty(options.PreviewHref, previewURL),
-		"previewLabel":       FirstNonEmpty(options.PreviewLabel, "Preview"),
-		"saveLabel":          FirstNonEmpty(options.SaveLabel, "Save changes"),
+		"previewHref":        core.FirstNonEmpty(options.PreviewHref, previewURL),
+		"previewLabel":       core.FirstNonEmpty(options.PreviewLabel, "Preview"),
+		"saveLabel":          core.FirstNonEmpty(options.SaveLabel, "Save changes"),
 		"routeLabel":         routeLabel,
 		"selectionLabel":     selectionLabel,
 		"zoom":               zoom,
@@ -146,20 +148,20 @@ func WorkbenchShellView(source WorkbenchShellSource, options WorkbenchShellViewO
 		"viewportLabel":      viewportLabel,
 		"viewports":          shellViewportViews(source.Viewports),
 		"previewURL":         previewURL,
-		"previewTitle":       FirstNonEmpty(options.PreviewTitle, source.Title+" preview", "Preview"),
-		"previewFrameTitle":  FirstNonEmpty(options.PreviewFrameTitle, source.Title+" preview", "Preview"),
+		"previewTitle":       core.FirstNonEmpty(options.PreviewTitle, source.Title+" preview", "Preview"),
+		"previewFrameTitle":  core.FirstNonEmpty(options.PreviewFrameTitle, source.Title+" preview", "Preview"),
 		"previewShell":       CanvasPreviewShellView(options.PreviewShell, previewURL),
 		"zoomLevels":         WorkbenchZoomLevelViews(zoom, options.ZoomLevels),
 		"leftResizer":        WorkbenchRailResizerView(options.LeftResizer, "left"),
 		"rightResizer":       WorkbenchRailResizerView(options.RightResizer, "right"),
-		"leftRailLabel":      FirstNonEmpty(options.LeftRailLabel, "Layers"),
-		"rightRailLabel":     FirstNonEmpty(options.RightRailLabel, "Inspector"),
-		"activityLabel":      FirstNonEmpty(options.ActivityLabel, "Activity"),
-		"focusLabel":         FirstNonEmpty(options.FocusLabel, "Focus"),
-		"canvasAriaLabel":    FirstNonEmpty(options.CanvasAriaLabel, routeLabel, source.Title, "Studio canvas"),
-		"canvasPanelKey":     FirstNonEmpty(options.CanvasPanelKey, NormalizeKey(routeLabel), "canvas"),
-		"commandEmptyTitle":  FirstNonEmpty(options.CommandEmptyTitle, "No commands"),
-		"commandEmptyDetail": FirstNonEmpty(options.CommandEmptyDetail, "Try a different search."),
+		"leftRailLabel":      core.FirstNonEmpty(options.LeftRailLabel, "Layers"),
+		"rightRailLabel":     core.FirstNonEmpty(options.RightRailLabel, "Inspector"),
+		"activityLabel":      core.FirstNonEmpty(options.ActivityLabel, "Activity"),
+		"focusLabel":         core.FirstNonEmpty(options.FocusLabel, "Focus"),
+		"canvasAriaLabel":    core.FirstNonEmpty(options.CanvasAriaLabel, routeLabel, source.Title, "Studio canvas"),
+		"canvasPanelKey":     core.FirstNonEmpty(options.CanvasPanelKey, core.NormalizeKey(routeLabel), "canvas"),
+		"commandEmptyTitle":  core.FirstNonEmpty(options.CommandEmptyTitle, "No commands"),
+		"commandEmptyDetail": core.FirstNonEmpty(options.CommandEmptyDetail, "Try a different search."),
 	}
 	if len(options.FeatureFlagAttrs) > 0 {
 		view["featureFlagAttrs"] = cloneAnyMap(options.FeatureFlagAttrs)
@@ -172,7 +174,7 @@ func WorkbenchShellView(source WorkbenchShellSource, options WorkbenchShellViewO
 	return view
 }
 
-func CanvasPreviewShellView(shell CanvasPreviewShell, previewURL string) map[string]any {
+func CanvasPreviewShellView(shell core.CanvasPreviewShell, previewURL string) map[string]any {
 	shell = shell.Normalize()
 	return map[string]any{
 		"overlayAttrs":         StudioAttrView(shell.OverlayAttr, "true"),
@@ -185,12 +187,12 @@ func CanvasPreviewShellView(shell CanvasPreviewShell, previewURL string) map[str
 		"outlineLabelAttrs":    StudioAttrView(shell.OutlineLabelAttr, "true"),
 		"fieldTemplateAttrs":   StudioAttrView(shell.FieldTemplateAttr, "true"),
 		"fieldActionTextAttrs": StudioAttrView(shell.FieldActionTextAttr, "true"),
-		"moveUpActionAttrs":    StudioAttrView(shell.ActionAttr, string(CanvasActionMoveUp)),
-		"moveDownActionAttrs":  StudioAttrView(shell.ActionAttr, string(CanvasActionMoveDown)),
-		"inlineTextAttrs":      StudioAttrView(shell.ActionAttr, string(CanvasActionInlineText)),
-		"contentActionAttrs":   StudioAttrView(shell.ActionAttr, string(CanvasActionContent)),
-		"styleActionAttrs":     StudioAttrView(shell.ActionAttr, string(CanvasActionStyle)),
-		"visibilityAttrs":      StudioAttrView(shell.ActionAttr, string(CanvasActionToggleVisibility)),
+		"moveUpActionAttrs":    StudioAttrView(shell.ActionAttr, string(core.CanvasActionMoveUp)),
+		"moveDownActionAttrs":  StudioAttrView(shell.ActionAttr, string(core.CanvasActionMoveDown)),
+		"inlineTextAttrs":      StudioAttrView(shell.ActionAttr, string(core.CanvasActionInlineText)),
+		"contentActionAttrs":   StudioAttrView(shell.ActionAttr, string(core.CanvasActionContent)),
+		"styleActionAttrs":     StudioAttrView(shell.ActionAttr, string(core.CanvasActionStyle)),
+		"visibilityAttrs":      StudioAttrView(shell.ActionAttr, string(core.CanvasActionToggleVisibility)),
 		"inlineEditClass":      shell.InlineEditClass,
 		"styleImpactNodeAttr":  shell.StyleImpactNodeAttr,
 		"viewportAttr":         shell.ViewportAttr,
@@ -213,7 +215,7 @@ func StudioAttrView(pairs ...string) map[string]any {
 }
 
 func WorkbenchZoomLevelViews(active string, levels []WorkbenchZoomLevel) []map[string]any {
-	active = FirstNonEmpty(NormalizeKey(active), "fit")
+	active = core.FirstNonEmpty(core.NormalizeKey(active), "fit")
 	if len(levels) == 0 {
 		levels = []WorkbenchZoomLevel{
 			{Key: "fit", Label: "Fit"},
@@ -224,13 +226,13 @@ func WorkbenchZoomLevelViews(active string, levels []WorkbenchZoomLevel) []map[s
 	}
 	for _, level := range levels {
 		if level.Active {
-			active = NormalizeKey(level.Key)
+			active = core.NormalizeKey(level.Key)
 			break
 		}
 	}
 	out := make([]map[string]any, 0, len(levels))
 	for _, level := range levels {
-		key := NormalizeKey(level.Key)
+		key := core.NormalizeKey(level.Key)
 		label := strings.TrimSpace(level.Label)
 		if key == "" || label == "" {
 			continue
@@ -245,10 +247,10 @@ func WorkbenchZoomLevelViews(active string, levels []WorkbenchZoomLevel) []map[s
 }
 
 func WorkbenchRailResizerView(resizer WorkbenchRailResizer, side string) map[string]any {
-	side = NormalizeKey(FirstNonEmpty(resizer.Side, side, "left"))
+	side = core.NormalizeKey(core.FirstNonEmpty(resizer.Side, side, "left"))
 	defaults := defaultWorkbenchRailResizer(side)
 	resizer.Side = side
-	resizer.Label = FirstNonEmpty(resizer.Label, defaults.Label)
+	resizer.Label = core.FirstNonEmpty(resizer.Label, defaults.Label)
 	resizer.Min = firstPositive(resizer.Min, defaults.Min)
 	resizer.Max = firstPositive(resizer.Max, defaults.Max)
 	resizer.Default = firstPositive(resizer.Default, defaults.Default)
@@ -262,8 +264,8 @@ func WorkbenchRailResizerView(resizer WorkbenchRailResizer, side string) map[str
 }
 
 func normalizeWorkbenchShellSource(source WorkbenchShellSource) WorkbenchShellSource {
-	source.Title = FirstNonEmpty(source.Title, "Website editor")
-	source.PreviewURL = FirstNonEmpty(source.PreviewURL, "/")
+	source.Title = core.FirstNonEmpty(source.Title, "Website editor")
+	source.PreviewURL = core.FirstNonEmpty(source.PreviewURL, "/")
 	source.SaveAction = strings.TrimSpace(source.SaveAction)
 	source.Modes = NormalizeModes(source.Modes)
 	source.Viewports = NormalizeViewports(source.Viewports)

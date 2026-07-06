@@ -1,10 +1,11 @@
-package studio
+package shell
 
 import (
 	"testing"
 
 	"m31labs.dev/gosx-cms/lifecycle"
 	"m31labs.dev/gosx-cms/media"
+	"m31labs.dev/gosx-studio/core"
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
 )
@@ -31,14 +32,14 @@ func (stubStore) Readiness() ShellReadiness {
 	return NewShellReadiness(NewShellReadinessItem("content", "Content", ShellReadinessReady, "Ready", "All required copy is present."))
 }
 
-func (stubStore) Adapters() []ResourceAdapter {
-	return []ResourceAdapter{{
-		Kind:         ResourcePages,
+func (stubStore) Adapters() []core.ResourceAdapter {
+	return []core.ResourceAdapter{{
+		Kind:         core.ResourcePages,
 		Label:        "Pages",
 		Summary:      "Host page drafts and routes.",
-		Surface:      SurfaceSiteMap,
-		Capabilities: []ResourceCapability{ResourceList, ResourceRead},
-		Bindings:     []ResourceBinding{{Key: "routes", Label: "Routes", Binding: "pages.routes"}},
+		Surface:      core.SurfaceSiteMap,
+		Capabilities: []core.ResourceCapability{core.ResourceList, core.ResourceRead},
+		Bindings:     []core.ResourceBinding{{Key: "routes", Label: "Routes", Binding: "pages.routes"}},
 	}}
 }
 
@@ -57,7 +58,7 @@ func TestHostShellComposesStoreAndShellConfig(t *testing.T) {
 			{Key: "publish", Label: "Publish", Href: "/admin/editor?action=publish", Primary: true},
 			{Key: "restore", Label: "Restore", Href: "/admin/editor?action=restore"},
 		},
-		SiteMap: SiteMap{Pages: []Page{
+		SiteMap: core.SiteMap{Pages: []core.Page{
 			{Key: "home", Label: "Home", Route: "/", GoSXComponent: "HomePage"},
 			{
 				Key:           "contact",
@@ -65,8 +66,8 @@ func TestHostShellComposesStoreAndShellConfig(t *testing.T) {
 				Route:         "/contact",
 				GoSXComponent: "ContactPage",
 				Selected:      true,
-				Components: []Component{
-					{Key: "hero", Label: "Hero", GoSXComponent: "HeroSection", Controls: []Control{{Key: "headline", Label: "Headline", Kind: ControlText}}},
+				Components: []core.Component{
+					{Key: "hero", Label: "Hero", GoSXComponent: "HeroSection", Controls: []core.Control{{Key: "headline", Label: "Headline", Kind: core.ControlText}}},
 					{Key: "form", Label: "Contact form", GoSXComponent: "ContactForm"},
 				},
 			},
@@ -104,7 +105,7 @@ func TestHostShellComposesStoreAndShellConfig(t *testing.T) {
 	if len(resources) != 1 || resources[0]["href"] != "/admin/programs" || resources[0]["hasHref"] != true {
 		t.Fatalf("expected resource views in extras: %#v", resources)
 	}
-	if len(adapters) != 1 || adapters[0]["kind"] != string(ResourcePages) || len(adapters[0]["bindings"].([]map[string]any)) != 1 {
+	if len(adapters) != 1 || adapters[0]["kind"] != string(core.ResourcePages) || len(adapters[0]["bindings"].([]map[string]any)) != 1 {
 		t.Fatalf("expected store adapter views in extras: %#v", adapters)
 	}
 	authoring := view["authoring"].(map[string]any)
@@ -124,15 +125,15 @@ func TestHostShellComposesStoreAndShellConfig(t *testing.T) {
 func TestHostShellFallsBackToShellAdaptersWithoutStore(t *testing.T) {
 	shell := HostShell(nil, ShellConfig{
 		Labels: HostLabels{EditorTitle: "Website editor"},
-		Adapters: []ResourceAdapter{{
-			Kind:     ResourceMedia,
+		Adapters: []core.ResourceAdapter{{
+			Kind:     core.ResourceMedia,
 			Label:    "Media",
-			Bindings: []ResourceBinding{{Key: "assets", Label: "Assets", Binding: "media.assets"}},
+			Bindings: []core.ResourceBinding{{Key: "assets", Label: "Assets", Binding: "media.assets"}},
 		}},
 	})
 	view := View(shell)
 	adapters := view["adapters"].([]map[string]any)
-	if len(adapters) != 1 || adapters[0]["kind"] != string(ResourceMedia) {
+	if len(adapters) != 1 || adapters[0]["kind"] != string(core.ResourceMedia) {
 		t.Fatalf("expected shell adapter views: %#v", adapters)
 	}
 	if shell.PreviewURL != "/" || shell.Canvas.SelectionLabel != "No selection" {

@@ -1,24 +1,22 @@
-package studio
+package shell
 
-// This file (originally host_runtime.go) is what remains at the studio root
-// after Slice 3 of the package restructure (see
-// .tiller/scratch/gosx-studio-restructure-spec-v0.1.md) moved the
-// Mounter/MountRuntimes asset-mounting pair, the runtime/asset bundle code,
-// and the public /_gosx/studio/* path constants into
-// m31labs.dev/gosx-studio/hostruntime (see compat_hostruntime.go for the
-// facade aliases).
-//
-// RuntimeConfig itself stays here (not in hostruntime) for now: it embeds
-// ShellConfig, which is shell-package territory (Slice 8) and still lives
-// only at this root package today. hostruntime must not import the root
-// package (that would be a compile-time import cycle, since this package
-// already imports hostruntime for the Slice 3 facade), and shell is DAG-below
-// hostruntime (shell imports hostruntime, never the reverse), so
-// RuntimeConfig cannot move until ShellConfig has its own package in Slice 8.
-// It is deferred there rather than forced into hostruntime early. It
-// continues to compile unchanged today via the compat_hostruntime.go shims
-// for AssetHref and the runtime path constants, which resolve as unqualified
-// package-level names in this same package.
+import (
+	"m31labs.dev/gosx-studio/core"
+	"m31labs.dev/gosx-studio/hostruntime"
+)
+
+// RuntimeConfig (originally host_runtime.go) landed in the shell package in
+// Slice 8 of the package restructure (see
+// .tiller/scratch/gosx-studio-restructure-spec-v0.1.md). Slice 3 had deferred
+// it: it embeds ShellConfig (shell territory) and its methods use the
+// hostruntime /_gosx/studio/* path constants and AssetHref, so it could not
+// live in hostruntime (that would invert the DAG — shell imports hostruntime,
+// never the reverse) nor stay stranded at the root once shell existed. Now
+// that shell is a real package below hostruntime in the DAG, RuntimeConfig
+// imports hostruntime directly for the canonical path constants and AssetHref
+// (no facade shim needed). The root compat_hostruntime.go continues to
+// re-export DefaultRuntimeConfig/RuntimeConfig via compat_shell.go for the
+// v0.6.x compatibility window.
 
 // RuntimeConfig is the reusable host-facing runtime/config bundle for Studio
 // browser assets and shell defaults.
@@ -43,10 +41,10 @@ func (c RuntimeConfig) HostConfig() ShellConfig {
 // Scripts returns the canonical Studio runtime script paths for host views.
 func (c RuntimeConfig) Scripts() map[string]any {
 	return map[string]any{
-		"engineRuntime":    AssetHref(EngineRuntimePath, c.AssetVersion),
-		"workbenchRuntime": AssetHref(WorkbenchRuntimePath, c.AssetVersion),
-		"commandRuntime":   AssetHref(CommandRuntimePath, c.AssetVersion),
-		"stateRuntime":     AssetHref(StateRuntimePath, c.AssetVersion),
+		"engineRuntime":    hostruntime.AssetHref(hostruntime.EngineRuntimePath, c.AssetVersion),
+		"workbenchRuntime": hostruntime.AssetHref(hostruntime.WorkbenchRuntimePath, c.AssetVersion),
+		"commandRuntime":   hostruntime.AssetHref(hostruntime.CommandRuntimePath, c.AssetVersion),
+		"stateRuntime":     hostruntime.AssetHref(hostruntime.StateRuntimePath, c.AssetVersion),
 	}
 }
 
@@ -73,7 +71,7 @@ func (c RuntimeConfig) Showcase3DEngineHost() map[string]any {
 	return c.engineHost("showcase-3d", "studio-showcase3d-engine-host")
 }
 
-func (c RuntimeConfig) CanvasPreviewShell() CanvasPreviewShell {
+func (c RuntimeConfig) CanvasPreviewShell() core.CanvasPreviewShell {
 	return c.HostConfig().Canvas.PreviewShell
 }
 

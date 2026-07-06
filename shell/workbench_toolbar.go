@@ -1,9 +1,10 @@
-package studio
+package shell
 
 import (
 	"strings"
 
 	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/core"
 )
 
 type WorkbenchToolbarOptions struct {
@@ -107,13 +108,11 @@ type WorkbenchCommandPaletteOptions struct {
 }
 
 func RenderWorkbenchToolbar(view map[string]any, options WorkbenchToolbarOptions) gosx.Node {
-	kicker := FirstNonEmpty(options.Kicker, workbenchViewString(view, "toolbarKicker"), "Website")
-	title := FirstNonEmpty(options.Title, workbenchViewString(view, "toolbarTitle"), "Editor")
-	summary := FirstNonEmpty(options.Summary, workbenchViewString(view, "selectionLabel"), workbenchViewString(view, "routeLabel"))
+	kicker := core.FirstNonEmpty(options.Kicker, core.WorkbenchViewString(view, "toolbarKicker"), "Website")
+	title := core.FirstNonEmpty(options.Title, core.WorkbenchViewString(view, "toolbarTitle"), "Editor")
+	summary := core.FirstNonEmpty(options.Summary, core.WorkbenchViewString(view, "selectionLabel"), core.WorkbenchViewString(view, "routeLabel"))
 	children := []gosx.Node{
-		renderWorkbenchToolbarTitle(
-			FirstNonEmpty(options.TitleClass, "gosx-studio-toolbar__title"),
-			kicker,
+		renderWorkbenchToolbarTitle(core.FirstNonEmpty(options.TitleClass, "gosx-studio-toolbar__title"), kicker,
 			title,
 			summary,
 		),
@@ -124,7 +123,7 @@ func RenderWorkbenchToolbar(view map[string]any, options WorkbenchToolbarOptions
 	actions := []gosx.Node{}
 	actions = appendWorkbenchNode(actions, options.SaveStatusNode)
 	if !options.DisableHistoryControls {
-		if workbenchNodeEmpty(options.HistoryControlsNode) {
+		if core.WorkbenchNodeEmpty(options.HistoryControlsNode) {
 			actions = append(actions, RenderWorkbenchHistoryControls(WorkbenchHistoryControlsOptions{}))
 		} else {
 			actions = append(actions, options.HistoryControlsNode)
@@ -132,20 +131,20 @@ func RenderWorkbenchToolbar(view map[string]any, options WorkbenchToolbarOptions
 	}
 	actions = append(actions, options.Actions...)
 	if !options.DisablePreviewAction {
-		if href := workbenchViewString(view, "previewHref"); href != "" {
+		if href := core.WorkbenchViewString(view, "previewHref"); href != "" {
 			actions = append(actions, gosx.El("a", gosx.Attrs(
-				gosx.Attr("class", FirstNonEmpty(options.PreviewLinkClass, "button button--secondary")),
+				gosx.Attr("class", core.FirstNonEmpty(options.PreviewLinkClass, "button button--secondary")),
 				gosx.Attr("href", href),
 				gosx.Attr("data-gosx-link", "true"),
 				gosx.Attr("data-gosx-studio-preview-link", "true"),
-			), gosx.Text(FirstNonEmpty(options.PreviewLabel, workbenchViewString(view, "previewLabel"), "Preview"))))
+			), gosx.Text(core.FirstNonEmpty(options.PreviewLabel, core.WorkbenchViewString(view, "previewLabel"), "Preview"))))
 		}
 	}
 	if !options.DisableSaveButton {
-		saveLabel := FirstNonEmpty(options.SaveButtonLabel, workbenchViewString(view, "saveLabel"), "Save changes")
+		saveLabel := core.FirstNonEmpty(options.SaveButtonLabel, core.WorkbenchViewString(view, "saveLabel"), "Save changes")
 		if saveLabel != "" {
 			actions = append(actions, gosx.El("button", gosx.Attrs(
-				gosx.Attr("class", FirstNonEmpty(options.SaveButtonClass, "button button--primary")),
+				gosx.Attr("class", core.FirstNonEmpty(options.SaveButtonClass, "button button--primary")),
 				gosx.Attr("type", "submit"),
 				gosx.Attr("data-editor-save-button", "true"),
 				gosx.Attr("data-gosx-studio-save-button", "true"),
@@ -154,13 +153,13 @@ func RenderWorkbenchToolbar(view map[string]any, options WorkbenchToolbarOptions
 	}
 	if len(actions) > 0 {
 		children = append(children, gosx.El("div", gosx.Attrs(
-			gosx.Attr("class", FirstNonEmpty(options.ActionsClass, "gosx-studio-toolbar__actions")),
+			gosx.Attr("class", core.FirstNonEmpty(options.ActionsClass, "gosx-studio-toolbar__actions")),
 			gosx.Attr("data-gosx-studio-toolbar-actions", "true"),
 		), gosx.Fragment(actions...)))
 	}
 
 	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.Class, "gosx-studio-toolbar")),
+		gosx.Attr("class", core.FirstNonEmpty(options.Class, "gosx-studio-toolbar")),
 		gosx.Attr("data-studio-toolbar", "true"),
 		gosx.Attr("data-gosx-studio-toolbar", "true"),
 		gosx.Attr("data-gosx-studio-toolbar-renderer", "gosx-studio"),
@@ -168,54 +167,54 @@ func RenderWorkbenchToolbar(view map[string]any, options WorkbenchToolbarOptions
 }
 
 func RenderWorkbenchModebar(view map[string]any, options WorkbenchModebarOptions) gosx.Node {
-	modes := workbenchViewMapList(view, "modes")
+	modes := core.WorkbenchViewMapList(view, "modes")
 	nodes := make([]gosx.Node, 0, len(modes))
 	for _, mode := range modes {
-		key := workbenchMapString(mode, "key")
-		label := workbenchMapString(mode, "label")
+		key := core.WorkbenchViewString(mode, "key")
+		label := core.WorkbenchViewString(mode, "label")
 		if key == "" || label == "" {
 			continue
 		}
 		nodes = append(nodes, gosx.El("button", gosx.Attrs(
 			gosx.Attr("type", "button"),
 			gosx.Attr("data-studio-mode-control", key),
-			gosx.Attr("aria-pressed", FirstNonEmpty(workbenchMapString(mode, "pressed"), BoolAttr(workbenchMapBool(mode, "active")))),
+			gosx.Attr("aria-pressed", core.FirstNonEmpty(core.WorkbenchViewString(mode, "pressed"), core.BoolAttr(core.WorkbenchViewBool(mode, "active")))),
 		), gosx.Text(label)))
 	}
 	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.Class, "gosx-studio-modebar")),
+		gosx.Attr("class", core.FirstNonEmpty(options.Class, "gosx-studio-modebar")),
 		gosx.Attr("role", "toolbar"),
-		gosx.Attr("aria-label", FirstNonEmpty(options.Label, workbenchViewString(view, "modebarLabel"), "Editor mode")),
+		gosx.Attr("aria-label", core.FirstNonEmpty(options.Label, core.WorkbenchViewString(view, "modebarLabel"), "Editor mode")),
 	), gosx.Fragment(nodes...))
 }
 
 func RenderWorkbenchMetricStrip(view map[string]any, options WorkbenchMetricStripOptions) gosx.Node {
-	metrics := workbenchViewMapList(view, "metrics")
+	metrics := core.WorkbenchViewMapList(view, "metrics")
 	nodes := make([]gosx.Node, 0, len(metrics))
 	for _, metric := range metrics {
-		key := workbenchMapString(metric, "key")
-		label := workbenchMapString(metric, "label")
+		key := core.WorkbenchViewString(metric, "key")
+		label := core.WorkbenchViewString(metric, "label")
 		if key == "" || label == "" {
 			continue
 		}
 		nodes = append(nodes, gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-metric", key)),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(metric, "value"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(metric, "value"))),
 			gosx.Text(" "),
 			gosx.Text(label),
 		))
 	}
 	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.Class, "gosx-studio-context-strip")),
-		gosx.Attr("aria-label", FirstNonEmpty(options.Label, workbenchViewString(view, "metricLabel"), "Workspace details")),
+		gosx.Attr("class", core.FirstNonEmpty(options.Class, "gosx-studio-context-strip")),
+		gosx.Attr("aria-label", core.FirstNonEmpty(options.Label, core.WorkbenchViewString(view, "metricLabel"), "Workspace details")),
 	), gosx.Fragment(nodes...))
 }
 
 func RenderWorkbenchZoomControls(view map[string]any, options WorkbenchZoomControlsOptions) gosx.Node {
-	current := FirstNonEmpty(workbenchViewString(view, "zoom"), "fit")
-	levels := workbenchViewMapList(view, "zoomLevels")
+	current := core.FirstNonEmpty(core.WorkbenchViewString(view, "zoom"), "fit")
+	levels := core.WorkbenchViewMapList(view, "zoomLevels")
 	for _, level := range levels {
-		if workbenchMapBool(level, "pressed") {
-			if key := workbenchMapString(level, "key"); key != "" {
+		if core.WorkbenchViewBool(level, "pressed") {
+			if key := core.WorkbenchViewString(level, "key"); key != "" {
 				current = key
 				break
 			}
@@ -223,25 +222,25 @@ func RenderWorkbenchZoomControls(view map[string]any, options WorkbenchZoomContr
 	}
 	nodes := make([]gosx.Node, 0, len(levels))
 	for _, level := range levels {
-		key := workbenchMapString(level, "key")
-		label := workbenchMapString(level, "label")
+		key := core.WorkbenchViewString(level, "key")
+		label := core.WorkbenchViewString(level, "label")
 		if key == "" || label == "" {
 			continue
 		}
-		pressed := workbenchMapBool(level, "pressed")
+		pressed := core.WorkbenchViewBool(level, "pressed")
 		if key == current {
 			pressed = true
 		}
 		nodes = append(nodes, gosx.El("button", gosx.Attrs(
 			gosx.Attr("type", "button"),
 			gosx.Attr("data-studio-zoom", key),
-			gosx.Attr("aria-pressed", BoolAttr(pressed)),
+			gosx.Attr("aria-pressed", core.BoolAttr(pressed)),
 		), gosx.Text(label)))
 	}
 	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.Class, "studio-zoombar")),
+		gosx.Attr("class", core.FirstNonEmpty(options.Class, "studio-zoombar")),
 		gosx.Attr("role", "toolbar"),
-		gosx.Attr("aria-label", FirstNonEmpty(options.Label, "Canvas zoom")),
+		gosx.Attr("aria-label", core.FirstNonEmpty(options.Label, "Canvas zoom")),
 		gosx.Attr("data-studio-zoom-island", "true"),
 		gosx.Attr("data-studio-zoom-current", current),
 		gosx.Attr("data-gosx-studio-zoom-controls-renderer", "gosx-studio"),
@@ -249,26 +248,26 @@ func RenderWorkbenchZoomControls(view map[string]any, options WorkbenchZoomContr
 }
 
 func RenderWorkbenchViewportControls(view map[string]any, options WorkbenchViewportControlsOptions) gosx.Node {
-	current := FirstNonEmpty(workbenchViewString(view, "viewportKey"), "desktop")
-	viewports := workbenchViewMapList(view, "viewports")
+	current := core.FirstNonEmpty(core.WorkbenchViewString(view, "viewportKey"), "desktop")
+	viewports := core.WorkbenchViewMapList(view, "viewports")
 	nodes := make([]gosx.Node, 0, len(viewports))
 	for _, viewport := range viewports {
-		key := workbenchMapString(viewport, "key")
-		label := workbenchMapString(viewport, "label")
+		key := core.WorkbenchViewString(viewport, "key")
+		label := core.WorkbenchViewString(viewport, "label")
 		if key == "" || label == "" {
 			continue
 		}
 		nodes = append(nodes, gosx.El("button", gosx.Attrs(
 			gosx.Attr("type", "button"),
 			gosx.Attr("data-studio-viewport", key),
-			gosx.Attr("data-studio-viewport-width", workbenchMapString(viewport, "width")),
-			gosx.Attr("aria-pressed", BoolAttr(key == current)),
+			gosx.Attr("data-studio-viewport-width", core.WorkbenchViewString(viewport, "width")),
+			gosx.Attr("aria-pressed", core.BoolAttr(key == current)),
 		), gosx.Text(label)))
 	}
 	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.Class, "studio-viewport-switcher")),
+		gosx.Attr("class", core.FirstNonEmpty(options.Class, "studio-viewport-switcher")),
 		gosx.Attr("role", "toolbar"),
-		gosx.Attr("aria-label", FirstNonEmpty(options.Label, "Preview viewport")),
+		gosx.Attr("aria-label", core.FirstNonEmpty(options.Label, "Preview viewport")),
 		gosx.Attr("data-studio-viewport-current", current),
 		gosx.Attr("data-gosx-studio-viewport-controls-renderer", "gosx-studio"),
 	), gosx.Fragment(nodes...))
@@ -276,109 +275,109 @@ func RenderWorkbenchViewportControls(view map[string]any, options WorkbenchViewp
 
 func RenderWorkbenchCanvasTools(view map[string]any, options WorkbenchCanvasToolsOptions) gosx.Node {
 	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.Class, "studio-canvas-tools")),
+		gosx.Attr("class", core.FirstNonEmpty(options.Class, "studio-canvas-tools")),
 		gosx.Attr("role", "toolbar"),
-		gosx.Attr("aria-label", FirstNonEmpty(options.Label, "Canvas tools")),
+		gosx.Attr("aria-label", core.FirstNonEmpty(options.Label, "Canvas tools")),
 		gosx.Attr("data-gosx-studio-canvas-tools-renderer", "gosx-studio"),
 	),
 		gosx.El("button", gosx.Attrs(
 			gosx.Attr("type", "button"),
 			gosx.Attr("data-studio-rail-toggle", "left"),
 			gosx.Attr("aria-pressed", "true"),
-		), gosx.Text(FirstNonEmpty(workbenchViewString(view, "leftRailLabel"), "Layers"))),
+		), gosx.Text(core.FirstNonEmpty(core.WorkbenchViewString(view, "leftRailLabel"), "Layers"))),
 		gosx.El("button", gosx.Attrs(
 			gosx.Attr("type", "button"),
 			gosx.Attr("data-studio-rail-toggle", "right"),
 			gosx.Attr("aria-pressed", "true"),
-		), gosx.Text(FirstNonEmpty(workbenchViewString(view, "rightRailLabel"), "Inspector"))),
+		), gosx.Text(core.FirstNonEmpty(core.WorkbenchViewString(view, "rightRailLabel"), "Inspector"))),
 		gosx.El("button", gosx.Attrs(
 			gosx.Attr("type", "button"),
 			gosx.Attr("data-studio-activity-toggle", "true"),
 			gosx.Attr("aria-pressed", "true"),
-		), gosx.Text(FirstNonEmpty(workbenchViewString(view, "activityLabel"), "Activity"))),
+		), gosx.Text(core.FirstNonEmpty(core.WorkbenchViewString(view, "activityLabel"), "Activity"))),
 		gosx.El("button", gosx.Attrs(
 			gosx.Attr("type", "button"),
 			gosx.Attr("data-studio-focus-toggle", "true"),
 			gosx.Attr("aria-pressed", "false"),
-		), gosx.Text(FirstNonEmpty(workbenchViewString(view, "focusLabel"), "Focus"))),
+		), gosx.Text(core.FirstNonEmpty(core.WorkbenchViewString(view, "focusLabel"), "Focus"))),
 	)
 }
 
 func RenderWorkbenchCanvasBar(view map[string]any, options WorkbenchCanvasBarOptions) gosx.Node {
-	routeLabel := FirstNonEmpty(options.RouteLabel, workbenchViewString(view, "routeLabel"), "Preview")
-	selectionLabel := FirstNonEmpty(options.SelectionLabel, workbenchViewString(view, "selectionLabel"), "No selection")
+	routeLabel := core.FirstNonEmpty(options.RouteLabel, core.WorkbenchViewString(view, "routeLabel"), "Preview")
+	selectionLabel := core.FirstNonEmpty(options.SelectionLabel, core.WorkbenchViewString(view, "selectionLabel"), "No selection")
 	titleAttrs := []any{}
 	if strings.TrimSpace(options.TitleClass) != "" {
 		titleAttrs = append(titleAttrs, gosx.Attr("class", strings.TrimSpace(options.TitleClass)))
 	}
 	children := []gosx.Node{
 		gosx.El("div", gosx.Attrs(titleAttrs...),
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", FirstNonEmpty(options.KickerClass, "kicker"))), gosx.Text(FirstNonEmpty(options.Kicker, "Canvas"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", core.FirstNonEmpty(options.KickerClass, "kicker"))), gosx.Text(core.FirstNonEmpty(options.Kicker, "Canvas"))),
 			gosx.El("strong", nil, gosx.Text(routeLabel)),
 		),
 		gosx.El("nav", gosx.Attrs(
-			gosx.Attr("class", FirstNonEmpty(options.BreadcrumbClass, "studio-breadcrumbs")),
-			gosx.Attr("aria-label", FirstNonEmpty(options.BreadcrumbLabel, "Canvas selection")),
+			gosx.Attr("class", core.FirstNonEmpty(options.BreadcrumbClass, "studio-breadcrumbs")),
+			gosx.Attr("aria-label", core.FirstNonEmpty(options.BreadcrumbLabel, "Canvas selection")),
 		),
-			gosx.El("span", nil, gosx.Text(FirstNonEmpty(options.BreadcrumbRoot, "Site"))),
+			gosx.El("span", nil, gosx.Text(core.FirstNonEmpty(options.BreadcrumbRoot, "Site"))),
 			gosx.El("span", nil, gosx.Text(routeLabel)),
-			gosx.El("output", gosx.Attrs(gosx.Attr(FirstNonEmpty(options.SelectionDataKey, "data-studio-selection-label"), "true")), gosx.Text(selectionLabel)),
+			gosx.El("output", gosx.Attrs(gosx.Attr(core.FirstNonEmpty(options.SelectionDataKey, "data-studio-selection-label"), "true")), gosx.Text(selectionLabel)),
 		),
 	}
 	children = append(children, options.Controls...)
 	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.Class, "studio-canvas-bar")),
+		gosx.Attr("class", core.FirstNonEmpty(options.Class, "studio-canvas-bar")),
 		gosx.Attr("data-gosx-studio-canvas-bar-renderer", "gosx-studio"),
 	), gosx.Fragment(children...))
 }
 
 func RenderWorkbenchCanvasStatus(view map[string]any, options WorkbenchCanvasStatusOptions) gosx.Node {
 	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.Class, "studio-canvas-status")),
+		gosx.Attr("class", core.FirstNonEmpty(options.Class, "studio-canvas-status")),
 		gosx.Attr("data-gosx-studio-canvas-status-renderer", "gosx-studio"),
 	),
-		gosx.El("span", nil, gosx.Text(FirstNonEmpty(options.RouteLabel, workbenchViewString(view, "routeLabel"), "Preview"))),
-		gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-viewport-label", "true")), gosx.Text(FirstNonEmpty(options.ViewportLabel, workbenchViewString(view, "viewportLabel")))),
-		gosx.El("output", gosx.Attrs(gosx.Attr(FirstNonEmpty(options.SelectionDataKey, "data-studio-selection-label"), "true")), gosx.Text(FirstNonEmpty(options.SelectionLabel, workbenchViewString(view, "selectionLabel"), "No selection"))),
+		gosx.El("span", nil, gosx.Text(core.FirstNonEmpty(options.RouteLabel, core.WorkbenchViewString(view, "routeLabel"), "Preview"))),
+		gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-viewport-label", "true")), gosx.Text(core.FirstNonEmpty(options.ViewportLabel, core.WorkbenchViewString(view, "viewportLabel")))),
+		gosx.El("output", gosx.Attrs(gosx.Attr(core.FirstNonEmpty(options.SelectionDataKey, "data-studio-selection-label"), "true")), gosx.Text(core.FirstNonEmpty(options.SelectionLabel, core.WorkbenchViewString(view, "selectionLabel"), "No selection"))),
 	)
 }
 
 func RenderWorkbenchCommandPalette(view map[string]any, options WorkbenchCommandPaletteOptions) gosx.Node {
-	commands := workbenchViewMapList(view, "commands")
+	commands := core.WorkbenchViewMapList(view, "commands")
 	commandNodes := make([]gosx.Node, 0, len(commands))
 	for _, command := range commands {
-		key := workbenchMapString(command, "key")
-		label := workbenchMapString(command, "label")
+		key := core.WorkbenchViewString(command, "key")
+		label := core.WorkbenchViewString(command, "label")
 		if key == "" || label == "" {
 			continue
 		}
 		children := []gosx.Node{
-			gosx.El("span", gosx.Attrs(gosx.Attr("class", "studio-command-item__group")), gosx.Text(workbenchMapString(command, "group"))),
+			gosx.El("span", gosx.Attrs(gosx.Attr("class", "studio-command-item__group")), gosx.Text(core.WorkbenchViewString(command, "group"))),
 			gosx.El("span", gosx.Attrs(gosx.Attr("class", "studio-command-item__label")), gosx.Text(label)),
 		}
-		if workbenchMapBool(command, "hasSummary") {
-			children = append(children, gosx.El("span", gosx.Attrs(gosx.Attr("class", "studio-command-item__summary")), gosx.Text(workbenchMapString(command, "summary"))))
+		if core.WorkbenchViewBool(command, "hasSummary") {
+			children = append(children, gosx.El("span", gosx.Attrs(gosx.Attr("class", "studio-command-item__summary")), gosx.Text(core.WorkbenchViewString(command, "summary"))))
 		}
-		if workbenchMapBool(command, "hasShortcut") {
-			children = append(children, gosx.El("kbd", nil, gosx.Text(workbenchMapString(command, "shortcut"))))
+		if core.WorkbenchViewBool(command, "hasShortcut") {
+			children = append(children, gosx.El("kbd", nil, gosx.Text(core.WorkbenchViewString(command, "shortcut"))))
 		}
 		commandNodes = append(commandNodes, gosx.El("button", gosx.Attrs(
-			gosx.Attr("class", FirstNonEmpty(workbenchMapString(command, "class"), "studio-command-item")),
+			gosx.Attr("class", core.FirstNonEmpty(core.WorkbenchViewString(command, "class"), "studio-command-item")),
 			gosx.Attr("type", "button"),
 			gosx.Attr("role", "option"),
 			gosx.Attr("data-studio-command", key),
-			gosx.Attr("data-studio-command-kind", workbenchMapString(command, "kind")),
-			gosx.Attr("data-studio-command-target", workbenchMapString(command, "target")),
-			gosx.Attr("data-studio-command-search-text", workbenchMapString(command, "searchText")),
-			gosx.Attr("data-studio-command-href", workbenchMapString(command, "href")),
-			gosx.Attr("data-studio-command-shortcut", workbenchMapString(command, "shortcut")),
+			gosx.Attr("data-studio-command-kind", core.WorkbenchViewString(command, "kind")),
+			gosx.Attr("data-studio-command-target", core.WorkbenchViewString(command, "target")),
+			gosx.Attr("data-studio-command-search-text", core.WorkbenchViewString(command, "searchText")),
+			gosx.Attr("data-studio-command-href", core.WorkbenchViewString(command, "href")),
+			gosx.Attr("data-studio-command-shortcut", core.WorkbenchViewString(command, "shortcut")),
 		), gosx.Fragment(children...)))
 	}
 
-	title := FirstNonEmpty(options.Title, workbenchViewString(view, "commandTitle"), "Editor tools")
+	title := core.FirstNonEmpty(options.Title, core.WorkbenchViewString(view, "commandTitle"), "Editor tools")
 	listID := "studio-command-list"
 	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.Class, "studio-command-palette")),
+		gosx.Attr("class", core.FirstNonEmpty(options.Class, "studio-command-palette")),
 		gosx.Attr("data-studio-command-palette", "true"),
 		gosx.Attr("data-studio-command-state", "closed"),
 		gosx.Attr("data-gosx-studio-command-renderer", "gosx-studio"),
@@ -390,7 +389,7 @@ func RenderWorkbenchCommandPalette(view map[string]any, options WorkbenchCommand
 			gosx.Attr("aria-haspopup", "dialog"),
 			gosx.Attr("aria-expanded", "false"),
 		),
-			gosx.El("span", nil, gosx.Text(FirstNonEmpty(options.Launcher, workbenchViewString(view, "commandLauncher"), "Find"))),
+			gosx.El("span", nil, gosx.Text(core.FirstNonEmpty(options.Launcher, core.WorkbenchViewString(view, "commandLauncher"), "Find"))),
 			gosx.El("kbd", nil, gosx.Text("Ctrl K")),
 		),
 		gosx.El("div", gosx.Attrs(
@@ -424,7 +423,7 @@ func RenderWorkbenchCommandPalette(view map[string]any, options WorkbenchCommand
 						gosx.Attr("aria-expanded", "false"),
 						gosx.Attr("aria-controls", listID),
 						gosx.Attr("data-studio-command-search", "true"),
-						gosx.Attr("placeholder", FirstNonEmpty(options.SearchHint, workbenchViewString(view, "commandSearchHint"), "Find editing areas, sections, previews, and advanced tools")),
+						gosx.Attr("placeholder", core.FirstNonEmpty(options.SearchHint, core.WorkbenchViewString(view, "commandSearchHint"), "Find editing areas, sections, previews, and advanced tools")),
 						gosx.Attr("autocomplete", "off"),
 					)),
 				),
@@ -439,8 +438,8 @@ func RenderWorkbenchCommandPalette(view map[string]any, options WorkbenchCommand
 					gosx.Attr("data-studio-command-empty", "true"),
 					gosx.Attr("hidden", "hidden"),
 				),
-					gosx.El("strong", nil, gosx.Text(FirstNonEmpty(options.EmptyTitle, workbenchViewString(view, "commandEmptyTitle"), "No commands"))),
-					gosx.El("span", nil, gosx.Text(FirstNonEmpty(options.EmptyDetail, workbenchViewString(view, "commandEmptyDetail"), "Try a different search."))),
+					gosx.El("strong", nil, gosx.Text(core.FirstNonEmpty(options.EmptyTitle, core.WorkbenchViewString(view, "commandEmptyTitle"), "No commands"))),
+					gosx.El("span", nil, gosx.Text(core.FirstNonEmpty(options.EmptyDetail, core.WorkbenchViewString(view, "commandEmptyDetail"), "Try a different search."))),
 				),
 			),
 		),
@@ -448,38 +447,38 @@ func RenderWorkbenchCommandPalette(view map[string]any, options WorkbenchCommand
 }
 
 func RenderWorkbenchSaveStatus(options WorkbenchSaveStatusOptions) gosx.Node {
-	className := FirstNonEmpty(options.Class, "gosx-studio-save-status")
+	className := core.FirstNonEmpty(options.Class, "gosx-studio-save-status")
 	return gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", className),
 		gosx.Attr("data-gosx-studio-save-status", "true"),
 	),
 		gosx.El("output", gosx.Attrs(
-			gosx.Attr("class", FirstNonEmpty(options.StateClass, className+"__state")),
+			gosx.Attr("class", core.FirstNonEmpty(options.StateClass, className+"__state")),
 			gosx.Attr("data-gosx-studio-save-state", "true"),
 			gosx.Attr("aria-live", "polite"),
-		), gosx.Text(FirstNonEmpty(options.StateLabel, "Saved"))),
+		), gosx.Text(core.FirstNonEmpty(options.StateLabel, "Saved"))),
 		gosx.El("span", gosx.Attrs(
-			gosx.Attr("class", FirstNonEmpty(options.DetailClass, className+"__detail")),
+			gosx.Attr("class", core.FirstNonEmpty(options.DetailClass, className+"__detail")),
 			gosx.Attr("data-gosx-studio-save-detail", "true"),
-		), gosx.Text(FirstNonEmpty(options.DetailLabel, "Ready"))),
+		), gosx.Text(core.FirstNonEmpty(options.DetailLabel, "Ready"))),
 		gosx.El("output", gosx.Attrs(
-			gosx.Attr("class", FirstNonEmpty(options.DirtyCountClass, className+"__dirty-count")),
+			gosx.Attr("class", core.FirstNonEmpty(options.DirtyCountClass, className+"__dirty-count")),
 			gosx.Attr("data-gosx-studio-dirty-count", "true"),
 			gosx.Attr("hidden", "hidden"),
 		), gosx.Text("0 changes")),
 		gosx.El("time", gosx.Attrs(
-			gosx.Attr("class", FirstNonEmpty(options.LastSavedClass, className+"__last-saved")),
+			gosx.Attr("class", core.FirstNonEmpty(options.LastSavedClass, className+"__last-saved")),
 			gosx.Attr("data-gosx-studio-last-saved", "true"),
-			gosx.Attr("data-gosx-studio-last-saved-empty", FirstNonEmpty(options.LastSavedLabel, "Not saved this session")),
-		), gosx.Text(FirstNonEmpty(options.LastSavedLabel, "Not saved this session"))),
+			gosx.Attr("data-gosx-studio-last-saved-empty", core.FirstNonEmpty(options.LastSavedLabel, "Not saved this session")),
+		), gosx.Text(core.FirstNonEmpty(options.LastSavedLabel, "Not saved this session"))),
 	)
 }
 
 func RenderWorkbenchHistoryControls(options WorkbenchHistoryControlsOptions) gosx.Node {
-	className := FirstNonEmpty(options.Class, "gosx-studio-history-controls")
-	buttonClass := FirstNonEmpty(options.ButtonClass, "button button--secondary")
-	undoTitle := FirstNonEmpty(options.UndoTitle, "Undo last change")
-	redoTitle := FirstNonEmpty(options.RedoTitle, "Redo last undone change")
+	className := core.FirstNonEmpty(options.Class, "gosx-studio-history-controls")
+	buttonClass := core.FirstNonEmpty(options.ButtonClass, "button button--secondary")
+	undoTitle := core.FirstNonEmpty(options.UndoTitle, "Undo last change")
+	redoTitle := core.FirstNonEmpty(options.RedoTitle, "Redo last undone change")
 	children := []gosx.Node{
 		gosx.El("button", gosx.Attrs(
 			gosx.Attr("class", buttonClass),
@@ -488,7 +487,7 @@ func RenderWorkbenchHistoryControls(options WorkbenchHistoryControlsOptions) gos
 			gosx.Attr("aria-label", undoTitle),
 			gosx.Attr("title", undoTitle),
 			gosx.Attr("disabled", "disabled"),
-		), gosx.Text(FirstNonEmpty(options.UndoLabel, "Undo"))),
+		), gosx.Text(core.FirstNonEmpty(options.UndoLabel, "Undo"))),
 		gosx.El("button", gosx.Attrs(
 			gosx.Attr("class", buttonClass),
 			gosx.Attr("type", "button"),
@@ -496,14 +495,14 @@ func RenderWorkbenchHistoryControls(options WorkbenchHistoryControlsOptions) gos
 			gosx.Attr("aria-label", redoTitle),
 			gosx.Attr("title", redoTitle),
 			gosx.Attr("disabled", "disabled"),
-		), gosx.Text(FirstNonEmpty(options.RedoLabel, "Redo"))),
+		), gosx.Text(core.FirstNonEmpty(options.RedoLabel, "Redo"))),
 	}
 	if options.IncludeStatus {
 		children = append(children, gosx.El("output", gosx.Attrs(
-			gosx.Attr("class", FirstNonEmpty(options.StatusClass, className+"__status")),
+			gosx.Attr("class", core.FirstNonEmpty(options.StatusClass, className+"__status")),
 			gosx.Attr("data-gosx-studio-history-status", "true"),
 			gosx.Attr("aria-live", "polite"),
-		), gosx.Text(FirstNonEmpty(options.StatusLabel, "No local edits"))))
+		), gosx.Text(core.FirstNonEmpty(options.StatusLabel, "No local edits"))))
 	}
 	return gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", className),
@@ -524,81 +523,14 @@ func renderWorkbenchToolbarTitle(className, kicker, title, summary string) gosx.
 }
 
 func appendWorkbenchNode(nodes []gosx.Node, node gosx.Node) []gosx.Node {
-	if workbenchNodeEmpty(node) {
+	if core.WorkbenchNodeEmpty(node) {
 		return nodes
 	}
 	return append(nodes, node)
 }
 
-func workbenchNodeEmpty(node gosx.Node) bool {
-	html := gosx.RenderHTML(node)
-	return html == "" || html == "<></>"
-}
-
-func workbenchViewString(view map[string]any, key string) string {
-	if view == nil {
-		return ""
-	}
-	value, ok := view[key]
-	if !ok || value == nil {
-		return ""
-	}
-	switch typed := value.(type) {
-	case string:
-		return strings.TrimSpace(typed)
-	default:
-		return strings.TrimSpace(FmtAny(typed))
-	}
-}
-
-func workbenchViewMapList(view map[string]any, key string) []map[string]any {
-	if view == nil {
-		return nil
-	}
-	switch typed := view[key].(type) {
-	case []map[string]any:
-		return typed
-	case []map[string]string:
-		out := make([]map[string]any, 0, len(typed))
-		for _, item := range typed {
-			next := make(map[string]any, len(item))
-			for key, value := range item {
-				next[key] = value
-			}
-			out = append(out, next)
-		}
-		return out
-	default:
-		return nil
-	}
-}
-
-func workbenchMapString(values map[string]any, key string) string {
-	if values == nil {
-		return ""
-	}
-	value, ok := values[key]
-	if !ok || value == nil {
-		return ""
-	}
-	switch typed := value.(type) {
-	case string:
-		return strings.TrimSpace(typed)
-	default:
-		return strings.TrimSpace(FmtAny(typed))
-	}
-}
-
-func workbenchMapBool(values map[string]any, key string) bool {
-	if values == nil {
-		return false
-	}
-	switch typed := values[key].(type) {
-	case bool:
-		return typed
-	case string:
-		return strings.EqualFold(strings.TrimSpace(typed), "true")
-	default:
-		return false
-	}
-}
+// workbenchNodeEmpty/workbenchViewString/workbenchViewMapList/
+// workbenchMapString/workbenchMapBool moved to core as the exported
+// WorkbenchNodeEmpty/WorkbenchViewString/WorkbenchViewMapList/WorkbenchViewBool
+// helpers in Slice 8 (see core/workbench_view.go). Callers in this package now
+// reference core.Workbench* directly.

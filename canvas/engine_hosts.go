@@ -67,11 +67,11 @@ func studioEngineHostsRootAttrs(options StudioEngineHostsOptions) gosx.AttrList 
 }
 
 func renderStudioEngineHost(host map[string]any, options StudioEngineHostsOptions) gosx.Node {
-	key := mapString(host, "key")
-	name := mapString(host, "name")
-	mountID := mapString(host, "mountId")
-	className := mapString(host, "class")
-	engineSource := core.FirstNonEmpty(mapString(host, "engineSource"), options.EngineSource, "gosx")
+	key := core.WorkbenchViewString(host, "key")
+	name := core.WorkbenchViewString(host, "name")
+	mountID := core.WorkbenchViewString(host, "mountId")
+	className := core.WorkbenchViewString(host, "class")
+	engineSource := core.FirstNonEmpty(core.WorkbenchViewString(host, "engineSource"), options.EngineSource, "gosx")
 	capabilities := engineCapabilities(engineCapabilityStrings(host["capabilities"]))
 	mountAttrs := map[string]any{
 		"class":                     className,

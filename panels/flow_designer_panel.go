@@ -30,26 +30,26 @@ func RenderFlowDesignerHeader() gosx.Node {
 }
 
 func RenderFlowDesignerReadiness(flow map[string]any) gosx.Node {
-	readiness := workbenchViewMap(flow, "readiness")
+	readiness := core.WorkbenchViewMap(flow, "readiness")
 	nodes := []gosx.Node{
 		gosx.El("header", nil,
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(readiness, "label"))),
-			gosx.El("span", nil, gosx.Text(workbenchMapString(readiness, "summary"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(readiness, "label"))),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(readiness, "summary"))),
 		),
 	}
-	checks := workbenchViewMapList(flow, "readinessChecks")
+	checks := core.WorkbenchViewMapList(flow, "readinessChecks")
 	checkNodes := make([]gosx.Node, 0, len(checks))
 	for _, check := range checks {
 		checkNodes = append(checkNodes, gosx.El("section", gosx.Attrs(
-			gosx.Attr("class", workbenchMapString(check, "class")),
+			gosx.Attr("class", core.WorkbenchViewString(check, "class")),
 			gosx.Attr("role", "listitem"),
-			gosx.Attr("tabindex", workbenchMapString(check, "tabIndex")),
-			gosx.Attr("data-studio-flow-check", workbenchMapString(check, "key")),
-			gosx.Attr("data-studio-flow-check-status", workbenchMapString(check, "status")),
+			gosx.Attr("tabindex", core.WorkbenchViewString(check, "tabIndex")),
+			gosx.Attr("data-studio-flow-check", core.WorkbenchViewString(check, "key")),
+			gosx.Attr("data-studio-flow-check-status", core.WorkbenchViewString(check, "status")),
 		),
-			gosx.El("span", nil, gosx.Text(workbenchMapString(check, "statusLabel"))),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(check, "label"))),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(check, "summary"))),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(check, "statusLabel"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(check, "label"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(check, "summary"))),
 		))
 	}
 	nodes = append(nodes, gosx.El("div", gosx.Attrs(
@@ -58,26 +58,26 @@ func RenderFlowDesignerReadiness(flow map[string]any) gosx.Node {
 		gosx.Attr("aria-label", "Flow readiness checks"),
 	), gosx.Fragment(checkNodes...)))
 	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", workbenchMapString(readiness, "class")),
-		gosx.Attr("data-studio-flow-readiness", workbenchMapString(flow, "key")),
+		gosx.Attr("class", core.WorkbenchViewString(readiness, "class")),
+		gosx.Attr("data-studio-flow-readiness", core.WorkbenchViewString(flow, "key")),
 	), gosx.Fragment(nodes...))
 }
 
 func RenderFlowDesignerGraph(flow map[string]any) gosx.Node {
-	nodes := workbenchViewMapList(flow, "nodes")
+	nodes := core.WorkbenchViewMapList(flow, "nodes")
 	children := make([]gosx.Node, 0, len(nodes))
 	for _, node := range nodes {
 		children = append(children, gosx.El("section", gosx.Attrs(
-			gosx.Attr("class", workbenchMapString(node, "class")),
+			gosx.Attr("class", core.WorkbenchViewString(node, "class")),
 			gosx.Attr("role", "listitem"),
-			gosx.Attr("tabindex", workbenchMapString(node, "tabIndex")),
-			gosx.Attr("data-studio-flow-node", workbenchMapString(node, "key")),
-			gosx.Attr("data-studio-flow-node-kind", workbenchMapString(node, "kind")),
-			gosx.Attr("data-studio-flow-node-status", workbenchMapString(node, "status")),
+			gosx.Attr("tabindex", core.WorkbenchViewString(node, "tabIndex")),
+			gosx.Attr("data-studio-flow-node", core.WorkbenchViewString(node, "key")),
+			gosx.Attr("data-studio-flow-node-kind", core.WorkbenchViewString(node, "kind")),
+			gosx.Attr("data-studio-flow-node-status", core.WorkbenchViewString(node, "status")),
 		),
-			gosx.El("span", nil, gosx.Text(workbenchMapString(node, "kindLabel"))),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(node, "label"))),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(node, "summary"))),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(node, "kindLabel"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(node, "label"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(node, "summary"))),
 		))
 	}
 	return gosx.El("div", gosx.Attrs(
@@ -91,79 +91,79 @@ func RenderFlowDesignerRoute(flow map[string]any, formID string) gosx.Node {
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-flow-editor__route")),
 		gosx.El("label", gosx.Attrs(
 			gosx.Attr("class", "field"),
-			gosx.Attr("for", workbenchMapString(flow, "routeInputID")),
+			gosx.Attr("for", core.WorkbenchViewString(flow, "routeInputID")),
 		),
 			gosx.El("span", nil, gosx.Text("Public page")),
 			gosx.El("input", gosx.Attrs(
-				gosx.Attr("id", workbenchMapString(flow, "routeInputID")),
-				gosx.Attr("name", workbenchMapString(flow, "routeInputName")),
-				gosx.Attr("value", workbenchMapString(flow, "route")),
+				gosx.Attr("id", core.WorkbenchViewString(flow, "routeInputID")),
+				gosx.Attr("name", core.WorkbenchViewString(flow, "routeInputName")),
+				gosx.Attr("value", core.WorkbenchViewString(flow, "route")),
 				gosx.Attr("form", formID),
-				gosx.Attr("data-studio-field-source", "flow."+workbenchMapString(flow, "key")+".route"),
+				gosx.Attr("data-studio-field-source", "flow."+core.WorkbenchViewString(flow, "key")+".route"),
 				gosx.Attr("data-studio-field-editable", "routing"),
 				gosx.Attr("readonly", true),
 			)),
 		),
 		gosx.El("label", gosx.Attrs(
 			gosx.Attr("class", "field"),
-			gosx.Attr("for", workbenchMapString(flow, "embedInputID")),
+			gosx.Attr("for", core.WorkbenchViewString(flow, "embedInputID")),
 		),
 			gosx.El("span", nil, gosx.Text("Appears in")),
 			gosx.El("input", gosx.Attrs(
-				gosx.Attr("id", workbenchMapString(flow, "embedInputID")),
-				gosx.Attr("name", workbenchMapString(flow, "embedInputName")),
-				gosx.Attr("value", workbenchMapString(flow, "embedTarget")),
+				gosx.Attr("id", core.WorkbenchViewString(flow, "embedInputID")),
+				gosx.Attr("name", core.WorkbenchViewString(flow, "embedInputName")),
+				gosx.Attr("value", core.WorkbenchViewString(flow, "embedTarget")),
 				gosx.Attr("form", formID),
-				gosx.Attr("data-studio-field-source", "flow."+workbenchMapString(flow, "key")+".embedTarget"),
+				gosx.Attr("data-studio-field-source", "flow."+core.WorkbenchViewString(flow, "key")+".embedTarget"),
 				gosx.Attr("data-studio-field-editable", "routing"),
 				gosx.Attr("readonly", true),
 			)),
 		),
 		gosx.El("input", gosx.Attrs(
-			gosx.Attr("id", workbenchMapString(flow, "handlerInputID")),
-			gosx.Attr("name", workbenchMapString(flow, "handlerInputName")),
-			gosx.Attr("value", workbenchMapString(flow, "handlerRef")),
+			gosx.Attr("id", core.WorkbenchViewString(flow, "handlerInputID")),
+			gosx.Attr("name", core.WorkbenchViewString(flow, "handlerInputName")),
+			gosx.Attr("value", core.WorkbenchViewString(flow, "handlerRef")),
 			gosx.Attr("form", formID),
-			gosx.Attr("data-studio-field-source", workbenchMapString(flow, "handlerSource")),
+			gosx.Attr("data-studio-field-source", core.WorkbenchViewString(flow, "handlerSource")),
 			gosx.Attr("data-studio-field-editable", "flow"),
 			gosx.Attr("data-studio-flow-handler-ref", "true"),
 			gosx.Attr("type", "hidden"),
 		)),
 		gosx.El("div", gosx.Attrs(
-			gosx.Attr("class", workbenchMapString(flow, "handlerClass")),
-			gosx.Attr("data-studio-flow-handler-summary", workbenchMapString(flow, "key")),
+			gosx.Attr("class", core.WorkbenchViewString(flow, "handlerClass")),
+			gosx.Attr("data-studio-flow-handler-summary", core.WorkbenchViewString(flow, "key")),
 		),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(flow, "handlerStatusLabel"))),
-			gosx.El("span", nil, gosx.Text(workbenchMapString(flow, "handlerDetail"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(flow, "handlerStatusLabel"))),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(flow, "handlerDetail"))),
 		),
 	)
 }
 
 func RenderFlowDesignerActions(flow map[string]any) gosx.Node {
-	actions := workbenchViewMapList(flow, "actions")
+	actions := core.WorkbenchViewMapList(flow, "actions")
 	actionNodes := make([]gosx.Node, 0, len(actions))
 	for _, action := range actions {
-		fields := workbenchViewMapList(action, "fields")
+		fields := core.WorkbenchViewMapList(action, "fields")
 		fieldNodes := make([]gosx.Node, 0, len(fields))
 		for _, field := range fields {
 			fieldNodes = append(fieldNodes, gosx.El("span", gosx.Attrs(
 				gosx.Attr("class", "studio-flow-field"),
-				gosx.Attr("data-studio-flow-field", workbenchMapString(field, "name")),
+				gosx.Attr("data-studio-flow-field", core.WorkbenchViewString(field, "name")),
 				gosx.Attr("tabindex", "0"),
 			),
-				gosx.El("strong", nil, gosx.Text(workbenchMapString(field, "label"))),
-				gosx.El("small", nil, gosx.Text(workbenchMapString(field, "requiredLabel"))),
+				gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(field, "label"))),
+				gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(field, "requiredLabel"))),
 			))
 		}
 		actionNodes = append(actionNodes, gosx.El("section", gosx.Attrs(
 			gosx.Attr("class", "studio-flow-action"),
-			gosx.Attr("data-studio-flow-action", workbenchMapString(action, "key")),
+			gosx.Attr("data-studio-flow-action", core.WorkbenchViewString(action, "key")),
 			gosx.Attr("tabindex", "0"),
 		),
 			gosx.El("header", nil,
-				gosx.El("strong", nil, gosx.Text(workbenchMapString(action, "label"))),
+				gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(action, "label"))),
 				gosx.El("span", nil,
-					gosx.Text(workbenchMapString(action, "fieldCount")),
+					gosx.Text(core.WorkbenchViewString(action, "fieldCount")),
 					gosx.Text(" fields"),
 				),
 			),
@@ -183,7 +183,7 @@ func flowDesignerPanelRootAttrs(view map[string]any, rootAttrs map[string]any) [
 		gosx.Attr("data-studio-panel", "flow-designer"),
 		gosx.Attr("data-studio-flow-designer-panel", "true"),
 		gosx.Attr("data-studio-engine-source", "gosx"),
-		gosx.Attr("data-studio-flow-selected", workbenchMapString(view, "defaultFlowKey")),
+		gosx.Attr("data-studio-flow-selected", core.WorkbenchViewString(view, "defaultFlowKey")),
 		gosx.Attr("data-gosx-studio-flow-designer-panel-renderer", "gosx-studio"),
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, rootAttrs)
@@ -191,31 +191,31 @@ func flowDesignerPanelRootAttrs(view map[string]any, rootAttrs map[string]any) [
 }
 
 func renderFlowDesignerList(view map[string]any) gosx.Node {
-	flows := workbenchViewMapList(view, "flows")
+	flows := core.WorkbenchViewMapList(view, "flows")
 	nodes := make([]gosx.Node, 0, len(flows))
-	selected := workbenchMapString(view, "defaultFlowKey")
+	selected := core.WorkbenchViewString(view, "defaultFlowKey")
 	for _, flow := range flows {
-		key := workbenchMapString(flow, "key")
+		key := core.WorkbenchViewString(flow, "key")
 		isSelected := key == selected
 		nodes = append(nodes, gosx.El("button", gosx.Attrs(
 			gosx.Attr("type", "button"),
-			gosx.Attr("class", workbenchMapString(flow, "cardClass")),
+			gosx.Attr("class", core.WorkbenchViewString(flow, "cardClass")),
 			gosx.Attr("data-editor-flow", key),
 			gosx.Attr("data-studio-flow-card", key),
 			gosx.Attr("data-studio-flow-card-selected", core.BoolAttr(isSelected)),
-			gosx.Attr("data-studio-flow-route", workbenchMapString(flow, "route")),
-			gosx.Attr("data-studio-flow-label", workbenchMapString(flow, "label")),
-			gosx.Attr("data-studio-flow-status", workbenchMapString(flow, "statusLabel")),
+			gosx.Attr("data-studio-flow-route", core.WorkbenchViewString(flow, "route")),
+			gosx.Attr("data-studio-flow-label", core.WorkbenchViewString(flow, "label")),
+			gosx.Attr("data-studio-flow-status", core.WorkbenchViewString(flow, "statusLabel")),
 			gosx.Attr("aria-pressed", core.BoolAttr(isSelected)),
 		),
 			gosx.El("span", gosx.Attrs(gosx.Attr("class", "studio-flow-card__head")),
-				gosx.El("strong", nil, gosx.Text(workbenchMapString(flow, "label"))),
-				gosx.El("output", nil, gosx.Text(workbenchMapString(flow, "statusLabel"))),
+				gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(flow, "label"))),
+				gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(flow, "statusLabel"))),
 			),
-			gosx.El("span", gosx.Attrs(gosx.Attr("class", "studio-flow-card__body")), gosx.Text(workbenchMapString(flow, "description"))),
+			gosx.El("span", gosx.Attrs(gosx.Attr("class", "studio-flow-card__body")), gosx.Text(core.WorkbenchViewString(flow, "description"))),
 			gosx.El("span", gosx.Attrs(gosx.Attr("class", "studio-flow-card__meta")),
-				gosx.El("span", nil, gosx.Text(workbenchMapString(flow, "summary"))),
-				gosx.El("span", nil, gosx.Text(workbenchMapString(flow, "handlerStatusLabel"))),
+				gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(flow, "summary"))),
+				gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(flow, "handlerStatusLabel"))),
 			),
 			gosx.El("output", gosx.Attrs(
 				gosx.Attr("class", "studio-flow-summary__dirty"),
@@ -232,26 +232,26 @@ func renderFlowDesignerList(view map[string]any) gosx.Node {
 }
 
 func renderFlowDesignerEditors(view map[string]any) gosx.Node {
-	flows := workbenchViewMapList(view, "flows")
+	flows := core.WorkbenchViewMapList(view, "flows")
 	nodes := make([]gosx.Node, 0, len(flows))
-	selected := workbenchMapString(view, "defaultFlowKey")
-	formID := workbenchMapString(view, "formID")
-	publishAction := workbenchMapString(view, "publishAction")
+	selected := core.WorkbenchViewString(view, "defaultFlowKey")
+	formID := core.WorkbenchViewString(view, "formID")
+	publishAction := core.WorkbenchViewString(view, "publishAction")
 	for _, flow := range flows {
-		nodes = append(nodes, renderFlowDesignerEditor(flow, formID, publishAction, workbenchMapString(flow, "key") == selected))
+		nodes = append(nodes, renderFlowDesignerEditor(flow, formID, publishAction, core.WorkbenchViewString(flow, "key") == selected))
 	}
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-flow-designer__editors")), gosx.Fragment(nodes...))
 }
 
 func renderFlowDesignerEditor(flow map[string]any, formID, publishAction string, selected bool) gosx.Node {
-	key := workbenchMapString(flow, "key")
-	readiness := workbenchViewMap(flow, "readiness")
+	key := core.WorkbenchViewString(flow, "key")
+	readiness := core.WorkbenchViewMap(flow, "readiness")
 	return gosx.El("article", gosx.Attrs(
 		gosx.Attr("class", "studio-flow-editor"),
 		gosx.Attr("data-editor-flow", key),
 		gosx.Attr("data-studio-flow-editor", key),
-		gosx.Attr("data-studio-flow-valid", core.BoolAttr(workbenchMapBool(readiness, "canPublish"))),
-		gosx.Attr("data-studio-flow-readiness-status", workbenchMapString(readiness, "status")),
+		gosx.Attr("data-studio-flow-valid", core.BoolAttr(core.WorkbenchViewBool(readiness, "canPublish"))),
+		gosx.Attr("data-studio-flow-readiness-status", core.WorkbenchViewString(readiness, "status")),
 		gosx.Attr("data-studio-flow-dirty", "false"),
 		gosx.Attr("data-studio-flow-editor-visible", core.BoolAttr(selected)),
 	),
@@ -265,19 +265,19 @@ func renderFlowDesignerEditor(flow map[string]any, formID, publishAction string,
 }
 
 func renderFlowDesignerEditorHead(flow map[string]any, formID, publishAction string) gosx.Node {
-	key := workbenchMapString(flow, "key")
-	readiness := workbenchViewMap(flow, "readiness")
+	key := core.WorkbenchViewString(flow, "key")
+	readiness := core.WorkbenchViewMap(flow, "readiness")
 	return gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-flow-editor__head")),
 		gosx.El("div", nil,
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchMapString(flow, "statusLabel"))),
-			gosx.El("h3", nil, gosx.Text(workbenchMapString(flow, "label"))),
-			gosx.El("p", nil, gosx.Text(workbenchMapString(flow, "summary"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.WorkbenchViewString(flow, "statusLabel"))),
+			gosx.El("h3", nil, gosx.Text(core.WorkbenchViewString(flow, "label"))),
+			gosx.El("p", nil, gosx.Text(core.WorkbenchViewString(flow, "summary"))),
 		),
 		gosx.El("output", gosx.Attrs(
-			gosx.Attr("class", workbenchMapString(readiness, "badgeClass")),
+			gosx.Attr("class", core.WorkbenchViewString(readiness, "badgeClass")),
 			gosx.Attr("data-studio-flow-editor-state", key),
 			gosx.Attr("data-studio-flow-editor-state-visible", "true"),
-		), gosx.Text(workbenchMapString(readiness, "label"))),
+		), gosx.Text(core.WorkbenchViewString(readiness, "label"))),
 		gosx.El("output", gosx.Attrs(
 			gosx.Attr("class", "studio-flow-editor__state studio-flow-editor__state--watch"),
 			gosx.Attr("data-studio-flow-editor-state", key),
@@ -297,33 +297,33 @@ func renderFlowDesignerEditorHead(flow map[string]any, formID, publishAction str
 }
 
 func renderFlowDesignerSteps(flow map[string]any, formID string) gosx.Node {
-	steps := workbenchViewMapList(flow, "steps")
+	steps := core.WorkbenchViewMapList(flow, "steps")
 	stepNodes := make([]gosx.Node, 0, len(steps))
 	for _, step := range steps {
 		stepNodes = append(stepNodes, gosx.El("section", gosx.Attrs(
 			gosx.Attr("class", "studio-flow-step"),
-			gosx.Attr("data-studio-flow-step", workbenchMapString(step, "key")),
+			gosx.Attr("data-studio-flow-step", core.WorkbenchViewString(step, "key")),
 			gosx.Attr("tabindex", "0"),
 		),
 			gosx.El("label", gosx.Attrs(
 				gosx.Attr("class", "field"),
-				gosx.Attr("for", workbenchMapString(step, "labelInputID")),
+				gosx.Attr("for", core.WorkbenchViewString(step, "labelInputID")),
 			),
-				gosx.El("span", nil, gosx.Text(workbenchMapString(step, "label"))),
+				gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(step, "label"))),
 				gosx.El("input", gosx.Attrs(
-					gosx.Attr("id", workbenchMapString(step, "labelInputID")),
-					gosx.Attr("name", workbenchMapString(step, "labelInputName")),
-					gosx.Attr("value", workbenchMapString(step, "label")),
+					gosx.Attr("id", core.WorkbenchViewString(step, "labelInputID")),
+					gosx.Attr("name", core.WorkbenchViewString(step, "labelInputName")),
+					gosx.Attr("value", core.WorkbenchViewString(step, "label")),
 					gosx.Attr("form", formID),
-					gosx.Attr("data-studio-field-source", workbenchMapString(step, "labelSource")),
+					gosx.Attr("data-studio-field-source", core.WorkbenchViewString(step, "labelSource")),
 					gosx.Attr("data-studio-field-editable", "flow"),
 				)),
 			),
 			gosx.El("p", gosx.Attrs(
 				gosx.Attr("class", "studio-flow-step__body"),
-				gosx.Attr("data-studio-field-source", workbenchMapString(step, "bodySource")),
+				gosx.Attr("data-studio-field-source", core.WorkbenchViewString(step, "bodySource")),
 				gosx.Attr("data-studio-field-editable", "flow"),
-			), gosx.Text(workbenchMapString(step, "bodySummary"))),
+			), gosx.Text(core.WorkbenchViewString(step, "bodySummary"))),
 		))
 	}
 	return gosx.El("div", gosx.Attrs(

@@ -1,8 +1,10 @@
-package studio
+package shell
 
 import (
 	"fmt"
 	"strings"
+
+	"m31labs.dev/gosx-studio/core"
 )
 
 type ShellReadinessStatus string
@@ -54,7 +56,7 @@ func (item ShellReadinessItem) WithActionLabel(label string) ShellReadinessItem 
 func NormalizeShellReadiness(readiness ShellReadiness) ShellReadiness {
 	out := make([]ShellReadinessItem, 0, len(readiness.Items))
 	for _, item := range readiness.Items {
-		item.Key = NormalizeKey(item.Key)
+		item.Key = core.NormalizeKey(item.Key)
 		item.Label = strings.TrimSpace(item.Label)
 		item.Status = NormalizeShellReadinessStatus(item.Status)
 		item.Summary = strings.TrimSpace(item.Summary)
@@ -119,7 +121,7 @@ func shellReadinessItemViews(items []ShellReadinessItem) []map[string]any {
 			"detail":      item.Detail,
 			"href":        item.Href,
 			"hasHref":     item.Href != "",
-			"actionLabel": FirstNonEmpty(item.ActionLabel, ShellReadinessActionLabel(status)),
+			"actionLabel": core.FirstNonEmpty(item.ActionLabel, ShellReadinessActionLabel(status)),
 		})
 	}
 	return out

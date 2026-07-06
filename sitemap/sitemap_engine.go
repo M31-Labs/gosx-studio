@@ -55,10 +55,10 @@ type SiteMapEngineRender struct {
 
 func SiteMapEngineHostFromMap(host map[string]any) SiteMapEngineHostOptions {
 	return SiteMapEngineHostOptions{
-		Key:          workbenchMapString(host, "key"),
-		Name:         workbenchMapString(host, "name"),
-		MountID:      workbenchMapString(host, "mountId"),
-		Class:        workbenchMapString(host, "class"),
+		Key:          core.WorkbenchViewString(host, "key"),
+		Name:         core.WorkbenchViewString(host, "name"),
+		MountID:      core.WorkbenchViewString(host, "mountId"),
+		Class:        core.WorkbenchViewString(host, "class"),
 		Capabilities: siteMapEngineCapabilityStrings(host["capabilities"]),
 	}
 }
@@ -119,24 +119,24 @@ func renderSiteMapEngineRootOpen(options SiteMapEngineOptions) gosx.Node {
 func renderSiteMapEngineHeader(siteMapView map[string]any) gosx.Node {
 	return gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-site-map-engine__chrome")),
 		gosx.El("div", nil,
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchViewString(siteMapView, "kicker"))),
-			gosx.El("h2", nil, gosx.Text(workbenchViewString(siteMapView, "title"))),
-			gosx.El("p", nil, gosx.Text(workbenchViewString(siteMapView, "summary"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.WorkbenchViewString(siteMapView, "kicker"))),
+			gosx.El("h2", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "title"))),
+			gosx.El("p", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "summary"))),
 		),
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-engine__stats"),
 			gosx.Attr("aria-label", "Site map summary"),
 		),
-			gosx.El("output", nil, gosx.Text(workbenchViewString(siteMapView, "pageCountLabel"))),
-			gosx.El("output", nil, gosx.Text(workbenchViewString(siteMapView, "componentCountLabel"))),
-			gosx.El("output", nil, gosx.Text(workbenchViewString(siteMapView, "controlCountLabel"))),
-			gosx.El("output", nil, gosx.Text(workbenchViewString(siteMapView, "selectedPageLabel"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "pageCountLabel"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "componentCountLabel"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "controlCountLabel"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "selectedPageLabel"))),
 		),
 	)
 }
 
 func renderSiteMapEngineSourceLegend(siteMapView map[string]any) gosx.Node {
-	sources := workbenchViewMapList(siteMapView, "sources")
+	sources := core.WorkbenchViewMapList(siteMapView, "sources")
 	if len(sources) == 0 {
 		return gosx.Fragment()
 	}
@@ -144,10 +144,10 @@ func renderSiteMapEngineSourceLegend(siteMapView map[string]any) gosx.Node {
 	for _, source := range sources {
 		items = append(items, gosx.El("span", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-source"),
-			gosx.Attr("data-studio-site-map-source-kind", workbenchMapString(source, "key")),
+			gosx.Attr("data-studio-site-map-source-kind", core.WorkbenchViewString(source, "key")),
 		),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(source, "label"))),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(source, "countLabel"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(source, "label"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(source, "countLabel"))),
 		))
 	}
 	return gosx.El("div", gosx.Attrs(

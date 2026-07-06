@@ -100,7 +100,7 @@ func TestEditableControlViewKindPresent(t *testing.T) {
 		}},
 	}), SiteMapViewOptions{})
 
-	ctrl := workbenchViewMap(view, "editableControl")
+	ctrl := core.WorkbenchViewMap(view, "editableControl")
 	if ctrl == nil {
 		t.Fatal("editableControl must be present in the view")
 	}

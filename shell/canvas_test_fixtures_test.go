@@ -1,24 +1,26 @@
-package studio
+package shell
 
 // This file preserves test-only fixtures that used to live in
 // sitemap_canvas_test.go and engine_hosts_test.go before Slice 4 of the
 // package restructure (see
 // .tiller/scratch/gosx-studio-restructure-spec-v0.1.md) moved those files
-// into m31labs.dev/gosx-studio/canvas. Two still-root-resident test files
-// (backend_editor_workbench_test.go, backend_editor_page_test.go — shell
-// package territory, Slice 8) call these unexported helpers by their
-// original unqualified names; canvas carries its own equivalents for its own
-// test suite (canvas/sitemap_canvas_test.go's siteMapCanvasTestView is a
-// hand-built literal since canvas cannot import authoring/sitemap, and
-// canvas/engine_hosts_test.go's recordingStudioEngineRuntime is unchanged),
-// so this is a small, deliberate duplication rather than a shim, matching the
-// same "still-root-resident file needs a helper from a moved file" pattern
-// documented in the compat_*.go facades.
+// into m31labs.dev/gosx-studio/canvas. It moved from the studio root into the
+// shell package alongside backend_editor_workbench_test.go and
+// backend_editor_page_test.go in Slice 8; those tests call these helpers by
+// their bare names (now qualified to core./authoring./sitemap. since shell may
+// import them). canvas carries its own equivalents for its own test suite
+// (canvas/sitemap_canvas_test.go's siteMapCanvasTestView is a hand-built
+// literal since canvas cannot import authoring/sitemap, and
+// canvas/engine_hosts_test.go's recordingStudioEngineRuntime is unchanged), so
+// this is a small, deliberate duplication rather than a shim.
 
 import (
 	"strings"
 
 	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/authoring"
+	"m31labs.dev/gosx-studio/core"
+	"m31labs.dev/gosx-studio/sitemap"
 	"m31labs.dev/gosx/engine"
 )
 
@@ -26,29 +28,29 @@ import (
 // sitemap_board_test.go exercises, so root-resident render tests are
 // validated against the exact data the DOM board renders from.
 func siteMapCanvasTestView() map[string]any {
-	return AuthoringSiteMapView(NoCodeAuthoringSurface(SiteMap{
-		Pages: []Page{{
+	return sitemap.AuthoringSiteMapView(authoring.NoCodeAuthoringSurface(core.SiteMap{
+		Pages: []core.Page{{
 			Key:           "home",
 			Label:         "Home",
 			Route:         "/",
-			Group:         PageGroupSite,
+			Group:         core.PageGroupSite,
 			GoSXComponent: "HomePage",
 			Status:        "Editable",
 			Editable:      true,
 			Selected:      true,
-			Components: []Component{{
+			Components: []core.Component{{
 				Key:           "hero",
 				TemplateKey:   "hero",
 				Label:         "Hero",
 				GoSXComponent: "HomeHero",
-				Source:        ComponentSourceHost,
+				Source:        core.ComponentSourceHost,
 				Binding:       "home.section.hero",
 				Status:        "Visible",
 				Editable:      true,
 				Visible:       true,
 			}},
 		}},
-	}), SiteMapViewOptions{})
+	}), sitemap.SiteMapViewOptions{})
 }
 
 // recordingStudioEngineRuntime is a test double for the StudioEngineRuntime
@@ -77,7 +79,7 @@ func (runtime *recordingStudioEngineRuntime) Engine(cfg engine.Config, fallback 
 		attrs = append(attrs, gosx.Attr(name, value))
 	}
 	if len(cfg.Capabilities) > 0 {
-		attrs = append(attrs, gosx.Attr("data-gosx-engine-capabilities", strings.Join(siteMapEngineCapabilityNames(cfg.Capabilities), " ")))
+		attrs = append(attrs, gosx.Attr("data-gosx-engine-capabilities", strings.Join(sitemap.SiteMapEngineCapabilityNames(cfg.Capabilities), " ")))
 	}
 	return gosx.El("div", gosx.Attrs(attrs...))
 }

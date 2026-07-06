@@ -347,7 +347,7 @@ func siteMapCanvasNodes(siteMapView map[string]any) []gosx.CanvasBoardNode {
 
 func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOptions) []gosx.CanvasBoardNode {
 	layout := siteMapCanvasLayoutFrom(options)
-	layers := mapList(siteMapView, "workspaceLayers")
+	layers := core.WorkbenchViewMapList(siteMapView, "workspaceLayers")
 	placements := map[string]siteMapCanvasNodePlacement{}
 
 	rects := make([]gosx.CanvasBoardNode, 0)
@@ -356,10 +356,10 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 	labels := make([]gosx.CanvasBoardNode, 0)
 
 	for layerIndex, layer := range layers {
-		nodes := mapList(layer, "nodes")
+		nodes := core.WorkbenchViewMapList(layer, "nodes")
 		x := float64(layerIndex) * layout.columnStride
 		for nodeIndex, node := range nodes {
-			key := mapString(node, "key")
+			key := core.WorkbenchViewString(node, "key")
 			if key == "" {
 				continue
 			}
@@ -368,7 +368,7 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 			// placements are never recorded, but that's safe because the link
 			// "spiderweb" loop below is also skipped under this flag, so there are
 			// no dangling endpoints to resolve.
-			if options.PageArtboardsOnly && mapString(node, "kind") != string(core.WorkspaceNodePage) {
+			if options.PageArtboardsOnly && core.WorkbenchViewString(node, "kind") != string(core.WorkspaceNodePage) {
 				continue
 			}
 			if _, seen := placements[key]; seen {
@@ -392,7 +392,7 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 				Y:      placement.y,
 				Width:  placement.width,
 				Height: placement.height,
-				Color:  siteMapCanvasGroupColor(mapString(node, "group")),
+				Color:  siteMapCanvasGroupColor(core.WorkbenchViewString(node, "group")),
 			})
 			labels = append(labels, gosx.CanvasBoardNode{
 				ID:    key + ":label",
@@ -410,8 +410,8 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 			// authoring view exposes "route" only on page nodes (components and
 			// resources leave it empty), so the kind+route gate keeps the route
 			// label off non-page cards.
-			if mapString(node, "kind") == string(core.WorkspaceNodePage) {
-				if route := mapString(node, "route"); route != "" {
+			if core.WorkbenchViewString(node, "kind") == string(core.WorkspaceNodePage) {
+				if route := core.WorkbenchViewString(node, "route"); route != "" {
 					labels = append(labels, gosx.CanvasBoardNode{
 						ID:    key + ":route",
 						Kind:  "label",
@@ -467,14 +467,14 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 	// are no inter-node connectors to draw (and non-page endpoints have no
 	// placements anyway). When the flag is off this emits the full link graph.
 	if !options.PageArtboardsOnly {
-		for _, link := range mapList(siteMapView, "workspaceLinks") {
-			from, okFrom := placements[mapString(link, "fromNodeKey")]
-			to, okTo := placements[mapString(link, "toNodeKey")]
+		for _, link := range core.WorkbenchViewMapList(siteMapView, "workspaceLinks") {
+			from, okFrom := placements[core.WorkbenchViewString(link, "fromNodeKey")]
+			to, okTo := placements[core.WorkbenchViewString(link, "toNodeKey")]
 			if !okFrom || !okTo {
 				continue
 			}
 			lines = append(lines, gosx.CanvasBoardNode{
-				ID:    mapString(link, "key"),
+				ID:    core.WorkbenchViewString(link, "key"),
 				Kind:  "line",
 				X1:    from.centerX(),
 				Y1:    from.centerY(),
@@ -541,8 +541,8 @@ func flipBoardNodesYUp(nodes []gosx.CanvasBoardNode) []gosx.CanvasBoardNode {
 
 func siteMapCanvasNodeText(node map[string]any) string {
 	return core.FirstNonEmpty(
-		mapString(node, "label"),
-		mapString(node, "key"),
+		core.WorkbenchViewString(node, "label"),
+		core.WorkbenchViewString(node, "key"),
 	)
 }
 

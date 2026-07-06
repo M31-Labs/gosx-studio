@@ -4,6 +4,7 @@ import (
 	"m31labs.dev/gosx"
 
 	"m31labs.dev/gosx-studio/authoring"
+	"m31labs.dev/gosx-studio/core"
 )
 
 // RenderStylePanel renders a brand color-palette editor as a managed authoring
@@ -248,12 +249,12 @@ func stylePaletteEntries(view map[string]any) []map[string]string {
 		out := make([]map[string]string, 0, len(typed))
 		for _, entry := range typed {
 			out = append(out, map[string]string{
-				"key":      workbenchMapString(entry, "key"),
-				"name":     workbenchMapString(entry, "name"),
-				"label":    workbenchMapString(entry, "label"),
-				"cssVar":   workbenchMapString(entry, "cssVar"),
-				"value":    workbenchMapString(entry, "value"),
-				"fallback": workbenchMapString(entry, "fallback"),
+				"key":      core.WorkbenchViewString(entry, "key"),
+				"name":     core.WorkbenchViewString(entry, "name"),
+				"label":    core.WorkbenchViewString(entry, "label"),
+				"cssVar":   core.WorkbenchViewString(entry, "cssVar"),
+				"value":    core.WorkbenchViewString(entry, "value"),
+				"fallback": core.WorkbenchViewString(entry, "fallback"),
 			})
 		}
 		return out
@@ -281,12 +282,12 @@ func styleFontEntries(view map[string]any) []map[string]string {
 		out := make([]map[string]string, 0, len(typed))
 		for _, entry := range typed {
 			out = append(out, map[string]string{
-				"role":      workbenchMapString(entry, "role"),
-				"label":     workbenchMapString(entry, "label"),
-				"nameField": workbenchMapString(entry, "nameField"),
-				"urlField":  workbenchMapString(entry, "urlField"),
-				"family":    workbenchMapString(entry, "family"),
-				"url":       workbenchMapString(entry, "url"),
+				"role":      core.WorkbenchViewString(entry, "role"),
+				"label":     core.WorkbenchViewString(entry, "label"),
+				"nameField": core.WorkbenchViewString(entry, "nameField"),
+				"urlField":  core.WorkbenchViewString(entry, "urlField"),
+				"family":    core.WorkbenchViewString(entry, "family"),
+				"url":       core.WorkbenchViewString(entry, "url"),
 			})
 		}
 		return out

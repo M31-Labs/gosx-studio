@@ -6,11 +6,13 @@ import (
 )
 
 // assertOrder is a frozen, byte-identical copy of the unexported test helper
-// of the same name defined in the root package's backend_editor_page_test.go
-// (backend_editor_page.go/backend_editor_workbench.go are shell territory
-// per the restructure spec — .tiller/scratch/gosx-studio-restructure-spec-v0.1.md,
-// Slice 8 — and never move into backoffice, so their test file cannot be
-// imported here). backend_blog_detail_test.go, backend_category_detail_test.go,
+// of the same name whose canonical definition now lives in the shell package's
+// backend_editor_page_test.go (backend_editor_* moved from the root into shell
+// in Slice 8 of the restructure —
+// .tiller/scratch/gosx-studio-restructure-spec-v0.1.md; those files never move
+// into backoffice, so their test file cannot be imported here, and Go test
+// helpers are not importable across packages regardless).
+// backend_blog_detail_test.go, backend_category_detail_test.go,
 // backend_gallery_detail_test.go, backend_media_detail_test.go,
 // backend_page_detail_test.go, and backend_product_detail_test.go call this
 // bare unexported name by its original (pre-restructure) name; this copy

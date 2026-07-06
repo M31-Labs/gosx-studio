@@ -52,45 +52,45 @@ func renderInspectorFieldRow(field map[string]any, options InspectorFieldRowOpti
 		return renderHomeInspectorFieldRow(field, options)
 	}
 	children := make([]gosx.Node, 0, 4)
-	if workbenchMapBool(field, "isCard") {
+	if core.WorkbenchViewBool(field, "isCard") {
 		children = append(children,
-			gosx.El("label", nil, gosx.Text(workbenchMapString(field, "label"))),
+			gosx.El("label", nil, gosx.Text(core.WorkbenchViewString(field, "label"))),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-source-card")),
-				gosx.El("strong", nil, gosx.Text(workbenchMapString(field, "cardTitle"))),
+				gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(field, "cardTitle"))),
 				renderInspectorFieldHelp(field),
 				gosx.El("div", gosx.Attrs(gosx.Attr("class", "button-row")), gosx.Fragment(renderInspectorFieldActions(field)...)),
 			),
 		)
-		return gosx.El("div", gosx.Attrs(inspectorFieldMapAttrs(workbenchViewMap(field, "rowAttrs"))...), gosx.Fragment(children...))
+		return gosx.El("div", gosx.Attrs(inspectorFieldMapAttrs(core.WorkbenchViewMap(field, "rowAttrs"))...), gosx.Fragment(children...))
 	}
 
-	children = append(children, gosx.El("label", gosx.Attrs(gosx.Attr("for", workbenchMapString(field, "id"))), gosx.Text(workbenchMapString(field, "label"))))
+	children = append(children, gosx.El("label", gosx.Attrs(gosx.Attr("for", core.WorkbenchViewString(field, "id"))), gosx.Text(core.WorkbenchViewString(field, "label"))))
 	children = append(children, renderInspectorFieldControl(field))
 	children = append(children, renderInspectorFieldHelp(field))
 
-	return gosx.El("div", gosx.Attrs(inspectorFieldMapAttrs(workbenchViewMap(field, "rowAttrs"))...), gosx.Fragment(children...))
+	return gosx.El("div", gosx.Attrs(inspectorFieldMapAttrs(core.WorkbenchViewMap(field, "rowAttrs"))...), gosx.Fragment(children...))
 }
 
 func renderHomeInspectorFieldRow(field map[string]any, options InspectorFieldRowOptions) gosx.Node {
-	return gosx.El("div", gosx.Attrs(inspectorFieldMapAttrs(workbenchViewMap(field, "rowAttrs"))...),
+	return gosx.El("div", gosx.Attrs(inspectorFieldMapAttrs(core.WorkbenchViewMap(field, "rowAttrs"))...),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-home-field__head")),
-			gosx.El("label", gosx.Attrs(gosx.Attr("for", workbenchMapString(field, "id"))), gosx.Text(workbenchMapString(field, "label"))),
-			gosx.El("span", nil, gosx.Text(workbenchMapString(field, "kindLabel"))),
+			gosx.El("label", gosx.Attrs(gosx.Attr("for", core.WorkbenchViewString(field, "id"))), gosx.Text(core.WorkbenchViewString(field, "label"))),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(field, "kindLabel"))),
 		),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-home-field__meta")),
-			gosx.El("output", nil, gosx.Text(workbenchMapString(field, "validationLabel"))),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(field, "reactionLabel"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(field, "validationLabel"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(field, "reactionLabel"))),
 			gosx.El("small", gosx.Attrs(gosx.Attr("class", "studio-home-field__invalid")), gosx.Text(options.InvalidLabel)),
 		),
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "studio-source-card"),
-			gosx.Attr("hidden", !workbenchMapBool(field, "isCard")),
+			gosx.Attr("hidden", !core.WorkbenchViewBool(field, "isCard")),
 		),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(field, "cardTitle"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(field, "cardTitle"))),
 			gosx.El("small", gosx.Attrs(
 				gosx.Attr("class", "field-help"),
-				gosx.Attr("hidden", !workbenchMapBool(field, "hasHelp")),
-			), gosx.Text(workbenchMapString(field, "help"))),
+				gosx.Attr("hidden", !core.WorkbenchViewBool(field, "hasHelp")),
+			), gosx.Text(core.WorkbenchViewString(field, "help"))),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "button-row")), gosx.Fragment(renderHomeInspectorFieldActions(field)...)),
 		),
 		renderHomeInspectorTextarea(field),
@@ -98,8 +98,8 @@ func renderHomeInspectorFieldRow(field map[string]any, options InspectorFieldRow
 		renderHomeInspectorInput(field),
 		gosx.El("small", gosx.Attrs(
 			gosx.Attr("class", "field-help"),
-			gosx.Attr("hidden", workbenchMapBool(field, "isCard") || !workbenchMapBool(field, "hasHelp")),
-		), gosx.Text(workbenchMapString(field, "help"))),
+			gosx.Attr("hidden", core.WorkbenchViewBool(field, "isCard") || !core.WorkbenchViewBool(field, "hasHelp")),
+		), gosx.Text(core.WorkbenchViewString(field, "help"))),
 	)
 }
 
@@ -107,26 +107,26 @@ func renderHomeInspectorFieldActions(field map[string]any) []gosx.Node {
 	actions := siteMapMapList(field, "actions")
 	nodes := make([]gosx.Node, 0, len(actions)*2)
 	for _, action := range actions {
-		hasFormAction := workbenchMapBool(action, "hasFormAction")
+		hasFormAction := core.WorkbenchViewBool(action, "hasFormAction")
 		nodes = append(nodes,
 			gosx.El("button", gosx.Attrs(
-				gosx.Attr("class", workbenchMapString(action, "class")),
+				gosx.Attr("class", core.WorkbenchViewString(action, "class")),
 				gosx.Attr("type", "submit"),
-				gosx.Attr("formaction", workbenchMapString(action, "formAction")),
-				gosx.Attr("formmethod", workbenchMapString(action, "formMethod")),
-				gosx.Attr("name", workbenchMapString(action, "name")),
+				gosx.Attr("formaction", core.WorkbenchViewString(action, "formAction")),
+				gosx.Attr("formmethod", core.WorkbenchViewString(action, "formMethod")),
+				gosx.Attr("name", core.WorkbenchViewString(action, "name")),
 				gosx.Attr("value", inspectorFieldRawString(action, "value")),
-				gosx.Attr("data-admin-confirm", workbenchMapString(action, "confirm")),
-				gosx.Attr("data-studio-submit-action", workbenchMapString(action, "submitAction")),
-				gosx.Attr("data-studio-field-action-formaction", workbenchMapString(action, "formAction")),
+				gosx.Attr("data-admin-confirm", core.WorkbenchViewString(action, "confirm")),
+				gosx.Attr("data-studio-submit-action", core.WorkbenchViewString(action, "submitAction")),
+				gosx.Attr("data-studio-field-action-formaction", core.WorkbenchViewString(action, "formAction")),
 				gosx.Attr("hidden", !hasFormAction),
-			), gosx.Text(workbenchMapString(action, "label"))),
+			), gosx.Text(core.WorkbenchViewString(action, "label"))),
 			gosx.El("a", gosx.Attrs(
-				gosx.Attr("class", workbenchMapString(action, "class")),
-				gosx.Attr("href", workbenchMapString(action, "href")),
+				gosx.Attr("class", core.WorkbenchViewString(action, "class")),
+				gosx.Attr("href", core.WorkbenchViewString(action, "href")),
 				gosx.Attr("data-gosx-link", "true"),
 				gosx.Attr("hidden", hasFormAction),
-			), gosx.Text(workbenchMapString(action, "label"))),
+			), gosx.Text(core.WorkbenchViewString(action, "label"))),
 		)
 	}
 	return nodes
@@ -134,19 +134,19 @@ func renderHomeInspectorFieldActions(field map[string]any) []gosx.Node {
 
 func renderHomeInspectorTextarea(field map[string]any) gosx.Node {
 	return gosx.El("textarea", gosx.Attrs(
-		gosx.Attr("id", workbenchMapString(field, "id")),
-		gosx.Attr("name", workbenchMapString(field, "areaName")),
+		gosx.Attr("id", core.WorkbenchViewString(field, "id")),
+		gosx.Attr("name", core.WorkbenchViewString(field, "areaName")),
 		gosx.Attr("rows", inspectorFieldValue(field, "rows")),
-		gosx.Attr("placeholder", workbenchMapString(field, "placeholder")),
-		gosx.Attr("required", workbenchMapBool(field, "areaRequired")),
-		gosx.Attr("disabled", workbenchMapBool(field, "areaDisabled")),
-		gosx.Attr("data-editor-source", workbenchMapString(field, "areaEditorSource")),
-		gosx.Attr("data-editor-frame-target", workbenchMapString(field, "areaFrameTarget")),
-		gosx.Attr("data-editor-frame-attr-target", workbenchMapString(field, "areaAttrTarget")),
-		gosx.Attr("data-editor-frame-attr", workbenchMapString(field, "areaAttrName")),
-		gosx.Attr("data-editor-frame-attr-prefix", workbenchMapString(field, "areaAttrPrefix")),
-		gosx.Attr("data-editor-frame-attr-suffix", workbenchMapString(field, "areaAttrSuffix")),
-		gosx.Attr("hidden", !workbenchMapBool(field, "isArea")),
+		gosx.Attr("placeholder", core.WorkbenchViewString(field, "placeholder")),
+		gosx.Attr("required", core.WorkbenchViewBool(field, "areaRequired")),
+		gosx.Attr("disabled", core.WorkbenchViewBool(field, "areaDisabled")),
+		gosx.Attr("data-editor-source", core.WorkbenchViewString(field, "areaEditorSource")),
+		gosx.Attr("data-editor-frame-target", core.WorkbenchViewString(field, "areaFrameTarget")),
+		gosx.Attr("data-editor-frame-attr-target", core.WorkbenchViewString(field, "areaAttrTarget")),
+		gosx.Attr("data-editor-frame-attr", core.WorkbenchViewString(field, "areaAttrName")),
+		gosx.Attr("data-editor-frame-attr-prefix", core.WorkbenchViewString(field, "areaAttrPrefix")),
+		gosx.Attr("data-editor-frame-attr-suffix", core.WorkbenchViewString(field, "areaAttrSuffix")),
+		gosx.Attr("hidden", !core.WorkbenchViewBool(field, "isArea")),
 	), gosx.Text(inspectorFieldRawString(field, "areaValue")))
 }
 
@@ -154,57 +154,57 @@ func renderHomeInspectorSelect(field map[string]any) gosx.Node {
 	optionNodes := []gosx.Node{}
 	for _, option := range siteMapMapList(field, "options") {
 		optionNodes = append(optionNodes, gosx.El("option", gosx.Attrs(
-			gosx.Attr("value", workbenchMapString(option, "value")),
-			gosx.Attr("selected", workbenchMapBool(option, "selected")),
-		), gosx.Text(workbenchMapString(option, "label"))))
+			gosx.Attr("value", core.WorkbenchViewString(option, "value")),
+			gosx.Attr("selected", core.WorkbenchViewBool(option, "selected")),
+		), gosx.Text(core.WorkbenchViewString(option, "label"))))
 	}
 	return gosx.El("select", gosx.Attrs(
-		gosx.Attr("id", workbenchMapString(field, "id")),
-		gosx.Attr("name", workbenchMapString(field, "selectName")),
-		gosx.Attr("required", workbenchMapBool(field, "selectRequired")),
-		gosx.Attr("disabled", workbenchMapBool(field, "selectDisabled")),
-		gosx.Attr("data-editor-source", workbenchMapString(field, "selectEditorSource")),
-		gosx.Attr("data-editor-frame-target", workbenchMapString(field, "selectFrameTarget")),
-		gosx.Attr("data-editor-frame-attr-target", workbenchMapString(field, "selectAttrTarget")),
-		gosx.Attr("data-editor-frame-attr", workbenchMapString(field, "selectAttrName")),
-		gosx.Attr("data-editor-frame-attr-prefix", workbenchMapString(field, "selectAttrPrefix")),
-		gosx.Attr("data-editor-frame-attr-suffix", workbenchMapString(field, "selectAttrSuffix")),
-		gosx.Attr("hidden", !workbenchMapBool(field, "isSelect")),
+		gosx.Attr("id", core.WorkbenchViewString(field, "id")),
+		gosx.Attr("name", core.WorkbenchViewString(field, "selectName")),
+		gosx.Attr("required", core.WorkbenchViewBool(field, "selectRequired")),
+		gosx.Attr("disabled", core.WorkbenchViewBool(field, "selectDisabled")),
+		gosx.Attr("data-editor-source", core.WorkbenchViewString(field, "selectEditorSource")),
+		gosx.Attr("data-editor-frame-target", core.WorkbenchViewString(field, "selectFrameTarget")),
+		gosx.Attr("data-editor-frame-attr-target", core.WorkbenchViewString(field, "selectAttrTarget")),
+		gosx.Attr("data-editor-frame-attr", core.WorkbenchViewString(field, "selectAttrName")),
+		gosx.Attr("data-editor-frame-attr-prefix", core.WorkbenchViewString(field, "selectAttrPrefix")),
+		gosx.Attr("data-editor-frame-attr-suffix", core.WorkbenchViewString(field, "selectAttrSuffix")),
+		gosx.Attr("hidden", !core.WorkbenchViewBool(field, "isSelect")),
 	), gosx.Fragment(optionNodes...))
 }
 
 func renderHomeInspectorInput(field map[string]any) gosx.Node {
 	return gosx.El("input", gosx.Attrs(
-		gosx.Attr("id", workbenchMapString(field, "id")),
-		gosx.Attr("name", workbenchMapString(field, "inputName")),
-		gosx.Attr("type", workbenchMapString(field, "inputType")),
+		gosx.Attr("id", core.WorkbenchViewString(field, "id")),
+		gosx.Attr("name", core.WorkbenchViewString(field, "inputName")),
+		gosx.Attr("type", core.WorkbenchViewString(field, "inputType")),
 		gosx.Attr("value", inspectorFieldRawString(field, "inputValue")),
-		gosx.Attr("placeholder", workbenchMapString(field, "placeholder")),
-		gosx.Attr("required", workbenchMapBool(field, "inputRequired")),
-		gosx.Attr("disabled", workbenchMapBool(field, "inputDisabled")),
-		gosx.Attr("checked", workbenchMapBool(field, "checked")),
-		gosx.Attr("data-editor-source", workbenchMapString(field, "inputEditorSource")),
-		gosx.Attr("data-editor-frame-target", workbenchMapString(field, "inputFrameTarget")),
-		gosx.Attr("data-editor-frame-attr-target", workbenchMapString(field, "inputAttrTarget")),
-		gosx.Attr("data-editor-frame-attr", workbenchMapString(field, "inputAttrName")),
-		gosx.Attr("data-editor-frame-attr-prefix", workbenchMapString(field, "inputAttrPrefix")),
-		gosx.Attr("data-editor-frame-attr-suffix", workbenchMapString(field, "inputAttrSuffix")),
-		gosx.Attr("hidden", workbenchMapBool(field, "isArea") || workbenchMapBool(field, "isSelect") || workbenchMapBool(field, "isCard")),
+		gosx.Attr("placeholder", core.WorkbenchViewString(field, "placeholder")),
+		gosx.Attr("required", core.WorkbenchViewBool(field, "inputRequired")),
+		gosx.Attr("disabled", core.WorkbenchViewBool(field, "inputDisabled")),
+		gosx.Attr("checked", core.WorkbenchViewBool(field, "checked")),
+		gosx.Attr("data-editor-source", core.WorkbenchViewString(field, "inputEditorSource")),
+		gosx.Attr("data-editor-frame-target", core.WorkbenchViewString(field, "inputFrameTarget")),
+		gosx.Attr("data-editor-frame-attr-target", core.WorkbenchViewString(field, "inputAttrTarget")),
+		gosx.Attr("data-editor-frame-attr", core.WorkbenchViewString(field, "inputAttrName")),
+		gosx.Attr("data-editor-frame-attr-prefix", core.WorkbenchViewString(field, "inputAttrPrefix")),
+		gosx.Attr("data-editor-frame-attr-suffix", core.WorkbenchViewString(field, "inputAttrSuffix")),
+		gosx.Attr("hidden", core.WorkbenchViewBool(field, "isArea") || core.WorkbenchViewBool(field, "isSelect") || core.WorkbenchViewBool(field, "isCard")),
 	))
 }
 
 func renderInspectorFieldControl(field map[string]any) gosx.Node {
-	attrs := gosx.Attrs(inspectorFieldMapAttrs(workbenchViewMap(field, "controlAttrs"))...)
+	attrs := gosx.Attrs(inspectorFieldMapAttrs(core.WorkbenchViewMap(field, "controlAttrs"))...)
 	switch {
-	case workbenchMapBool(field, "isArea"):
+	case core.WorkbenchViewBool(field, "isArea"):
 		return gosx.El("textarea", attrs, gosx.Text(inspectorFieldRawString(field, "value")))
-	case workbenchMapBool(field, "isSelect"):
+	case core.WorkbenchViewBool(field, "isSelect"):
 		optionNodes := []gosx.Node{}
 		for _, option := range siteMapMapList(field, "options") {
-			optionNodes = append(optionNodes, gosx.El("option", gosx.Attrs(inspectorFieldMapAttrs(workbenchViewMap(option, "attrs"))...), gosx.Text(workbenchMapString(option, "label"))))
+			optionNodes = append(optionNodes, gosx.El("option", gosx.Attrs(inspectorFieldMapAttrs(core.WorkbenchViewMap(option, "attrs"))...), gosx.Text(core.WorkbenchViewString(option, "label"))))
 		}
 		return gosx.El("select", attrs, gosx.Fragment(optionNodes...))
-	case workbenchMapBool(field, "isCheckbox"), workbenchMapBool(field, "isInput"):
+	case core.WorkbenchViewBool(field, "isCheckbox"), core.WorkbenchViewBool(field, "isInput"):
 		return gosx.El("input", attrs)
 	default:
 		return gosx.Fragment()
@@ -212,22 +212,22 @@ func renderInspectorFieldControl(field map[string]any) gosx.Node {
 }
 
 func renderInspectorFieldHelp(field map[string]any) gosx.Node {
-	if !workbenchMapBool(field, "hasHelp") {
+	if !core.WorkbenchViewBool(field, "hasHelp") {
 		return gosx.Fragment()
 	}
-	return gosx.El("small", gosx.Attrs(gosx.Attr("class", "field-help")), gosx.Text(workbenchMapString(field, "help")))
+	return gosx.El("small", gosx.Attrs(gosx.Attr("class", "field-help")), gosx.Text(core.WorkbenchViewString(field, "help")))
 }
 
 func renderInspectorFieldActions(field map[string]any) []gosx.Node {
 	actions := siteMapMapList(field, "actions")
 	nodes := make([]gosx.Node, 0, len(actions))
 	for _, action := range actions {
-		attrs := gosx.Attrs(inspectorFieldMapAttrs(workbenchViewMap(action, "attrs"))...)
-		if workbenchMapBool(action, "hasFormAction") {
-			nodes = append(nodes, gosx.El("button", attrs, gosx.Text(workbenchMapString(action, "label"))))
+		attrs := gosx.Attrs(inspectorFieldMapAttrs(core.WorkbenchViewMap(action, "attrs"))...)
+		if core.WorkbenchViewBool(action, "hasFormAction") {
+			nodes = append(nodes, gosx.El("button", attrs, gosx.Text(core.WorkbenchViewString(action, "label"))))
 			continue
 		}
-		nodes = append(nodes, gosx.El("a", attrs, gosx.Text(workbenchMapString(action, "label"))))
+		nodes = append(nodes, gosx.El("a", attrs, gosx.Text(core.WorkbenchViewString(action, "label"))))
 	}
 	return nodes
 }

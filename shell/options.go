@@ -1,4 +1,4 @@
-package studio
+package shell
 
 import (
 	"strings"
@@ -7,6 +7,7 @@ import (
 	"m31labs.dev/gosx-admin/blockstudio"
 	"m31labs.dev/gosx-cms/lifecycle"
 	"m31labs.dev/gosx-cms/media"
+	"m31labs.dev/gosx-studio/core"
 )
 
 type Options struct {
@@ -301,7 +302,7 @@ func shellModeViews(modes []Mode) []map[string]any {
 			"key":     mode.Key,
 			"label":   mode.Label,
 			"active":  mode.Active,
-			"pressed": BoolAttr(mode.Active),
+			"pressed": core.BoolAttr(mode.Active),
 		})
 	}
 	return out
@@ -315,7 +316,7 @@ func shellViewportViews(viewports []Viewport) []map[string]any {
 			"label":   viewport.Label,
 			"width":   viewport.Width,
 			"active":  viewport.Active,
-			"pressed": BoolAttr(viewport.Active),
+			"pressed": core.BoolAttr(viewport.Active),
 		})
 	}
 	return out
@@ -432,7 +433,7 @@ func shellRenderModebar(modes []Mode) gosx.Node {
 		nodes = append(nodes, gosx.El("button", gosx.Attrs(
 			gosx.Attr("type", "button"),
 			gosx.Attr("data-studio-mode-control", mode.Key),
-			gosx.Attr("aria-pressed", BoolAttr(mode.Active)),
+			gosx.Attr("aria-pressed", core.BoolAttr(mode.Active)),
 		), gosx.Text(mode.Label)))
 	}
 	return gosx.El("div", gosx.Attrs(
@@ -447,7 +448,7 @@ func shellRenderMetricStrip(metrics []Metric) gosx.Node {
 	for _, metric := range metrics {
 		nodes = append(nodes, gosx.El("span", gosx.Attrs(
 			gosx.Attr("data-studio-metric", metric.Key),
-		), gosx.Text(metric.Label+": "+strings.TrimSpace(strings.ReplaceAll(FmtAny(metric.Value), "\n", " ")))))
+		), gosx.Text(metric.Label+": "+strings.TrimSpace(strings.ReplaceAll(core.FmtAny(metric.Value), "\n", " ")))))
 	}
 	return gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", "gosx-studio__metrics"),
@@ -475,7 +476,7 @@ func shellRenderViewports(viewports []Viewport) gosx.Node {
 		nodes = append(nodes, gosx.El("button", gosx.Attrs(
 			gosx.Attr("type", "button"),
 			gosx.Attr("data-studio-viewport", viewport.Key),
-			gosx.Attr("aria-pressed", BoolAttr(viewport.Active)),
+			gosx.Attr("aria-pressed", core.BoolAttr(viewport.Active)),
 		), gosx.Text(viewport.Label)))
 	}
 	return gosx.El("div", gosx.Attrs(
@@ -545,7 +546,7 @@ func shellRenderPanelColumn(className string, panels []Panel) gosx.Node {
 func normalizeShellActions(actions []Action, saveAction string) []Action {
 	out := make([]Action, 0, len(actions)+1)
 	for _, action := range actions {
-		action.Key = NormalizeKey(action.Key)
+		action.Key = core.NormalizeKey(action.Key)
 		action.Label = strings.TrimSpace(action.Label)
 		action.Href = strings.TrimSpace(action.Href)
 		if action.Key == "" || action.Label == "" {
@@ -562,7 +563,7 @@ func normalizeShellActions(actions []Action, saveAction string) []Action {
 func normalizeShellSections(sections []Section) []Section {
 	out := make([]Section, 0, len(sections))
 	for _, section := range sections {
-		section.Key = NormalizeKey(section.Key)
+		section.Key = core.NormalizeKey(section.Key)
 		section.Label = strings.TrimSpace(section.Label)
 		section.Summary = strings.TrimSpace(section.Summary)
 		section.Actions = normalizeShellActions(section.Actions, "")
@@ -577,7 +578,7 @@ func normalizeShellSections(sections []Section) []Section {
 func NormalizeMetrics(metrics []Metric) []Metric {
 	out := make([]Metric, 0, len(metrics))
 	for _, metric := range metrics {
-		metric.Key = NormalizeKey(metric.Key)
+		metric.Key = core.NormalizeKey(metric.Key)
 		metric.Label = strings.TrimSpace(metric.Label)
 		if metric.Key == "" || metric.Label == "" {
 			continue
@@ -599,7 +600,7 @@ func NormalizeModes(modes []Mode) []Mode {
 	out := make([]Mode, 0, len(modes))
 	hasActive := false
 	for _, mode := range modes {
-		mode.Key = NormalizeKey(mode.Key)
+		mode.Key = core.NormalizeKey(mode.Key)
 		mode.Label = strings.TrimSpace(mode.Label)
 		if mode.Key == "" || mode.Label == "" {
 			continue
@@ -630,7 +631,7 @@ func NormalizeViewports(viewports []Viewport) []Viewport {
 	out := make([]Viewport, 0, len(viewports))
 	hasActive := false
 	for _, viewport := range viewports {
-		viewport.Key = NormalizeKey(viewport.Key)
+		viewport.Key = core.NormalizeKey(viewport.Key)
 		viewport.Label = strings.TrimSpace(viewport.Label)
 		viewport.Width = strings.TrimSpace(viewport.Width)
 		if viewport.Key == "" || viewport.Label == "" {
@@ -654,9 +655,9 @@ func NormalizeViewports(viewports []Viewport) []Viewport {
 func normalizeShellCanvas(canvas CanvasSurface, fallbackTitle string) CanvasSurface {
 	canvas.RouteLabel = strings.TrimSpace(canvas.RouteLabel)
 	canvas.SelectionLabel = strings.TrimSpace(canvas.SelectionLabel)
-	canvas.Zoom = NormalizeKey(canvas.Zoom)
+	canvas.Zoom = core.NormalizeKey(canvas.Zoom)
 	if canvas.RouteLabel == "" {
-		canvas.RouteLabel = FirstNonEmpty(fallbackTitle, "Preview")
+		canvas.RouteLabel = core.FirstNonEmpty(fallbackTitle, "Preview")
 	}
 	if canvas.SelectionLabel == "" {
 		canvas.SelectionLabel = "No selection"
@@ -670,7 +671,7 @@ func normalizeShellCanvas(canvas CanvasSurface, fallbackTitle string) CanvasSurf
 func normalizeShellPanels(panels []Panel) []Panel {
 	out := make([]Panel, 0, len(panels))
 	for _, panel := range panels {
-		panel.Key = NormalizeKey(panel.Key)
+		panel.Key = core.NormalizeKey(panel.Key)
 		panel.Label = strings.TrimSpace(panel.Label)
 		panel.Summary = strings.TrimSpace(panel.Summary)
 		if panel.Key == "" || panel.Label == "" {
@@ -680,70 +681,6 @@ func normalizeShellPanels(panels []Panel) []Panel {
 	}
 	return out
 }
-
-func shellBlockSummaries(blocks []blockstudio.Definition) []BlockSummary {
-	out := make([]BlockSummary, 0, len(blocks))
-	for _, block := range blocks {
-		out = append(out, BlockSummary{
-			Key:        block.Key,
-			Label:      block.Label,
-			Summary:    block.Summary,
-			Kind:       block.Kind,
-			Preview:    block.Preview,
-			DefaultOn:  block.DefaultOn,
-			Locked:     block.Locked,
-			Repeatable: block.Repeatable,
-			Icon:       block.Icon,
-			FieldCount: len(block.Fields),
-		})
-	}
-	return out
-}
-
-func shellMediaSummaries(assets []media.Asset) []MediaSummary {
-	out := make([]MediaSummary, 0, len(assets))
-	for _, asset := range assets {
-		out = append(out, MediaSummary{
-			ID:          asset.ID,
-			URL:         asset.URL,
-			Alt:         asset.Alt,
-			Filename:    asset.Filename,
-			ContentType: asset.ContentType,
-			Size:        asset.Size,
-			Archived:    asset.ArchivedAt != nil,
-		})
-	}
-	return out
-}
-
-func shellRevisionSummaries(revisions []lifecycle.Revision) []RevisionSummary {
-	out := make([]RevisionSummary, 0, len(revisions))
-	for index, revision := range revisions {
-		created := ""
-		if !revision.Created.IsZero() {
-			created = revision.Created.Format("2006-01-02T15:04:05Z07:00")
-		}
-		summary := RevisionSummary{
-			ID:            revision.ID,
-			ResourceKind:  revision.ResourceKind,
-			ResourceID:    revision.ResourceID,
-			ResourceTitle: revision.ResourceTitle,
-			Action:        revision.Action,
-			Summary:       revision.Summary,
-			Created:       created,
-		}
-		if index+1 < len(revisions) {
-			if diff, err := lifecycle.DiffRevisions(revisions[index+1], revision); err == nil {
-				summary.ChangeSummary = diff.Summary
-				summary.ChangeCount = len(diff.Changes)
-				summary.HasDiff = true
-			}
-		}
-		out = append(out, summary)
-	}
-	return out
-}
-
 func shellCloneExtras(extras map[string]any) map[string]any {
 	if extras == nil {
 		return nil
@@ -756,9 +693,9 @@ func shellCloneExtras(extras map[string]any) map[string]any {
 }
 
 func shellHasAction(actions []Action, key string) bool {
-	key = NormalizeKey(key)
+	key = core.NormalizeKey(key)
 	for _, action := range actions {
-		if NormalizeKey(action.Key) == key {
+		if core.NormalizeKey(action.Key) == key {
 			return true
 		}
 	}

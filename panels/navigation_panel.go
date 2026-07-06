@@ -1,6 +1,9 @@
 package panels
 
-import "m31labs.dev/gosx"
+import (
+	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/core"
+)
 
 type NavigationPanelOptions struct {
 	RootAttrs map[string]any
@@ -8,41 +11,41 @@ type NavigationPanelOptions struct {
 
 func RenderNavigationPanel(view map[string]any, options NavigationPanelOptions) gosx.Node {
 	attrs := []any{
-		gosx.Attr("class", workbenchMapString(view, "class")),
-		gosx.Attr("data-panel-key", workbenchMapString(view, "panelKey")),
+		gosx.Attr("class", core.WorkbenchViewString(view, "class")),
+		gosx.Attr("data-panel-key", core.WorkbenchViewString(view, "panelKey")),
 		gosx.Attr("data-studio-navigation-panel", "true"),
 		gosx.Attr("data-gosx-studio-navigation-panel-renderer", "gosx-studio"),
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, options.RootAttrs)
 
-	hasItems := workbenchMapBool(view, "hasItems")
+	hasItems := core.WorkbenchViewBool(view, "hasItems")
 	return gosx.El("section", gosx.Attrs(attrs...),
-		gosx.El("div", gosx.Attrs(gosx.Attr("class", workbenchMapString(view, "headerClass"))),
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchMapString(view, "kicker"))),
-			gosx.El("h2", nil, gosx.Text(workbenchMapString(view, "title"))),
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", "field-help")), gosx.Text(workbenchMapString(view, "help"))),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", core.WorkbenchViewString(view, "headerClass"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.WorkbenchViewString(view, "kicker"))),
+			gosx.El("h2", nil, gosx.Text(core.WorkbenchViewString(view, "title"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "field-help")), gosx.Text(core.WorkbenchViewString(view, "help"))),
 		),
 		gosx.El("p", gosx.Attrs(
 			gosx.Attr("class", "empty"),
 			gosx.Attr("hidden", hasItems),
-		), gosx.Text(workbenchMapString(view, "empty"))),
+		), gosx.Text(core.WorkbenchViewString(view, "empty"))),
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "inline-form studio-navigation-panel__form"),
 			gosx.Attr("hidden", !hasItems),
 		),
 			gosx.El("ul", gosx.Attrs(gosx.Attr("class", "field-list field-list--stacked")),
-				gosx.Fragment(renderNavigationPanelRows(workbenchViewMapList(view, "items"))...),
+				gosx.Fragment(renderNavigationPanelRows(core.WorkbenchViewMapList(view, "items"))...),
 			),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "button-row")),
 				gosx.El("button", gosx.Attrs(
 					gosx.Attr("class", "button button--primary"),
 					gosx.Attr("type", "submit"),
-					gosx.Attr("form", workbenchMapString(view, "formID")),
-					gosx.Attr("formaction", workbenchMapString(view, "action")),
+					gosx.Attr("form", core.WorkbenchViewString(view, "formID")),
+					gosx.Attr("formaction", core.WorkbenchViewString(view, "action")),
 					gosx.Attr("formmethod", "post"),
 					gosx.Attr("data-studio-submit-action", "navigation"),
-					gosx.Attr("data-studio-field-action-formaction", workbenchMapString(view, "action")),
-				), gosx.Text(workbenchMapString(view, "buttonLabel"))),
+					gosx.Attr("data-studio-field-action-formaction", core.WorkbenchViewString(view, "action")),
+				), gosx.Text(core.WorkbenchViewString(view, "buttonLabel"))),
 			),
 		),
 	)
@@ -53,40 +56,40 @@ func renderNavigationPanelRows(items []map[string]any) []gosx.Node {
 	for _, item := range items {
 		nodes = append(nodes, gosx.El("li", gosx.Attrs(
 			gosx.Attr("class", "studio-navigation-panel__row"),
-			gosx.Attr("data-studio-navigation-row", workbenchMapString(item, "key")),
+			gosx.Attr("data-studio-navigation-row", core.WorkbenchViewString(item, "key")),
 		),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-navigation-panel__field")),
-				gosx.El("label", gosx.Attrs(gosx.Attr("for", workbenchMapString(item, "labelID"))), gosx.Text(workbenchMapString(item, "labelFieldText"))),
+				gosx.El("label", gosx.Attrs(gosx.Attr("for", core.WorkbenchViewString(item, "labelID"))), gosx.Text(core.WorkbenchViewString(item, "labelFieldText"))),
 				gosx.El("input", gosx.Attrs(
-					gosx.Attr("id", workbenchMapString(item, "labelID")),
-					gosx.Attr("name", workbenchMapString(item, "labelName")),
+					gosx.Attr("id", core.WorkbenchViewString(item, "labelID")),
+					gosx.Attr("name", core.WorkbenchViewString(item, "labelName")),
 					gosx.Attr("type", "text"),
-					gosx.Attr("value", workbenchMapString(item, "label")),
+					gosx.Attr("value", core.WorkbenchViewString(item, "label")),
 				)),
-				gosx.El("small", gosx.Attrs(gosx.Attr("class", "field-help")), gosx.Text(workbenchMapString(item, "linkLabel"))),
+				gosx.El("small", gosx.Attrs(gosx.Attr("class", "field-help")), gosx.Text(core.WorkbenchViewString(item, "linkLabel"))),
 			),
 			gosx.El("input", gosx.Attrs(
 				gosx.Attr("type", "hidden"),
-				gosx.Attr("name", workbenchMapString(item, "hrefName")),
-				gosx.Attr("value", workbenchMapString(item, "href")),
+				gosx.Attr("name", core.WorkbenchViewString(item, "hrefName")),
+				gosx.Attr("value", core.WorkbenchViewString(item, "href")),
 			)),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-navigation-panel__controls")),
 				gosx.El("label", gosx.Attrs(gosx.Attr("class", "studio-navigation-panel__toggle")),
 					gosx.El("input", gosx.Attrs(
-						gosx.Attr("name", workbenchMapString(item, "enabledName")),
+						gosx.Attr("name", core.WorkbenchViewString(item, "enabledName")),
 						gosx.Attr("type", "checkbox"),
-						gosx.Attr("value", workbenchMapString(item, "enabledValue")),
-						gosx.Attr("checked", workbenchMapBool(item, "enabled")),
+						gosx.Attr("value", core.WorkbenchViewString(item, "enabledValue")),
+						gosx.Attr("checked", core.WorkbenchViewBool(item, "enabled")),
 					)),
-					gosx.El("span", nil, gosx.Text(workbenchMapString(item, "showLabel"))),
+					gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(item, "showLabel"))),
 				),
 				gosx.El("label", gosx.Attrs(gosx.Attr("class", "studio-navigation-panel__order")),
-					gosx.El("span", nil, gosx.Text(workbenchMapString(item, "positionLabel"))),
+					gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(item, "positionLabel"))),
 					gosx.El("input", gosx.Attrs(
-						gosx.Attr("name", workbenchMapString(item, "orderName")),
+						gosx.Attr("name", core.WorkbenchViewString(item, "orderName")),
 						gosx.Attr("type", "number"),
 						gosx.Attr("min", "1"),
-						gosx.Attr("value", workbenchMapString(item, "order")),
+						gosx.Attr("value", core.WorkbenchViewString(item, "order")),
 					)),
 				),
 			),

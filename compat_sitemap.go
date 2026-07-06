@@ -160,24 +160,23 @@ func RenderSiteNavigatorList(view map[string]any, options SiteNavigatorPanelOpti
 // helpers that root-only files (not moved until later slices) call by their
 // original lowercase names: plugin_test.go
 // (authoringSiteMapComponentTemplateViews — stays at root pending a later
-// cleanup slice, see spec §1 core row), control_locked_test.go
+// cleanup slice, see spec §1 core row) and control_locked_test.go
 // (authoringSiteMapControlViews, authoringSiteMapEditableControlView,
-// authoringSiteMapStaticControlViews — same), and canvas_test_fixtures_test.go
-// (siteMapEngineCapabilityNames — same). The sitemap package exports the
+// authoringSiteMapStaticControlViews — same). The sitemap package exports the
 // equivalent implementations under capitalized names (matching the
 // canvas/block_layout_engine.go precedent from Slice 4); these vars keep
 // those call sites compiling unchanged, and will disappear once those files
 // move to their own subpackages in later slices.
 //
-// siteMapHiddenInputs, siteMapInputViews, and siteMapMapList (formerly
-// shimmed here for inspector.go/inspector_fields.go) were removed in Slice 6:
-// those files moved to the panels package, which carries its own frozen
-// copies of the same helpers (panels/support.go) rather than importing
-// sitemap (a forbidden peer import per the DAG).
+// The siteMapEngineCapabilityNames shim (formerly here for
+// canvas_test_fixtures_test.go) was removed in Slice 8 when that test moved to
+// the shell package; shell references sitemap.SiteMapEngineCapabilityNames
+// directly. Likewise siteMapHiddenInputs/siteMapInputViews/siteMapMapList
+// (formerly shimmed for inspector.go/inspector_fields.go) were removed in
+// Slice 6 when those files moved to panels.
 var (
 	authoringSiteMapComponentTemplateViews = sitemap.AuthoringSiteMapComponentTemplateViews
 	authoringSiteMapControlViews           = sitemap.AuthoringSiteMapControlViews
 	authoringSiteMapEditableControlView    = sitemap.AuthoringSiteMapEditableControlView
 	authoringSiteMapStaticControlViews     = sitemap.AuthoringSiteMapStaticControlViews
-	siteMapEngineCapabilityNames           = sitemap.SiteMapEngineCapabilityNames
 )

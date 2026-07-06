@@ -1,6 +1,9 @@
 package sitemap
 
-import "m31labs.dev/gosx"
+import (
+	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/core"
+)
 
 type SiteNavigatorItem struct {
 	Key     string
@@ -27,12 +30,12 @@ type SiteNavigatorPanelOptions struct {
 
 func SiteNavigatorPropsFromMap(view map[string]any) SiteNavigatorProps {
 	return SiteNavigatorProps{
-		Mode:     workbenchMapString(view, "mode"),
-		Kicker:   workbenchMapString(view, "kicker"),
-		Title:    workbenchMapString(view, "title"),
-		Label:    workbenchMapString(view, "label"),
-		Empty:    workbenchMapString(view, "empty"),
-		HasItems: workbenchMapBool(view, "hasItems"),
+		Mode:     core.WorkbenchViewString(view, "mode"),
+		Kicker:   core.WorkbenchViewString(view, "kicker"),
+		Title:    core.WorkbenchViewString(view, "title"),
+		Label:    core.WorkbenchViewString(view, "label"),
+		Empty:    core.WorkbenchViewString(view, "empty"),
+		HasItems: core.WorkbenchViewBool(view, "hasItems"),
 		Items:    siteNavigatorItemsFromMap(view),
 	}
 }
@@ -70,8 +73,8 @@ func RenderSiteNavigatorHeader(view map[string]any, options SiteNavigatorPanelOp
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, options.RootAttrs)
 	return gosx.El("div", gosx.Attrs(attrs...),
-		gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchMapString(view, "kicker"))),
-		gosx.El("h2", nil, gosx.Text(workbenchMapString(view, "title"))),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.WorkbenchViewString(view, "kicker"))),
+		gosx.El("h2", nil, gosx.Text(core.WorkbenchViewString(view, "title"))),
 	)
 }
 
@@ -99,15 +102,15 @@ func renderSiteNavigatorFilterButton(label string, pressed bool) gosx.Node {
 func RenderSiteNavigatorList(view map[string]any, options SiteNavigatorPanelOptions) gosx.Node {
 	attrs := []any{
 		gosx.Attr("class", "studio-page-list"),
-		gosx.Attr("aria-label", workbenchMapString(view, "label")),
+		gosx.Attr("aria-label", core.WorkbenchViewString(view, "label")),
 		gosx.Attr("data-gosx-studio-site-navigator-renderer", "gosx-studio"),
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, options.RootAttrs)
 
-	items := workbenchViewMapList(view, "items")
-	if len(items) == 0 && !workbenchMapBool(view, "hasItems") {
+	items := core.WorkbenchViewMapList(view, "items")
+	if len(items) == 0 && !core.WorkbenchViewBool(view, "hasItems") {
 		return gosx.El("nav", gosx.Attrs(attrs...),
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(workbenchMapString(view, "empty"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(core.WorkbenchViewString(view, "empty"))),
 		)
 	}
 	return gosx.El("nav", gosx.Attrs(attrs...), gosx.Fragment(renderSiteNavigatorItems(items)...))
@@ -117,13 +120,13 @@ func renderSiteNavigatorItems(items []map[string]any) []gosx.Node {
 	nodes := make([]gosx.Node, 0, len(items))
 	for _, item := range items {
 		nodes = append(nodes, gosx.El("a", gosx.Attrs(
-			gosx.Attr("href", workbenchMapString(item, "href")),
-			gosx.Attr("class", workbenchMapString(item, "class")),
+			gosx.Attr("href", core.WorkbenchViewString(item, "href")),
+			gosx.Attr("class", core.WorkbenchViewString(item, "class")),
 			gosx.Attr("data-gosx-link", "true"),
-			gosx.Attr("data-studio-site-page", workbenchMapString(item, "key")),
-			gosx.Attr("data-studio-site-group", workbenchMapString(item, "group")),
-			gosx.Attr("title", workbenchMapString(item, "summary")),
-		), gosx.El("span", nil, gosx.Text(workbenchMapString(item, "label")))))
+			gosx.Attr("data-studio-site-page", core.WorkbenchViewString(item, "key")),
+			gosx.Attr("data-studio-site-group", core.WorkbenchViewString(item, "group")),
+			gosx.Attr("title", core.WorkbenchViewString(item, "summary")),
+		), gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(item, "label")))))
 	}
 	return nodes
 }
@@ -144,16 +147,16 @@ func siteNavigatorItemViews(items []SiteNavigatorItem) []map[string]any {
 }
 
 func siteNavigatorItemsFromMap(view map[string]any) []SiteNavigatorItem {
-	items := workbenchViewMapList(view, "items")
+	items := core.WorkbenchViewMapList(view, "items")
 	out := make([]SiteNavigatorItem, 0, len(items))
 	for _, item := range items {
 		out = append(out, SiteNavigatorItem{
-			Key:     workbenchMapString(item, "key"),
-			Group:   workbenchMapString(item, "group"),
-			Label:   workbenchMapString(item, "label"),
-			Href:    workbenchMapString(item, "href"),
-			Class:   workbenchMapString(item, "class"),
-			Summary: workbenchMapString(item, "summary"),
+			Key:     core.WorkbenchViewString(item, "key"),
+			Group:   core.WorkbenchViewString(item, "group"),
+			Label:   core.WorkbenchViewString(item, "label"),
+			Href:    core.WorkbenchViewString(item, "href"),
+			Class:   core.WorkbenchViewString(item, "class"),
+			Summary: core.WorkbenchViewString(item, "summary"),
 		})
 	}
 	return out

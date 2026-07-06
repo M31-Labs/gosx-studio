@@ -11,9 +11,9 @@ type LookPanelOptions struct {
 }
 
 func RenderLookPanel(view map[string]any, options LookPanelOptions) gosx.Node {
-	settings := workbenchViewMap(view, "settings")
+	settings := core.WorkbenchViewMap(view, "settings")
 	children := []gosx.Node{renderLookPanelHead(view)}
-	for _, group := range workbenchViewMapList(view, "groups") {
+	for _, group := range core.WorkbenchViewMapList(view, "groups") {
 		children = append(children, renderLookPanelGroupInput(group))
 	}
 	children = append(children,
@@ -22,8 +22,8 @@ func RenderLookPanel(view map[string]any, options LookPanelOptions) gosx.Node {
 			gosx.Attr("class", "studio-look-panel__scope"),
 			gosx.Attr("data-studio-look-scope", "true"),
 		),
-			renderLookStyleScope(workbenchViewMap(settings, "scope")),
-			renderLookStyleWorkbench(workbenchViewMap(settings, "workbench")),
+			renderLookStyleScope(core.WorkbenchViewMap(settings, "scope")),
+			renderLookStyleWorkbench(core.WorkbenchViewMap(settings, "workbench")),
 		),
 		renderLookPanelThemeSlot(view, settings),
 		renderLookPanelLayoutSlot(view, settings),
@@ -40,7 +40,7 @@ func lookPanelRootAttrs(view map[string]any, rootAttrs map[string]any) []any {
 		gosx.Attr("data-studio-mode-panel", "look"),
 		gosx.Attr("data-studio-panel", "style"),
 		gosx.Attr("data-studio-engine-source", "gosx"),
-		gosx.Attr("data-studio-look-group-active", workbenchMapString(view, "defaultGroupKey")),
+		gosx.Attr("data-studio-look-group-active", core.WorkbenchViewString(view, "defaultGroupKey")),
 		gosx.Attr("data-gosx-studio-look-panel-renderer", "gosx-studio"),
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, rootAttrs)
@@ -50,9 +50,9 @@ func lookPanelRootAttrs(view map[string]any, rootAttrs map[string]any) []any {
 func renderLookPanelHead(view map[string]any) gosx.Node {
 	return gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-look-panel__head")),
 		gosx.El("div", nil,
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchMapString(view, "kicker"))),
-			gosx.El("h2", nil, gosx.Text(workbenchMapString(view, "title"))),
-			gosx.El("p", nil, gosx.Text(workbenchMapString(view, "summary"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.WorkbenchViewString(view, "kicker"))),
+			gosx.El("h2", nil, gosx.Text(core.WorkbenchViewString(view, "title"))),
+			gosx.El("p", nil, gosx.Text(core.WorkbenchViewString(view, "summary"))),
 		),
 	)
 }
@@ -60,51 +60,51 @@ func renderLookPanelHead(view map[string]any) gosx.Node {
 func renderLookPanelGroupInput(group map[string]any) gosx.Node {
 	return gosx.El("input", gosx.Attrs(
 		gosx.Attr("class", "studio-look-panel__group-input"),
-		gosx.Attr("id", workbenchMapString(group, "inputID")),
+		gosx.Attr("id", core.WorkbenchViewString(group, "inputID")),
 		gosx.Attr("type", "radio"),
 		gosx.Attr("name", "studioLookGroup"),
-		gosx.Attr("value", workbenchMapString(group, "key")),
-		gosx.Attr("checked", workbenchMapBool(group, "selected")),
-		gosx.Attr("aria-label", workbenchMapString(group, "label")),
+		gosx.Attr("value", core.WorkbenchViewString(group, "key")),
+		gosx.Attr("checked", core.WorkbenchViewBool(group, "selected")),
+		gosx.Attr("aria-label", core.WorkbenchViewString(group, "label")),
 	))
 }
 
 func renderLookPanelGroups(view map[string]any) gosx.Node {
-	groups := workbenchViewMapList(view, "groups")
+	groups := core.WorkbenchViewMapList(view, "groups")
 	children := make([]gosx.Node, 0, len(groups))
 	for _, group := range groups {
 		children = append(children, gosx.El("label", gosx.Attrs(
 			gosx.Attr("class", "studio-look-panel__group"),
-			gosx.Attr("for", workbenchMapString(group, "inputID")),
-			gosx.Attr("data-studio-look-group-label", workbenchMapString(group, "key")),
+			gosx.Attr("for", core.WorkbenchViewString(group, "inputID")),
+			gosx.Attr("data-studio-look-group-label", core.WorkbenchViewString(group, "key")),
 		),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(group, "label"))),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(group, "summary"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(group, "label"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(group, "summary"))),
 		))
 	}
 	return gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", "studio-look-panel__groups"),
 		gosx.Attr("role", "radiogroup"),
-		gosx.Attr("aria-label", workbenchMapString(view, "groupLabel")),
+		gosx.Attr("aria-label", core.WorkbenchViewString(view, "groupLabel")),
 	), gosx.Fragment(children...))
 }
 
 func renderLookPanelThemeSlot(view, settings map[string]any) gosx.Node {
 	return renderLookPanelGroupSlot(view, "theme", "Theme", "Starter kit and template.",
-		renderLookChoiceGroup(workbenchViewMap(settings, "kitGroup")),
-		renderLookChoiceGroup(workbenchViewMap(settings, "templateGroup")),
+		renderLookChoiceGroup(core.WorkbenchViewMap(settings, "kitGroup")),
+		renderLookChoiceGroup(core.WorkbenchViewMap(settings, "templateGroup")),
 	)
 }
 
 func renderLookPanelLayoutSlot(view, settings map[string]any) gosx.Node {
 	return renderLookPanelGroupSlot(view, "layout", "Layout", "Hero shape, width, density, and rhythm.",
 		gosx.El("div", gosx.Attrs(
-			gosx.Attr("class", workbenchMapString(settings, "customBuilderClass")),
+			gosx.Attr("class", core.WorkbenchViewString(settings, "customBuilderClass")),
 			gosx.Attr("data-custom-template-builder", "true"),
 		),
-			renderLookField(workbenchViewMap(settings, "customNameField")),
+			renderLookField(core.WorkbenchViewMap(settings, "customNameField")),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "editor-control-grid")),
-				gosx.Fragment(renderLookSelectControls(workbenchViewMapList(settings, "customControls"))...),
+				gosx.Fragment(renderLookSelectControls(core.WorkbenchViewMapList(settings, "customControls"))...),
 			),
 		),
 	)
@@ -112,17 +112,17 @@ func renderLookPanelLayoutSlot(view, settings map[string]any) gosx.Node {
 
 func renderLookPanelColorSlot(view, settings map[string]any) gosx.Node {
 	return renderLookPanelGroupSlot(view, "color", "Color", "Palette and editable color tokens.",
-		renderLookSelectControl(workbenchViewMap(settings, "palette")),
-		renderLookSwatches(workbenchViewMapList(settings, "swatches")),
+		renderLookSelectControl(core.WorkbenchViewMap(settings, "palette")),
+		renderLookSwatches(core.WorkbenchViewMapList(settings, "swatches")),
 	)
 }
 
 func renderLookPanelDetailsSlot(view, settings map[string]any) gosx.Node {
 	return renderLookPanelGroupSlot(view, "details", "Details", "Navigation, buttons, cards, images, spacing, and motion.",
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "editor-control-grid")),
-			gosx.Fragment(renderLookSelectControls(workbenchViewMapList(settings, "styleControls"))...),
+			gosx.Fragment(renderLookSelectControls(core.WorkbenchViewMapList(settings, "styleControls"))...),
 		),
-		renderLookRadioGroup(workbenchViewMap(settings, "imageCrop")),
+		renderLookRadioGroup(core.WorkbenchViewMap(settings, "imageCrop")),
 	)
 }
 
@@ -130,7 +130,7 @@ func renderLookPanelGroupSlot(view map[string]any, key, title, summary string, c
 	return gosx.El("section", gosx.Attrs(
 		gosx.Attr("class", "studio-look-panel__group-slot"),
 		gosx.Attr("data-studio-look-group-slot", key),
-		gosx.Attr("data-studio-look-group-selected", core.BoolAttr(workbenchMapString(view, "defaultGroupKey") == key)),
+		gosx.Attr("data-studio-look-group-selected", core.BoolAttr(core.WorkbenchViewString(view, "defaultGroupKey") == key)),
 	),
 		gosx.El("header", nil,
 			gosx.El("h3", nil, gosx.Text(title)),
@@ -145,23 +145,23 @@ func renderLookPanelGroupSlot(view map[string]any, key, title, summary string, c
 
 func renderLookStyleScope(scope map[string]any) gosx.Node {
 	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", workbenchMapString(scope, "class")),
+		gosx.Attr("class", core.WorkbenchViewString(scope, "class")),
 		gosx.Attr("data-studio-style-scope", "true"),
-		gosx.Attr("data-style-valid", core.BoolAttr(workbenchMapBool(scope, "valid"))),
+		gosx.Attr("data-style-valid", core.BoolAttr(core.WorkbenchViewBool(scope, "valid"))),
 		gosx.Attr("aria-label", "Active style scope"),
 	),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-style-scope__head")),
 			gosx.El("div", nil,
 				gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text("Scope")),
-				gosx.El("strong", gosx.Attrs(gosx.Attr("data-studio-style-scope-block", "true")), gosx.Text(workbenchMapString(scope, "blockLabel"))),
+				gosx.El("strong", gosx.Attrs(gosx.Attr("data-studio-style-scope-block", "true")), gosx.Text(core.WorkbenchViewString(scope, "blockLabel"))),
 			),
-			gosx.El("output", gosx.Attrs(gosx.Attr("data-studio-style-validity", "true")), gosx.Text(workbenchMapString(scope, "validityLabel"))),
+			gosx.El("output", gosx.Attrs(gosx.Attr("data-studio-style-validity", "true")), gosx.Text(core.WorkbenchViewString(scope, "validityLabel"))),
 		),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-style-scope__grid")),
-			renderLookScopeField("System", workbenchMapString(scope, "systemID"), "data-studio-style-system-label"),
-			renderLookScopeField("Page", workbenchMapString(scope, "pageLabel"), ""),
-			renderLookScopeField("Field", workbenchMapString(scope, "fieldLabel"), "data-studio-style-scope-field"),
-			renderLookScopeField("Breakpoint", workbenchMapString(scope, "breakpointLabel"), "data-studio-style-breakpoint-label"),
+			renderLookScopeField("System", core.WorkbenchViewString(scope, "systemID"), "data-studio-style-system-label"),
+			renderLookScopeField("Page", core.WorkbenchViewString(scope, "pageLabel"), ""),
+			renderLookScopeField("Field", core.WorkbenchViewString(scope, "fieldLabel"), "data-studio-style-scope-field"),
+			renderLookScopeField("Breakpoint", core.WorkbenchViewString(scope, "breakpointLabel"), "data-studio-style-breakpoint-label"),
 		),
 		renderLookStyleStatebar(scope),
 	)
@@ -180,14 +180,14 @@ func renderLookScopeField(label, value, attr string) gosx.Node {
 
 func renderLookStyleStatebar(scope map[string]any) gosx.Node {
 	children := []gosx.Node{}
-	for _, state := range workbenchViewMapList(scope, "states") {
+	for _, state := range core.WorkbenchViewMapList(scope, "states") {
 		children = append(children, gosx.El("button", gosx.Attrs(
 			gosx.Attr("type", "button"),
-			gosx.Attr("data-studio-style-state", workbenchMapString(state, "key")),
-			gosx.Attr("aria-pressed", workbenchMapBool(state, "active")),
-		), gosx.Text(workbenchMapString(state, "label"))))
+			gosx.Attr("data-studio-style-state", core.WorkbenchViewString(state, "key")),
+			gosx.Attr("aria-pressed", core.WorkbenchViewBool(state, "active")),
+		), gosx.Text(core.WorkbenchViewString(state, "label"))))
 	}
-	children = append(children, gosx.El("output", gosx.Attrs(gosx.Attr("data-studio-style-state-label", "true")), gosx.Text(workbenchMapString(scope, "activeState"))))
+	children = append(children, gosx.El("output", gosx.Attrs(gosx.Attr("data-studio-style-state-label", "true")), gosx.Text(core.WorkbenchViewString(scope, "activeState"))))
 	return gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", "studio-style-statebar"),
 		gosx.Attr("role", "toolbar"),
@@ -198,18 +198,18 @@ func renderLookStyleStatebar(scope map[string]any) gosx.Node {
 func renderLookStyleWorkbench(workbench map[string]any) gosx.Node {
 	children := []gosx.Node{
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-panel-heading")),
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchMapString(workbench, "kicker"))),
-			gosx.El("h3", nil, gosx.Text(workbenchMapString(workbench, "title"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.WorkbenchViewString(workbench, "kicker"))),
+			gosx.El("h3", nil, gosx.Text(core.WorkbenchViewString(workbench, "title"))),
 		),
-		renderLookStyleImpact(workbenchViewMap(workbench, "impact")),
+		renderLookStyleImpact(core.WorkbenchViewMap(workbench, "impact")),
 	}
 	recipeNodes := []gosx.Node{}
-	for _, recipe := range workbenchViewMapList(workbench, "groups") {
+	for _, recipe := range core.WorkbenchViewMapList(workbench, "groups") {
 		recipeNodes = append(recipeNodes, renderLookStyleRecipe(recipe))
 	}
 	children = append(children, gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-style-recipe-grid")), gosx.Fragment(recipeNodes...)))
 	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", workbenchMapString(workbench, "class")),
+		gosx.Attr("class", core.WorkbenchViewString(workbench, "class")),
 		gosx.Attr("data-studio-style-workbench", "true"),
 	), gosx.Fragment(children...))
 }
@@ -221,14 +221,14 @@ func renderLookStyleImpact(impact map[string]any) gosx.Node {
 		gosx.Attr("aria-live", "polite"),
 	),
 		gosx.El("div", nil,
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchMapString(impact, "kicker"))),
-			gosx.El("strong", gosx.Attrs(gosx.Attr("data-studio-style-impact-label", "true")), gosx.Text(workbenchMapString(impact, "label"))),
-			gosx.El("p", gosx.Attrs(gosx.Attr("data-studio-style-impact-summary", "true")), gosx.Text(workbenchMapString(impact, "summary"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.WorkbenchViewString(impact, "kicker"))),
+			gosx.El("strong", gosx.Attrs(gosx.Attr("data-studio-style-impact-label", "true")), gosx.Text(core.WorkbenchViewString(impact, "label"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("data-studio-style-impact-summary", "true")), gosx.Text(core.WorkbenchViewString(impact, "summary"))),
 		),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-style-impact__meta")),
-			gosx.El("output", gosx.Attrs(gosx.Attr("data-studio-style-impact-count", "true")), gosx.Text(workbenchMapString(impact, "countLabel"))),
-			gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-style-impact-scope", "true")), gosx.Text(workbenchMapString(impact, "scopeLabel"))),
-			gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-style-impact-state", "true")), gosx.Text(workbenchMapString(impact, "stateLabel"))),
+			gosx.El("output", gosx.Attrs(gosx.Attr("data-studio-style-impact-count", "true")), gosx.Text(core.WorkbenchViewString(impact, "countLabel"))),
+			gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-style-impact-scope", "true")), gosx.Text(core.WorkbenchViewString(impact, "scopeLabel"))),
+			gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-style-impact-state", "true")), gosx.Text(core.WorkbenchViewString(impact, "stateLabel"))),
 		),
 	)
 }
@@ -236,44 +236,44 @@ func renderLookStyleImpact(impact map[string]any) gosx.Node {
 func renderLookStyleRecipe(recipe map[string]any) gosx.Node {
 	children := []gosx.Node{
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-style-recipe-card__head")),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(recipe, "label"))),
-			gosx.El("output", gosx.Attrs(gosx.Attr("data-studio-style-readout", workbenchMapString(workbenchViewMap(recipe, "readout"), "field"))), gosx.Text(workbenchMapString(workbenchViewMap(recipe, "readout"), "label"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(recipe, "label"))),
+			gosx.El("output", gosx.Attrs(gosx.Attr("data-studio-style-readout", core.WorkbenchViewString(core.WorkbenchViewMap(recipe, "readout"), "field"))), gosx.Text(core.WorkbenchViewString(core.WorkbenchViewMap(recipe, "readout"), "label"))),
 		),
 		renderLookStyleVisual(recipe),
 	}
-	for _, control := range workbenchViewMapList(recipe, "controls") {
+	for _, control := range core.WorkbenchViewMapList(recipe, "controls") {
 		children = append(children, renderLookStyleControlGroup(control))
 	}
 	return gosx.El("section", gosx.Attrs(
 		gosx.Attr("class", "studio-style-recipe-card"),
-		gosx.Attr("data-studio-style-recipe", workbenchMapString(recipe, "key")),
+		gosx.Attr("data-studio-style-recipe", core.WorkbenchViewString(recipe, "key")),
 	), gosx.Fragment(children...))
 }
 
 func renderLookStyleVisual(recipe map[string]any) gosx.Node {
-	marks := workbenchViewMapList(recipe, "marks")
+	marks := core.WorkbenchViewMapList(recipe, "marks")
 	children := make([]gosx.Node, 0, len(marks))
 	for _, mark := range marks {
-		children = append(children, gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-style-mark", workbenchMapString(mark, "key")))))
+		children = append(children, gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-style-mark", core.WorkbenchViewString(mark, "key")))))
 	}
 	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", workbenchMapString(recipe, "visualFullClass")),
+		gosx.Attr("class", core.WorkbenchViewString(recipe, "visualFullClass")),
 		gosx.Attr("aria-hidden", "true"),
 	), gosx.Fragment(children...))
 }
 
 func renderLookStyleControlGroup(control map[string]any) gosx.Node {
-	options := workbenchViewMapList(control, "options")
+	options := core.WorkbenchViewMapList(control, "options")
 	children := make([]gosx.Node, 0, len(options))
 	for _, option := range options {
-		children = append(children, gosx.El("button", gosx.Attrs(BlockLibraryPanelMapAttrs(workbenchViewMap(option, "attrs"))...), gosx.Text(workbenchMapString(option, "label"))))
+		children = append(children, gosx.El("button", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(option, "attrs"))...), gosx.Text(core.WorkbenchViewString(option, "label"))))
 	}
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-style-control-group")),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-style-control-group__head")),
-			gosx.El("span", nil, gosx.Text(workbenchMapString(control, "label"))),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(control, "label"))),
 			gosx.El("button", gosx.Attrs(
 				gosx.Attr("type", "button"),
-				gosx.Attr("data-studio-style-reset", workbenchMapString(control, "fieldName")),
+				gosx.Attr("data-studio-style-reset", core.WorkbenchViewString(control, "fieldName")),
 			), gosx.Text("Reset")),
 		),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-style-choice-row")), gosx.Fragment(children...)),
@@ -281,40 +281,40 @@ func renderLookStyleControlGroup(control map[string]any) gosx.Node {
 }
 
 func renderLookChoiceGroup(group map[string]any) gosx.Node {
-	cards := workbenchViewMapList(group, "cards")
+	cards := core.WorkbenchViewMapList(group, "cards")
 	children := make([]gosx.Node, 0, len(cards))
 	for _, card := range cards {
-		children = append(children, gosx.El("label", gosx.Attrs(BlockLibraryPanelMapAttrs(workbenchViewMap(card, "cardAttrs"))...),
-			gosx.El("input", gosx.Attrs(BlockLibraryPanelMapAttrs(workbenchViewMap(card, "inputAttrs"))...)),
+		children = append(children, gosx.El("label", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(card, "cardAttrs"))...),
+			gosx.El("input", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(card, "inputAttrs"))...)),
 			gosx.El("span", nil,
-				gosx.El("strong", nil, gosx.Text(workbenchMapString(card, "label"))),
-				gosx.El("small", nil, gosx.Text(workbenchMapString(card, "summary"))),
+				gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(card, "label"))),
+				gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(card, "summary"))),
 			),
 		))
 	}
-	return gosx.El("fieldset", gosx.Attrs(gosx.Attr("class", workbenchMapString(group, "class"))),
-		gosx.El("legend", nil, gosx.Text(workbenchMapString(group, "legend"))),
-		gosx.El("div", gosx.Attrs(gosx.Attr("class", workbenchMapString(group, "gridClass"))), gosx.Fragment(children...)),
+	return gosx.El("fieldset", gosx.Attrs(gosx.Attr("class", core.WorkbenchViewString(group, "class"))),
+		gosx.El("legend", nil, gosx.Text(core.WorkbenchViewString(group, "legend"))),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", core.WorkbenchViewString(group, "gridClass"))), gosx.Fragment(children...)),
 	)
 }
 
 func renderLookField(field map[string]any) gosx.Node {
 	children := []gosx.Node{
-		gosx.El("label", gosx.Attrs(gosx.Attr("for", workbenchMapString(field, "id"))), gosx.Text(workbenchMapString(field, "label"))),
+		gosx.El("label", gosx.Attrs(gosx.Attr("for", core.WorkbenchViewString(field, "id"))), gosx.Text(core.WorkbenchViewString(field, "label"))),
 	}
-	if workbenchMapBool(field, "isArea") {
-		children = append(children, gosx.El("textarea", gosx.Attrs(BlockLibraryPanelMapAttrs(workbenchViewMap(field, "controlAttrs"))...), gosx.Text(workbenchMapString(field, "value"))))
+	if core.WorkbenchViewBool(field, "isArea") {
+		children = append(children, gosx.El("textarea", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(field, "controlAttrs"))...), gosx.Text(core.WorkbenchViewString(field, "value"))))
 	}
-	if workbenchMapBool(field, "isSelect") {
+	if core.WorkbenchViewBool(field, "isSelect") {
 		children = append(children, renderLookSelectElement(field))
 	}
-	if workbenchMapBool(field, "isCheckbox") || workbenchMapBool(field, "isInput") {
-		children = append(children, gosx.El("input", gosx.Attrs(BlockLibraryPanelMapAttrs(workbenchViewMap(field, "controlAttrs"))...)))
+	if core.WorkbenchViewBool(field, "isCheckbox") || core.WorkbenchViewBool(field, "isInput") {
+		children = append(children, gosx.El("input", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(field, "controlAttrs"))...)))
 	}
-	if workbenchMapBool(field, "hasHelp") {
-		children = append(children, gosx.El("small", gosx.Attrs(gosx.Attr("class", "field-help")), gosx.Text(workbenchMapString(field, "help"))))
+	if core.WorkbenchViewBool(field, "hasHelp") {
+		children = append(children, gosx.El("small", gosx.Attrs(gosx.Attr("class", "field-help")), gosx.Text(core.WorkbenchViewString(field, "help"))))
 	}
-	return gosx.El("div", gosx.Attrs(BlockLibraryPanelMapAttrs(workbenchViewMap(field, "rowAttrs"))...), gosx.Fragment(children...))
+	return gosx.El("div", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(field, "rowAttrs"))...), gosx.Fragment(children...))
 }
 
 func renderLookSelectControls(controls []map[string]any) []gosx.Node {
@@ -326,32 +326,32 @@ func renderLookSelectControls(controls []map[string]any) []gosx.Node {
 }
 
 func renderLookSelectControl(control map[string]any) gosx.Node {
-	return gosx.El("div", gosx.Attrs(BlockLibraryPanelMapAttrs(workbenchViewMap(control, "rowAttrs"))...),
-		gosx.El("label", gosx.Attrs(gosx.Attr("for", workbenchMapString(control, "id"))), gosx.Text(workbenchMapString(control, "label"))),
+	return gosx.El("div", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(control, "rowAttrs"))...),
+		gosx.El("label", gosx.Attrs(gosx.Attr("for", core.WorkbenchViewString(control, "id"))), gosx.Text(core.WorkbenchViewString(control, "label"))),
 		renderLookSelectElement(control),
 	)
 }
 
 func renderLookSelectElement(control map[string]any) gosx.Node {
-	options := workbenchViewMapList(control, "options")
+	options := core.WorkbenchViewMapList(control, "options")
 	children := make([]gosx.Node, 0, len(options))
 	for _, option := range options {
-		children = append(children, gosx.El("option", gosx.Attrs(BlockLibraryPanelMapAttrs(workbenchViewMap(option, "attrs"))...), gosx.Text(workbenchMapString(option, "label"))))
+		children = append(children, gosx.El("option", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(option, "attrs"))...), gosx.Text(core.WorkbenchViewString(option, "label"))))
 	}
-	return gosx.El("select", gosx.Attrs(BlockLibraryPanelMapAttrs(workbenchViewMap(control, "controlAttrs"))...), gosx.Fragment(children...))
+	return gosx.El("select", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(control, "controlAttrs"))...), gosx.Fragment(children...))
 }
 
 func renderLookRadioGroup(group map[string]any) gosx.Node {
-	options := workbenchViewMapList(group, "options")
-	children := []gosx.Node{gosx.El("legend", nil, gosx.Text(workbenchMapString(group, "legend")))}
+	options := core.WorkbenchViewMapList(group, "options")
+	children := []gosx.Node{gosx.El("legend", nil, gosx.Text(core.WorkbenchViewString(group, "legend")))}
 	for _, option := range options {
 		children = append(children, gosx.El("label", nil,
-			gosx.El("input", gosx.Attrs(BlockLibraryPanelMapAttrs(workbenchViewMap(option, "attrs"))...)),
+			gosx.El("input", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(option, "attrs"))...)),
 			gosx.Text(" "),
-			gosx.Text(workbenchMapString(option, "label")),
+			gosx.Text(core.WorkbenchViewString(option, "label")),
 		))
 	}
-	return gosx.El("fieldset", gosx.Attrs(BlockLibraryPanelMapAttrs(workbenchViewMap(group, "attrs"))...), gosx.Fragment(children...))
+	return gosx.El("fieldset", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(group, "attrs"))...), gosx.Fragment(children...))
 }
 
 func renderLookSwatches(tokens []map[string]any) gosx.Node {
@@ -359,8 +359,8 @@ func renderLookSwatches(tokens []map[string]any) gosx.Node {
 	for _, token := range tokens {
 		children = append(children, gosx.El("span", gosx.Attrs(
 			gosx.Attr("class", "theme-swatch"),
-			gosx.Attr("style", workbenchMapString(token, "style")),
-			gosx.Attr("title", workbenchMapString(token, "label")),
+			gosx.Attr("style", core.WorkbenchViewString(token, "style")),
+			gosx.Attr("title", core.WorkbenchViewString(token, "label")),
 		)))
 	}
 	return gosx.El("div", gosx.Attrs(
