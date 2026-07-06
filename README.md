@@ -12,9 +12,12 @@ site).
 Earlier docs described Studio as "the authoring layer, intentionally separate
 from `gosx-cms` and `gosx-admin`." That framing is retired — the code moved
 past it. Studio is the portal; `gosx-admin` is a generic back-office toolkit
-dependency (Studio consumes only `gosx-admin/blockstudio`); `gosx-cms` is
-content storage that a Phase 2 fold-in is expected to bring inside this module
-(see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §"Release model").
+dependency (Studio consumes only `gosx-admin/blockstudio`); the former
+`gosx-cms` content-storage module is folded into this module as `cms/*` (see
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §"Release model" and
+[cms/PROVENANCE.md](cms/PROVENANCE.md) for the fold-in record). The standalone
+`m31labs.dev/gosx-cms` repository is frozen and tombstoned as of its final
+`v0.2.1` tag; new code should import `m31labs.dev/gosx-studio/cms/...`.
 
 ## What hosts provide vs. what Studio provides
 
@@ -60,6 +63,8 @@ composes everything above it, and peers never import each other. See
 | `*runtime` islands (`fieldruntime`, `selectionruntime`, `workbenchruntime`, `styleruntime`, `previewruntime`, `blocklayoutruntime`, `brandruntime`, `inspectorruntime`, `sitemapruntime`, `authoringruntime`, `inlineeditruntime`, `canvas*runtime`) | The go:embed browser-runtime bundles the shell/canvas/sitemap/panels packages mount — one package per engine's client-side JS/WASM surface. |
 | `plugins/showcase3d` | The CMS/Studio contract for source photos, generated model artifacts, provenance, moderation, lifecycle readiness, no-code placement controls, and Scene3D viewer descriptors. |
 | `studio` (root) | Deprecated compatibility facade — type aliases and forwarding wrappers only, no logic. See "Versioning & compatibility" below. |
+| `cms/{blocks, content, flows, lifecycle{,/sqlstore}, media, render, store{,/file,/memory}, style}` | Folded-in content storage: block catalogs, revision/draft/publish lifecycle, media assets, generic block rendering, and CMS store contracts (+ in-memory/file/sqlite-backed implementations). Bottom tier — stdlib, `gosx`, `gosx-admin` only, zero imports of `cms/studio` or the root facade. See [cms/PROVENANCE.md](cms/PROVENANCE.md). |
+| `cms/studio` (+ `cms/studio/collab`) | Folded-in portal UI (three-pane authoring shell model, canvas/preview/panels/actions, realtime collaboration) that used to live in the standalone `gosx-cms` module. Top tier — imports `cms/{lifecycle,flows,style}` and `cms/studio/collab`; nothing in this module imports `cms/studio` back (that would close a cycle through the facade — see ARCHITECTURE.md). Ships its own forked runtime assets — see "Release model" below. |
 
 ## Quick start
 
@@ -80,15 +85,19 @@ end.
 ## Versioning & compatibility
 
 The root `studio` package is a **deprecated compatibility facade** for one
-release cycle (v0.6.x): every symbol muddy, pajaritos, and `gosx-cms/studio`
-used before the package restructure still resolves through a type alias or
-thin forwarding wrapper, each marked `// Deprecated:`. New code should import
-the subpackages above directly (`core`, `authoring`, `shell`, `canvas`,
-`sitemap`, `panels`, `backoffice`, `hostruntime`) rather than the root.
+release cycle (v0.6.x): every symbol muddy, pajaritos, and `cms/studio` (the
+former `gosx-cms/studio`) used before the package restructure still resolves
+through a type alias or thin forwarding wrapper, each marked `// Deprecated:`.
+New code should import the subpackages above directly (`core`, `authoring`,
+`shell`, `canvas`, `sitemap`, `panels`, `backoffice`, `hostruntime`) rather
+than the root.
 
-A `gosx-cms` module fold-in is planned for Phase 2, after this facade window
-closes — see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §"Release model"
-for the plan and current status.
+The `gosx-cms` module fold-in (previously "Phase 2") landed: all 13 `gosx-cms`
+packages now live under `cms/` in this module, and `gosx-studio`'s own
+`go.mod` no longer requires `gosx-cms` — see
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §"Release model" for the folded
+DAG shape and [cms/PROVENANCE.md](cms/PROVENANCE.md) for the path mapping and
+source commit.
 
 See `docs/WEBFLOW_CLASS_EDITOR_GAP_INVENTORY.md` for the detailed gap
 inventory and work plan toward a Webflow-class no-code editor.

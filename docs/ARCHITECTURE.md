@@ -15,31 +15,45 @@ does:
   `shell/cmsbridge.go`). Long term, if `blockstudio` proves studio-specific,
   it may move into `gosx-studio/shell` and admin shrinks to ops-CRUD
   primitives for non-website tools.
-- The content-storage subsystem (`gosx-cms/{content,media,lifecycle,flows,
-  style,store,render,blocks}`) is being folded into this module rather than
-  kept as a separate library — see "Release model" below. `gosx-cms/studio`
-  (~50 files: `panels.go`, `workbench.go`, `chrome.go`, `site_canvas.go`,
-  `flow_authoring.go`, `collab/`, …) is portal UI, not content storage; it is
-  the wrong side of the module boundary and is expected to merge into
-  `shell`/`panels`/`backoffice` in the same fold-in.
+- The content-storage subsystem (`content, media, lifecycle{,/sqlstore},
+  flows, style, store{,/file,/memory}, render, blocks`) that used to live in
+  the standalone `gosx-cms` module has been folded into this module as
+  `cms/{content,media,lifecycle,lifecycle/sqlstore,flows,style,store,store/file,
+  store/memory,render,blocks}` — see "Release model" below and
+  [`cms/PROVENANCE.md`](../cms/PROVENANCE.md). `cms/studio` (~64 files:
+  `panels.go`, `workbench.go`, `chrome.go`, `site_canvas.go`,
+  `flow_authoring.go`, `collab/`, …) is portal UI, not content storage, but it
+  stayed a distinct top-tier package rather than merging into
+  `shell`/`panels`/`backoffice` (the merge that the original restructure sketch
+  floated was rejected before execution — see "Release model").
 - `gosx-studio` is the portal itself: everything a site owner touches, from
-  the canvas to the CRUD back-office.
+  the canvas to the CRUD back-office, now including the folded `cms/` content
+  layer.
 
 ## Package DAG
 
 The module is a strict import DAG. Arrows mean "may import":
 
 ```text
-core            → (stdlib, m31labs.dev/gosx only)
-authoring       → core
-hostruntime     → core, the *runtime packages
-canvas          → core
-sitemap         → core, authoring
-panels          → core, authoring
-backoffice      → core
-shell           → core, authoring, canvas, sitemap, panels, hostruntime,
-                  gosx-cms/{lifecycle,media}, gosx-admin/blockstudio
-studio (root)   → everything (deprecated facade only; no logic)
+core                  → (stdlib, m31labs.dev/gosx only)
+authoring             → core
+hostruntime           → core, the *runtime packages
+canvas                → core
+sitemap               → core, authoring
+panels                → core, authoring
+backoffice            → core
+cms/<storage×8>       → stdlib, m31labs.dev/gosx, gosx-admin only
+                        (blocks, content, flows, lifecycle{,/sqlstore},
+                        media, render, store{,/file,/memory}; bottom tier,
+                        beside core; zero imports of cms/studio or the root
+                        facade)
+shell                 → core, authoring, canvas, sitemap, panels, hostruntime,
+                        cms/{lifecycle,media}, gosx-admin/blockstudio
+studio (root)         → everything (deprecated facade only; no logic);
+                        never imports cms/studio
+cms/studio            → cms/{lifecycle,flows,style}, cms/studio/collab
+                        (top tier, above root; see "vestigial facade edge"
+                        below for the one deviation from the pre-fold-in plan)
 ```
 
 Rule: no package may import a peer or anything above it in the DAG. `core`
@@ -50,21 +64,52 @@ panels, `backoffice` renders the CRUD portal pages, and the one file that
 composes both editor-and-CRUD concerns (`backend_editor_workbench.go`) lives
 in `shell` because it is chrome composition, not a backend CRUD page.
 
+**Hard rule, gated every release:** none of
+`core`/`authoring`/`hostruntime`/`canvas`/`sitemap`/`panels`/`backoffice`/`shell`
+may ever import `cms/studio` — that would close a cycle through the root
+facade (`cms/studio → root → shell → cms/{lifecycle,media}` is a DAG path,
+not a loop, only as long as nothing upstream of `cms/studio` imports it back).
+Gate: `go list -deps ./core/... ./authoring/... ./hostruntime/... ./canvas/...
+./sitemap/... ./panels/... ./backoffice/... ./shell/...` must contain zero
+references to `m31labs.dev/gosx-studio/cms/studio`.
+
 Two seams are designed on purpose, not accidents to clean up later:
 
 - **`shell/cmsbridge.go`** is the *only* file in the module that imports
-  `gosx-cms/{lifecycle,media}` and `gosx-admin/blockstudio`. It holds the
-  `Store` interface a host implements to feed Studio content, and the three
-  converters (`shellBlockSummaries`, `shellMediaSummaries`,
-  `shellRevisionSummaries`) from cms/admin types to Studio's pure
+  `cms/{lifecycle,media}` (formerly the standalone `gosx-cms/{lifecycle,media}`)
+  and `gosx-admin/blockstudio`. It holds the `Store` interface a host
+  implements to feed Studio content, and the three converters
+  (`shellBlockSummaries`, `shellMediaSummaries`, `shellRevisionSummaries`)
+  from cms/admin types to Studio's pure
   `BlockSummary`/`MediaSummary`/`RevisionSummary` structs (which stay in
-  `shell/options.go`, cms/admin-free). This is the one file the Phase 2 cms
-  fold-in rewrites.
+  `shell/options.go`, cms/admin-free). Before the fold-in, this was the one
+  file that imported a separate `gosx-cms` module; the cutover slice rewrote
+  its two imports in place (`gosx-cms/{lifecycle,media}` →
+  `gosx-studio/cms/{lifecycle,media}`) and dropped the module-level `require`
+  + `replace` — no other change to the file.
 - **Consumer-side engine-runtime interfaces.** `canvas.StudioEngineRuntime`
   and `sitemap.SiteMapEngineRuntime` are implemented by
   `hostruntime.RuntimeConfig` through Go structural typing. `hostruntime`
   does not import either package — the interfaces stay owned by their
   consumers (`canvas`, `sitemap`), not centralized upward.
+- **The `cms/studio` → root facade edge (vestigial).** The pre-fold-in plan
+  assumed `cms/studio` imported the root `studio` facade
+  (`gosxstudio "m31labs.dev/gosx-studio"`) and that this import had to be
+  preserved byte-for-byte during the move, since rewriting its ~200
+  `gosxstudio.`-prefixed references to subpackages was scoped as v0.7 work.
+  Verification during the fold-in (`cms/PROVENANCE.md`, S3) found the
+  premise was wrong: no `.go` file in the frozen `gosx-cms` source (or the
+  copied `cms/studio` package) actually imports the bare
+  `m31labs.dev/gosx-studio` package — `go list -deps ./cms/studio/...` shows
+  its closure is only `cms/{lifecycle,flows,media,style}` +
+  `cms/studio/collab` + external deps. The `m31labs.dev/gosx-studio` entry in
+  the standalone `gosx-cms` module's `go.mod` was inert metadata (never
+  referenced by any import), confirmed when `go mod tidy` dropped it cleanly
+  from the tombstoned `v0.2.1` release with no code change required. There is
+  therefore no v0.7 facade-rewrite debt for `cms/studio` to pay down; the
+  `gosxstudio:`-prefixed strings visible in `cms/studio/assets_test.go` are
+  DOM/event-name string literals asserted by the runtime bundle tests, not Go
+  imports.
 
 ## Contracts
 
@@ -138,7 +183,7 @@ such as `media.assets`, `pages.routes`, `products.collection`, or
 
 Adapters describe what Studio can ask for; host applications decide how
 those requests load, validate, mutate, preview, publish, restore, or
-execute. This keeps `gosx-cms`, `gosx-admin`, and app-specific repositories
+execute. This keeps `cms/*`, `gosx-admin`, and app-specific repositories
 behind a configuration boundary.
 
 `shell.ShellConfig` is the reusable chrome contract for host-mounted Studio
@@ -248,38 +293,76 @@ themselves a compatibility surface: they are the rendered-page contract
 between Studio's Go/`.gsx` output and both the browser runtimes above and the
 Playwright harness, and no package move may rename them.
 
+**`cms/studio/assets` is a deliberate fork of `hostruntime/assets`, not a
+dedup target.** `cms/studio/assets/{workbench_runtime,command_palette,
+state_runtime}.js` share filenames with `hostruntime/assets/*.js` and open
+with near-identical bytes, because both trace back to the same original
+runtime code before the standalone `gosx-cms` module and this module's
+`hostruntime` diverged. The fold-in moved `cms/studio/assets/` as-is
+(`assets.go`'s `go:embed` is package-directory-relative, so the files had to
+land beside their own package) and made **no attempt to reconcile or dedup**
+the two runtimes against each other — that risked silently changing rendered
+bytes for either `studio`'s or `cms/studio`'s consumers mid-fold-in.
+Canonicalizing the two into one shared runtime (or proving they've fully
+diverged and should stay separate) is explicitly deferred to a v0.7 decision;
+until then, treat `cms/studio/assets/*.js` and `hostruntime/assets/*.js` as
+two independently-versioned bundles that happen to share names.
+
 ## Release model
 
 The root `studio` package is a deprecated compatibility facade (type aliases
 + forwarding wrappers, no logic) for one release cycle, v0.6.x. Every symbol
-muddy-noni-commerce, pajaritos-forest-school, and `gosx-cms/studio` used
-before the restructure still resolves through the facade; each symbol is
-marked `// Deprecated: use <pkg>.<Name>.`. `facade_completeness_test.go`
-gates the facade in gosx-studio's own CI: it references every exported
-`compat_*.go` symbol, so an accidental rename or deletion is a local compile
-failure instead of a silent break only caught when a consumer repo happens
-to be built.
+muddy-noni-commerce, pajaritos-forest-school, and `cms/studio` (formerly
+`gosx-cms/studio`) used before the restructure still resolves through the
+facade; each symbol is marked `// Deprecated: use <pkg>.<Name>.`.
+`facade_completeness_test.go` gates the facade in gosx-studio's own CI: it
+references every exported `compat_*.go` symbol, so an accidental rename or
+deletion is a local compile failure instead of a silent break only caught
+when a consumer repo happens to be built.
 
-Today `gosx-studio` and `gosx-cms` form a real module cycle:
-`gosx-cms/go.mod` requires `m31labs.dev/gosx-studio`, and
-`gosx-studio/go.mod` requires `m31labs.dev/gosx-cms` (for the `lifecycle` and
-`media` packages `shell/cmsbridge.go` touches). Every studio tag today still
-requires a two-step lockstep dance: tag studio requiring the old cms, tag cms
-requiring the new studio, re-tag studio. That is why this restructure lands
-without a version tag — the cycle makes tagging mid-restructure unsafe, and
-is deferred to the Phase 2 decision below.
+**The `gosx-studio`↔`gosx-cms` module cycle described in earlier drafts of
+this document is dissolved, not just planned around.** It used to be real:
+`gosx-cms/go.mod` required `m31labs.dev/gosx-studio`, and
+`gosx-studio/go.mod` required `m31labs.dev/gosx-cms` (for the `lifecycle` and
+`media` packages `shell/cmsbridge.go` touches), forcing a two-step lockstep
+tagging dance on every studio release. The fold-in (full record in
+[`cms/PROVENANCE.md`](../cms/PROVENANCE.md)) closed it: all 13 `gosx-cms`
+packages now live under `cms/` in this module; `shell/cmsbridge.go` and
+`shell/options.go` were rewritten in place to import
+`gosx-studio/cms/{lifecycle,media}`; and this module's `go.mod` dropped the
+`gosx-cms` `require` + `replace` entirely. There is no cycle left to lockstep
+around.
 
-**Phase 2 (gated on owner sign-off): fold `gosx-cms` into this module.**
-`gosx-cms/{content,media,lifecycle,flows,style,store,render,blocks}` move to
-`gosx-studio/cms/<same>`; `gosx-cms/studio/*` (portal UI, not content
-storage) merges into `shell`/`panels`/`backoffice`; `gosx-cms` becomes a
-one-way deprecation facade whose only require is `gosx-studio`, breaking the
-cycle. This ships as studio v0.7.0 with the cms packages absorbed (including
-the `modernc.org/sqlite` dependency `gosx-cms/lifecycle/sqlstore` and `store`
-carry) plus a `gosx-cms` v0.3.0 facade release. Consumers migrate off
-`m31labs.dev/gosx-cms/X` imports to `m31labs.dev/gosx-studio/cms/X` on their
-own schedule. `gosx-admin`'s remit is unaffected either way: it stays a
-standalone toolkit whose only Studio-relevant export is `blockstudio`.
+Two decisions changed between the original Phase-2 sketch and execution:
+
+- **No `gosx-cms` v0.3.0 alias-facade release.** The sketch's runner-up —
+  publish `gosx-cms` as a type-alias facade over `gosx-studio/cms/*` — was
+  rejected: maintaining a second ~700-symbol facade across 13 packages for
+  exactly two in-house consumers (muddy-noni-commerce,
+  pajaritos-forest-school) wasn't worth it. Instead the standalone
+  `gosx-cms` repository is **frozen and tombstoned**: README replaced with a
+  fold-in notice + import-path mapping table, a `// Deprecated:` comment
+  added above its `module` line, final tag `v0.2.1` cut, and all package code
+  left intact so existing `v0.2.x` pins keep resolving unchanged. Consumers
+  migrate by a mechanical prefix sed (`m31labs.dev/gosx-cms/` →
+  `m31labs.dev/gosx-studio/cms/`) directly against the folded paths, not
+  through any facade.
+- **`gosx-cms/studio` did not merge into `shell`/`panels`/`backoffice`.** It
+  moved to `cms/studio` (+ `cms/studio/collab`) as its own package instead —
+  see the Package DAG section above. The merge floated in the original sketch
+  was rejected before execution: both sides have colliding names
+  (`style_panel.go`, overlapping workbench/panel symbols), the merge wasn't
+  mechanical, and the two consumers already imported `gosx-cms/studio`
+  directly — keeping `cms/studio` as a preserved path let their migration
+  stay a pure prefix sed too. Dissolving `cms/studio` into the root packages
+  remains an option for a future release, not a commitment made here.
+
+The fold-in targets `gosx-studio` v0.6.0 (this module's `go.mod` also picked
+up `modernc.org/sqlite` and bumped `gosx-admin` to v0.2.0 for the
+`cms/lifecycle/sqlstore` and `cms/studio` dependencies the folded code needs);
+tagging and the proxy-resolution verification are a separate release slice.
+`gosx-admin`'s remit is unaffected either way: it stays a standalone toolkit
+whose only Studio-relevant export is `blockstudio`.
 
 ## Noni proving ground
 
