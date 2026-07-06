@@ -49,7 +49,10 @@ type BackendEditorWorkbenchPanelStackProps struct {
 	BlockLibraryPanel               gosx.Node
 	BlockLibraryPanelView           map[string]any
 	SiteMapEngine                   gosx.Node
+	SiteMapView                     map[string]any
+	SiteMapEngineOptions            SiteMapEngineOptions
 	SiteMapCanvas                   gosx.Node
+	SiteMapCanvasSurfaceOptions     SiteMapCanvasSurfaceOptions
 	InspectorChrome                 gosx.Node
 	InspectorChromeView             map[string]any
 	HomeInspector                   gosx.Node
@@ -289,6 +292,14 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 			RevisionHistory: props.RevisionHistory,
 		})
 	}
+	siteMapEngine := props.SiteMapEngine
+	if workbenchNodeEmpty(siteMapEngine) && len(props.SiteMapView) > 0 {
+		siteMapEngine = RenderSiteMapEngine(props.SiteMapView, props.SiteMapEngineOptions).Surface
+	}
+	siteMapCanvas := props.SiteMapCanvas
+	if workbenchNodeEmpty(siteMapCanvas) && len(props.SiteMapView) > 0 {
+		siteMapCanvas = RenderSiteMapCanvasSurface(props.SiteMapView, props.SiteMapCanvasSurfaceOptions)
+	}
 
 	return RenderBackendEditorWorkbenchContent(BackendEditorWorkbenchContentProps{
 		View:            props.View,
@@ -298,8 +309,8 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 		CanvasStatus:    props.CanvasStatus,
 		SiteNavigator:   siteNavigator,
 		BlockLayout:     blockLayout,
-		SiteMapEngine:   props.SiteMapEngine,
-		SiteMapCanvas:   props.SiteMapCanvas,
+		SiteMapEngine:   siteMapEngine,
+		SiteMapCanvas:   siteMapCanvas,
 		InspectorChrome: inspectorChrome,
 		HomeInspector:   homeInspector,
 		LookPanel:       lookPanel,

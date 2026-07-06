@@ -367,6 +367,92 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 	)
 }
 
+func TestRenderBackendEditorWorkbenchPanelStackRendersSiteMapSurfacesFromProps(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Website editor"}, WorkbenchShellViewOptions{})
+	siteMapView := siteMapCanvasTestView()
+
+	html := gosx.RenderHTML(RenderBackendEditorWorkbenchPanelStack(BackendEditorWorkbenchPanelStackProps{
+		View:                  view,
+		SiteNavigator:         gosx.El("section", gosx.Attrs(gosx.Attr("data-site-navigator", "true")), gosx.Text("Pages")),
+		HomeLayers:            map[string]any{"kicker": "Home", "title": "Sections"},
+		BlockLayoutEngineHost: gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
+		SiteMapView:           siteMapView,
+		SiteMapEngineOptions: SiteMapEngineOptions{
+			LayoutAction: "/admin/editor/__actions/siteMapLayout",
+			EngineHost: SiteMapEngineHostFromMap(map[string]any{
+				"key":     "site-map",
+				"name":    SiteMapEngineName,
+				"mountId": "gosx-studio-site-map-engine",
+			}),
+			HideAuthoringForms: true,
+		},
+		SiteMapCanvasSurfaceOptions: SiteMapCanvasSurfaceOptions{
+			Mode: SiteMapCanvasSurfaceCanvasDefault,
+			Canvas: SiteMapCanvasOptions{
+				Class:       "studio-site-map-canvas editor-site-map-canvas",
+				CanvasClass: "editor-site-map-canvas__surface",
+			},
+		},
+	}))
+
+	for _, fragment := range []string{
+		`data-gosx-studio-site-map-engine-renderer="gosx-studio"`,
+		`data-gosx-studio-site-map-layout-action="/admin/editor/__actions/siteMapLayout"`,
+		`id="gosx-studio-site-map-engine"`,
+		`data-gosx-studio-site-map-board-renderer="gosx-studio"`,
+		`data-studio-site-map-canvas-engine="true"`,
+		`data-gosx-studio-site-map-canvas-renderer="gosx-studio"`,
+		`class="studio-site-map-canvas editor-site-map-canvas"`,
+		`data-gosx-studio-canvas-selection-bridge="true"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("backend editor panel stack site-map render missing %q:\n%s", fragment, html)
+		}
+	}
+	assertOrder(t, html,
+		`data-gosx-studio-board-slot="true"`,
+		`data-gosx-studio-site-map-engine-renderer="gosx-studio"`,
+		`data-studio-site-map-canvas-engine="true"`,
+	)
+}
+
+func TestRenderBackendEditorWorkbenchPanelStackKeepsExplicitSiteMapOverrides(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Website editor"}, WorkbenchShellViewOptions{})
+
+	html := gosx.RenderHTML(RenderBackendEditorWorkbenchPanelStack(BackendEditorWorkbenchPanelStackProps{
+		View:                  view,
+		SiteNavigator:         gosx.El("section", gosx.Attrs(gosx.Attr("data-site-navigator", "true")), gosx.Text("Pages")),
+		HomeLayers:            map[string]any{"kicker": "Home", "title": "Sections"},
+		BlockLayoutEngineHost: gosx.El("div", gosx.Attrs(gosx.Attr("data-block-layout-host", "true"))),
+		SiteMapView:           siteMapCanvasTestView(),
+		SiteMapEngineOptions: SiteMapEngineOptions{
+			LayoutAction: "/admin/editor/__actions/siteMapLayout",
+		},
+		SiteMapCanvasSurfaceOptions: SiteMapCanvasSurfaceOptions{
+			Mode: SiteMapCanvasSurfaceCanvasDefault,
+		},
+		SiteMapEngine: gosx.El("section", gosx.Attrs(gosx.Attr("data-explicit-site-map-engine", "true")), gosx.Text("Explicit engine")),
+		SiteMapCanvas: gosx.El("section", gosx.Attrs(gosx.Attr("data-explicit-site-map-canvas", "true")), gosx.Text("Explicit canvas")),
+	}))
+
+	for _, fragment := range []string{
+		`data-explicit-site-map-engine="true"`,
+		`data-explicit-site-map-canvas="true"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("explicit site-map override missing %q:\n%s", fragment, html)
+		}
+	}
+	for _, fragment := range []string{
+		`data-gosx-studio-site-map-engine-renderer="gosx-studio"`,
+		`data-gosx-studio-site-map-canvas-renderer="gosx-studio"`,
+	} {
+		if strings.Contains(html, fragment) {
+			t.Fatalf("explicit site-map override should not render default fragment %q:\n%s", fragment, html)
+		}
+	}
+}
+
 func TestRenderBackendEditorWorkbenchPanelStackKeepsExplicitBrandMediaPickerOverride(t *testing.T) {
 	view := WorkbenchShellView(WorkbenchShellSource{Title: "Website editor"}, WorkbenchShellViewOptions{})
 	brandPanel := map[string]any{

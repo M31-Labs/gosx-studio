@@ -13,6 +13,9 @@ type BackendEditorPageProps struct {
 	RevisionRestored    bool
 	WorkbenchShell      gosx.Node
 	SupportNodes        []gosx.Node
+	SiteMapView         map[string]any
+	SiteMapAuthoringFormsOptions SiteMapAuthoringFormsOptions
+	SiteMapAuthoringFormsNode    gosx.Node
 	StylePanelView      map[string]any
 	StylePanelFormID    string
 	StylePanelAction    string
@@ -63,6 +66,9 @@ func RenderBackendEditorPage(props BackendEditorPageProps) gosx.Node {
 
 func backendEditorSupportNodes(props BackendEditorPageProps) []gosx.Node {
 	nodes := append([]gosx.Node{}, props.SupportNodes...)
+	if siteMapAuthoringForms := backendEditorSiteMapAuthoringFormsNode(props); !siteMapAuthoringForms.IsZero() {
+		nodes = append(nodes, siteMapAuthoringForms)
+	}
 	if stylePanel := backendEditorStylePanelNode(props); !stylePanel.IsZero() {
 		nodes = append(nodes, stylePanel)
 	}
@@ -75,6 +81,16 @@ func backendEditorSupportNodes(props BackendEditorPageProps) []gosx.Node {
 		}))
 	}
 	return nodes
+}
+
+func backendEditorSiteMapAuthoringFormsNode(props BackendEditorPageProps) gosx.Node {
+	if !props.SiteMapAuthoringFormsNode.IsZero() {
+		return props.SiteMapAuthoringFormsNode
+	}
+	if len(props.SiteMapView) == 0 || props.SiteMapAuthoringFormsOptions.Action == "" {
+		return gosx.Node{}
+	}
+	return RenderSiteMapAuthoringForms(props.SiteMapView, props.SiteMapAuthoringFormsOptions)
 }
 
 func backendEditorStylePanelNode(props BackendEditorPageProps) gosx.Node {
