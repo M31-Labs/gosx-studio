@@ -1,4 +1,4 @@
-package studio
+package canvas
 
 import (
 	"strings"
@@ -23,12 +23,12 @@ func TestRenderSiteMapCanvasSurfaceComposesFullWASMCanvasDefault(t *testing.T) {
 		`data-gosx-engine-component="CanvasBoard"`,
 		`class="studio-site-map-canvas host-canvas"`,
 		`class="host-canvas__surface"`,
-		CanvasSelectionBridgePath + `?v=dev+1`,
+		canvasSelectionBridgePath + `?v=dev+1`,
 		`data-gosx-studio-canvas-selection-bridge="true"`,
 		`data-studio-site-map-canvas-default="true"`,
-		CanvasInlineEditPath + `?v=dev+1`,
+		canvasInlineEditPath + `?v=dev+1`,
 		`data-gosx-studio-canvas-inline-edit="true"`,
-		CanvasDefaultInlineInstallerPath + `?v=dev+1`,
+		canvasDefaultInlineInstallerPath + `?v=dev+1`,
 		`data-gosx-studio-canvas-inline-edit-installer="true"`,
 	} {
 		if !strings.Contains(html, fragment) {
@@ -36,9 +36,9 @@ func TestRenderSiteMapCanvasSurfaceComposesFullWASMCanvasDefault(t *testing.T) {
 		}
 	}
 	for _, forbidden := range []string{
-		Canvas2DPainterPath,
-		CanvasWASMFreeClientPath,
-		CanvasContextualPanelPath,
+		canvas2DPainterPath,
+		canvasWASMFreeClientPath,
+		canvasContextualPanelPath,
 		`data-gosx-canvas-wasm-free="true"`,
 		`component:home:hero`,
 	} {
@@ -62,14 +62,14 @@ func TestRenderSiteMapCanvasSurfaceComposesWASMFreeSurface(t *testing.T) {
 		`data-gosx-studio-site-map-canvas-renderer="gosx-studio"`,
 		`data-gosx-canvas-wasm-free="true"`,
 		`data-gosx-canvas-bundle="studio-site-map-canvas-board"`,
-		Canvas2DPainterPath + `?v=dev`,
+		canvas2DPainterPath + `?v=dev`,
 		`data-gosx-studio-canvas2d-painter="true"`,
 		`data-studio-site-map-canvas-default="true"`,
-		CanvasInlineEditPath + `?v=dev`,
+		canvasInlineEditPath + `?v=dev`,
 		`data-gosx-studio-canvas-inline-edit="true"`,
-		CanvasContextualPanelPath + `?v=dev`,
+		canvasContextualPanelPath + `?v=dev`,
 		`data-gosx-studio-canvas-contextual-panel="true"`,
-		CanvasWASMFreeClientPath + `?v=dev`,
+		canvasWASMFreeClientPath + `?v=dev`,
 		`data-gosx-studio-canvas-wasm-free-client="true"`,
 	} {
 		if !strings.Contains(html, fragment) {
@@ -79,8 +79,8 @@ func TestRenderSiteMapCanvasSurfaceComposesWASMFreeSurface(t *testing.T) {
 	for _, forbidden := range []string{
 		`data-gosx-surface-kind="canvas2d"`,
 		`data-gosx-engine-component="CanvasBoard"`,
-		CanvasSelectionBridgePath,
-		CanvasDefaultInlineInstallerPath,
+		canvasSelectionBridgePath,
+		canvasDefaultInlineInstallerPath,
 		`component:home:hero`,
 	} {
 		if strings.Contains(html, forbidden) {

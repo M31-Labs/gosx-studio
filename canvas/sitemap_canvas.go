@@ -1,8 +1,22 @@
-package studio
+// Package canvas owns the page-canvas engine hosting and server-rendered
+// surface markup: artboards, thumbnails, and the block-layout DOM contract.
+//
+// This package moved here from the studio root in Slice 4 of the package
+// restructure (see .tiller/scratch/gosx-studio-restructure-spec-v0.1.md). Per
+// the DAG in that spec's §1, canvas may import only core: the
+// StudioEngineRuntime/BlockLayoutEngineRuntime engine-runtime interfaces stay
+// consumer-side via structural typing (so canvas never imports hostruntime),
+// and a handful of small map-reading/engine-capability helpers that are still
+// unexported duplicates in not-yet-migrated root files are carried locally in
+// support.go rather than importing the sitemap/shell packages those files are
+// destined for (see support.go's doc comment).
+package canvas
 
 import (
 	"m31labs.dev/gosx"
 	"m31labs.dev/gosx/render/bundle2d"
+
+	"m31labs.dev/gosx-studio/core"
 )
 
 // SiteMapCanvasOptions configures the opt-in Canvas2D site-map surface.
@@ -158,7 +172,7 @@ func (p siteMapCanvasNodePlacement) centerY() float64 { return p.y + p.height/2 
 func RenderSiteMapCanvasEngine(siteMapView map[string]any, options SiteMapCanvasOptions) gosx.Node {
 	if !options.Enabled {
 		return gosx.El("section", gosx.Attrs(
-			gosx.Attr("class", FirstNonEmpty(options.Class, "studio-site-map-canvas")),
+			gosx.Attr("class", core.FirstNonEmpty(options.Class, "studio-site-map-canvas")),
 			gosx.Attr("data-studio-site-map-canvas-engine", "disabled"),
 			gosx.Attr("hidden", true),
 			gosx.Attr("aria-hidden", "true"),
@@ -174,7 +188,7 @@ func RenderSiteMapCanvasEngine(siteMapView map[string]any, options SiteMapCanvas
 		// bundle path.
 		nodes = append(nodes, options.ExtraNodes...)
 	}
-	background := FirstNonEmpty(options.Background, siteMapCanvasDefaultBackground)
+	background := core.FirstNonEmpty(options.Background, siteMapCanvasDefaultBackground)
 
 	// In the WASM-free path we emit a plain <canvas> that carries NO
 	// data-gosx-surface-kind, so the gosx client bootstrap never WASM-hydrates it.
@@ -191,14 +205,14 @@ func RenderSiteMapCanvasEngine(siteMapView map[string]any, options SiteMapCanvas
 			Backend:    gosx.CanvasBoardBackendWebGPU,
 			Zoom:       1.0,
 			Nodes:      nodes,
-			OnPick:     FirstNonEmpty(options.OnPick, siteMapCanvasDefaultOnPick),
+			OnPick:     core.FirstNonEmpty(options.OnPick, siteMapCanvasDefaultOnPick),
 			ClassName:  options.CanvasClass,
 		})
 	}
 
 	// gosx.El takes ...any (AttrList + Node children), so children carry as []any.
 	sectionAttrs := []any{
-		gosx.Attr("class", FirstNonEmpty(options.Class, "studio-site-map-canvas")),
+		gosx.Attr("class", core.FirstNonEmpty(options.Class, "studio-site-map-canvas")),
 		gosx.Attr("data-studio-site-map-canvas-engine", "true"),
 		gosx.Attr("data-gosx-studio-site-map-canvas-renderer", "gosx-studio"),
 		gosx.Attr("aria-label", "Site map canvas surface"),
@@ -333,7 +347,7 @@ func siteMapCanvasNodes(siteMapView map[string]any) []gosx.CanvasBoardNode {
 
 func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOptions) []gosx.CanvasBoardNode {
 	layout := siteMapCanvasLayoutFrom(options)
-	layers := workbenchViewMapList(siteMapView, "workspaceLayers")
+	layers := mapList(siteMapView, "workspaceLayers")
 	placements := map[string]siteMapCanvasNodePlacement{}
 
 	rects := make([]gosx.CanvasBoardNode, 0)
@@ -342,10 +356,10 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 	labels := make([]gosx.CanvasBoardNode, 0)
 
 	for layerIndex, layer := range layers {
-		nodes := siteMapMapList(layer, "nodes")
+		nodes := mapList(layer, "nodes")
 		x := float64(layerIndex) * layout.columnStride
 		for nodeIndex, node := range nodes {
-			key := workbenchMapString(node, "key")
+			key := mapString(node, "key")
 			if key == "" {
 				continue
 			}
@@ -354,7 +368,7 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 			// placements are never recorded, but that's safe because the link
 			// "spiderweb" loop below is also skipped under this flag, so there are
 			// no dangling endpoints to resolve.
-			if options.PageArtboardsOnly && workbenchMapString(node, "kind") != string(WorkspaceNodePage) {
+			if options.PageArtboardsOnly && mapString(node, "kind") != string(core.WorkspaceNodePage) {
 				continue
 			}
 			if _, seen := placements[key]; seen {
@@ -378,7 +392,7 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 				Y:      placement.y,
 				Width:  placement.width,
 				Height: placement.height,
-				Color:  siteMapCanvasGroupColor(workbenchMapString(node, "group")),
+				Color:  siteMapCanvasGroupColor(mapString(node, "group")),
 			})
 			labels = append(labels, gosx.CanvasBoardNode{
 				ID:    key + ":label",
@@ -396,8 +410,8 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 			// authoring view exposes "route" only on page nodes (components and
 			// resources leave it empty), so the kind+route gate keeps the route
 			// label off non-page cards.
-			if workbenchMapString(node, "kind") == string(WorkspaceNodePage) {
-				if route := workbenchMapString(node, "route"); route != "" {
+			if mapString(node, "kind") == string(core.WorkspaceNodePage) {
+				if route := mapString(node, "route"); route != "" {
 					labels = append(labels, gosx.CanvasBoardNode{
 						ID:    key + ":route",
 						Kind:  "label",
@@ -453,14 +467,14 @@ func siteMapCanvasNodesWith(siteMapView map[string]any, options SiteMapCanvasOpt
 	// are no inter-node connectors to draw (and non-page endpoints have no
 	// placements anyway). When the flag is off this emits the full link graph.
 	if !options.PageArtboardsOnly {
-		for _, link := range workbenchViewMapList(siteMapView, "workspaceLinks") {
-			from, okFrom := placements[workbenchMapString(link, "fromNodeKey")]
-			to, okTo := placements[workbenchMapString(link, "toNodeKey")]
+		for _, link := range mapList(siteMapView, "workspaceLinks") {
+			from, okFrom := placements[mapString(link, "fromNodeKey")]
+			to, okTo := placements[mapString(link, "toNodeKey")]
 			if !okFrom || !okTo {
 				continue
 			}
 			lines = append(lines, gosx.CanvasBoardNode{
-				ID:    workbenchMapString(link, "key"),
+				ID:    mapString(link, "key"),
 				Kind:  "line",
 				X1:    from.centerX(),
 				Y1:    from.centerY(),
@@ -526,9 +540,9 @@ func flipBoardNodesYUp(nodes []gosx.CanvasBoardNode) []gosx.CanvasBoardNode {
 }
 
 func siteMapCanvasNodeText(node map[string]any) string {
-	return FirstNonEmpty(
-		workbenchMapString(node, "label"),
-		workbenchMapString(node, "key"),
+	return core.FirstNonEmpty(
+		mapString(node, "label"),
+		mapString(node, "key"),
 	)
 }
 
@@ -545,15 +559,15 @@ const (
 // a neutral slate.
 func siteMapCanvasGroupColor(group string) string {
 	switch group {
-	case string(PageGroupSite):
+	case string(core.PageGroupSite):
 		return "#2563eb"
-	case string(PageGroupCommerce):
+	case string(core.PageGroupCommerce):
 		return "#7c3aed"
-	case string(PageGroupContent):
+	case string(core.PageGroupContent):
 		return "#0d9488"
-	case string(PageGroupFlows):
+	case string(core.PageGroupFlows):
 		return "#d97706"
-	case string(PageGroupUtility):
+	case string(core.PageGroupUtility):
 		return "#475569"
 	default:
 		return "#334155"

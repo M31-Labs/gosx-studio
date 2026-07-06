@@ -1,4 +1,4 @@
-package studio
+package canvas
 
 import (
 	"strings"
