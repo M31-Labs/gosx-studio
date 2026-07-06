@@ -40,13 +40,6 @@ jobs:
           token: ${{ secrets.CI_GITHUB_TOKEN || github.token }}
           path: gosx-admin
 
-      - name: Checkout gosx-cms
-        uses: actions/checkout@v4
-        with:
-          repository: odvcencio/gosx-cms
-          token: ${{ secrets.CI_GITHUB_TOKEN || github.token }}
-          path: gosx-cms
-
       - name: Checkout Muddy/Noni
         uses: actions/checkout@v4
         with:
@@ -69,7 +62,6 @@ jobs:
             gosx-studio/go.sum
             gosx/go.sum
             gosx-admin/go.sum
-            gosx-cms/go.sum
             muddy-noni-commerce/go.sum
             pajaritos-forest-school/go.sum
 

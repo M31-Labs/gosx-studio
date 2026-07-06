@@ -6,13 +6,10 @@ replace m31labs.dev/gosx => ../gosx
 
 replace m31labs.dev/gosx-admin => ../gosx-admin
 
-replace m31labs.dev/gosx-cms => ../gosx-cms
-
 require (
 	golang.org/x/image v0.38.0
 	m31labs.dev/gosx v0.29.2
 	m31labs.dev/gosx-admin v0.2.0
-	m31labs.dev/gosx-cms v0.0.0-00010101000000-000000000000
 	modernc.org/sqlite v1.50.1
 )
 

@@ -5,8 +5,8 @@ import (
 
 	"m31labs.dev/gosx"
 	"m31labs.dev/gosx-admin/blockstudio"
-	"m31labs.dev/gosx-cms/lifecycle"
-	"m31labs.dev/gosx-cms/media"
+	"m31labs.dev/gosx-studio/cms/lifecycle"
+	"m31labs.dev/gosx-studio/cms/media"
 	"m31labs.dev/gosx-studio/core"
 )
 

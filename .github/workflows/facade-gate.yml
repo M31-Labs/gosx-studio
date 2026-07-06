@@ -4,10 +4,10 @@ name: facade gate
 # .tiller/scratch/gosx-studio-restructure-spec-v0.1.md §3 and §"Gate in CI")
 # in-repo, without depending on the reference-apps.yml cross-repo checkouts.
 # reference-apps.yml already builds+tests gosx-studio alongside
-# muddy-noni-commerce, pajaritos-forest-school, and gosx-cms/studio, but its
-# checkout of the two private odvcencio-owned repos currently 404s for any
-# token available to this workflow (see the Slice 9 spore) — this job is the
-# facade completeness gate that stays green independent of that infra issue.
+# muddy-noni-commerce and pajaritos-forest-school, but its checkout of the two
+# private odvcencio-owned repos currently 404s for any token available to this
+# workflow (see the Slice 9 spore) — this job is the facade completeness gate
+# that stays green independent of that infra issue.
 on:
   push:
     branches:
@@ -29,12 +29,14 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      # go.mod carries local replace directives for m31labs.dev/{gosx,gosx-admin,gosx-cms}
-      # pointing at ../gosx, ../gosx-admin, ../gosx-cms (same layout reference-apps.yml
-      # uses). All three are public repos, so the default github.token is sufficient —
-      # unlike muddy-noni-commerce/pajaritos-forest-school, which are private and owned
+      # go.mod carries local replace directives for m31labs.dev/{gosx,gosx-admin}
+      # pointing at ../gosx, ../gosx-admin (same layout reference-apps.yml uses).
+      # Both are public repos, so the default github.token is sufficient — unlike
+      # muddy-noni-commerce/pajaritos-forest-school, which are private and owned
       # by a different account than this workflow runs under (the reference-apps.yml
       # known-broken infra this job intentionally does not depend on).
+      # gosx-cms was folded into gosx-studio/cms/* at v0.6.0 (Phase 2 fold-in);
+      # its packages now live in-repo, so no sibling checkout is needed.
       - name: Checkout gosx-studio
         uses: actions/checkout@v4
         with:
@@ -52,12 +54,6 @@ jobs:
           repository: odvcencio/gosx-admin
           path: gosx-admin
 
-      - name: Checkout gosx-cms
-        uses: actions/checkout@v4
-        with:
-          repository: odvcencio/gosx-cms
-          path: gosx-cms
-
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -66,7 +62,6 @@ jobs:
             gosx-studio/go.sum
             gosx/go.sum
             gosx-admin/go.sum
-            gosx-cms/go.sum
 
       - name: Build
         working-directory: gosx-studio
