@@ -26,13 +26,39 @@ cross repositories, so this file is the provenance anchor.
 | `store/file/` | `cms/store/file/` | copied (S2) |
 | `store/memory/` | `cms/store/memory/` | copied (S2) |
 | `style/` | `cms/style/` | copied (S2) |
-| `studio/` | `cms/studio/` | pending (S3) |
-| `studio/collab/` | `cms/studio/collab/` | pending (S3) |
+| `studio/` | `cms/studio/` | copied (S3) |
+| `studio/collab/` | `cms/studio/collab/` | copied (S3) |
+| `studio/assets/` | `cms/studio/assets/` | copied (S3) |
 
 S2 copied the 11 packages above with zero `studio` imports (bottom-tier, DAG
 gate: `go list -deps` shows none of core/authoring/hostruntime/canvas/sitemap/
 panels/backoffice/shell import `cms/studio` — n/a until S3 lands `cms/studio`
 itself). The old `m31labs.dev/gosx-cms` module require + replace stay in
 `go.mod` through S3; `shell/{cmsbridge.go,options.go}` still import the old
-module paths until S4's cutover. `studio/` + `studio/collab/` (~60 files) and
-`studio/assets/` (5 embedded JS runtimes) move in S3.
+module paths until S4's cutover.
+
+S3 copied `studio/` + `studio/collab/` (64 .go files) and `studio/assets/`
+(5 embedded JS runtimes) — 69 files total, byte-identical to the frozen
+source SHA modulo the `m31labs.dev/gosx-cms/` → `m31labs.dev/gosx-studio/cms/`
+import rewrite (verified file-by-file, diff-based, both against the S1 hash
+manifest and directly against the frozen source commit). `go.mod` bumped
+`m31labs.dev/gosx-admin` `v0.1.1` → `v0.2.0` per spec (folded code needs
+`workbench`, `calendar`, `blockstudio/collab`, all present in the local
+`../gosx-admin` checkout at `v0.2.0`); `go mod tidy` picked up
+`github.com/gorilla/websocket` as a new indirect dependency.
+
+DAG gate (S3): `go list -deps ./core/... ./authoring/... ./hostruntime/...
+./canvas/... ./sitemap/... ./panels/... ./backoffice/... ./shell/...` contains
+zero references to `m31labs.dev/gosx-studio/cms/studio` — confirmed no cycle
+reappeared through the facade.
+
+**Note (deviation from spec narrative):** the spec's DAG description states
+`cms/studio` imports the `gosx-studio` root facade (`gosxstudio
+"m31labs.dev/gosx-studio"`) and that this import must be kept as-is. At the
+frozen source SHA (`81dc8b0`), no `.go` file anywhere in gosx-cms actually
+imports the bare `m31labs.dev/gosx-studio` package — `go.mod` requires it
+(inert/vestigial), but `go list -deps ./cms/studio/...` shows its dependency
+closure is only `cms/{lifecycle,flows,media,style}` +
+`cms/studio/collab` + external deps, no root facade. Nothing needed
+preserving; there was no such import to rewrite or keep. Confirmed via
+repo-wide grep of the frozen SHA before and after the copy.

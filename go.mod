@@ -11,7 +11,7 @@ replace m31labs.dev/gosx-cms => ../gosx-cms
 require (
 	golang.org/x/image v0.38.0
 	m31labs.dev/gosx v0.29.2
-	m31labs.dev/gosx-admin v0.1.1
+	m31labs.dev/gosx-admin v0.2.0
 	m31labs.dev/gosx-cms v0.0.0-00010101000000-000000000000
 	modernc.org/sqlite v1.50.1
 )
@@ -19,6 +19,7 @@ require (
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
