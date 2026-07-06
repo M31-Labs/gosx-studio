@@ -1,4 +1,4 @@
-package studio
+package sitemap
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/core"
 )
 
 type SiteMapBoardOptions struct {
@@ -76,7 +77,7 @@ func RenderSiteMapBoard(siteMapView map[string]any, options SiteMapBoardOptions)
 	), gosx.Fragment(bodyChildren...)))
 
 	return gosx.El("section", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.Class, "studio-site-map-board")),
+		gosx.Attr("class", core.FirstNonEmpty(options.Class, "studio-site-map-board")),
 		gosx.Attr("data-studio-site-map-board", "true"),
 		gosx.Attr("data-gosx-studio-site-map-board-renderer", "gosx-studio"),
 		gosx.Attr("data-studio-site-map-filter", state.group),
@@ -99,13 +100,13 @@ func RenderSiteMapBoard(siteMapView map[string]any, options SiteMapBoardOptions)
 
 func siteMapBoardInitialState(siteMapView map[string]any, options SiteMapBoardOptions) siteMapBoardState {
 	return siteMapBoardState{
-		group:                 FirstNonEmpty(options.DefaultGroupKey, workbenchViewString(siteMapView, "defaultGroupKey"), "all"),
-		detail:                FirstNonEmpty(options.DefaultDetailKey, workbenchViewString(siteMapView, "defaultDetailKey"), "map"),
-		palette:               FirstNonEmpty(options.DefaultPaletteKey, "all"),
-		focus:                 FirstNonEmpty(options.DefaultFocusKey, workbenchViewString(siteMapView, "defaultFocusKey"), "all"),
-		zoom:                  FirstNonEmpty(options.DefaultZoomKey, "fit"),
-		density:               FirstNonEmpty(options.DefaultDensityKey, "roomy"),
-		grid:                  FirstNonEmpty(options.DefaultGridKey, "on"),
+		group:                 core.FirstNonEmpty(options.DefaultGroupKey, workbenchViewString(siteMapView, "defaultGroupKey"), "all"),
+		detail:                core.FirstNonEmpty(options.DefaultDetailKey, workbenchViewString(siteMapView, "defaultDetailKey"), "map"),
+		palette:               core.FirstNonEmpty(options.DefaultPaletteKey, "all"),
+		focus:                 core.FirstNonEmpty(options.DefaultFocusKey, workbenchViewString(siteMapView, "defaultFocusKey"), "all"),
+		zoom:                  core.FirstNonEmpty(options.DefaultZoomKey, "fit"),
+		density:               core.FirstNonEmpty(options.DefaultDensityKey, "roomy"),
+		grid:                  core.FirstNonEmpty(options.DefaultGridKey, "on"),
 		selectedBlueprintKey:  workbenchViewString(siteMapView, "defaultBlueprintKey"),
 		selectedTemplateKey:   workbenchViewString(siteMapView, "defaultTemplateKey"),
 		selectedNodeKey:       workbenchViewString(siteMapView, "defaultWorkspaceNodeKey"),
@@ -117,7 +118,7 @@ func siteMapBoardInitialState(siteMapView map[string]any, options SiteMapBoardOp
 		selectedNodeBinding:   workbenchViewString(siteMapView, "defaultWorkspaceNodeBinding"),
 		selectedNodeStatus:    workbenchViewString(siteMapView, "defaultWorkspaceNodeStatus"),
 		selectedNodeComponent: workbenchViewString(siteMapView, "defaultWorkspaceNodeComponentLabel"),
-		inspectorInputID:      FirstNonEmpty(options.InspectorInputID, "studioSiteMapInspectorFocus"),
+		inspectorInputID:      core.FirstNonEmpty(options.InspectorInputID, "studioSiteMapInspectorFocus"),
 	}
 }
 
@@ -301,7 +302,7 @@ func renderSiteMapBoardWorkspaceLayers(siteMapView map[string]any, state siteMap
 }
 
 func renderSiteMapBoardWorkspaceLayer(layer map[string]any, state siteMapBoardState) gosx.Node {
-	nodes := siteMapMapList(layer, "nodes")
+	nodes := SiteMapMapList(layer, "nodes")
 	nodeChildren := make([]gosx.Node, 0, len(nodes)*3)
 	for _, node := range nodes {
 		nodeChildren = append(nodeChildren, renderSiteMapBoardWorkspaceNode(node, state)...)
@@ -556,7 +557,7 @@ func renderSiteMapBoardIntents(siteMapView map[string]any, state siteMapBoardSta
 }
 
 func renderSiteMapBoardIntent(intent map[string]any, state siteMapBoardState) gosx.Node {
-	steps := siteMapMapList(intent, "steps")
+	steps := SiteMapMapList(intent, "steps")
 	stepChildren := make([]gosx.Node, 0, len(steps))
 	for _, step := range steps {
 		stepChildren = append(stepChildren, gosx.El("li", gosx.Attrs(
@@ -630,7 +631,7 @@ func renderSiteMapBoardBlueprints(siteMapView map[string]any, state siteMapBoard
 }
 
 func renderSiteMapBoardBlueprint(blueprint map[string]any, state siteMapBoardState) gosx.Node {
-	components := siteMapMapList(blueprint, "components")
+	components := SiteMapMapList(blueprint, "components")
 	componentChildren := make([]gosx.Node, 0, len(components))
 	for _, component := range components {
 		componentChildren = append(componentChildren, gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-gosx-component", workbenchMapString(component, "gosxComponent"))), gosx.Text(workbenchMapString(component, "label"))))
@@ -702,7 +703,7 @@ func renderSiteMapBoardPalette(siteMapView map[string]any, state siteMapBoardSta
 }
 
 func renderSiteMapBoardTemplate(template map[string]any, state siteMapBoardState) gosx.Node {
-	controls := siteMapMapList(template, "controls")
+	controls := SiteMapMapList(template, "controls")
 	controlChildren := make([]gosx.Node, 0, len(controls))
 	for _, control := range controls {
 		controlChildren = append(controlChildren, gosx.El("small", gosx.Attrs(
@@ -761,7 +762,7 @@ func renderSiteMapBoardViewport(siteMapView map[string]any, state siteMapBoardSt
 }
 
 func renderSiteMapBoardPage(page map[string]any, state siteMapBoardState) gosx.Node {
-	components := siteMapMapList(page, "components")
+	components := SiteMapMapList(page, "components")
 	componentNodes := make([]gosx.Node, 0, len(components))
 	sourceNodes := make([]gosx.Node, 0, len(components))
 	controlNodes := make([]gosx.Node, 0, len(components))
@@ -882,7 +883,7 @@ func renderSiteMapBoardControlCard(component map[string]any) gosx.Node {
 }
 
 func renderSiteMapBoardControls(component map[string]any) gosx.Node {
-	controls := siteMapMapList(component, "controls")
+	controls := SiteMapMapList(component, "controls")
 	children := make([]gosx.Node, 0, len(controls))
 	for _, control := range controls {
 		children = append(children, gosx.El("span", gosx.Attrs(

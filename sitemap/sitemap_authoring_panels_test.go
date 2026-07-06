@@ -1,29 +1,31 @@
-package studio
+package sitemap
 
 import (
 	"strings"
 	"testing"
 
 	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/authoring"
+	"m31labs.dev/gosx-studio/core"
 )
 
 func TestRenderSiteMapAuthoringPanelsUsesSharedAuthoringContracts(t *testing.T) {
-	view := AuthoringSiteMapView(NoCodeAuthoringSurface(SiteMap{
-		Pages: []Page{{
+	view := AuthoringSiteMapView(authoring.NoCodeAuthoringSurface(core.SiteMap{
+		Pages: []core.Page{{
 			Key:           "home",
 			Label:         "Home",
 			Route:         "/",
-			Group:         PageGroupSite,
+			Group:         core.PageGroupSite,
 			GoSXComponent: "HomePage",
 			Status:        "Editable",
 			Editable:      true,
 			Selected:      true,
-			Components: []Component{{
+			Components: []core.Component{{
 				Key:                 "hero",
 				TemplateKey:         "hero",
 				Label:               "Hero",
 				GoSXComponent:       "HomeHero",
-				Source:              ComponentSourceHost,
+				Source:              core.ComponentSourceHost,
 				Binding:             "home.section.hero",
 				Status:              "Visible",
 				Editable:            true,
@@ -32,10 +34,10 @@ func TestRenderSiteMapAuthoringPanelsUsesSharedAuthoringContracts(t *testing.T) 
 				CanDuplicate:        true,
 				CanToggleVisibility: true,
 				CanDelete:           true,
-				Controls: []Control{{
+				Controls: []core.Control{{
 					Key:     "headline",
 					Label:   "Headline",
-					Kind:    ControlText,
+					Kind:    core.ControlText,
 					Binding: "pages.home.hero.headline",
 					Value:   "Forest mornings",
 				}},
@@ -44,7 +46,7 @@ func TestRenderSiteMapAuthoringPanelsUsesSharedAuthoringContracts(t *testing.T) 
 				TemplateKey:   "programs",
 				Label:         "Programs",
 				GoSXComponent: "ProgramsGrid",
-				Source:        ComponentSourceCMS,
+				Source:        core.ComponentSourceCMS,
 				Binding:       "home.section.programs",
 				Status:        "Visible",
 				Editable:      true,
@@ -52,25 +54,25 @@ func TestRenderSiteMapAuthoringPanelsUsesSharedAuthoringContracts(t *testing.T) 
 				CanReorder:    true,
 			}},
 		}},
-		Library: CompositionLibrary{
-			PageBlueprints: []PageBlueprint{{
+		Library: core.CompositionLibrary{
+			PageBlueprints: []core.PageBlueprint{{
 				Key:           "landing",
 				Label:         "Landing",
 				RoutePattern:  "/landing",
-				Group:         PageGroupContent,
+				Group:         core.PageGroupContent,
 				GoSXComponent: "LandingPage",
-				Components: []ComponentTemplate{{
+				Components: []core.ComponentTemplate{{
 					Key:           "hero",
 					Label:         "Hero",
 					GoSXComponent: "HomeHero",
 				}},
 			}},
-			ComponentTemplates: []ComponentTemplate{{
+			ComponentTemplates: []core.ComponentTemplate{{
 				Key:            "gallery",
 				Label:          "Gallery",
 				GoSXComponent:  "GalleryGrid",
 				DefaultBinding: "home.section.gallery",
-				Source:         ComponentSourceCMS,
+				Source:         core.ComponentSourceCMS,
 			}},
 		},
 	}), SiteMapViewOptions{})

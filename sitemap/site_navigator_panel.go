@@ -1,4 +1,4 @@
-package studio
+package sitemap
 
 import "m31labs.dev/gosx"
 

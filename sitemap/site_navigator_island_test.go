@@ -1,4 +1,4 @@
-package studio
+package sitemap
 
 import (
 	"os"
@@ -19,7 +19,7 @@ func TestSiteNavigatorIslandSourceContract(t *testing.T) {
 	typeText := string(typeSource)
 
 	for _, want := range []string{
-		"package studio",
+		"package sitemap",
 		"//gosx:island",
 		"func SiteNavigatorIsland(props SiteNavigatorProps) gosx.Node",
 		`filter := signal.New("all")`,

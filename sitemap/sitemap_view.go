@@ -1,6 +1,8 @@
-package studio
+package sitemap
 
 import (
+	"m31labs.dev/gosx-studio/authoring"
+	"m31labs.dev/gosx-studio/core"
 	"strconv"
 	"strings"
 )
@@ -15,7 +17,7 @@ type SiteMapViewOptions struct {
 	TemplateInputName     string
 	WorkspaceInputName    string
 	PreviewHref           func(route string) string
-	CompositionIntentView func(CompositionIntent) map[string]any
+	CompositionIntentView func(core.CompositionIntent) map[string]any
 	// NodePositions carries free-placed workspace node coordinates keyed by node
 	// key (e.g. "page:home", "component:home:hero"). A host persists these from
 	// the runtime's gosxstudio:sitemap-node-moved event (detail {key,x,y}) and
@@ -34,11 +36,11 @@ type SiteMapNodePosition struct {
 	Y float64
 }
 
-func SiteMapAuthoringView(siteMap SiteMap, options SiteMapViewOptions) map[string]any {
-	return AuthoringSiteMapView(NoCodeAuthoringSurface(siteMap), options)
+func SiteMapAuthoringView(siteMap core.SiteMap, options SiteMapViewOptions) map[string]any {
+	return AuthoringSiteMapView(authoring.NoCodeAuthoringSurface(siteMap), options)
 }
 
-func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) map[string]any {
+func AuthoringSiteMapView(surface authoring.AuthoringSurface, options SiteMapViewOptions) map[string]any {
 	siteMap := surface.SiteMap.Normalize()
 	workspace := surface.Workspace.Normalize()
 	if workspace.NodeCount() == 0 && len(siteMap.Pages) > 0 {
@@ -68,10 +70,10 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 	duplicateComponent := authoringSiteMapDuplicateComponentView(siteMap.Pages)
 	visibilityComponent := authoringSiteMapVisibilityComponentView(siteMap.Pages)
 	deleteComponent := authoringSiteMapDeleteComponentView(siteMap.Pages)
-	editableControl := authoringSiteMapEditableControlView(siteMap.Pages)
+	editableControl := AuthoringSiteMapEditableControlView(siteMap.Pages)
 	sources := authoringSiteMapSourceViews(siteMap)
 	blueprints := authoringSiteMapPageBlueprintViews(siteMap.Library.PageBlueprints, options)
-	palette := authoringSiteMapComponentTemplateViews(siteMap.Library.ComponentTemplates, options)
+	palette := AuthoringSiteMapComponentTemplateViews(siteMap.Library.ComponentTemplates, options)
 	compositionIntents := authoringSiteMapIntentViews(surface.Intents(), options)
 	activeIntentCount := 0
 	if len(blueprints) > 0 {
@@ -142,11 +144,11 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 		"hasPalette":                         len(palette) > 0,
 		"compositionIntents":                 compositionIntents,
 		"hasCompositionIntents":              len(compositionIntents) > 0,
-		"authoring":                          AuthoringSurfaceView(surface),
+		"authoring":                          authoring.AuthoringSurfaceView(surface),
 	}
 }
 
-func authoringSiteMapPageViews(pages []Page, options SiteMapViewOptions) []map[string]any {
+func authoringSiteMapPageViews(pages []core.Page, options SiteMapViewOptions) []map[string]any {
 	out := make([]map[string]any, 0, len(pages))
 	for _, page := range pages {
 		page = page.Normalize()
@@ -178,13 +180,13 @@ func authoringSiteMapPageViews(pages []Page, options SiteMapViewOptions) []map[s
 	return out
 }
 
-func authoringSiteMapMetadataPageView(pages []Page) map[string]any {
+func authoringSiteMapMetadataPageView(pages []core.Page) map[string]any {
 	for _, page := range pages {
 		page = page.Normalize()
 		if !page.Editable {
 			continue
 		}
-		mutation := AuthoringMutationForPage(page)
+		mutation := authoring.AuthoringMutationForPage(page)
 		return map[string]any{
 			"key":                page.Key,
 			"label":              page.Label,
@@ -195,22 +197,22 @@ func authoringSiteMapMetadataPageView(pages []Page) map[string]any {
 			"authoringPageKey":   mutation.PageKey,
 			"authoringPageLabel": mutation.PageLabel,
 			"authoringPageRoute": mutation.PageRoute,
-			"mutation":           AuthoringMutationView(mutation),
+			"mutation":           authoring.AuthoringMutationView(mutation),
 			"formValues":         mutation.FormValues(),
-			"formInputs":         AuthoringMutationFormInputViews(mutation),
+			"formInputs":         authoring.AuthoringMutationFormInputViews(mutation),
 		}
 	}
 	return nil
 }
 
-func authoringSiteMapComponentViews(page Page, components []Component) []map[string]any {
+func authoringSiteMapComponentViews(page core.Page, components []core.Component) []map[string]any {
 	out := make([]map[string]any, 0, len(components))
 	page = page.Normalize()
 	for index, component := range components {
 		component = component.Normalize()
 		component.Position = index
-		moveUpMutation := AuthoringMutation{}
-		moveDownMutation := AuthoringMutation{}
+		moveUpMutation := authoring.AuthoringMutation{}
+		moveDownMutation := authoring.AuthoringMutation{}
 		moveUpFormValues := map[string]string(nil)
 		moveDownFormValues := map[string]string(nil)
 		moveUpFormInputs := []map[string]string(nil)
@@ -218,43 +220,43 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 		canMoveUp := component.CanReorder && index > 0
 		canMoveDown := component.CanReorder && index < len(components)-1
 		if canMoveUp {
-			moveUpMutation = AuthoringMutationForComponentReorder(page, component, index-1)
+			moveUpMutation = authoring.AuthoringMutationForComponentReorder(page, component, index-1)
 			moveUpFormValues = moveUpMutation.FormValues()
-			moveUpFormInputs = AuthoringMutationFormInputViews(moveUpMutation)
+			moveUpFormInputs = authoring.AuthoringMutationFormInputViews(moveUpMutation)
 		}
 		if canMoveDown {
-			moveDownMutation = AuthoringMutationForComponentReorder(page, component, index+1)
+			moveDownMutation = authoring.AuthoringMutationForComponentReorder(page, component, index+1)
 			moveDownFormValues = moveDownMutation.FormValues()
-			moveDownFormInputs = AuthoringMutationFormInputViews(moveDownMutation)
+			moveDownFormInputs = authoring.AuthoringMutationFormInputViews(moveDownMutation)
 		}
-		visibilityMutation := AuthoringMutation{}
+		visibilityMutation := authoring.AuthoringMutation{}
 		visibilityFormValues := map[string]string(nil)
 		visibilityFormInputs := []map[string]string(nil)
 		visibilityActionLabel := ""
 		if component.CanToggleVisibility {
-			visibilityMutation = AuthoringMutationForComponentVisibility(page, component, !component.Visible)
+			visibilityMutation = authoring.AuthoringMutationForComponentVisibility(page, component, !component.Visible)
 			visibilityFormValues = visibilityMutation.FormValues()
-			visibilityFormInputs = AuthoringMutationFormInputViews(visibilityMutation)
+			visibilityFormInputs = authoring.AuthoringMutationFormInputViews(visibilityMutation)
 			visibilityActionLabel = "Show"
 			if component.Visible {
 				visibilityActionLabel = "Hide"
 			}
 		}
-		deleteMutation := AuthoringMutation{}
+		deleteMutation := authoring.AuthoringMutation{}
 		deleteFormValues := map[string]string(nil)
 		deleteFormInputs := []map[string]string(nil)
 		if component.CanDelete {
-			deleteMutation = AuthoringMutationForComponentDelete(page, component)
+			deleteMutation = authoring.AuthoringMutationForComponentDelete(page, component)
 			deleteFormValues = deleteMutation.FormValues()
-			deleteFormInputs = AuthoringMutationFormInputViews(deleteMutation)
+			deleteFormInputs = authoring.AuthoringMutationFormInputViews(deleteMutation)
 		}
-		duplicateMutation := AuthoringMutation{}
+		duplicateMutation := authoring.AuthoringMutation{}
 		duplicateFormValues := map[string]string(nil)
 		duplicateFormInputs := []map[string]string(nil)
 		if component.CanDuplicate {
-			duplicateMutation = AuthoringMutationForComponentDuplicate(page, component, index+1)
+			duplicateMutation = authoring.AuthoringMutationForComponentDuplicate(page, component, index+1)
 			duplicateFormValues = duplicateMutation.FormValues()
-			duplicateFormInputs = AuthoringMutationFormInputViews(duplicateMutation)
+			duplicateFormInputs = authoring.AuthoringMutationFormInputViews(duplicateMutation)
 		}
 		out = append(out, map[string]any{
 			"key":                          component.Key,
@@ -265,7 +267,7 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 			"gosxComponent":                component.GoSXComponent,
 			"goSXComponent":                component.GoSXComponent,
 			"source":                       string(component.NormalizedSource()),
-			"sourceLabel":                  ComponentSourceLabel(component.Source),
+			"sourceLabel":                  core.ComponentSourceLabel(component.Source),
 			"sourceSummary":                authoringComponentSourceSummary(component),
 			"binding":                      component.Binding,
 			"statusLabel":                  component.Status,
@@ -282,14 +284,14 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 			"moveUpAuthoringPageKey":       moveUpMutation.PageKey,
 			"moveUpAuthoringComponent":     moveUpMutation.ComponentKey,
 			"moveUpAuthoringPosition":      moveUpMutation.Position,
-			"moveUpMutation":               AuthoringMutationView(moveUpMutation),
+			"moveUpMutation":               authoring.AuthoringMutationView(moveUpMutation),
 			"moveUpFormValues":             moveUpFormValues,
 			"moveUpFormInputs":             moveUpFormInputs,
 			"moveDownAuthoringOperation":   string(moveDownMutation.Kind),
 			"moveDownAuthoringPageKey":     moveDownMutation.PageKey,
 			"moveDownAuthoringComponent":   moveDownMutation.ComponentKey,
 			"moveDownAuthoringPosition":    moveDownMutation.Position,
-			"moveDownMutation":             AuthoringMutationView(moveDownMutation),
+			"moveDownMutation":             authoring.AuthoringMutationView(moveDownMutation),
 			"moveDownFormValues":           moveDownFormValues,
 			"moveDownFormInputs":           moveDownFormInputs,
 			"visible":                      component.Visible,
@@ -299,7 +301,7 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 			"visibilityAuthoringPageKey":   visibilityMutation.PageKey,
 			"visibilityAuthoringComponent": visibilityMutation.ComponentKey,
 			"visibilityAuthoringVisible":   visibilityMutation.Visible,
-			"visibilityMutation":           AuthoringMutationView(visibilityMutation),
+			"visibilityMutation":           authoring.AuthoringMutationView(visibilityMutation),
 			"visibilityFormValues":         visibilityFormValues,
 			"visibilityFormInputs":         visibilityFormInputs,
 			"canDelete":                    component.CanDelete,
@@ -307,7 +309,7 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 			"deleteAuthoringOperation":     string(deleteMutation.Kind),
 			"deleteAuthoringPageKey":       deleteMutation.PageKey,
 			"deleteAuthoringComponent":     deleteMutation.ComponentKey,
-			"deleteMutation":               AuthoringMutationView(deleteMutation),
+			"deleteMutation":               authoring.AuthoringMutationView(deleteMutation),
 			"deleteFormValues":             deleteFormValues,
 			"deleteFormInputs":             deleteFormInputs,
 			"duplicateActionLabel":         "Duplicate",
@@ -316,10 +318,10 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 			"duplicateAuthoringComponent":  duplicateMutation.ComponentKey,
 			"duplicateAuthoringTemplate":   duplicateMutation.ComponentTemplateKey,
 			"duplicateAuthoringPosition":   duplicateMutation.Position,
-			"duplicateMutation":            AuthoringMutationView(duplicateMutation),
+			"duplicateMutation":            authoring.AuthoringMutationView(duplicateMutation),
 			"duplicateFormValues":          duplicateFormValues,
 			"duplicateFormInputs":          duplicateFormInputs,
-			"controls":                     authoringSiteMapControlViews(page, component, component.Controls),
+			"controls":                     AuthoringSiteMapControlViews(page, component, component.Controls),
 			"hasControls":                  component.ControlCount() > 0,
 			"controlLabel":                 countLabel(component.ControlCount(), "field", "fields"),
 		})
@@ -327,7 +329,7 @@ func authoringSiteMapComponentViews(page Page, components []Component) []map[str
 	return out
 }
 
-func authoringSiteMapReorderComponentView(pages []Page) map[string]any {
+func authoringSiteMapReorderComponentView(pages []core.Page) map[string]any {
 	for _, page := range pages {
 		page = page.Normalize()
 		for index, component := range page.Components {
@@ -345,7 +347,7 @@ func authoringSiteMapReorderComponentView(pages []Page) map[string]any {
 				targetPosition = index - 1
 				actionLabel = "Move up"
 			}
-			mutation := AuthoringMutationForComponentReorder(page, component, targetPosition)
+			mutation := authoring.AuthoringMutationForComponentReorder(page, component, targetPosition)
 			return map[string]any{
 				"key":                 component.Key,
 				"label":               component.Label,
@@ -362,16 +364,16 @@ func authoringSiteMapReorderComponentView(pages []Page) map[string]any {
 				"authoringPageKey":    mutation.PageKey,
 				"authoringComponent":  mutation.ComponentKey,
 				"authoringPosition":   mutation.Position,
-				"mutation":            AuthoringMutationView(mutation),
+				"mutation":            authoring.AuthoringMutationView(mutation),
 				"formValues":          mutation.FormValues(),
-				"formInputs":          AuthoringMutationFormInputViews(mutation),
+				"formInputs":          authoring.AuthoringMutationFormInputViews(mutation),
 			}
 		}
 	}
 	return nil
 }
 
-func authoringSiteMapDuplicateComponentView(pages []Page) map[string]any {
+func authoringSiteMapDuplicateComponentView(pages []core.Page) map[string]any {
 	for _, page := range pages {
 		page = page.Normalize()
 		for index, component := range page.Components {
@@ -380,7 +382,7 @@ func authoringSiteMapDuplicateComponentView(pages []Page) map[string]any {
 			if !component.CanDuplicate {
 				continue
 			}
-			mutation := AuthoringMutationForComponentDuplicate(page, component, index+1)
+			mutation := authoring.AuthoringMutationForComponentDuplicate(page, component, index+1)
 			return map[string]any{
 				"key":                component.Key,
 				"templateKey":        component.TemplateKey,
@@ -398,16 +400,16 @@ func authoringSiteMapDuplicateComponentView(pages []Page) map[string]any {
 				"authoringComponent": mutation.ComponentKey,
 				"authoringTemplate":  mutation.ComponentTemplateKey,
 				"authoringPosition":  mutation.Position,
-				"mutation":           AuthoringMutationView(mutation),
+				"mutation":           authoring.AuthoringMutationView(mutation),
 				"formValues":         mutation.FormValues(),
-				"formInputs":         AuthoringMutationFormInputViews(mutation),
+				"formInputs":         authoring.AuthoringMutationFormInputViews(mutation),
 			}
 		}
 	}
 	return nil
 }
 
-func authoringSiteMapVisibilityComponentView(pages []Page) map[string]any {
+func authoringSiteMapVisibilityComponentView(pages []core.Page) map[string]any {
 	for _, page := range pages {
 		page = page.Normalize()
 		for _, component := range page.Components {
@@ -415,7 +417,7 @@ func authoringSiteMapVisibilityComponentView(pages []Page) map[string]any {
 			if !component.CanToggleVisibility {
 				continue
 			}
-			mutation := AuthoringMutationForComponentVisibility(page, component, !component.Visible)
+			mutation := authoring.AuthoringMutationForComponentVisibility(page, component, !component.Visible)
 			actionLabel := "Show"
 			if component.Visible {
 				actionLabel = "Hide"
@@ -434,16 +436,16 @@ func authoringSiteMapVisibilityComponentView(pages []Page) map[string]any {
 				"authoringPageKey":   mutation.PageKey,
 				"authoringComponent": mutation.ComponentKey,
 				"authoringVisible":   mutation.Visible,
-				"mutation":           AuthoringMutationView(mutation),
+				"mutation":           authoring.AuthoringMutationView(mutation),
 				"formValues":         mutation.FormValues(),
-				"formInputs":         AuthoringMutationFormInputViews(mutation),
+				"formInputs":         authoring.AuthoringMutationFormInputViews(mutation),
 			}
 		}
 	}
 	return nil
 }
 
-func authoringSiteMapDeleteComponentView(pages []Page) map[string]any {
+func authoringSiteMapDeleteComponentView(pages []core.Page) map[string]any {
 	for _, page := range pages {
 		page = page.Normalize()
 		for index, component := range page.Components {
@@ -452,7 +454,7 @@ func authoringSiteMapDeleteComponentView(pages []Page) map[string]any {
 			if !component.CanDelete {
 				continue
 			}
-			mutation := AuthoringMutationForComponentDelete(page, component)
+			mutation := authoring.AuthoringMutationForComponentDelete(page, component)
 			return map[string]any{
 				"key":                component.Key,
 				"label":              component.Label,
@@ -466,16 +468,16 @@ func authoringSiteMapDeleteComponentView(pages []Page) map[string]any {
 				"authoringOperation": string(mutation.Kind),
 				"authoringPageKey":   mutation.PageKey,
 				"authoringComponent": mutation.ComponentKey,
-				"mutation":           AuthoringMutationView(mutation),
+				"mutation":           authoring.AuthoringMutationView(mutation),
 				"formValues":         mutation.FormValues(),
-				"formInputs":         AuthoringMutationFormInputViews(mutation),
+				"formInputs":         authoring.AuthoringMutationFormInputViews(mutation),
 			}
 		}
 	}
 	return nil
 }
 
-func authoringSiteMapEditableControlView(pages []Page) map[string]any {
+func AuthoringSiteMapEditableControlView(pages []core.Page) map[string]any {
 	for _, page := range pages {
 		page = page.Normalize()
 		for _, component := range page.Components {
@@ -492,7 +494,7 @@ func authoringSiteMapEditableControlView(pages []Page) map[string]any {
 				if control.Locked {
 					continue
 				}
-				mutation := AuthoringMutationForControl(page, component, control)
+				mutation := authoring.AuthoringMutationForControl(page, component, control)
 				view := authoringSiteMapControlView(control)
 				view["pageKey"] = page.Key
 				view["pageLabel"] = page.Label
@@ -501,7 +503,7 @@ func authoringSiteMapEditableControlView(pages []Page) map[string]any {
 				view["componentLabel"] = component.Label
 				view["componentBinding"] = component.Binding
 				view["selectionKey"] = component.SelectionKey(page.Key)
-				view["inputName"] = AuthoringFieldValue
+				view["inputName"] = authoring.AuthoringFieldValue
 				view["actionLabel"] = "Save field"
 				view["authoringOperation"] = string(mutation.Kind)
 				view["authoringPageKey"] = mutation.PageKey
@@ -509,9 +511,9 @@ func authoringSiteMapEditableControlView(pages []Page) map[string]any {
 				view["authoringControl"] = mutation.ControlKey
 				view["authoringBinding"] = mutation.Binding
 				view["authoringControlKind"] = string(mutation.ControlKind)
-				view["mutation"] = AuthoringMutationView(mutation)
+				view["mutation"] = authoring.AuthoringMutationView(mutation)
 				view["formValues"] = mutation.FormValues()
-				view["formInputs"] = AuthoringMutationFormInputViews(mutation)
+				view["formInputs"] = authoring.AuthoringMutationFormInputViews(mutation)
 				return view
 			}
 		}
@@ -519,7 +521,7 @@ func authoringSiteMapEditableControlView(pages []Page) map[string]any {
 	return nil
 }
 
-func authoringSiteMapControlViews(page Page, component Component, controls []Control) []map[string]any {
+func AuthoringSiteMapControlViews(page core.Page, component core.Component, controls []core.Control) []map[string]any {
 	out := make([]map[string]any, 0, len(controls))
 	for _, control := range controls {
 		control = control.Normalize()
@@ -530,24 +532,24 @@ func authoringSiteMapControlViews(page Page, component Component, controls []Con
 		if control.Locked {
 			continue
 		}
-		mutation := AuthoringMutationForControl(page, component, control)
+		mutation := authoring.AuthoringMutationForControl(page, component, control)
 		view := authoringSiteMapControlView(control)
-		view["inputName"] = AuthoringFieldValue
+		view["inputName"] = authoring.AuthoringFieldValue
 		view["authoringOperation"] = string(mutation.Kind)
 		view["authoringPageKey"] = mutation.PageKey
 		view["authoringComponent"] = mutation.ComponentKey
 		view["authoringControl"] = mutation.ControlKey
 		view["authoringBinding"] = mutation.Binding
 		view["authoringControlKind"] = string(mutation.ControlKind)
-		view["mutation"] = AuthoringMutationView(mutation)
+		view["mutation"] = authoring.AuthoringMutationView(mutation)
 		view["formValues"] = mutation.FormValues()
-		view["formInputs"] = AuthoringMutationFormInputViews(mutation)
+		view["formInputs"] = authoring.AuthoringMutationFormInputViews(mutation)
 		out = append(out, view)
 	}
 	return out
 }
 
-func authoringSiteMapStaticControlViews(controls []Control) []map[string]any {
+func AuthoringSiteMapStaticControlViews(controls []core.Control) []map[string]any {
 	out := make([]map[string]any, 0, len(controls))
 	for _, control := range controls {
 		control = control.Normalize()
@@ -563,7 +565,7 @@ func authoringSiteMapStaticControlViews(controls []Control) []map[string]any {
 	return out
 }
 
-func authoringSiteMapControlView(control Control) map[string]any {
+func authoringSiteMapControlView(control core.Control) map[string]any {
 	return map[string]any{
 		"key":       control.Key,
 		"label":     control.Label,
@@ -577,7 +579,7 @@ func authoringSiteMapControlView(control Control) map[string]any {
 	}
 }
 
-func authoringSiteMapPageBlueprintViews(blueprints []PageBlueprint, options SiteMapViewOptions) []map[string]any {
+func authoringSiteMapPageBlueprintViews(blueprints []core.PageBlueprint, options SiteMapViewOptions) []map[string]any {
 	out := make([]map[string]any, 0, len(blueprints))
 	for index, blueprint := range blueprints {
 		blueprint = blueprint.Normalize()
@@ -592,7 +594,7 @@ func authoringSiteMapPageBlueprintViews(blueprints []PageBlueprint, options Site
 			"gosxComponent":       blueprint.GoSXComponent,
 			"goSXComponent":       blueprint.GoSXComponent,
 			"componentCountLabel": countLabel(blueprint.ComponentCount(), "building block", "building blocks"),
-			"components":          authoringSiteMapComponentTemplateViews(blueprint.Components, options),
+			"components":          AuthoringSiteMapComponentTemplateViews(blueprint.Components, options),
 			"hasComponents":       blueprint.ComponentCount() > 0,
 			"inputID":             "studioSiteMapBlueprint-" + workspaceToken(blueprint.Key),
 			"inputName":           firstNonEmpty(options.BlueprintInputName, "studioPageBlueprintIntent"),
@@ -602,7 +604,7 @@ func authoringSiteMapPageBlueprintViews(blueprints []PageBlueprint, options Site
 	return out
 }
 
-func authoringSiteMapComponentTemplateViews(templates []ComponentTemplate, options SiteMapViewOptions) []map[string]any {
+func AuthoringSiteMapComponentTemplateViews(templates []core.ComponentTemplate, options SiteMapViewOptions) []map[string]any {
 	out := make([]map[string]any, 0, len(templates))
 	for index, template := range templates {
 		template = template.Normalize()
@@ -623,7 +625,7 @@ func authoringSiteMapComponentTemplateViews(templates []ComponentTemplate, optio
 			"defaultBinding": template.DefaultBinding,
 			"statusLabel":    template.Status,
 			"addLabel":       firstNonEmpty(template.AddLabel, "Add"),
-			"controls":       authoringSiteMapStaticControlViews(template.Controls),
+			"controls":       AuthoringSiteMapStaticControlViews(template.Controls),
 			"hasControls":    template.ControlCount() > 0,
 			"controlLabel":   countLabel(template.ControlCount(), "field", "fields"),
 			"inputID":        "studioSiteMapTemplate-" + workspaceToken(template.Key),
@@ -634,7 +636,7 @@ func authoringSiteMapComponentTemplateViews(templates []ComponentTemplate, optio
 	return out
 }
 
-func authoringSiteMapIntentViews(intents []CompositionIntent, options SiteMapViewOptions) []map[string]any {
+func authoringSiteMapIntentViews(intents []core.CompositionIntent, options SiteMapViewOptions) []map[string]any {
 	out := make([]map[string]any, 0, len(intents))
 	for _, intent := range normalizeCompositionIntents(intents) {
 		if options.CompositionIntentView != nil {
@@ -646,10 +648,10 @@ func authoringSiteMapIntentViews(intents []CompositionIntent, options SiteMapVie
 	return out
 }
 
-func authoringSiteMapIntentView(intent CompositionIntent) map[string]any {
+func authoringSiteMapIntentView(intent core.CompositionIntent) map[string]any {
 	intent = intent.Normalize()
 	kind := intent.NormalizedKind()
-	mutation := AuthoringMutationFromIntent(intent)
+	mutation := authoring.AuthoringMutationFromIntent(intent)
 	return map[string]any{
 		"key":                  intent.Key,
 		"label":                intent.Label,
@@ -685,13 +687,13 @@ func authoringSiteMapIntentView(intent CompositionIntent) map[string]any {
 		"authoringComponent":   mutation.ComponentLabel,
 		"authoringBinding":     mutation.Binding,
 		"authoringRegion":      mutation.TargetRegion,
-		"mutation":             AuthoringMutationView(mutation),
+		"mutation":             authoring.AuthoringMutationView(mutation),
 		"formValues":           mutation.FormValues(),
-		"formInputs":           AuthoringMutationFormInputViews(mutation),
+		"formInputs":           authoring.AuthoringMutationFormInputViews(mutation),
 	}
 }
 
-func authoringSiteMapStepViews(steps []CompositionStep) []map[string]any {
+func authoringSiteMapStepViews(steps []core.CompositionStep) []map[string]any {
 	out := make([]map[string]any, 0, len(steps))
 	for _, step := range normalizeCompositionSteps(steps) {
 		out = append(out, map[string]any{
@@ -707,14 +709,14 @@ func authoringSiteMapStepViews(steps []CompositionStep) []map[string]any {
 	return out
 }
 
-func authoringSiteMapWorkspaceLayerViews(siteMap SiteMap, workspace CompositionWorkspace, positions map[string]SiteMapNodePosition) []map[string]any {
+func authoringSiteMapWorkspaceLayerViews(siteMap core.SiteMap, workspace core.CompositionWorkspace, positions map[string]SiteMapNodePosition) []map[string]any {
 	siteMap = siteMap.Normalize()
 	workspace = workspace.Normalize()
-	pagesByKey := map[string]Page{}
+	pagesByKey := map[string]core.Page{}
 	for _, page := range siteMap.Pages {
 		pagesByKey[page.Key] = page
 	}
-	nodesByKey := map[string]WorkspaceNode{}
+	nodesByKey := map[string]core.WorkspaceNode{}
 	for _, node := range workspace.Nodes {
 		nodesByKey[node.Key] = node
 	}
@@ -763,13 +765,13 @@ func authoringSiteMapWorkspaceLayerViews(siteMap SiteMap, workspace CompositionW
 	return out
 }
 
-func authoringSiteMapWorkspaceNodeView(node WorkspaceNode) map[string]any {
+func authoringSiteMapWorkspaceNodeView(node core.WorkspaceNode) map[string]any {
 	node = node.Normalize()
 	kind := node.NormalizedKind()
 	label := authoringWorkspaceNodeLabel(node)
 	summary := node.Summary
-	if kind == WorkspaceNodeResource {
-		summary = ComponentSourceLabel(node.Source) + " resource"
+	if kind == core.WorkspaceNodeResource {
+		summary = core.ComponentSourceLabel(node.Source) + " resource"
 	}
 	bindingLabel := authoringBindingLabel(node.Binding)
 	className := "studio-site-map-workspace-node studio-site-map-workspace-node--" + string(kind)
@@ -786,12 +788,12 @@ func authoringSiteMapWorkspaceNodeView(node WorkspaceNode) map[string]any {
 		"pageKey":           node.PageKey,
 		"route":             node.Route,
 		"group":             string(node.Group),
-		"groupLabel":        PageGroupLabel(node.Group),
+		"groupLabel":        core.PageGroupLabel(node.Group),
 		"gosxComponent":     node.GoSXComponent,
 		"goSXComponent":     node.GoSXComponent,
 		"componentLabel":    componentDisplayLabel(node.GoSXComponent),
 		"source":            string(node.Source),
-		"sourceLabel":       ComponentSourceLabel(node.Source),
+		"sourceLabel":       core.ComponentSourceLabel(node.Source),
 		"binding":           node.Binding,
 		"bindingLabel":      bindingLabel,
 		"statusLabel":       firstNonEmpty(node.Status, "Ready"),
@@ -801,13 +803,13 @@ func authoringSiteMapWorkspaceNodeView(node WorkspaceNode) map[string]any {
 		"class":             className,
 		"hasSummary":        summary != "",
 		"hasRoute":          node.Route != "",
-		"hasSource":         kind != WorkspaceNodePage,
+		"hasSource":         kind != core.WorkspaceNodePage,
 		"hasBindingLabel":   bindingLabel != "",
 		"hasComponentLabel": strings.TrimSpace(node.GoSXComponent) != "",
 	}
 }
 
-func authoringSiteMapWorkspaceLinkViews(workspace CompositionWorkspace) []map[string]any {
+func authoringSiteMapWorkspaceLinkViews(workspace core.CompositionWorkspace) []map[string]any {
 	workspace = workspace.Normalize()
 	nodesByKey := authoringWorkspaceNodesByKey(workspace)
 	out := make([]map[string]any, 0, len(workspace.Links))
@@ -824,7 +826,7 @@ func authoringSiteMapWorkspaceLinkViews(workspace CompositionWorkspace) []map[st
 			"label":       link.Label,
 			"summary":     link.Summary,
 			"kind":        string(kind),
-			"kindLabel":   WorkspaceLinkKindLabel(kind),
+			"kindLabel":   core.WorkspaceLinkKindLabel(kind),
 			"fromNodeKey": link.FromNodeKey,
 			"toNodeKey":   link.ToNodeKey,
 			"fromPageKey": from.PageKey,
@@ -839,10 +841,10 @@ func authoringSiteMapWorkspaceLinkViews(workspace CompositionWorkspace) []map[st
 	return out
 }
 
-func authoringSiteMapWorkspaceCanvasLinkViews(workspace CompositionWorkspace, canvas WorkspaceCanvas) []map[string]any {
+func authoringSiteMapWorkspaceCanvasLinkViews(workspace core.CompositionWorkspace, canvas core.WorkspaceCanvas) []map[string]any {
 	workspace = workspace.Normalize()
 	nodesByKey := authoringWorkspaceNodesByKey(workspace)
-	linksByKey := map[string]WorkspaceLink{}
+	linksByKey := map[string]core.WorkspaceLink{}
 	for _, link := range workspace.Links {
 		linksByKey[link.Key] = link.Normalize()
 	}
@@ -859,7 +861,7 @@ func authoringSiteMapWorkspaceCanvasLinkViews(workspace CompositionWorkspace, ca
 			"key":         path.Key,
 			"path":        path.Path,
 			"kind":        string(kind),
-			"kindLabel":   WorkspaceLinkKindLabel(kind),
+			"kindLabel":   core.WorkspaceLinkKindLabel(kind),
 			"fromNodeKey": path.FromNodeKey,
 			"toNodeKey":   path.ToNodeKey,
 			"fromPageKey": from.PageKey,
@@ -874,14 +876,14 @@ func authoringSiteMapWorkspaceCanvasLinkViews(workspace CompositionWorkspace, ca
 	return out
 }
 
-func authoringSiteMapSourceViews(siteMap SiteMap) []map[string]any {
-	counts := map[ComponentSource]int{}
+func authoringSiteMapSourceViews(siteMap core.SiteMap) []map[string]any {
+	counts := map[core.ComponentSource]int{}
 	for _, page := range siteMap.Normalize().Pages {
 		for _, component := range page.Components {
 			counts[component.NormalizedSource()]++
 		}
 	}
-	sources := []ComponentSource{ComponentSourceHost, ComponentSourceCMS, ComponentSourcePlugin, ComponentSourceStudio}
+	sources := []core.ComponentSource{core.ComponentSourceHost, core.ComponentSourceCMS, core.ComponentSourcePlugin, core.ComponentSourceStudio}
 	out := make([]map[string]any, 0, len(sources))
 	for _, source := range sources {
 		count := counts[source]
@@ -890,18 +892,18 @@ func authoringSiteMapSourceViews(siteMap SiteMap) []map[string]any {
 		}
 		out = append(out, map[string]any{
 			"key":        string(source),
-			"label":      ComponentSourceLabel(source),
+			"label":      core.ComponentSourceLabel(source),
 			"countLabel": countLabel(count, "component", "components"),
 		})
 	}
 	return out
 }
 
-func authoringDefaultWorkspaceNodeView(workspace CompositionWorkspace) (map[string]any, bool) {
+func authoringDefaultWorkspaceNodeView(workspace core.CompositionWorkspace) (map[string]any, bool) {
 	workspace = workspace.Normalize()
 	selectedPageKey := ""
 	for _, node := range workspace.Nodes {
-		if node.Selected && node.NormalizedKind() == WorkspaceNodePage {
+		if node.Selected && node.NormalizedKind() == core.WorkspaceNodePage {
 			selectedPageKey = strings.TrimSpace(node.PageKey)
 			if selectedPageKey == "" {
 				selectedPageKey = strings.TrimPrefix(strings.TrimSpace(node.Key), "page:")
@@ -911,7 +913,7 @@ func authoringDefaultWorkspaceNodeView(workspace CompositionWorkspace) (map[stri
 	}
 	if selectedPageKey != "" {
 		for _, node := range workspace.Nodes {
-			if node.NormalizedKind() == WorkspaceNodeComponent && strings.TrimSpace(node.PageKey) == selectedPageKey {
+			if node.NormalizedKind() == core.WorkspaceNodeComponent && strings.TrimSpace(node.PageKey) == selectedPageKey {
 				return authoringSiteMapWorkspaceNodeView(node), true
 			}
 		}
@@ -922,7 +924,7 @@ func authoringDefaultWorkspaceNodeView(workspace CompositionWorkspace) (map[stri
 		}
 	}
 	for _, node := range workspace.Nodes {
-		if node.NormalizedKind() == WorkspaceNodeComponent {
+		if node.NormalizedKind() == core.WorkspaceNodeComponent {
 			return authoringSiteMapWorkspaceNodeView(node), true
 		}
 	}
@@ -932,8 +934,8 @@ func authoringDefaultWorkspaceNodeView(workspace CompositionWorkspace) (map[stri
 	return authoringSiteMapWorkspaceNodeView(workspace.Nodes[0]), true
 }
 
-func authoringWorkspaceNodesByKey(workspace CompositionWorkspace) map[string]WorkspaceNode {
-	out := map[string]WorkspaceNode{}
+func authoringWorkspaceNodesByKey(workspace core.CompositionWorkspace) map[string]core.WorkspaceNode {
+	out := map[string]core.WorkspaceNode{}
 	for _, node := range workspace.Normalize().Nodes {
 		out[node.Key] = node
 	}
@@ -958,7 +960,7 @@ func authoringPreviewHref(route string, options SiteMapViewOptions) string {
 	return route
 }
 
-func authoringSelectedPageLabel(page Page, ok bool) string {
+func authoringSelectedPageLabel(page core.Page, ok bool) string {
 	if !ok {
 		return "No page selected"
 	}
@@ -966,20 +968,20 @@ func authoringSelectedPageLabel(page Page, ok bool) string {
 	return strings.TrimSpace(page.Label + " " + page.Route)
 }
 
-func authoringWorkspaceNodeKindLabel(kind WorkspaceNodeKind) string {
+func authoringWorkspaceNodeKindLabel(kind core.WorkspaceNodeKind) string {
 	switch kind {
-	case WorkspaceNodeComponent:
+	case core.WorkspaceNodeComponent:
 		return "Section"
-	case WorkspaceNodeResource:
+	case core.WorkspaceNodeResource:
 		return "Content"
 	default:
-		return WorkspaceNodeKindLabel(kind)
+		return core.WorkspaceNodeKindLabel(kind)
 	}
 }
 
-func authoringWorkspaceNodeLabel(node WorkspaceNode) string {
+func authoringWorkspaceNodeLabel(node core.WorkspaceNode) string {
 	node = node.Normalize()
-	if node.NormalizedKind() == WorkspaceNodeResource {
+	if node.NormalizedKind() == core.WorkspaceNodeResource {
 		return firstNonEmpty(authoringBindingLabel(node.Binding), node.Label)
 	}
 	return node.Label
@@ -1027,37 +1029,37 @@ func authoringBindingLabel(binding string) string {
 	return titleFromToken(parts[len(parts)-1]) + " content"
 }
 
-func authoringComponentDefaultSummary(component Component) string {
+func authoringComponentDefaultSummary(component core.Component) string {
 	return strings.TrimSpace(component.Label + " is editable on this site with " + countLabel(component.ControlCount(), "field", "fields") + ".")
 }
 
-func authoringComponentSourceSummary(component Component) string {
+func authoringComponentSourceSummary(component core.Component) string {
 	switch component.NormalizedSource() {
-	case ComponentSourceCMS:
+	case core.ComponentSourceCMS:
 		return "Connected content source"
-	case ComponentSourcePlugin:
+	case core.ComponentSourcePlugin:
 		return "Plugin-provided block"
-	case ComponentSourceStudio:
+	case core.ComponentSourceStudio:
 		return "Studio building block"
 	default:
 		return "Site-owned editable block"
 	}
 }
 
-func authoringCompositionIntentKindLabel(kind CompositionIntentKind) string {
+func authoringCompositionIntentKindLabel(kind core.CompositionIntentKind) string {
 	switch kind {
-	case CompositionIntentCreatePage:
+	case core.CompositionIntentCreatePage:
 		return "Page draft"
 	default:
 		return "Block draft"
 	}
 }
 
-func authoringCompositionIntentActionLabel(kind CompositionIntentKind) string {
+func authoringCompositionIntentActionLabel(kind core.CompositionIntentKind) string {
 	switch kind {
-	case CompositionIntentCreatePage:
+	case core.CompositionIntentCreatePage:
 		return "Create page"
-	case CompositionIntentAddComponent:
+	case core.CompositionIntentAddComponent:
 		return "Add section"
 	default:
 		return "Apply draft"

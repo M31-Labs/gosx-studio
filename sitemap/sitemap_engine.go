@@ -1,9 +1,10 @@
-package studio
+package sitemap
 
 import (
 	"strings"
 
 	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/core"
 	"m31labs.dev/gosx/engine"
 )
 
@@ -102,11 +103,11 @@ func RenderSiteMapEngineSegments(siteMapView map[string]any, options SiteMapEngi
 
 func renderSiteMapEngineRootOpen(options SiteMapEngineOptions) gosx.Node {
 	attrs := []any{
-		gosx.Attr("class", FirstNonEmpty(options.Class, "studio-site-map-engine")),
+		gosx.Attr("class", core.FirstNonEmpty(options.Class, "studio-site-map-engine")),
 		gosx.Attr("data-studio-site-map-panel", "true"),
-		gosx.Attr("data-studio-mode-panel", FirstNonEmpty(options.ModePanel, "home")),
-		gosx.Attr("data-studio-panel", FirstNonEmpty(options.PanelKey, "site-map")),
-		gosx.Attr("data-studio-engine-source", FirstNonEmpty(options.EngineSource, "gosx")),
+		gosx.Attr("data-studio-mode-panel", core.FirstNonEmpty(options.ModePanel, "home")),
+		gosx.Attr("data-studio-panel", core.FirstNonEmpty(options.PanelKey, "site-map")),
+		gosx.Attr("data-studio-engine-source", core.FirstNonEmpty(options.EngineSource, "gosx")),
 		gosx.Attr("data-gosx-studio-site-map-engine-renderer", "gosx-studio"),
 	}
 	if strings.TrimSpace(options.LayoutAction) != "" {
@@ -194,7 +195,7 @@ func renderSiteMapEngineHost(options SiteMapEngineOptions) gosx.Node {
 		gosx.Attr("data-studio-site-map-engine-surface", "true"),
 	}
 	if len(capabilities) > 0 {
-		attrs = append(attrs, gosx.Attr("data-gosx-engine-capabilities", strings.Join(siteMapEngineCapabilityNames(capabilities), " ")))
+		attrs = append(attrs, gosx.Attr("data-gosx-engine-capabilities", strings.Join(SiteMapEngineCapabilityNames(capabilities), " ")))
 	}
 	return gosx.El("div", gosx.Attrs(attrs...))
 }
@@ -202,19 +203,19 @@ func renderSiteMapEngineHost(options SiteMapEngineOptions) gosx.Node {
 func normalizeSiteMapEngineHost(host SiteMapEngineHostOptions, engineSource string) SiteMapEngineHostOptions {
 	defaults := SiteMapEngineHostOptions{
 		Key:          "site-map",
-		Name:         SiteMapEngineName,
+		Name:         siteMapEngineDefaultName,
 		MountID:      "gosx-studio-site-map-engine",
 		Class:        "studio-site-map-engine-host",
 		Capabilities: []string{"canvas", "pointer", "keyboard", "text-input", "animation"},
 		EngineSource: "gosx",
 	}
 	return SiteMapEngineHostOptions{
-		Key:          FirstNonEmpty(host.Key, defaults.Key),
-		Name:         FirstNonEmpty(host.Name, defaults.Name),
-		MountID:      FirstNonEmpty(host.MountID, defaults.MountID),
-		Class:        FirstNonEmpty(host.Class, defaults.Class),
+		Key:          core.FirstNonEmpty(host.Key, defaults.Key),
+		Name:         core.FirstNonEmpty(host.Name, defaults.Name),
+		MountID:      core.FirstNonEmpty(host.MountID, defaults.MountID),
+		Class:        core.FirstNonEmpty(host.Class, defaults.Class),
 		Capabilities: siteMapEngineHostCapabilities(host.Capabilities, defaults.Capabilities),
-		EngineSource: FirstNonEmpty(host.EngineSource, engineSource, defaults.EngineSource),
+		EngineSource: core.FirstNonEmpty(host.EngineSource, engineSource, defaults.EngineSource),
 	}
 }
 
@@ -235,7 +236,7 @@ func siteMapEngineCapabilities(values []string) []engine.Capability {
 	return capabilities
 }
 
-func siteMapEngineCapabilityNames(values []engine.Capability) []string {
+func SiteMapEngineCapabilityNames(values []engine.Capability) []string {
 	names := make([]string, 0, len(values))
 	for _, value := range values {
 		if name := strings.TrimSpace(string(value)); name != "" {
@@ -278,10 +279,10 @@ func siteMapEngineCapabilityStrings(value any) []string {
 		}
 	case []any:
 		for _, item := range typed {
-			appendFields(FmtAny(item))
+			appendFields(core.FmtAny(item))
 		}
 	default:
-		appendFields(FmtAny(typed))
+		appendFields(core.FmtAny(typed))
 	}
 	return out
 }

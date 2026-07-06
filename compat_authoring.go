@@ -264,14 +264,3 @@ func ApplySetStyle(m AuthoringMutation, write StyleDraftWriter) (AuthoringMutati
 func ApplySaveAppearance(m AuthoringMutation, allowedKeys []string, write AppearanceWriter) (AuthoringMutationResult, error) {
 	return authoring.ApplySaveAppearance(m, allowedKeys, write)
 }
-
-// --- Unexported shims for not-yet-moved root files ---
-//
-// authoring.go also carried an unexported composition-intent normalizer that
-// root-only files (not moved until later slices) call by its original
-// lowercase name. sitemap_view.go's AuthoringSiteMapView (moving in the
-// sitemap slice) is the one remaining caller. This var keeps that call site
-// compiling unchanged against the new authoring implementation; it is
-// internal wiring, not part of the public facade, and will disappear once
-// sitemap_view.go moves to its own subpackage.
-var normalizeCompositionIntents = authoring.NormalizeCompositionIntents

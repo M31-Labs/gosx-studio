@@ -1,29 +1,31 @@
-package studio
+package sitemap
 
 import (
 	"strings"
 	"testing"
 
 	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/authoring"
+	"m31labs.dev/gosx-studio/core"
 )
 
 func TestRenderSiteMapBoardUsesSharedRuntimeContracts(t *testing.T) {
-	view := AuthoringSiteMapView(NoCodeAuthoringSurface(SiteMap{
-		Pages: []Page{{
+	view := AuthoringSiteMapView(authoring.NoCodeAuthoringSurface(core.SiteMap{
+		Pages: []core.Page{{
 			Key:           "home",
 			Label:         "Home",
 			Route:         "/",
-			Group:         PageGroupSite,
+			Group:         core.PageGroupSite,
 			GoSXComponent: "HomePage",
 			Status:        "Editable",
 			Editable:      true,
 			Selected:      true,
-			Components: []Component{{
+			Components: []core.Component{{
 				Key:                 "hero",
 				TemplateKey:         "hero",
 				Label:               "Hero",
 				GoSXComponent:       "HomeHero",
-				Source:              ComponentSourceHost,
+				Source:              core.ComponentSourceHost,
 				Binding:             "home.section.hero",
 				Status:              "Visible",
 				Editable:            true,
@@ -32,39 +34,39 @@ func TestRenderSiteMapBoardUsesSharedRuntimeContracts(t *testing.T) {
 				CanDuplicate:        true,
 				CanToggleVisibility: true,
 				CanDelete:           true,
-				Controls: []Control{{
+				Controls: []core.Control{{
 					Key:     "headline",
 					Label:   "Headline",
-					Kind:    ControlText,
+					Kind:    core.ControlText,
 					Binding: "pages.home.hero.headline",
 					Value:   "Forest mornings",
 				}},
 			}},
 		}},
-		Library: CompositionLibrary{
-			PageBlueprints: []PageBlueprint{{
+		Library: core.CompositionLibrary{
+			PageBlueprints: []core.PageBlueprint{{
 				Key:           "landing",
 				Label:         "Landing",
 				RoutePattern:  "/landing",
-				Group:         PageGroupContent,
+				Group:         core.PageGroupContent,
 				GoSXComponent: "LandingPage",
-				Components: []ComponentTemplate{{
+				Components: []core.ComponentTemplate{{
 					Key:           "hero",
 					Label:         "Hero",
 					GoSXComponent: "HomeHero",
 				}},
 			}},
-			ComponentTemplates: []ComponentTemplate{{
+			ComponentTemplates: []core.ComponentTemplate{{
 				Key:            "gallery",
 				Label:          "Gallery",
 				GoSXComponent:  "GalleryGrid",
 				DefaultBinding: "home.section.gallery",
-				Source:         ComponentSourceCMS,
+				Source:         core.ComponentSourceCMS,
 				Category:       "Page sections",
-				Controls: []Control{{
+				Controls: []core.Control{{
 					Key:   "caption",
 					Label: "Caption",
-					Kind:  ControlText,
+					Kind:  core.ControlText,
 				}},
 			}},
 		},
@@ -108,12 +110,12 @@ func TestRenderSiteMapBoardUsesSharedRuntimeContracts(t *testing.T) {
 }
 
 func TestRenderSiteMapBoardPanSurfaceIsPositionedAnchor(t *testing.T) {
-	view := AuthoringSiteMapView(NoCodeAuthoringSurface(SiteMap{
-		Pages: []Page{{
+	view := AuthoringSiteMapView(authoring.NoCodeAuthoringSurface(core.SiteMap{
+		Pages: []core.Page{{
 			Key:      "home",
 			Label:    "Home",
 			Route:    "/",
-			Group:    PageGroupSite,
+			Group:    core.PageGroupSite,
 			Editable: true,
 			Selected: true,
 		}},
@@ -134,11 +136,11 @@ func TestRenderSiteMapBoardRoundTripsNodePositions(t *testing.T) {
 	// the {key,x,y} a host stores are pan-surface-LOCAL pixels, and feeding the
 	// same {x,y} back through SiteMapViewOptions.NodePositions must reproduce the
 	// exact absolute style and node-x/-y the runtime reads (1:1 round-trip).
-	surface := NoCodeAuthoringSurface(SiteMap{Pages: []Page{{
+	surface := authoring.NoCodeAuthoringSurface(core.SiteMap{Pages: []core.Page{{
 		Key:           "home",
 		Label:         "Home",
 		Route:         "/",
-		Group:         PageGroupSite,
+		Group:         core.PageGroupSite,
 		GoSXComponent: "HomePage",
 		Editable:      true,
 		Selected:      true,
@@ -166,11 +168,11 @@ func TestRenderSiteMapBoardWithoutNodePositionsStaysInLaneFlow(t *testing.T) {
 	// The default render (no NodePositions) must be layout-neutral: no absolute
 	// positioning and no node-x attrs anywhere, so the reference editors are
 	// visually unchanged.
-	surface := NoCodeAuthoringSurface(SiteMap{Pages: []Page{{
+	surface := authoring.NoCodeAuthoringSurface(core.SiteMap{Pages: []core.Page{{
 		Key:           "home",
 		Label:         "Home",
 		Route:         "/",
-		Group:         PageGroupSite,
+		Group:         core.PageGroupSite,
 		GoSXComponent: "HomePage",
 		Editable:      true,
 		Selected:      true,

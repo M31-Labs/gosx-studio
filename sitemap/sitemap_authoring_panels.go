@@ -1,9 +1,11 @@
-package studio
+package sitemap
 
 import (
 	"strings"
 
 	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/authoring"
+	"m31labs.dev/gosx-studio/core"
 )
 
 type SiteMapAuthoringPanelsOptions struct {
@@ -62,18 +64,18 @@ func renderSiteMapPageMetadataPanel(siteMapView map[string]any, options SiteMapA
 		return gosx.Fragment()
 	}
 	page := workbenchViewMap(siteMapView, "metadataPage")
-	formID := FirstNonEmpty(options.MetadataFormID, defaultSiteMapMetadataFormID)
+	formID := core.FirstNonEmpty(options.MetadataFormID, defaultSiteMapMetadataFormID)
 	children := []gosx.Node{
 		renderSiteMapPanelHeader("Page details", workbenchMapString(page, "groupLabel"), workbenchMapString(page, "statusLabel")),
 	}
-	children = append(children, siteMapHiddenInputs(formID, siteMapInputViews(page, "formInputs"), AuthoringFieldPageLabel, AuthoringFieldPageRoute)...)
+	children = append(children, SiteMapHiddenInputs(formID, SiteMapInputViews(page, "formInputs"), authoring.AuthoringFieldPageLabel, authoring.AuthoringFieldPageRoute)...)
 	children = append(children,
 		gosx.El("label", nil,
 			gosx.El("span", nil, gosx.Text("Title")),
 			gosx.El("input", gosx.Attrs(
 				gosx.Attr("form", formID),
 				gosx.Attr("type", "text"),
-				gosx.Attr("name", AuthoringFieldPageLabel),
+				gosx.Attr("name", authoring.AuthoringFieldPageLabel),
 				gosx.Attr("value", workbenchMapString(page, "authoringPageLabel")),
 			)),
 		),
@@ -82,7 +84,7 @@ func renderSiteMapPageMetadataPanel(siteMapView map[string]any, options SiteMapA
 			gosx.El("input", gosx.Attrs(
 				gosx.Attr("form", formID),
 				gosx.Attr("type", "text"),
-				gosx.Attr("name", AuthoringFieldPageRoute),
+				gosx.Attr("name", authoring.AuthoringFieldPageRoute),
 				gosx.Attr("value", workbenchMapString(page, "authoringPageRoute")),
 			)),
 		),
@@ -92,7 +94,7 @@ func renderSiteMapPageMetadataPanel(siteMapView map[string]any, options SiteMapA
 		), gosx.Text("Save page")),
 	)
 	return gosx.El("section", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.MetadataClass, options.PanelClass, "studio-site-map-page-edit studio-site-map-builder__panel")),
+		gosx.Attr("class", core.FirstNonEmpty(options.MetadataClass, options.PanelClass, "studio-site-map-page-edit studio-site-map-builder__panel")),
 		gosx.Attr("data-gosx-studio-page-metadata", "true"),
 		gosx.Attr("data-studio-site-map-page-edit", "true"),
 		gosx.Attr("data-studio-site-map-page", workbenchMapString(page, "key")),
@@ -105,14 +107,14 @@ func renderSiteMapEditableControlPanel(siteMapView map[string]any, options SiteM
 		return gosx.Fragment()
 	}
 	control := workbenchViewMap(siteMapView, "editableControl")
-	inputName := FirstNonEmpty(workbenchMapString(control, "inputName"), AuthoringFieldValue)
-	formID := FirstNonEmpty(options.ControlFormID, defaultSiteMapControlFormID)
+	inputName := core.FirstNonEmpty(workbenchMapString(control, "inputName"), authoring.AuthoringFieldValue)
+	formID := core.FirstNonEmpty(options.ControlFormID, defaultSiteMapControlFormID)
 	children := []gosx.Node{
 		renderSiteMapPanelHeader(workbenchMapString(control, "label"), workbenchMapString(control, "componentLabel"), workbenchMapString(control, "kindLabel")),
 		RenderInspectorControl(control, formID, inputName),
 	}
 	return gosx.El("section", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.ControlClass, options.PanelClass, "studio-site-map-page-edit studio-site-map-builder__panel")),
+		gosx.Attr("class", core.FirstNonEmpty(options.ControlClass, options.PanelClass, "studio-site-map-page-edit studio-site-map-builder__panel")),
 		gosx.Attr("data-gosx-studio-editable-control", "true"),
 		gosx.Attr("data-studio-site-map-page", workbenchMapString(control, "pageKey")),
 		gosx.Attr("data-studio-site-map-component", workbenchMapString(control, "componentKey")),
@@ -125,8 +127,8 @@ func renderSiteMapReorderPanel(siteMapView map[string]any, options SiteMapAuthor
 	return renderSiteMapComponentActionPanel(siteMapView, componentPanelOptions{
 		ViewKey:        "reorderComponent",
 		EnabledKey:     "hasReorderComponent",
-		FormID:         FirstNonEmpty(options.ReorderFormID, defaultSiteMapReorderFormID),
-		ClassName:      FirstNonEmpty(options.ReorderClass, options.PanelClass, "studio-site-map-page-edit studio-site-map-builder__panel"),
+		FormID:         core.FirstNonEmpty(options.ReorderFormID, defaultSiteMapReorderFormID),
+		ClassName:      core.FirstNonEmpty(options.ReorderClass, options.PanelClass, "studio-site-map-page-edit studio-site-map-builder__panel"),
 		Title:          "Section order",
 		Empty:          "No section order changes are available.",
 		DataAttr:       "data-gosx-studio-component-reorder",
@@ -139,8 +141,8 @@ func renderSiteMapDuplicatePanel(siteMapView map[string]any, options SiteMapAuth
 	return renderSiteMapComponentActionPanel(siteMapView, componentPanelOptions{
 		ViewKey:        "duplicateComponent",
 		EnabledKey:     "hasDuplicateComponent",
-		FormID:         FirstNonEmpty(options.DuplicateFormID, defaultSiteMapDuplicateFormID),
-		ClassName:      FirstNonEmpty(options.DuplicateClass, options.PanelClass, "studio-site-map-page-edit studio-site-map-builder__panel"),
+		FormID:         core.FirstNonEmpty(options.DuplicateFormID, defaultSiteMapDuplicateFormID),
+		ClassName:      core.FirstNonEmpty(options.DuplicateClass, options.PanelClass, "studio-site-map-page-edit studio-site-map-builder__panel"),
 		Title:          "Duplicate section",
 		Empty:          "No duplicatable sections are available.",
 		DataAttr:       "data-gosx-studio-component-duplicate",
@@ -153,8 +155,8 @@ func renderSiteMapVisibilityPanel(siteMapView map[string]any, options SiteMapAut
 	return renderSiteMapComponentActionPanel(siteMapView, componentPanelOptions{
 		ViewKey:        "visibilityComponent",
 		EnabledKey:     "hasVisibilityComponent",
-		FormID:         FirstNonEmpty(options.VisibilityFormID, defaultSiteMapVisibilityFormID),
-		ClassName:      FirstNonEmpty(options.VisibilityClass, options.PanelClass, "studio-site-map-page-edit studio-site-map-builder__panel"),
+		FormID:         core.FirstNonEmpty(options.VisibilityFormID, defaultSiteMapVisibilityFormID),
+		ClassName:      core.FirstNonEmpty(options.VisibilityClass, options.PanelClass, "studio-site-map-page-edit studio-site-map-builder__panel"),
 		Title:          "Section visibility",
 		Empty:          "No editable section visibility controls are available.",
 		DataAttr:       "data-gosx-studio-component-visibility",
@@ -167,8 +169,8 @@ func renderSiteMapDeletePanel(siteMapView map[string]any, options SiteMapAuthori
 	return renderSiteMapComponentActionPanel(siteMapView, componentPanelOptions{
 		ViewKey:        "deleteComponent",
 		EnabledKey:     "hasDeleteComponent",
-		FormID:         FirstNonEmpty(options.DeleteFormID, defaultSiteMapDeleteFormID),
-		ClassName:      FirstNonEmpty(options.DeleteClass, options.PanelClass, "studio-site-map-page-edit studio-site-map-builder__panel"),
+		FormID:         core.FirstNonEmpty(options.DeleteFormID, defaultSiteMapDeleteFormID),
+		ClassName:      core.FirstNonEmpty(options.DeleteClass, options.PanelClass, "studio-site-map-page-edit studio-site-map-builder__panel"),
 		Title:          "Remove section",
 		Empty:          "No removable sections are available.",
 		DataAttr:       "data-gosx-studio-component-delete",
@@ -202,13 +204,13 @@ func renderSiteMapComponentActionPanel(siteMapView map[string]any, options compo
 	children := []gosx.Node{
 		renderSiteMapPanelHeader(options.Title, workbenchMapString(component, "pageLabel"), status),
 	}
-	children = append(children, siteMapHiddenInputs(options.FormID, siteMapInputViews(component, "formInputs"))...)
+	children = append(children, SiteMapHiddenInputs(options.FormID, SiteMapInputViews(component, "formInputs"))...)
 	children = append(children,
 		gosx.El("p", nil, gosx.Text(workbenchMapString(component, "label"))),
 		gosx.El("button", gosx.Attrs(
 			gosx.Attr("form", options.FormID),
 			gosx.Attr("type", "submit"),
-		), gosx.Text(FirstNonEmpty(workbenchMapString(component, "actionLabel"), "Apply")+" section")),
+		), gosx.Text(core.FirstNonEmpty(workbenchMapString(component, "actionLabel"), "Apply")+" section")),
 	)
 	attrs := []any{
 		gosx.Attr("class", options.ClassName),
@@ -237,7 +239,7 @@ func renderSiteMapCompositionIntentPanel(siteMapView map[string]any, options Sit
 		children = append(children, renderSiteMapCompositionIntent(intent, options))
 	}
 	return gosx.El("section", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.IntentClass, options.PanelClass, "studio-site-map-page-edit studio-site-map-builder__panel")),
+		gosx.Attr("class", core.FirstNonEmpty(options.IntentClass, options.PanelClass, "studio-site-map-page-edit studio-site-map-builder__panel")),
 		gosx.Attr("data-gosx-studio-composition-intents", "true"),
 		gosx.Attr("data-studio-composition-intent-panel", "true"),
 		gosx.Attr("data-gosx-studio-authoring-panel-renderer", "gosx-studio"),
@@ -247,14 +249,14 @@ func renderSiteMapCompositionIntentPanel(siteMapView map[string]any, options Sit
 func renderSiteMapPageList(siteMapView map[string]any, options SiteMapAuthoringPanelsOptions) gosx.Node {
 	pages := workbenchViewMapList(siteMapView, "pages")
 	if len(pages) == 0 {
-		return gosx.El("p", gosx.Attrs(gosx.Attr("class", FirstNonEmpty(options.EmptyClass, "empty"))), gosx.Text("No pages are available yet."))
+		return gosx.El("p", gosx.Attrs(gosx.Attr("class", core.FirstNonEmpty(options.EmptyClass, "empty"))), gosx.Text("No pages are available yet."))
 	}
 	children := []gosx.Node{
 		renderSiteMapPanelHeader("Current pages", workbenchViewString(siteMapView, "componentCountLabel"), workbenchViewString(siteMapView, "pageCountLabel")),
 	}
 	for _, page := range pages {
 		componentNodes := []gosx.Node{}
-		for _, component := range siteMapMapList(page, "components") {
+		for _, component := range SiteMapMapList(page, "components") {
 			componentNodes = append(componentNodes, gosx.El("span", gosx.Attrs(
 				gosx.Attr("data-studio-site-map-component", workbenchMapString(component, "key")),
 			), gosx.Text(workbenchMapString(component, "label"))))
@@ -275,7 +277,7 @@ func renderSiteMapPageList(siteMapView map[string]any, options SiteMapAuthoringP
 		), gosx.Fragment(pageChildren...)))
 	}
 	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.PageListClass, "studio-site-map-page-list")),
+		gosx.Attr("class", core.FirstNonEmpty(options.PageListClass, "studio-site-map-page-list")),
 		gosx.Attr("data-gosx-studio-page-list", "true"),
 		gosx.Attr("data-gosx-studio-page-list-renderer", "gosx-studio"),
 	), gosx.Fragment(children...))
@@ -283,7 +285,7 @@ func renderSiteMapPageList(siteMapView map[string]any, options SiteMapAuthoringP
 
 func renderSiteMapCompositionIntent(intent map[string]any, options SiteMapAuthoringPanelsOptions) gosx.Node {
 	children := []gosx.Node{}
-	for _, input := range siteMapInputViews(intent, "formInputs") {
+	for _, input := range SiteMapInputViews(intent, "formInputs") {
 		children = append(children, gosx.El("input", gosx.Attrs(
 			gosx.Attr("form", workbenchMapString(intent, "formID")),
 			gosx.Attr("type", "hidden"),
@@ -299,10 +301,10 @@ func renderSiteMapCompositionIntent(intent map[string]any, options SiteMapAuthor
 		gosx.El("button", gosx.Attrs(
 			gosx.Attr("form", workbenchMapString(intent, "formID")),
 			gosx.Attr("type", "submit"),
-		), gosx.Text(FirstNonEmpty(workbenchMapString(intent, "actionLabel"), "Apply draft"))),
+		), gosx.Text(core.FirstNonEmpty(workbenchMapString(intent, "actionLabel"), "Apply draft"))),
 	)
 	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", FirstNonEmpty(options.IntentItemClass, "studio-site-map-intent-form")),
+		gosx.Attr("class", core.FirstNonEmpty(options.IntentItemClass, "studio-site-map-intent-form")),
 		gosx.Attr("data-studio-composition-intent-apply", "true"),
 		gosx.Attr("data-studio-composition-intent", workbenchMapString(intent, "key")),
 		gosx.Attr("data-studio-composition-kind", workbenchMapString(intent, "kind")),
@@ -319,7 +321,7 @@ func renderSiteMapPanelHeader(title, detail, status string) gosx.Node {
 	)
 }
 
-func siteMapHiddenInputs(formID string, inputs []map[string]string, exclude ...string) []gosx.Node {
+func SiteMapHiddenInputs(formID string, inputs []map[string]string, exclude ...string) []gosx.Node {
 	excluded := map[string]bool{}
 	for _, name := range exclude {
 		name = strings.TrimSpace(name)
@@ -343,7 +345,7 @@ func siteMapHiddenInputs(formID string, inputs []map[string]string, exclude ...s
 	return nodes
 }
 
-func siteMapInputViews(values map[string]any, key string) []map[string]string {
+func SiteMapInputViews(values map[string]any, key string) []map[string]string {
 	switch typed := values[key].(type) {
 	case []map[string]string:
 		return typed
@@ -361,7 +363,7 @@ func siteMapInputViews(values map[string]any, key string) []map[string]string {
 	}
 }
 
-func siteMapMapList(values map[string]any, key string) []map[string]any {
+func SiteMapMapList(values map[string]any, key string) []map[string]any {
 	if values == nil {
 		return nil
 	}

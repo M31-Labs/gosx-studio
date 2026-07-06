@@ -534,10 +534,11 @@ func authoringPageGroupCountViews(counts []core.PageGroupCount) []map[string]any
 }
 
 // NormalizeCompositionIntents normalizes and filters a slice of composition
-// intents, dropping any without a Key or Label. It is exported so root-only
-// files that have not yet moved to their own subpackages (e.g. sitemap_view.go,
-// pending the sitemap slice) can call it through a temporary compat shim; see
-// compat_authoring.go's unexported shim section.
+// intents, dropping any without a Key or Label. It is exported so callers
+// outside this package can reach it; sitemap/sitemap_view.go (Slice 5 of the
+// package restructure) calls it through a local unexported alias in
+// sitemap/core_authoring_aliases.go, mirroring this package's own
+// core_aliases.go pattern.
 func NormalizeCompositionIntents(values []core.CompositionIntent) []core.CompositionIntent {
 	out := make([]core.CompositionIntent, 0, len(values))
 	for _, value := range values {
