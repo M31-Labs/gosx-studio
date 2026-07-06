@@ -45,7 +45,7 @@ type AdvancedSettingsPanelOptions struct {
 
 func RenderAdvancedPanel(view map[string]any, options AdvancedPanelOptions) gosx.Node {
 	children := []gosx.Node{renderAdvancedPanelControls(view)}
-	for _, group := range workbenchViewMapList(view, "groups") {
+	for _, group := range core.WorkbenchViewMapList(view, "groups") {
 		children = append(children, renderAdvancedPanelGroupSlot(group, options.GroupNodes))
 	}
 	return gosx.El("section", gosx.Attrs(advancedPanelRootAttrs(view, options.RootAttrs)...), gosx.Fragment(children...))
@@ -74,10 +74,10 @@ func RenderAdvancedPanelSegments(view map[string]any, options AdvancedPanelOptio
 
 func RenderAdvancedToolsPanel(view map[string]any, options AdvancedToolsPanelOptions) gosx.Node {
 	attrs := []any{
-		gosx.Attr("class", workbenchMapString(view, "class")),
-		gosx.Attr("data-panel-key", workbenchMapString(view, "key")),
-		gosx.Attr("data-studio-panel", workbenchMapString(view, "key")),
-		gosx.Attr("data-studio-mode-panel", workbenchMapString(view, "mode")),
+		gosx.Attr("class", core.WorkbenchViewString(view, "class")),
+		gosx.Attr("data-panel-key", core.WorkbenchViewString(view, "key")),
+		gosx.Attr("data-studio-panel", core.WorkbenchViewString(view, "key")),
+		gosx.Attr("data-studio-mode-panel", core.WorkbenchViewString(view, "mode")),
 		gosx.Attr("data-studio-engine-source", "gosx"),
 		gosx.Attr("data-gosx-studio-advanced-tools-panel-renderer", "gosx-studio"),
 	}
@@ -85,27 +85,27 @@ func RenderAdvancedToolsPanel(view map[string]any, options AdvancedToolsPanelOpt
 
 	children := []gosx.Node{
 		gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-panel-heading")),
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchMapString(view, "kicker"))),
-			gosx.El("h2", nil, gosx.Text(workbenchMapString(view, "title"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.WorkbenchViewString(view, "kicker"))),
+			gosx.El("h2", nil, gosx.Text(core.WorkbenchViewString(view, "title"))),
 		),
 		renderAdvancedToolsResources(view),
 	}
-	items := workbenchViewMapList(view, "items")
-	if len(items) == 0 && !workbenchMapBool(view, "hasItems") {
-		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(workbenchMapString(view, "empty"))))
+	items := core.WorkbenchViewMapList(view, "items")
+	if len(items) == 0 && !core.WorkbenchViewBool(view, "hasItems") {
+		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(core.WorkbenchViewString(view, "empty"))))
 	}
-	if len(items) > 0 || workbenchMapBool(view, "hasItems") {
-		children = append(children, gosx.El("div", gosx.Attrs(gosx.Attr("class", workbenchMapString(view, "gridClass"))), gosx.Fragment(renderAdvancedToolsItems(items)...)))
+	if len(items) > 0 || core.WorkbenchViewBool(view, "hasItems") {
+		children = append(children, gosx.El("div", gosx.Attrs(gosx.Attr("class", core.WorkbenchViewString(view, "gridClass"))), gosx.Fragment(renderAdvancedToolsItems(items)...)))
 	}
 	return gosx.El("section", gosx.Attrs(attrs...), gosx.Fragment(children...))
 }
 
 func RenderAdvancedFieldPanel(view map[string]any, options AdvancedFieldPanelOptions) gosx.Node {
 	attrs := []any{
-		gosx.Attr("class", workbenchMapString(view, "class")),
-		gosx.Attr("data-panel-key", workbenchMapString(view, "key")),
-		gosx.Attr("data-studio-panel", workbenchMapString(view, "key")),
-		gosx.Attr("data-studio-mode-panel", workbenchMapString(view, "mode")),
+		gosx.Attr("class", core.WorkbenchViewString(view, "class")),
+		gosx.Attr("data-panel-key", core.WorkbenchViewString(view, "key")),
+		gosx.Attr("data-studio-panel", core.WorkbenchViewString(view, "key")),
+		gosx.Attr("data-studio-mode-panel", core.WorkbenchViewString(view, "mode")),
 		gosx.Attr("data-studio-engine-source", "gosx"),
 		gosx.Attr("data-gosx-studio-advanced-field-panel-renderer", "gosx-studio"),
 	}
@@ -113,13 +113,13 @@ func RenderAdvancedFieldPanel(view map[string]any, options AdvancedFieldPanelOpt
 
 	children := []gosx.Node{
 		gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-panel-heading")),
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchMapString(view, "kicker"))),
-			gosx.El("h2", nil, gosx.Text(workbenchMapString(view, "title"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.WorkbenchViewString(view, "kicker"))),
+			gosx.El("h2", nil, gosx.Text(core.WorkbenchViewString(view, "title"))),
 		),
 	}
 	fieldList, ok := view["fieldList"].(gosx.Node)
-	if !ok || workbenchNodeEmpty(fieldList) || !workbenchMapBool(view, "hasFields") {
-		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(workbenchMapString(view, "empty"))))
+	if !ok || core.WorkbenchNodeEmpty(fieldList) || !core.WorkbenchViewBool(view, "hasFields") {
+		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(core.WorkbenchViewString(view, "empty"))))
 	} else {
 		children = append(children, fieldList)
 	}
@@ -128,10 +128,10 @@ func RenderAdvancedFieldPanel(view map[string]any, options AdvancedFieldPanelOpt
 
 func RenderAdvancedSettingsPanel(view map[string]any, options AdvancedSettingsPanelOptions) gosx.Node {
 	attrs := []any{
-		gosx.Attr("class", workbenchMapString(view, "class")),
-		gosx.Attr("data-panel-key", workbenchMapString(view, "key")),
-		gosx.Attr("data-studio-panel", workbenchMapString(view, "key")),
-		gosx.Attr("data-studio-mode-panel", workbenchMapString(view, "mode")),
+		gosx.Attr("class", core.WorkbenchViewString(view, "class")),
+		gosx.Attr("data-panel-key", core.WorkbenchViewString(view, "key")),
+		gosx.Attr("data-studio-panel", core.WorkbenchViewString(view, "key")),
+		gosx.Attr("data-studio-mode-panel", core.WorkbenchViewString(view, "mode")),
 		gosx.Attr("data-studio-engine-source", "gosx"),
 		gosx.Attr("data-gosx-studio-advanced-settings-panel-renderer", "gosx-studio"),
 	}
@@ -139,20 +139,20 @@ func RenderAdvancedSettingsPanel(view map[string]any, options AdvancedSettingsPa
 
 	children := []gosx.Node{
 		gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-panel-heading")),
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchMapString(view, "kicker"))),
-			gosx.El("h2", nil, gosx.Text(workbenchMapString(view, "title"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.WorkbenchViewString(view, "kicker"))),
+			gosx.El("h2", nil, gosx.Text(core.WorkbenchViewString(view, "title"))),
 		),
 	}
-	if summary := workbenchMapString(view, "summary"); summary != "" {
+	if summary := core.WorkbenchViewString(view, "summary"); summary != "" {
 		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "studio-advanced-settings-panel__summary")), gosx.Text(summary)))
 	}
 	fieldList, ok := view["fieldList"].(gosx.Node)
-	if ok && !workbenchNodeEmpty(fieldList) && workbenchMapBool(view, "hasFields") {
+	if ok && !core.WorkbenchNodeEmpty(fieldList) && core.WorkbenchViewBool(view, "hasFields") {
 		children = append(children, fieldList)
 	} else {
-		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(workbenchMapString(view, "empty"))))
+		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(core.WorkbenchViewString(view, "empty"))))
 	}
-	if statusCards := renderAdvancedSettingsStatusCards(view); !workbenchNodeEmpty(statusCards) {
+	if statusCards := renderAdvancedSettingsStatusCards(view); !core.WorkbenchNodeEmpty(statusCards) {
 		children = append(children, statusCards)
 	}
 	return gosx.El("section", gosx.Attrs(attrs...), gosx.Fragment(children...))
@@ -165,7 +165,7 @@ func advancedPanelRootAttrs(view map[string]any, rootAttrs map[string]any) []any
 		gosx.Attr("data-studio-mode-panel", "advanced"),
 		gosx.Attr("data-studio-panel", "advanced"),
 		gosx.Attr("data-studio-engine-source", "gosx"),
-		gosx.Attr("data-studio-advanced-group-active", workbenchMapString(view, "defaultGroupKey")),
+		gosx.Attr("data-studio-advanced-group-active", core.WorkbenchViewString(view, "defaultGroupKey")),
 		gosx.Attr("data-gosx-studio-advanced-panel-renderer", "gosx-studio"),
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, rootAttrs)
@@ -173,37 +173,37 @@ func advancedPanelRootAttrs(view map[string]any, rootAttrs map[string]any) []any
 }
 
 func renderAdvancedSettingsStatusCards(view map[string]any) gosx.Node {
-	cards := workbenchViewMapList(view, "statusCards")
+	cards := core.WorkbenchViewMapList(view, "statusCards")
 	if len(cards) == 0 {
 		return gosx.Fragment()
 	}
 	nodes := make([]gosx.Node, 0, len(cards)+1)
 	for _, card := range cards {
 		nodes = append(nodes, gosx.El("article", gosx.Attrs(
-			gosx.Attr("class", workbenchMapString(card, "class")),
-			gosx.Attr("data-studio-advanced-settings-status", workbenchMapString(card, "key")),
+			gosx.Attr("class", core.WorkbenchViewString(card, "class")),
+			gosx.Attr("data-studio-advanced-settings-status", core.WorkbenchViewString(card, "key")),
 		),
 			gosx.El("div", nil,
-				gosx.El("strong", nil, gosx.Text(workbenchMapString(card, "title"))),
-				gosx.El("p", nil, gosx.Text(workbenchMapString(card, "summary"))),
+				gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(card, "title"))),
+				gosx.El("p", nil, gosx.Text(core.WorkbenchViewString(card, "summary"))),
 			),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(card, "status"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(card, "status"))),
 		))
 	}
 	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", core.FirstNonEmpty(workbenchMapString(view, "statusGridClass"), "studio-advanced-settings-panel__status-grid")),
+		gosx.Attr("class", core.FirstNonEmpty(core.WorkbenchViewString(view, "statusGridClass"), "studio-advanced-settings-panel__status-grid")),
 		gosx.Attr("data-studio-advanced-settings-status-grid", "true"),
 	), gosx.Fragment(nodes...))
 }
 
 func renderAdvancedPanelControls(view map[string]any) gosx.Node {
-	groups := workbenchViewMapList(view, "groups")
+	groups := core.WorkbenchViewMapList(view, "groups")
 	children := []gosx.Node{
 		gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-advanced-panel__head")),
 			gosx.El("div", nil,
-				gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchMapString(view, "kicker"))),
-				gosx.El("h2", nil, gosx.Text(workbenchMapString(view, "title"))),
-				gosx.El("p", nil, gosx.Text(workbenchMapString(view, "summary"))),
+				gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.WorkbenchViewString(view, "kicker"))),
+				gosx.El("h2", nil, gosx.Text(core.WorkbenchViewString(view, "title"))),
+				gosx.El("p", nil, gosx.Text(core.WorkbenchViewString(view, "summary"))),
 			),
 		),
 	}
@@ -217,12 +217,12 @@ func renderAdvancedPanelControls(view map[string]any) gosx.Node {
 func renderAdvancedPanelGroupInput(group map[string]any) gosx.Node {
 	return gosx.El("input", gosx.Attrs(
 		gosx.Attr("class", "studio-advanced-panel__group-input"),
-		gosx.Attr("id", workbenchMapString(group, "inputID")),
+		gosx.Attr("id", core.WorkbenchViewString(group, "inputID")),
 		gosx.Attr("type", "radio"),
 		gosx.Attr("name", "studioAdvancedGroup"),
-		gosx.Attr("value", workbenchMapString(group, "key")),
-		gosx.Attr("checked", workbenchMapBool(group, "selected")),
-		gosx.Attr("aria-label", workbenchMapString(group, "label")),
+		gosx.Attr("value", core.WorkbenchViewString(group, "key")),
+		gosx.Attr("checked", core.WorkbenchViewBool(group, "selected")),
+		gosx.Attr("aria-label", core.WorkbenchViewString(group, "label")),
 	))
 }
 
@@ -231,26 +231,26 @@ func renderAdvancedPanelGroups(view map[string]any, groups []map[string]any) gos
 	for _, group := range groups {
 		children = append(children, gosx.El("label", gosx.Attrs(
 			gosx.Attr("class", "studio-advanced-panel__group"),
-			gosx.Attr("for", workbenchMapString(group, "inputID")),
-			gosx.Attr("data-studio-advanced-group-label", workbenchMapString(group, "key")),
+			gosx.Attr("for", core.WorkbenchViewString(group, "inputID")),
+			gosx.Attr("data-studio-advanced-group-label", core.WorkbenchViewString(group, "key")),
 		),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(group, "label"))),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(group, "summary"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(group, "label"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(group, "summary"))),
 		))
 	}
 	return gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", "studio-advanced-panel__groups"),
 		gosx.Attr("role", "radiogroup"),
-		gosx.Attr("aria-label", workbenchMapString(view, "groupLabel")),
+		gosx.Attr("aria-label", core.WorkbenchViewString(view, "groupLabel")),
 	), gosx.Fragment(children...))
 }
 
 func renderAdvancedPanelGroupSlot(group map[string]any, groupNodes map[string]gosx.Node) gosx.Node {
-	key := workbenchMapString(group, "key")
+	key := core.WorkbenchViewString(group, "key")
 	children := []gosx.Node{
 		gosx.El("header", nil,
-			gosx.El("h3", nil, gosx.Text(workbenchMapString(group, "label"))),
-			gosx.El("p", nil, gosx.Text(workbenchMapString(group, "summary"))),
+			gosx.El("h3", nil, gosx.Text(core.WorkbenchViewString(group, "label"))),
+			gosx.El("p", nil, gosx.Text(core.WorkbenchViewString(group, "summary"))),
 		),
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "studio-advanced-panel__group-body"),
@@ -268,18 +268,18 @@ func renderAdvancedPanelGroupNode(key string, groupNodes map[string]gosx.Node) g
 	if !ok {
 		return gosx.Fragment()
 	}
-	if workbenchNodeEmpty(node) {
+	if core.WorkbenchNodeEmpty(node) {
 		return gosx.Fragment()
 	}
 	return node
 }
 
 func renderAdvancedPanelGroupSlotOpen(group map[string]any) gosx.Node {
-	key := workbenchMapString(group, "key")
+	key := core.WorkbenchViewString(group, "key")
 	html := gosx.RenderHTML(gosx.El("section", gosx.Attrs(advancedPanelGroupSlotAttrs(group)...),
 		gosx.El("header", nil,
-			gosx.El("h3", nil, gosx.Text(workbenchMapString(group, "label"))),
-			gosx.El("p", nil, gosx.Text(workbenchMapString(group, "summary"))),
+			gosx.El("h3", nil, gosx.Text(core.WorkbenchViewString(group, "label"))),
+			gosx.El("p", nil, gosx.Text(core.WorkbenchViewString(group, "summary"))),
 		),
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "studio-advanced-panel__group-body"),
@@ -293,15 +293,15 @@ func renderAdvancedPanelGroupSlotOpen(group map[string]any) gosx.Node {
 func advancedPanelGroupSlotAttrs(group map[string]any) []any {
 	return []any{
 		gosx.Attr("class", "studio-advanced-panel__group-slot"),
-		gosx.Attr("data-studio-advanced-group-slot", workbenchMapString(group, "key")),
-		gosx.Attr("data-studio-advanced-group-selected", core.BoolAttr(workbenchMapBool(group, "selected"))),
+		gosx.Attr("data-studio-advanced-group-slot", core.WorkbenchViewString(group, "key")),
+		gosx.Attr("data-studio-advanced-group-selected", core.BoolAttr(core.WorkbenchViewBool(group, "selected"))),
 	}
 }
 
 func advancedPanelGroupsByKey(view map[string]any) map[string]map[string]any {
 	out := map[string]map[string]any{}
-	for _, group := range workbenchViewMapList(view, "groups") {
-		out[workbenchMapString(group, "key")] = group
+	for _, group := range core.WorkbenchViewMapList(view, "groups") {
+		out[core.WorkbenchViewString(group, "key")] = group
 	}
 	return out
 }
@@ -310,17 +310,17 @@ func renderAdvancedToolsResources(view map[string]any) gosx.Node {
 	children := []gosx.Node{
 		gosx.El("header", nil,
 			gosx.El("div", nil,
-				gosx.El("strong", nil, gosx.Text(workbenchMapString(view, "resourcesTitle"))),
-				gosx.El("p", nil, gosx.Text(workbenchMapString(view, "resourcesSummary"))),
+				gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(view, "resourcesTitle"))),
+				gosx.El("p", nil, gosx.Text(core.WorkbenchViewString(view, "resourcesSummary"))),
 			),
 		),
 	}
-	adapters := workbenchViewMapList(view, "adapters")
-	if len(adapters) == 0 && !workbenchMapBool(view, "hasAdapters") {
-		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(workbenchMapString(view, "resourceEmpty"))))
+	adapters := core.WorkbenchViewMapList(view, "adapters")
+	if len(adapters) == 0 && !core.WorkbenchViewBool(view, "hasAdapters") {
+		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(core.WorkbenchViewString(view, "resourceEmpty"))))
 	}
-	if len(adapters) > 0 || workbenchMapBool(view, "hasAdapters") {
-		children = append(children, gosx.El("div", gosx.Attrs(gosx.Attr("class", workbenchMapString(view, "resourceGridClass"))), gosx.Fragment(renderAdvancedToolsAdapters(adapters)...)))
+	if len(adapters) > 0 || core.WorkbenchViewBool(view, "hasAdapters") {
+		children = append(children, gosx.El("div", gosx.Attrs(gosx.Attr("class", core.WorkbenchViewString(view, "resourceGridClass"))), gosx.Fragment(renderAdvancedToolsAdapters(adapters)...)))
 	}
 	return gosx.El("section", gosx.Attrs(
 		gosx.Attr("class", "studio-resource-adapters"),
@@ -333,15 +333,15 @@ func renderAdvancedToolsAdapters(adapters []map[string]any) []gosx.Node {
 	for _, adapter := range adapters {
 		nodes = append(nodes, gosx.El("article", gosx.Attrs(
 			gosx.Attr("class", "studio-resource-adapter-card"),
-			gosx.Attr("data-studio-resource-adapter", workbenchMapString(adapter, "kind")),
-			gosx.Attr("data-studio-resource-surface", workbenchMapString(adapter, "surface")),
+			gosx.Attr("data-studio-resource-adapter", core.WorkbenchViewString(adapter, "kind")),
+			gosx.Attr("data-studio-resource-surface", core.WorkbenchViewString(adapter, "surface")),
 		),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(adapter, "label"))),
-			gosx.El("span", nil, gosx.Text(workbenchMapString(adapter, "summary"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(adapter, "label"))),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(adapter, "summary"))),
 			gosx.El("div", nil,
-				gosx.El("small", nil, gosx.Text(workbenchMapString(adapter, "surface"))),
-				gosx.El("small", nil, gosx.Text(workbenchMapString(adapter, "capabilityLabel"))),
-				gosx.El("small", nil, gosx.Text(workbenchMapString(adapter, "bindingLabel"))),
+				gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(adapter, "surface"))),
+				gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(adapter, "capabilityLabel"))),
+				gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(adapter, "bindingLabel"))),
 			),
 		))
 	}
@@ -351,9 +351,9 @@ func renderAdvancedToolsAdapters(adapters []map[string]any) []gosx.Node {
 func renderAdvancedToolsItems(items []map[string]any) []gosx.Node {
 	nodes := make([]gosx.Node, 0, len(items))
 	for _, item := range items {
-		nodes = append(nodes, gosx.El("a", gosx.Attrs(BlockLibraryPanelMapAttrs(workbenchViewMap(item, "attrs"))...),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(item, "label"))),
-			gosx.El("span", nil, gosx.Text(workbenchMapString(item, "summary"))),
+		nodes = append(nodes, gosx.El("a", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(item, "attrs"))...),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(item, "label"))),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(item, "summary"))),
 		))
 	}
 	return nodes

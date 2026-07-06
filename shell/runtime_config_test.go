@@ -1,4 +1,4 @@
-package studio
+package shell
 
 // This file (originally host_runtime_test.go) covers the RuntimeConfig
 // symbol that remains at the studio root after Slice 3 of the package
@@ -10,6 +10,8 @@ package studio
 import (
 	"reflect"
 	"testing"
+
+	"m31labs.dev/gosx-studio/hostruntime"
 )
 
 func TestDefaultRuntimeConfigExposesHostScriptsAndEngineHosts(t *testing.T) {
@@ -26,10 +28,10 @@ func TestDefaultRuntimeConfigExposesHostScriptsAndEngineHosts(t *testing.T) {
 	}
 
 	wantScripts := map[string]any{
-		"engineRuntime":    EngineRuntimePath + "?v=build+1",
-		"workbenchRuntime": WorkbenchRuntimePath + "?v=build+1",
-		"commandRuntime":   CommandRuntimePath + "?v=build+1",
-		"stateRuntime":     StateRuntimePath + "?v=build+1",
+		"engineRuntime":    hostruntime.EngineRuntimePath + "?v=build+1",
+		"workbenchRuntime": hostruntime.WorkbenchRuntimePath + "?v=build+1",
+		"commandRuntime":   hostruntime.CommandRuntimePath + "?v=build+1",
+		"stateRuntime":     hostruntime.StateRuntimePath + "?v=build+1",
 	}
 	if got := config.Scripts(); !reflect.DeepEqual(got, wantScripts) {
 		t.Fatalf("scripts = %#v, want %#v", got, wantScripts)

@@ -53,10 +53,10 @@ type BlockLayoutEngineSegments struct {
 
 func BlockLayoutEngineHostFromMap(host map[string]any) BlockLayoutEngineHostOptions {
 	return BlockLayoutEngineHostOptions{
-		Key:          mapString(host, "key"),
-		Name:         mapString(host, "name"),
-		MountID:      mapString(host, "mountId"),
-		Class:        mapString(host, "class"),
+		Key:          core.WorkbenchViewString(host, "key"),
+		Name:         core.WorkbenchViewString(host, "name"),
+		MountID:      core.WorkbenchViewString(host, "mountId"),
+		Class:        core.WorkbenchViewString(host, "class"),
 		Capabilities: engineCapabilityStrings(host["capabilities"]),
 	}
 }
@@ -81,7 +81,7 @@ func RenderBlockLayoutEngineHost(options BlockLayoutEngineOptions) gosx.Node {
 func RenderBlockLayoutEngine(view map[string]any, options BlockLayoutEngineOptions) gosx.Node {
 	segments := RenderBlockLayoutEngineSegments(view, options)
 	engineHost := segments.EngineHost
-	if !nodeEmpty(options.EngineHostNode) {
+	if !core.WorkbenchNodeEmpty(options.EngineHostNode) {
 		engineHost = options.EngineHostNode
 	}
 	return gosx.Fragment(
@@ -113,13 +113,13 @@ func renderBlockLayoutEngineRootOpen(options BlockLayoutEngineOptions) gosx.Node
 func renderBlockLayoutEngineHeader(view map[string]any, options BlockLayoutEngineOptions) gosx.Node {
 	return gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-block-layout-engine__chrome")),
 		gosx.El("div", nil,
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.FirstNonEmpty(options.Kicker, mapString(view, "kicker"), "Home"))),
-			gosx.El("h2", nil, gosx.Text(core.FirstNonEmpty(options.Title, mapString(view, "title"), "Sections"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.FirstNonEmpty(options.Kicker, core.WorkbenchViewString(view, "kicker"), "Home"))),
+			gosx.El("h2", nil, gosx.Text(core.FirstNonEmpty(options.Title, core.WorkbenchViewString(view, "title"), "Sections"))),
 		),
 		gosx.El("output", gosx.Attrs(
 			gosx.Attr("class", "studio-block-layout-engine__state"),
 			gosx.Attr("data-studio-block-layout-state", "true"),
-		), gosx.Text(core.FirstNonEmpty(options.CountLabel, mapString(view, "countLabel")))),
+		), gosx.Text(core.FirstNonEmpty(options.CountLabel, core.WorkbenchViewString(view, "countLabel")))),
 	)
 }
 

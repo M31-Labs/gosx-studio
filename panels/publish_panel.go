@@ -22,7 +22,7 @@ func RenderPublishPanel(view map[string]any, options PublishPanelOptions) gosx.N
 		gosx.Attr("data-studio-mode-panel", "publish"),
 		gosx.Attr("data-studio-panel", "publish"),
 		gosx.Attr("data-studio-engine-source", "gosx"),
-		gosx.Attr("data-studio-publish-status", workbenchMapString(view, "status")),
+		gosx.Attr("data-studio-publish-status", core.WorkbenchViewString(view, "status")),
 		gosx.Attr("data-gosx-studio-publish-panel-renderer", "gosx-studio"),
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, options.RootAttrs)
@@ -32,25 +32,25 @@ func RenderPublishPanel(view map[string]any, options PublishPanelOptions) gosx.N
 		renderPublishPanelDraftStatus(view),
 		renderPublishPanelActions(view),
 	}
-	if workbenchMapBool(view, "hasPendingChanges") {
+	if core.WorkbenchViewBool(view, "hasPendingChanges") {
 		children = append(children, renderPublishPanelPendingChanges(view))
 	}
 	children = append(children,
 		renderPublishPanelPreviewShare(options.PreviewShareNode),
 	)
-	if workbenchMapBool(view, "hasEnvironments") {
-		children = append(children, renderPublishPanelEnvironments(workbenchViewMapList(view, "environments")))
+	if core.WorkbenchViewBool(view, "hasEnvironments") {
+		children = append(children, renderPublishPanelEnvironments(core.WorkbenchViewMapList(view, "environments")))
 	}
 	children = append(children,
 		renderPublishPanelSchedule(view),
 		renderPublishPanelDecision(view),
 		renderPublishPanelSummary(view),
 	)
-	if workbenchMapBool(view, "hasChecks") {
-		children = append(children, renderPublishPanelChecks(workbenchViewMapList(view, "checks")))
+	if core.WorkbenchViewBool(view, "hasChecks") {
+		children = append(children, renderPublishPanelChecks(core.WorkbenchViewMapList(view, "checks")))
 	}
-	if workbenchMapBool(view, "hasImpacts") {
-		children = append(children, renderPublishPanelImpacts(workbenchViewMapList(view, "impacts")))
+	if core.WorkbenchViewBool(view, "hasImpacts") {
+		children = append(children, renderPublishPanelImpacts(core.WorkbenchViewMapList(view, "impacts")))
 	}
 	children = append(children,
 		renderPublishPanelActivity(options.ActivityPanelNode),
@@ -63,54 +63,54 @@ func RenderPublishPanel(view map[string]any, options PublishPanelOptions) gosx.N
 func renderPublishPanelHead(view map[string]any) gosx.Node {
 	return gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-publish-panel__head")),
 		gosx.El("div", nil,
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(workbenchMapString(view, "kicker"))),
-			gosx.El("h2", nil, gosx.Text(workbenchMapString(view, "panelTitle"))),
-			gosx.El("p", nil, gosx.Text(workbenchMapString(view, "summary"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.WorkbenchViewString(view, "kicker"))),
+			gosx.El("h2", nil, gosx.Text(core.WorkbenchViewString(view, "panelTitle"))),
+			gosx.El("p", nil, gosx.Text(core.WorkbenchViewString(view, "summary"))),
 		),
-		gosx.El("output", nil, gosx.Text(workbenchMapString(view, "countLabel"))),
+		gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(view, "countLabel"))),
 	)
 }
 
 func renderPublishPanelDraftStatus(view map[string]any) gosx.Node {
-	hasDraft := workbenchMapBool(view, "hasDraft")
+	hasDraft := core.WorkbenchViewBool(view, "hasDraft")
 	return gosx.El("p", gosx.Attrs(
 		gosx.Attr("class", "studio-publish-panel__draft-status"),
 		gosx.Attr("data-studio-publish-draft-status", "true"),
 		gosx.Attr("data-studio-has-draft", core.BoolAttr(hasDraft)),
 		gosx.Attr("hidden", !hasDraft),
-	), gosx.Text(workbenchMapString(view, "draftStatusLabel")))
+	), gosx.Text(core.WorkbenchViewString(view, "draftStatusLabel")))
 }
 
 func renderPublishPanelActions(view map[string]any) gosx.Node {
 	children := []gosx.Node{
 		gosx.El("a", gosx.Attrs(
 			gosx.Attr("class", "button button--secondary"),
-			gosx.Attr("href", workbenchMapString(view, "previewHref")),
+			gosx.Attr("href", core.WorkbenchViewString(view, "previewHref")),
 			gosx.Attr("data-gosx-link", "true"),
 		), gosx.Text("Open preview")),
 	}
-	if workbenchMapBool(view, "hasPublishAction") {
+	if core.WorkbenchViewBool(view, "hasPublishAction") {
 		children = append(children, gosx.El("button", gosx.Attrs(
 			gosx.Attr("class", "button button--primary"),
 			gosx.Attr("type", "submit"),
-			gosx.Attr("form", workbenchMapString(view, "formID")),
-			gosx.Attr("formaction", workbenchMapString(view, "publishAction")),
+			gosx.Attr("form", core.WorkbenchViewString(view, "formID")),
+			gosx.Attr("formaction", core.WorkbenchViewString(view, "publishAction")),
 			gosx.Attr("formmethod", "post"),
 			gosx.Attr("data-admin-confirm", "Publish this draft?"),
 			gosx.Attr("data-studio-submit-action", "publish"),
-			gosx.Attr("data-studio-field-action-formaction", workbenchMapString(view, "publishAction")),
+			gosx.Attr("data-studio-field-action-formaction", core.WorkbenchViewString(view, "publishAction")),
 		), gosx.Text("Publish")))
 	}
-	if workbenchMapBool(view, "hasDiscardAction") {
+	if core.WorkbenchViewBool(view, "hasDiscardAction") {
 		children = append(children, gosx.El("button", gosx.Attrs(
 			gosx.Attr("class", "button button--ghost"),
 			gosx.Attr("type", "submit"),
-			gosx.Attr("form", workbenchMapString(view, "formID")),
-			gosx.Attr("formaction", workbenchMapString(view, "discardAction")),
+			gosx.Attr("form", core.WorkbenchViewString(view, "formID")),
+			gosx.Attr("formaction", core.WorkbenchViewString(view, "discardAction")),
 			gosx.Attr("formmethod", "post"),
 			gosx.Attr("data-admin-confirm", "Discard unpublished changes?"),
 			gosx.Attr("data-studio-submit-action", "discard"),
-			gosx.Attr("data-studio-field-action-formaction", workbenchMapString(view, "discardAction")),
+			gosx.Attr("data-studio-field-action-formaction", core.WorkbenchViewString(view, "discardAction")),
 		), gosx.Text("Discard changes")))
 	}
 	return gosx.El("div", gosx.Attrs(
@@ -120,11 +120,11 @@ func renderPublishPanelActions(view map[string]any) gosx.Node {
 }
 
 func renderPublishPanelPendingChanges(view map[string]any) gosx.Node {
-	items := make([]gosx.Node, 0, len(workbenchViewMapList(view, "pendingChanges")))
-	for _, change := range workbenchViewMapList(view, "pendingChanges") {
+	items := make([]gosx.Node, 0, len(core.WorkbenchViewMapList(view, "pendingChanges")))
+	for _, change := range core.WorkbenchViewMapList(view, "pendingChanges") {
 		items = append(items, gosx.El("li", nil,
-			gosx.El("span", nil, gosx.Text(workbenchMapString(change, "kindLabel"))),
-			gosx.El("code", nil, gosx.Text(workbenchMapString(change, "path"))),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(change, "kindLabel"))),
+			gosx.El("code", nil, gosx.Text(core.WorkbenchViewString(change, "path"))),
 		))
 	}
 	return gosx.El("section", gosx.Attrs(
@@ -133,7 +133,7 @@ func renderPublishPanelPendingChanges(view map[string]any) gosx.Node {
 	),
 		gosx.El("header", nil,
 			gosx.El("h3", nil, gosx.Text("What will change")),
-			gosx.El("p", nil, gosx.Text(workbenchMapString(view, "draftSummary"))),
+			gosx.El("p", nil, gosx.Text(core.WorkbenchViewString(view, "draftSummary"))),
 		),
 		gosx.El("ul", gosx.Attrs(gosx.Attr("class", "revision-diff-list")), gosx.Fragment(items...)),
 	)
@@ -141,7 +141,7 @@ func renderPublishPanelPendingChanges(view map[string]any) gosx.Node {
 
 func renderPublishPanelPreviewShare(node gosx.Node) gosx.Node {
 	children := []gosx.Node{}
-	if !workbenchNodeEmpty(node) {
+	if !core.WorkbenchNodeEmpty(node) {
 		children = append(children, node)
 	}
 	return gosx.El("section", gosx.Attrs(
@@ -183,15 +183,15 @@ func renderPublishPanelEnvironments(environments []map[string]any) gosx.Node {
 		}
 		nodes = append(nodes, gosx.El("article", gosx.Attrs(
 			gosx.Attr("class", publishEnvironmentClass(environment, state)),
-			gosx.Attr("data-studio-publish-environment", workbenchMapString(environment, "key")),
+			gosx.Attr("data-studio-publish-environment", core.WorkbenchViewString(environment, "key")),
 			gosx.Attr("data-studio-publish-environment-state", state),
 		),
 			gosx.El("div", nil,
-				gosx.El("strong", nil, gosx.Text(workbenchMapString(environment, "label"))),
+				gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(environment, "label"))),
 				gosx.El("output", nil, gosx.Text(publishEnvironmentStateLabel(environment, state))),
 			),
 			valueNode,
-			gosx.El("p", nil, gosx.Text(workbenchMapString(environment, "detail"))),
+			gosx.El("p", nil, gosx.Text(core.WorkbenchViewString(environment, "detail"))),
 		))
 	}
 	return gosx.El("section", gosx.Attrs(
@@ -208,7 +208,7 @@ func renderPublishPanelEnvironments(environments []map[string]any) gosx.Node {
 }
 
 func publishEnvironmentClass(environment map[string]any, state string) string {
-	className := workbenchMapString(environment, "class")
+	className := core.WorkbenchViewString(environment, "class")
 	if className != "" {
 		return className
 	}
@@ -220,7 +220,7 @@ func publishEnvironmentState(environment map[string]any) string {
 	if value == "" || value == "tbd" {
 		return "tbd"
 	}
-	state := strings.ToLower(workbenchMapString(environment, "state"))
+	state := strings.ToLower(core.WorkbenchViewString(environment, "state"))
 	switch state {
 	case "ready", "tbd":
 		return state
@@ -229,7 +229,7 @@ func publishEnvironmentState(environment map[string]any) string {
 }
 
 func publishEnvironmentStateLabel(environment map[string]any, state string) string {
-	if label := workbenchMapString(environment, "stateLabel"); label != "" {
+	if label := core.WorkbenchViewString(environment, "stateLabel"); label != "" {
 		return label
 	}
 	if state == "tbd" {
@@ -239,17 +239,17 @@ func publishEnvironmentStateLabel(environment map[string]any, state string) stri
 }
 
 func publishEnvironmentValue(environment map[string]any) string {
-	if value := workbenchMapString(environment, "value"); value != "" {
+	if value := core.WorkbenchViewString(environment, "value"); value != "" {
 		return value
 	}
-	return workbenchMapString(environment, "url")
+	return core.WorkbenchViewString(environment, "url")
 }
 
 func publishEnvironmentHref(environment map[string]any) string {
-	if href := workbenchMapString(environment, "href"); href != "" {
+	if href := core.WorkbenchViewString(environment, "href"); href != "" {
 		return href
 	}
-	return workbenchMapString(environment, "url")
+	return core.WorkbenchViewString(environment, "url")
 }
 
 func publishEnvironmentHasHref(environment map[string]any, state string) bool {
@@ -262,38 +262,38 @@ func publishEnvironmentHasHref(environment map[string]any, state string) bool {
 	if _, ok := environment["hasHref"]; !ok {
 		return true
 	}
-	return workbenchMapBool(environment, "hasHref")
+	return core.WorkbenchViewBool(environment, "hasHref")
 }
 
 func renderPublishPanelSchedule(view map[string]any) gosx.Node {
 	children := []gosx.Node{
 		gosx.El("label", gosx.Attrs(
 			gosx.Attr("class", "field"),
-			gosx.Attr("for", workbenchMapString(view, "scheduleInputID")),
+			gosx.Attr("for", core.WorkbenchViewString(view, "scheduleInputID")),
 		),
 			gosx.El("span", nil, gosx.Text("Schedule for")),
 			gosx.El("input", gosx.Attrs(
-				gosx.Attr("id", workbenchMapString(view, "scheduleInputID")),
-				gosx.Attr("name", workbenchMapString(view, "scheduleInputName")),
+				gosx.Attr("id", core.WorkbenchViewString(view, "scheduleInputID")),
+				gosx.Attr("name", core.WorkbenchViewString(view, "scheduleInputName")),
 				gosx.Attr("type", "datetime-local"),
-				gosx.Attr("value", workbenchMapString(view, "scheduleInputValue")),
-				gosx.Attr("form", workbenchMapString(view, "formID")),
+				gosx.Attr("value", core.WorkbenchViewString(view, "scheduleInputValue")),
+				gosx.Attr("form", core.WorkbenchViewString(view, "formID")),
 				gosx.Attr("data-studio-field-source", "lifecycle.schedule.publishAt"),
 				gosx.Attr("data-studio-field-editable", "lifecycle"),
 			)),
 		),
-		gosx.El("p", nil, gosx.Text(workbenchMapString(view, "scheduleHelp"))),
+		gosx.El("p", nil, gosx.Text(core.WorkbenchViewString(view, "scheduleHelp"))),
 	}
-	if workbenchMapBool(view, "hasScheduleAction") {
+	if core.WorkbenchViewBool(view, "hasScheduleAction") {
 		children = append(children, gosx.El("button", gosx.Attrs(
 			gosx.Attr("class", "button button--secondary"),
 			gosx.Attr("type", "submit"),
-			gosx.Attr("form", workbenchMapString(view, "formID")),
-			gosx.Attr("formaction", workbenchMapString(view, "scheduleAction")),
+			gosx.Attr("form", core.WorkbenchViewString(view, "formID")),
+			gosx.Attr("formaction", core.WorkbenchViewString(view, "scheduleAction")),
 			gosx.Attr("formmethod", "post"),
 			gosx.Attr("data-admin-confirm", "Schedule this draft?"),
 			gosx.Attr("data-studio-submit-action", "schedule"),
-			gosx.Attr("data-studio-field-action-formaction", workbenchMapString(view, "scheduleAction")),
+			gosx.Attr("data-studio-field-action-formaction", core.WorkbenchViewString(view, "scheduleAction")),
 		), gosx.Text("Schedule")))
 	}
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-publish-panel__schedule")), gosx.Fragment(children...))
@@ -301,11 +301,11 @@ func renderPublishPanelSchedule(view map[string]any) gosx.Node {
 
 func renderPublishPanelDecision(view map[string]any) gosx.Node {
 	children := []gosx.Node{}
-	if workbenchMapBool(view, "hasApproval") {
-		children = append(children, renderPublishPanelApproval(workbenchViewMap(view, "approval")))
+	if core.WorkbenchViewBool(view, "hasApproval") {
+		children = append(children, renderPublishPanelApproval(core.WorkbenchViewMap(view, "approval")))
 	}
-	if workbenchMapBool(view, "hasSchedule") {
-		children = append(children, renderPublishPanelScheduleDecision(workbenchViewMap(view, "schedule")))
+	if core.WorkbenchViewBool(view, "hasSchedule") {
+		children = append(children, renderPublishPanelScheduleDecision(core.WorkbenchViewMap(view, "schedule")))
 	}
 	return gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", "studio-publish-panel__decision"),
@@ -316,29 +316,29 @@ func renderPublishPanelDecision(view map[string]any) gosx.Node {
 func renderPublishPanelApproval(approval map[string]any) gosx.Node {
 	children := []gosx.Node{
 		gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-publish-review__decision-head")),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(approval, "label"))),
-			gosx.El("output", nil, gosx.Text(workbenchMapString(approval, "statusLabel"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(approval, "label"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(approval, "statusLabel"))),
 		),
-		gosx.El("p", gosx.Attrs(gosx.Attr("class", "studio-publish-review__decision-summary")), gosx.Text(workbenchMapString(approval, "summary"))),
-		gosx.El("p", gosx.Attrs(gosx.Attr("class", "studio-publish-review__detail")), gosx.Text(workbenchMapString(approval, "detail"))),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "studio-publish-review__decision-summary")), gosx.Text(core.WorkbenchViewString(approval, "summary"))),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "studio-publish-review__detail")), gosx.Text(core.WorkbenchViewString(approval, "detail"))),
 	}
-	if workbenchMapBool(approval, "hasHref") {
+	if core.WorkbenchViewBool(approval, "hasHref") {
 		children = append(children, gosx.El("a", gosx.Attrs(
-			gosx.Attr("href", workbenchMapString(approval, "href")),
+			gosx.Attr("href", core.WorkbenchViewString(approval, "href")),
 			gosx.Attr("data-gosx-link", "true"),
-		), gosx.Text(workbenchMapString(approval, "actionLabel"))))
+		), gosx.Text(core.WorkbenchViewString(approval, "actionLabel"))))
 	}
-	return gosx.El("article", gosx.Attrs(gosx.Attr("class", workbenchMapString(approval, "class"))), gosx.Fragment(children...))
+	return gosx.El("article", gosx.Attrs(gosx.Attr("class", core.WorkbenchViewString(approval, "class"))), gosx.Fragment(children...))
 }
 
 func renderPublishPanelScheduleDecision(schedule map[string]any) gosx.Node {
-	return gosx.El("article", gosx.Attrs(gosx.Attr("class", workbenchMapString(schedule, "class"))),
+	return gosx.El("article", gosx.Attrs(gosx.Attr("class", core.WorkbenchViewString(schedule, "class"))),
 		gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-publish-review__decision-head")),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(schedule, "label"))),
-			gosx.El("output", nil, gosx.Text(workbenchMapString(schedule, "statusLabel"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(schedule, "label"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(schedule, "statusLabel"))),
 		),
-		gosx.El("p", gosx.Attrs(gosx.Attr("class", "studio-publish-review__decision-summary")), gosx.Text(workbenchMapString(schedule, "summary"))),
-		gosx.El("p", gosx.Attrs(gosx.Attr("class", "studio-publish-review__detail")), gosx.Text(workbenchMapString(schedule, "detail"))),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "studio-publish-review__decision-summary")), gosx.Text(core.WorkbenchViewString(schedule, "summary"))),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "studio-publish-review__detail")), gosx.Text(core.WorkbenchViewString(schedule, "detail"))),
 	)
 }
 
@@ -347,9 +347,9 @@ func renderPublishPanelSummary(view map[string]any) gosx.Node {
 		gosx.Attr("class", "studio-publish-review__summary"),
 		gosx.Attr("aria-label", "Publish review summary"),
 	),
-		gosx.El("span", nil, gosx.El("strong", nil, gosx.Text(workbenchMapString(view, "readyCountLabel"))), gosx.Text("clear")),
-		gosx.El("span", nil, gosx.El("strong", nil, gosx.Text(workbenchMapString(view, "watchCountLabel"))), gosx.Text("watch")),
-		gosx.El("span", nil, gosx.El("strong", nil, gosx.Text(workbenchMapString(view, "nextCountLabel"))), gosx.Text("next")),
+		gosx.El("span", nil, gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(view, "readyCountLabel"))), gosx.Text("clear")),
+		gosx.El("span", nil, gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(view, "watchCountLabel"))), gosx.Text("watch")),
+		gosx.El("span", nil, gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(view, "nextCountLabel"))), gosx.Text("next")),
 	)
 }
 
@@ -359,23 +359,23 @@ func renderPublishPanelChecks(checks []map[string]any) gosx.Node {
 		children := []gosx.Node{
 			gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-publish-review__card-head")),
 				gosx.El("div", nil,
-					gosx.El("strong", nil, gosx.Text(workbenchMapString(check, "label"))),
-					gosx.El("span", nil, gosx.Text(workbenchMapString(check, "scope"))),
+					gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(check, "label"))),
+					gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(check, "scope"))),
 				),
-				gosx.El("output", nil, gosx.Text(workbenchMapString(check, "statusLabel"))),
+				gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(check, "statusLabel"))),
 			),
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", "studio-publish-review__check-summary")), gosx.Text(workbenchMapString(check, "summary"))),
-			gosx.El("p", gosx.Attrs(gosx.Attr("class", "studio-publish-review__detail")), gosx.Text(workbenchMapString(check, "detail"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "studio-publish-review__check-summary")), gosx.Text(core.WorkbenchViewString(check, "summary"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "studio-publish-review__detail")), gosx.Text(core.WorkbenchViewString(check, "detail"))),
 		}
-		if workbenchMapBool(check, "hasHref") {
+		if core.WorkbenchViewBool(check, "hasHref") {
 			children = append(children, gosx.El("a", gosx.Attrs(
-				gosx.Attr("href", workbenchMapString(check, "href")),
+				gosx.Attr("href", core.WorkbenchViewString(check, "href")),
 				gosx.Attr("data-gosx-link", "true"),
-			), gosx.Text(workbenchMapString(check, "actionLabel"))))
+			), gosx.Text(core.WorkbenchViewString(check, "actionLabel"))))
 		}
 		nodes = append(nodes, gosx.El("article", gosx.Attrs(
-			gosx.Attr("class", workbenchMapString(check, "class")),
-			gosx.Attr("data-studio-publish-check", workbenchMapString(check, "key")),
+			gosx.Attr("class", core.WorkbenchViewString(check, "class")),
+			gosx.Attr("data-studio-publish-check", core.WorkbenchViewString(check, "key")),
 		), gosx.Fragment(children...)))
 	}
 	return gosx.El("div", gosx.Attrs(
@@ -388,15 +388,15 @@ func renderPublishPanelImpacts(impacts []map[string]any) gosx.Node {
 	nodes := make([]gosx.Node, 0, len(impacts))
 	for _, impact := range impacts {
 		nodes = append(nodes, gosx.El("article", gosx.Attrs(
-			gosx.Attr("class", workbenchMapString(impact, "class")),
-			gosx.Attr("data-studio-publish-impact", workbenchMapString(impact, "key")),
+			gosx.Attr("class", core.WorkbenchViewString(impact, "class")),
+			gosx.Attr("data-studio-publish-impact", core.WorkbenchViewString(impact, "key")),
 		),
 			gosx.El("div", nil,
-				gosx.El("strong", nil, gosx.Text(workbenchMapString(impact, "label"))),
-				gosx.El("span", nil, gosx.Text(workbenchMapString(impact, "scope"))),
+				gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(impact, "label"))),
+				gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(impact, "scope"))),
 			),
-			gosx.El("output", nil, gosx.Text(workbenchMapString(impact, "value"))),
-			gosx.El("p", nil, gosx.Text(workbenchMapString(impact, "detail"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(impact, "value"))),
+			gosx.El("p", nil, gosx.Text(core.WorkbenchViewString(impact, "detail"))),
 		))
 	}
 	return gosx.El("section", gosx.Attrs(
@@ -410,7 +410,7 @@ func renderPublishPanelImpacts(impacts []map[string]any) gosx.Node {
 
 func renderPublishPanelActivity(node gosx.Node) gosx.Node {
 	children := []gosx.Node{}
-	if !workbenchNodeEmpty(node) {
+	if !core.WorkbenchNodeEmpty(node) {
 		children = append(children, node)
 	}
 	return gosx.El("section", gosx.Attrs(
@@ -430,7 +430,7 @@ func renderPublishPanelActivity(node gosx.Node) gosx.Node {
 
 func renderPublishPanelHistory(node gosx.Node) gosx.Node {
 	children := []gosx.Node{}
-	if !workbenchNodeEmpty(node) {
+	if !core.WorkbenchNodeEmpty(node) {
 		children = append(children, node)
 	}
 	return gosx.El("section", gosx.Attrs(

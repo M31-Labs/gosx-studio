@@ -1,20 +1,18 @@
 package sitemap
 
-// This file carries small, dependency-free helpers and one larger widget
-// renderer that sitemap_board.go, sitemap_authoring_panels.go,
-// sitemap_authoring_forms.go, and site_navigator_panel.go need but that
-// still live as originals in not-yet-migrated root files
-// (workbench_toolbar.go, workbench_frame.go, block_library_panel.go,
-// inspector.go — see .tiller/scratch/gosx-studio-restructure-spec-v0.1.md,
-// panels/shell rows in §1). sitemap may import only core and authoring (§1
-// Import DAG), and those root files belong to the panels (Slice 6) and
-// shell (Slice 8) packages, so sitemap cannot reach their implementations
-// directly without an import that the DAG forbids (a peer/upward import).
-// Rather than force that import, this slice carries its own copy, matching
-// the existing precedent of duplicated helpers the spec itself documents
-// (§1 "Text helpers" seam, and canvas/support.go's identical treatment of
-// this same map-shape family for Slice 4) until a later slice promotes a
-// single shared home and every copy converges.
+// This file carries the block-library attribute helpers, the inspector-widget
+// renderer, and the site-map default engine-name constant that
+// sitemap_board.go, sitemap_authoring_panels.go, sitemap_authoring_forms.go,
+// and site_navigator_panel.go need. sitemap may import only core and authoring
+// (§1 Import DAG), so it cannot reach the canonical copies in the panels (Slice
+// 6) and shell (Slice 8) packages without a forbidden peer/upward import.
+//
+// As of Slice 8 the map-shape workbench helpers this file used to duplicate
+// converged into core (core/workbench_view.go) — callers use core.Workbench*.
+// The remaining frozen copies below (RenderInspectorControl + its widget vs.
+// panels/inspector.go, and siteMapEngineDefaultName vs. shell.SiteMapEngineName)
+// are guarded against drift by shell/frozen_copy_sync_test.go, the only place
+// that may import both sides.
 
 import (
 	"sort"
@@ -24,109 +22,6 @@ import (
 
 	"m31labs.dev/gosx-studio/core"
 )
-
-// workbenchViewMap reads values[key] as a map[string]any, converting a
-// map[string]string shape as needed. Mirrors workbench_frame.go's
-// workbenchViewMap.
-func workbenchViewMap(view map[string]any, key string) map[string]any {
-	if view == nil {
-		return nil
-	}
-	switch typed := view[key].(type) {
-	case map[string]any:
-		return typed
-	case map[string]string:
-		out := make(map[string]any, len(typed))
-		for key, value := range typed {
-			out[key] = value
-		}
-		return out
-	default:
-		return nil
-	}
-}
-
-// workbenchViewBool reads values[key] as a bool, accepting a case-insensitive
-// "true" string as truthy. Mirrors workbench_frame.go's workbenchViewBool
-// (identical to workbench_toolbar.go's workbenchMapBool).
-func workbenchViewBool(view map[string]any, key string) bool {
-	if view == nil {
-		return false
-	}
-	switch typed := view[key].(type) {
-	case bool:
-		return typed
-	case string:
-		return strings.EqualFold(strings.TrimSpace(typed), "true")
-	default:
-		return false
-	}
-}
-
-// workbenchMapBool is the workbench_toolbar.go-named twin of
-// workbenchViewBool; sitemap_board.go calls both bare names.
-func workbenchMapBool(values map[string]any, key string) bool {
-	return workbenchViewBool(values, key)
-}
-
-// workbenchViewString reads values[key] as a trimmed string, formatting
-// non-string values with core.FmtAny. Mirrors workbench_toolbar.go's
-// workbenchViewString.
-func workbenchViewString(view map[string]any, key string) string {
-	if view == nil {
-		return ""
-	}
-	value, ok := view[key]
-	if !ok || value == nil {
-		return ""
-	}
-	switch typed := value.(type) {
-	case string:
-		return strings.TrimSpace(typed)
-	default:
-		return strings.TrimSpace(core.FmtAny(typed))
-	}
-}
-
-// workbenchMapString is the workbench_toolbar.go-named twin of
-// workbenchViewString; sitemap_board.go/sitemap_authoring_panels.go call
-// both bare names.
-func workbenchMapString(values map[string]any, key string) string {
-	return workbenchViewString(values, key)
-}
-
-// workbenchViewMapList reads values[key] as a []map[string]any, converting a
-// []map[string]string shape as needed. Mirrors workbench_toolbar.go's
-// workbenchViewMapList (identical to sitemap_authoring_panels.go's
-// SiteMapMapList, which stays local to this package).
-func workbenchViewMapList(view map[string]any, key string) []map[string]any {
-	if view == nil {
-		return nil
-	}
-	switch typed := view[key].(type) {
-	case []map[string]any:
-		return typed
-	case []map[string]string:
-		out := make([]map[string]any, 0, len(typed))
-		for _, item := range typed {
-			next := make(map[string]any, len(item))
-			for key, value := range item {
-				next[key] = value
-			}
-			out = append(out, next)
-		}
-		return out
-	default:
-		return nil
-	}
-}
-
-// workbenchNodeEmpty reports whether a rendered gosx.Node is the empty/zero
-// fragment. Mirrors workbench_toolbar.go's workbenchNodeEmpty.
-func workbenchNodeEmpty(node gosx.Node) bool {
-	html := gosx.RenderHTML(node)
-	return html == "" || html == "<></>"
-}
 
 // appendBlockLibraryPanelAttrs appends the caller-supplied root attribute map
 // (already rendered as gosx.Attr values) onto attrs. Mirrors
@@ -191,9 +86,9 @@ func blockLibraryPanelMapAttrs(values map[string]any) []any {
 // sitemap, not below it, so importing it would be a forbidden peer import.
 // Reconcile when a later slice gives this widget a shared home.
 func RenderInspectorControl(control map[string]any, formID, inputName string) gosx.Node {
-	kind := workbenchMapString(control, "kind")
-	value := workbenchMapString(control, "value")
-	actionLabel := core.FirstNonEmpty(workbenchMapString(control, "actionLabel"), "Save field")
+	kind := core.WorkbenchViewString(control, "kind")
+	value := core.WorkbenchViewString(control, "value")
+	actionLabel := core.FirstNonEmpty(core.WorkbenchViewString(control, "actionLabel"), "Save field")
 	hiddenInputs := SiteMapHiddenInputs(formID, SiteMapInputViews(control, "formInputs"), inputName)
 
 	widget := inspectorWidget(kind, value, formID, inputName, control)
@@ -394,8 +289,8 @@ func inspectorControlOptions(control map[string]any) []map[string]string {
 		out := make([]map[string]string, 0, len(typed))
 		for _, item := range typed {
 			out = append(out, map[string]string{
-				"value": workbenchMapString(item, "value"),
-				"label": workbenchMapString(item, "label"),
+				"value": core.WorkbenchViewString(item, "value"),
+				"label": core.WorkbenchViewString(item, "label"),
 			})
 		}
 		return out

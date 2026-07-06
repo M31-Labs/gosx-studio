@@ -1,11 +1,13 @@
-package studio
+package shell
 
 import (
 	"testing"
 
 	"m31labs.dev/gosx-studio/blocklayoutruntime"
 	"m31labs.dev/gosx-studio/brandruntime"
+	"m31labs.dev/gosx-studio/core"
 	"m31labs.dev/gosx-studio/fieldruntime"
+	"m31labs.dev/gosx-studio/hostruntime"
 	"m31labs.dev/gosx-studio/inlineeditruntime"
 	"m31labs.dev/gosx-studio/previewruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
@@ -58,7 +60,7 @@ func TestDefaultShellConfigOwnsReusableStudioChrome(t *testing.T) {
 			t.Fatalf("%q must default to true post-legacy-deletion; got false", flag)
 		}
 	}
-	if _, ok := config.Adapter(ResourceProducts); !ok {
+	if _, ok := config.Adapter(core.ResourceProducts); !ok {
 		t.Fatalf("expected product resource adapter in %#v", config.Adapters)
 	}
 }
@@ -66,7 +68,7 @@ func TestDefaultShellConfigOwnsReusableStudioChrome(t *testing.T) {
 func TestShellConfigNormalizesHostOverrides(t *testing.T) {
 	config := ShellConfig{
 		Labels: HostLabels{EditorTitle: " Custom studio "},
-		Canvas: CanvasConfig{PreviewShell: CanvasPreviewShell{
+		Canvas: CanvasConfig{PreviewShell: core.CanvasPreviewShell{
 			OverlayAttr:     "data-custom-overlay",
 			InlineEditClass: "custom-inline",
 		}},
@@ -179,13 +181,13 @@ func TestEngineHostViewProjectsNormalizedEngine(t *testing.T) {
 }
 
 func TestStudioRuntimePathsArePublicContracts(t *testing.T) {
-	if RuntimeRoot != "/_gosx/studio" {
-		t.Fatalf("runtime root = %q", RuntimeRoot)
+	if hostruntime.RuntimeRoot != "/_gosx/studio" {
+		t.Fatalf("runtime root = %q", hostruntime.RuntimeRoot)
 	}
-	if StylesheetPath != RuntimeRoot+"/studio.css" || EngineRuntimePath != RuntimeRoot+"/studio-engines.js" {
-		t.Fatalf("runtime paths = %q %q", StylesheetPath, EngineRuntimePath)
+	if hostruntime.StylesheetPath != hostruntime.RuntimeRoot+"/studio.css" || hostruntime.EngineRuntimePath != hostruntime.RuntimeRoot+"/studio-engines.js" {
+		t.Fatalf("runtime paths = %q %q", hostruntime.StylesheetPath, hostruntime.EngineRuntimePath)
 	}
-	if WorkbenchRuntimePath == "" || CommandRuntimePath == "" || StateRuntimePath == "" {
+	if hostruntime.WorkbenchRuntimePath == "" || hostruntime.CommandRuntimePath == "" || hostruntime.StateRuntimePath == "" {
 		t.Fatalf("script paths should be declared")
 	}
 	if CanvasEngineName != "GoSXStudioCanvas" || SiteMapEngineName != "GoSXStudioSiteMap" || FlowDesignerName != "GoSXStudioFlowDesigner" || BlockLayoutEngineName != "GoSXStudioBlockLayout" || Showcase3DEngineName != "GoSXStudioShowcase3D" {

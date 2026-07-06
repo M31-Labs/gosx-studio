@@ -1,10 +1,11 @@
-package studio
+package shell
 
 import (
 	"strings"
 
 	"m31labs.dev/gosx-studio/blocklayoutruntime"
 	"m31labs.dev/gosx-studio/brandruntime"
+	"m31labs.dev/gosx-studio/core"
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/inlineeditruntime"
 	"m31labs.dev/gosx-studio/previewruntime"
@@ -38,8 +39,8 @@ type ShellConfig struct {
 	Resources    []ResourceConfig
 	Panels       []PanelConfig
 	Engines      []EngineConfig
-	Adapters     []ResourceAdapter
-	SiteMap      SiteMap
+	Adapters     []core.ResourceAdapter
+	SiteMap      core.SiteMap
 	Actions      []ActionConfig
 	Permissions  PermissionConfig
 	FeatureFlags map[string]bool
@@ -53,7 +54,7 @@ type HostLabels struct {
 }
 
 type CanvasConfig struct {
-	PreviewShell CanvasPreviewShell
+	PreviewShell core.CanvasPreviewShell
 }
 
 type ModeConfig struct {
@@ -108,7 +109,7 @@ func DefaultShellConfig() ShellConfig {
 			PublishLabel: "Publish",
 		},
 		Canvas: CanvasConfig{
-			PreviewShell: DefaultCanvasPreviewShell(),
+			PreviewShell: core.DefaultCanvasPreviewShell(),
 		},
 		Modes: []ModeConfig{
 			{Key: "home", Label: "Home", Summary: "Page content and section layout."},
@@ -132,7 +133,7 @@ func DefaultShellConfig() ShellConfig {
 			{Key: "block-layout", Name: BlockLayoutEngineName, MountID: "gosx-studio-block-layout-engine", Capabilities: []string{"pointer", "keyboard", "text-input", "animation"}},
 			{Key: "showcase-3d", Name: Showcase3DEngineName, MountID: "gosx-studio-showcase-3d-engine", Capabilities: []string{"canvas", "webgl", "webgpu", "pointer", "keyboard", "animation"}},
 		},
-		Adapters: DefaultResourceAdapters(),
+		Adapters: core.DefaultResourceAdapters(),
 		Actions: []ActionConfig{
 			{Key: "save", Label: "Save", Method: "POST", Primary: true},
 			{Key: "publish", Label: "Publish", Method: "POST", Primary: true},
@@ -164,10 +165,10 @@ func DefaultShellConfig() ShellConfig {
 func (config ShellConfig) Normalize() ShellConfig {
 	defaults := DefaultShellConfig()
 	out := config
-	out.Labels.ProductName = firstNonEmpty(out.Labels.ProductName, defaults.Labels.ProductName)
-	out.Labels.EditorTitle = firstNonEmpty(out.Labels.EditorTitle, defaults.Labels.EditorTitle)
-	out.Labels.PreviewLabel = firstNonEmpty(out.Labels.PreviewLabel, defaults.Labels.PreviewLabel)
-	out.Labels.PublishLabel = firstNonEmpty(out.Labels.PublishLabel, defaults.Labels.PublishLabel)
+	out.Labels.ProductName = core.FirstNonEmpty(out.Labels.ProductName, defaults.Labels.ProductName)
+	out.Labels.EditorTitle = core.FirstNonEmpty(out.Labels.EditorTitle, defaults.Labels.EditorTitle)
+	out.Labels.PreviewLabel = core.FirstNonEmpty(out.Labels.PreviewLabel, defaults.Labels.PreviewLabel)
+	out.Labels.PublishLabel = core.FirstNonEmpty(out.Labels.PublishLabel, defaults.Labels.PublishLabel)
 	out.Canvas = out.Canvas.Normalize()
 	out.Modes = normalizeModes(out.Modes, defaults.Modes)
 	out.Panels = normalizePanels(out.Panels, defaults.Panels)
@@ -208,8 +209,8 @@ func (config ShellConfig) Engine(key string) (EngineConfig, bool) {
 	return EngineConfig{}, false
 }
 
-func (config ShellConfig) Adapter(kind ResourceKind) (ResourceAdapter, bool) {
-	return ResourceAdapterByKind(config.Normalize().Adapters, kind)
+func (config ShellConfig) Adapter(kind core.ResourceKind) (core.ResourceAdapter, bool) {
+	return core.ResourceAdapterByKind(config.Normalize().Adapters, kind)
 }
 
 func (config ShellConfig) FeatureEnabled(key string) bool {
@@ -266,11 +267,11 @@ func normalizeResources(values []ResourceConfig) []ResourceConfig {
 	return out
 }
 
-func normalizeResourceAdapters(values []ResourceAdapter, defaults []ResourceAdapter) []ResourceAdapter {
+func normalizeResourceAdapters(values []core.ResourceAdapter, defaults []core.ResourceAdapter) []core.ResourceAdapter {
 	if len(values) == 0 {
 		values = defaults
 	}
-	out := make([]ResourceAdapter, 0, len(values))
+	out := make([]core.ResourceAdapter, 0, len(values))
 	for _, value := range values {
 		value = value.Normalize()
 		if value.Label == "" {

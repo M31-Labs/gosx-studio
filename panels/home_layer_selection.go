@@ -1,6 +1,9 @@
 package panels
 
-import "m31labs.dev/gosx"
+import (
+	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/core"
+)
 
 type HomeLayerSelectionItem struct {
 	Key   string
@@ -15,8 +18,8 @@ type HomeLayerSelectionProps struct {
 
 func HomeLayerSelectionPropsFromMap(view map[string]any) HomeLayerSelectionProps {
 	return HomeLayerSelectionProps{
-		DefaultSelectedKey:   workbenchMapString(view, "defaultSelectedKey"),
-		DefaultSelectedLabel: workbenchMapString(view, "defaultSelectedLabel"),
+		DefaultSelectedKey:   core.WorkbenchViewString(view, "defaultSelectedKey"),
+		DefaultSelectedLabel: core.WorkbenchViewString(view, "defaultSelectedLabel"),
 		Items:                homeLayerSelectionItemsFromMap(view),
 	}
 }
@@ -37,12 +40,12 @@ func RenderHomeLayerSelection(props HomeLayerSelectionProps) gosx.Node {
 }
 
 func homeLayerSelectionItemsFromMap(view map[string]any) []HomeLayerSelectionItem {
-	items := workbenchViewMapList(view, "items")
+	items := core.WorkbenchViewMapList(view, "items")
 	out := make([]HomeLayerSelectionItem, 0, len(items))
 	for _, item := range items {
 		out = append(out, HomeLayerSelectionItem{
-			Key:   workbenchMapString(item, "key"),
-			Label: workbenchMapString(item, "label"),
+			Key:   core.WorkbenchViewString(item, "key"),
+			Label: core.WorkbenchViewString(item, "label"),
 		})
 	}
 	return out

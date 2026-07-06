@@ -359,14 +359,7 @@ func RenderStylePanel(view map[string]any, formID, action, csrfToken string) gos
 	return panels.RenderStylePanel(view, formID, action, csrfToken)
 }
 
-// --- Unexported shims for not-yet-moved root files ---
-//
-// block_library_panel.go also carried an unexported attribute-map render
-// helper that workbench_frame.go (shell package territory, Slice 8) calls by
-// its original lowercase name. panels exports the equivalent implementation
-// as BlockLibraryPanelMapAttrs (see that package's doc comment); this var
-// keeps that call site compiling unchanged, and will disappear once
-// workbench_frame.go moves to its own subpackage in a later slice (mirrors
-// compat_canvas.go's and compat_sitemap.go's identical treatment of this
-// exact seam from Slices 4 and 5).
-var blockLibraryPanelMapAttrs = panels.BlockLibraryPanelMapAttrs
+// The unexported blockLibraryPanelMapAttrs shim (formerly here for
+// workbench_frame.go) was removed in Slice 8 when workbench_frame.go moved to
+// the shell package; shell references panels.BlockLibraryPanelMapAttrs
+// directly, so no root shim remains.

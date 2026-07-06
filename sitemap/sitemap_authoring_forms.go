@@ -23,26 +23,26 @@ type SiteMapAuthoringFormsOptions struct {
 }
 
 func RenderSiteMapAuthoringForms(siteMapView map[string]any, options SiteMapAuthoringFormsOptions) gosx.Node {
-	intents := workbenchViewMapList(siteMapView, "compositionIntents")
+	intents := core.WorkbenchViewMapList(siteMapView, "compositionIntents")
 	nodes := make([]gosx.Node, 0, len(intents)+6)
 	for _, intent := range intents {
-		formID := workbenchMapString(intent, "formID")
+		formID := core.WorkbenchViewString(intent, "formID")
 		if formID == "" {
 			continue
 		}
-		nodes = append(nodes, renderSiteMapAuthoringForm(formID, options.Action, options, gosx.Attr("data-studio-composition-intent-form", workbenchMapString(intent, "key"))))
+		nodes = append(nodes, renderSiteMapAuthoringForm(formID, options.Action, options, gosx.Attr("data-studio-composition-intent-form", core.WorkbenchViewString(intent, "key"))))
 	}
 	operationForms := []struct {
 		enabled bool
 		id      string
 		kind    string
 	}{
-		{workbenchViewBool(siteMapView, "hasMetadataPage"), core.FirstNonEmpty(options.MetadataFormID, defaultSiteMapMetadataFormID), "metadata"},
-		{workbenchViewBool(siteMapView, "hasEditableControl"), core.FirstNonEmpty(options.ControlFormID, defaultSiteMapControlFormID), "editable-control"},
-		{workbenchViewBool(siteMapView, "hasReorderComponent"), core.FirstNonEmpty(options.ReorderFormID, defaultSiteMapReorderFormID), "reorder"},
-		{workbenchViewBool(siteMapView, "hasDuplicateComponent"), core.FirstNonEmpty(options.DuplicateFormID, defaultSiteMapDuplicateFormID), "duplicate"},
-		{workbenchViewBool(siteMapView, "hasVisibilityComponent"), core.FirstNonEmpty(options.VisibilityFormID, defaultSiteMapVisibilityFormID), "visibility"},
-		{workbenchViewBool(siteMapView, "hasDeleteComponent"), core.FirstNonEmpty(options.DeleteFormID, defaultSiteMapDeleteFormID), "delete"},
+		{core.WorkbenchViewBool(siteMapView, "hasMetadataPage"), core.FirstNonEmpty(options.MetadataFormID, defaultSiteMapMetadataFormID), "metadata"},
+		{core.WorkbenchViewBool(siteMapView, "hasEditableControl"), core.FirstNonEmpty(options.ControlFormID, defaultSiteMapControlFormID), "editable-control"},
+		{core.WorkbenchViewBool(siteMapView, "hasReorderComponent"), core.FirstNonEmpty(options.ReorderFormID, defaultSiteMapReorderFormID), "reorder"},
+		{core.WorkbenchViewBool(siteMapView, "hasDuplicateComponent"), core.FirstNonEmpty(options.DuplicateFormID, defaultSiteMapDuplicateFormID), "duplicate"},
+		{core.WorkbenchViewBool(siteMapView, "hasVisibilityComponent"), core.FirstNonEmpty(options.VisibilityFormID, defaultSiteMapVisibilityFormID), "visibility"},
+		{core.WorkbenchViewBool(siteMapView, "hasDeleteComponent"), core.FirstNonEmpty(options.DeleteFormID, defaultSiteMapDeleteFormID), "delete"},
 	}
 	for _, form := range operationForms {
 		if !form.enabled {

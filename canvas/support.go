@@ -4,75 +4,22 @@ import (
 	"net/url"
 	"strings"
 
-	"m31labs.dev/gosx"
 	"m31labs.dev/gosx/engine"
 
 	"m31labs.dev/gosx-studio/core"
 )
 
-// This file carries small, dependency-free helpers that engine_hosts.go,
-// block_layout_engine.go, and sitemap_canvas.go need but that still live as
-// unexported duplicates in not-yet-migrated root files (workbench_toolbar.go,
-// sitemap_authoring_panels.go, sitemap_engine.go — see
-// .tiller/scratch/gosx-studio-restructure-spec-v0.1.md, sitemap/shell rows in
-// §1). canvas may import only core (§1 Import DAG), and those root files
-// belong to the sitemap (Slice 5) and shell (Slice 8) packages, so canvas
-// cannot reach their implementations directly without an import that the DAG
-// forbids (a peer/upward import). Rather than force that import, this slice
-// carries its own copy, matching the existing precedent of duplicated
-// helpers the spec itself documents (§1 "Text helpers" seam) until a later
-// slice promotes a single shared home (likely core) and every copy converges.
-//
-// mapString reads values[key] as a trimmed string, formatting non-string
-// values with core.FmtAny. Mirrors workbench_toolbar.go's workbenchMapString.
-func mapString(values map[string]any, key string) string {
-	if values == nil {
-		return ""
-	}
-	value, ok := values[key]
-	if !ok || value == nil {
-		return ""
-	}
-	switch typed := value.(type) {
-	case string:
-		return strings.TrimSpace(typed)
-	default:
-		return strings.TrimSpace(core.FmtAny(typed))
-	}
-}
-
-// mapList reads values[key] as a []map[string]any, converting a
-// []map[string]string shape as needed. Mirrors workbench_toolbar.go's
-// workbenchViewMapList and sitemap_authoring_panels.go's siteMapMapList
-// (identical logic; that duplication predates this slice).
-func mapList(values map[string]any, key string) []map[string]any {
-	if values == nil {
-		return nil
-	}
-	switch typed := values[key].(type) {
-	case []map[string]any:
-		return typed
-	case []map[string]string:
-		out := make([]map[string]any, 0, len(typed))
-		for _, item := range typed {
-			next := make(map[string]any, len(item))
-			for k, v := range item {
-				next[k] = v
-			}
-			out = append(out, next)
-		}
-		return out
-	default:
-		return nil
-	}
-}
-
-// nodeEmpty reports whether a rendered gosx.Node is the empty/zero fragment.
-// Mirrors workbench_toolbar.go's workbenchNodeEmpty.
-func nodeEmpty(node gosx.Node) bool {
-	html := gosx.RenderHTML(node)
-	return html == "" || html == "<></>"
-}
+// This file carries small, dependency-free engine-capability helpers plus the
+// frozen rendered-page-contract constants (hostruntime asset paths, the
+// block-layout default engine name, and assetHref) that engine_hosts.go,
+// block_layout_engine.go, and sitemap_canvas.go need. canvas may import only
+// core (§1 Import DAG) and stays a leaf package, so it cannot reach
+// hostruntime (a peer) directly. The former workbenchView*/mapString/mapList/
+// nodeEmpty duplicates in this file converged into core in Slice 8 (see
+// core/workbench_view.go); callers now use core.Workbench*. The remaining
+// frozen values below are guarded against drift by a shell sync-guard test
+// (shell/frozen_copy_sync_test.go), which is the only package that may import
+// both canvas and hostruntime.
 
 // engineCapabilityStrings normalizes a loosely-typed capability value (a
 // comma/space-separated string, []string, []engine.Capability, []any, or any

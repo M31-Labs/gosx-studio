@@ -60,8 +60,8 @@ func RenderSiteMapBoard(siteMapView map[string]any, options SiteMapBoardOptions)
 		renderSiteMapBoardToolbar(siteMapView, state),
 		gosx.El("p", gosx.Attrs(
 			gosx.Attr("class", "empty"),
-			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(!workbenchViewBool(siteMapView, "hasPages"))),
-		), gosx.Text(workbenchViewString(siteMapView, "empty"))),
+			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(!core.WorkbenchViewBool(siteMapView, "hasPages"))),
+		), gosx.Text(core.WorkbenchViewString(siteMapView, "empty"))),
 	}
 	bodyChildren := []gosx.Node{
 		renderSiteMapBoardWorkspace(siteMapView, state),
@@ -73,7 +73,7 @@ func RenderSiteMapBoard(siteMapView map[string]any, options SiteMapBoardOptions)
 	}
 	children = append(children, gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", "studio-site-map-board__body"),
-		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchViewBool(siteMapView, "hasPages"))),
+		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(siteMapView, "hasPages"))),
 	), gosx.Fragment(bodyChildren...)))
 
 	return gosx.El("section", gosx.Attrs(
@@ -100,24 +100,24 @@ func RenderSiteMapBoard(siteMapView map[string]any, options SiteMapBoardOptions)
 
 func siteMapBoardInitialState(siteMapView map[string]any, options SiteMapBoardOptions) siteMapBoardState {
 	return siteMapBoardState{
-		group:                 core.FirstNonEmpty(options.DefaultGroupKey, workbenchViewString(siteMapView, "defaultGroupKey"), "all"),
-		detail:                core.FirstNonEmpty(options.DefaultDetailKey, workbenchViewString(siteMapView, "defaultDetailKey"), "map"),
+		group:                 core.FirstNonEmpty(options.DefaultGroupKey, core.WorkbenchViewString(siteMapView, "defaultGroupKey"), "all"),
+		detail:                core.FirstNonEmpty(options.DefaultDetailKey, core.WorkbenchViewString(siteMapView, "defaultDetailKey"), "map"),
 		palette:               core.FirstNonEmpty(options.DefaultPaletteKey, "all"),
-		focus:                 core.FirstNonEmpty(options.DefaultFocusKey, workbenchViewString(siteMapView, "defaultFocusKey"), "all"),
+		focus:                 core.FirstNonEmpty(options.DefaultFocusKey, core.WorkbenchViewString(siteMapView, "defaultFocusKey"), "all"),
 		zoom:                  core.FirstNonEmpty(options.DefaultZoomKey, "fit"),
 		density:               core.FirstNonEmpty(options.DefaultDensityKey, "roomy"),
 		grid:                  core.FirstNonEmpty(options.DefaultGridKey, "on"),
-		selectedBlueprintKey:  workbenchViewString(siteMapView, "defaultBlueprintKey"),
-		selectedTemplateKey:   workbenchViewString(siteMapView, "defaultTemplateKey"),
-		selectedNodeKey:       workbenchViewString(siteMapView, "defaultWorkspaceNodeKey"),
-		selectedNodeLabel:     workbenchViewString(siteMapView, "defaultWorkspaceNodeLabel"),
-		selectedNodeKind:      workbenchViewString(siteMapView, "defaultWorkspaceNodeKind"),
-		selectedNodeSummary:   workbenchViewString(siteMapView, "defaultWorkspaceNodeSummary"),
-		selectedNodeRoute:     workbenchViewString(siteMapView, "defaultWorkspaceNodeRoute"),
-		selectedNodeSource:    workbenchViewString(siteMapView, "defaultWorkspaceNodeSource"),
-		selectedNodeBinding:   workbenchViewString(siteMapView, "defaultWorkspaceNodeBinding"),
-		selectedNodeStatus:    workbenchViewString(siteMapView, "defaultWorkspaceNodeStatus"),
-		selectedNodeComponent: workbenchViewString(siteMapView, "defaultWorkspaceNodeComponentLabel"),
+		selectedBlueprintKey:  core.WorkbenchViewString(siteMapView, "defaultBlueprintKey"),
+		selectedTemplateKey:   core.WorkbenchViewString(siteMapView, "defaultTemplateKey"),
+		selectedNodeKey:       core.WorkbenchViewString(siteMapView, "defaultWorkspaceNodeKey"),
+		selectedNodeLabel:     core.WorkbenchViewString(siteMapView, "defaultWorkspaceNodeLabel"),
+		selectedNodeKind:      core.WorkbenchViewString(siteMapView, "defaultWorkspaceNodeKind"),
+		selectedNodeSummary:   core.WorkbenchViewString(siteMapView, "defaultWorkspaceNodeSummary"),
+		selectedNodeRoute:     core.WorkbenchViewString(siteMapView, "defaultWorkspaceNodeRoute"),
+		selectedNodeSource:    core.WorkbenchViewString(siteMapView, "defaultWorkspaceNodeSource"),
+		selectedNodeBinding:   core.WorkbenchViewString(siteMapView, "defaultWorkspaceNodeBinding"),
+		selectedNodeStatus:    core.WorkbenchViewString(siteMapView, "defaultWorkspaceNodeStatus"),
+		selectedNodeComponent: core.WorkbenchViewString(siteMapView, "defaultWorkspaceNodeComponentLabel"),
 		inspectorInputID:      core.FirstNonEmpty(options.InspectorInputID, "studioSiteMapInspectorFocus"),
 	}
 }
@@ -163,14 +163,14 @@ func renderSiteMapBoardToolbar(siteMapView map[string]any, state siteMapBoardSta
 }
 
 func siteMapBoardPageChoices(siteMapView map[string]any) []siteMapBoardChoice {
-	pages := workbenchViewMapList(siteMapView, "pages")
+	pages := core.WorkbenchViewMapList(siteMapView, "pages")
 	choices := make([]siteMapBoardChoice, 0, len(pages))
 	for _, page := range pages {
-		key := workbenchMapString(page, "key")
+		key := core.WorkbenchViewString(page, "key")
 		if key == "" {
 			continue
 		}
-		choices = append(choices, siteMapBoardChoice{Label: workbenchMapString(page, "label"), Key: key})
+		choices = append(choices, siteMapBoardChoice{Label: core.WorkbenchViewString(page, "label"), Key: key})
 	}
 	return choices
 }
@@ -222,14 +222,14 @@ func renderSiteMapBoardWorkspace(siteMapView map[string]any, state siteMapBoardS
 				gosx.Attr("class", "studio-site-map-workspace__stats"),
 				gosx.Attr("aria-label", "Composition board summary"),
 			),
-				gosx.El("output", nil, gosx.Text(workbenchViewString(siteMapView, "workspaceLayerCountLabel"))),
-				gosx.El("output", nil, gosx.Text(workbenchViewString(siteMapView, "workspaceNodeCountLabel"))),
-				gosx.El("output", nil, gosx.Text(workbenchViewString(siteMapView, "workspaceLinkCountLabel"))),
+				gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "workspaceLayerCountLabel"))),
+				gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "workspaceNodeCountLabel"))),
+				gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "workspaceLinkCountLabel"))),
 			),
 		),
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-workspace__body"),
-			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchViewBool(siteMapView, "hasWorkspace"))),
+			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(siteMapView, "hasWorkspace"))),
 		),
 			gosx.El("div", gosx.Attrs(
 				gosx.Attr("class", "studio-site-map-workspace__canvas"),
@@ -256,41 +256,41 @@ func renderSiteMapBoardWorkspace(siteMapView map[string]any, state siteMapBoardS
 		),
 		gosx.El("p", gosx.Attrs(
 			gosx.Attr("class", "empty"),
-			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(!workbenchViewBool(siteMapView, "hasWorkspace"))),
+			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(!core.WorkbenchViewBool(siteMapView, "hasWorkspace"))),
 		), gosx.Text("No composition workspace is configured.")),
 	)
 }
 
 func renderSiteMapBoardCanvasPaths(siteMapView map[string]any, state siteMapBoardState) gosx.Node {
-	paths := workbenchViewMapList(siteMapView, "workspaceCanvasLinks")
+	paths := core.WorkbenchViewMapList(siteMapView, "workspaceCanvasLinks")
 	children := make([]gosx.Node, 0, len(paths))
 	for _, link := range paths {
 		children = append(children, gosx.El("path", gosx.Attrs(
-			gosx.Attr("class", workbenchMapString(link, "class")),
-			gosx.Attr("d", workbenchMapString(link, "path")),
-			gosx.Attr("data-studio-site-map-workspace-path", workbenchMapString(link, "key")),
-			gosx.Attr("data-studio-site-map-link-kind", workbenchMapString(link, "kind")),
-			gosx.Attr("data-studio-site-map-link-from", workbenchMapString(link, "fromNodeKey")),
-			gosx.Attr("data-studio-site-map-link-to", workbenchMapString(link, "toNodeKey")),
-			gosx.Attr("data-studio-site-map-link-from-page", workbenchMapString(link, "fromPageKey")),
-			gosx.Attr("data-studio-site-map-link-to-page", workbenchMapString(link, "toPageKey")),
-			gosx.Attr("data-studio-site-map-link-from-group", workbenchMapString(link, "fromGroup")),
-			gosx.Attr("data-studio-site-map-link-to-group", workbenchMapString(link, "toGroup")),
+			gosx.Attr("class", core.WorkbenchViewString(link, "class")),
+			gosx.Attr("d", core.WorkbenchViewString(link, "path")),
+			gosx.Attr("data-studio-site-map-workspace-path", core.WorkbenchViewString(link, "key")),
+			gosx.Attr("data-studio-site-map-link-kind", core.WorkbenchViewString(link, "kind")),
+			gosx.Attr("data-studio-site-map-link-from", core.WorkbenchViewString(link, "fromNodeKey")),
+			gosx.Attr("data-studio-site-map-link-to", core.WorkbenchViewString(link, "toNodeKey")),
+			gosx.Attr("data-studio-site-map-link-from-page", core.WorkbenchViewString(link, "fromPageKey")),
+			gosx.Attr("data-studio-site-map-link-to-page", core.WorkbenchViewString(link, "toPageKey")),
+			gosx.Attr("data-studio-site-map-link-from-group", core.WorkbenchViewString(link, "fromGroup")),
+			gosx.Attr("data-studio-site-map-link-to-group", core.WorkbenchViewString(link, "toGroup")),
 			gosx.Attr("data-studio-site-map-link-selected", siteMapBoardBoolString(siteMapBoardLinkSelected(link, state.selectedNodeKey))),
 			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(siteMapBoardLinkVisible(link, state.group))),
 		)))
 	}
 	return gosx.El("svg", gosx.Attrs(
 		gosx.Attr("class", "studio-site-map-workspace__paths"),
-		gosx.Attr("viewBox", workbenchViewString(siteMapView, "workspaceCanvasViewBox")),
+		gosx.Attr("viewBox", core.WorkbenchViewString(siteMapView, "workspaceCanvasViewBox")),
 		gosx.Attr("aria-hidden", "true"),
 		gosx.Attr("focusable", "false"),
-		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchViewBool(siteMapView, "hasWorkspaceCanvasLinks"))),
+		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(siteMapView, "hasWorkspaceCanvasLinks"))),
 	), gosx.Fragment(children...))
 }
 
 func renderSiteMapBoardWorkspaceLayers(siteMapView map[string]any, state siteMapBoardState) gosx.Node {
-	layers := workbenchViewMapList(siteMapView, "workspaceLayers")
+	layers := core.WorkbenchViewMapList(siteMapView, "workspaceLayers")
 	children := make([]gosx.Node, 0, len(layers))
 	for _, layer := range layers {
 		children = append(children, renderSiteMapBoardWorkspaceLayer(layer, state))
@@ -308,52 +308,52 @@ func renderSiteMapBoardWorkspaceLayer(layer map[string]any, state siteMapBoardSt
 		nodeChildren = append(nodeChildren, renderSiteMapBoardWorkspaceNode(node, state)...)
 	}
 	return gosx.El("section", gosx.Attrs(
-		gosx.Attr("class", workbenchMapString(layer, "class")),
-		gosx.Attr("data-studio-site-map-workspace-layer", workbenchMapString(layer, "key")),
+		gosx.Attr("class", core.WorkbenchViewString(layer, "class")),
+		gosx.Attr("data-studio-site-map-workspace-layer", core.WorkbenchViewString(layer, "key")),
 		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(siteMapBoardLayerVisible(layer, state.focus))),
 	),
 		gosx.El("header", nil,
 			gosx.El("div", nil,
-				gosx.El("strong", nil, gosx.Text(workbenchMapString(layer, "label"))),
-				gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(!workbenchMapBool(layer, "hasPageComposition")))), gosx.Text(workbenchMapString(layer, "summary"))),
-				gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchMapBool(layer, "hasPageComposition")))), gosx.Text(workbenchMapString(layer, "pageRoute"))),
+				gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(layer, "label"))),
+				gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(!core.WorkbenchViewBool(layer, "hasPageComposition")))), gosx.Text(core.WorkbenchViewString(layer, "summary"))),
+				gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(layer, "hasPageComposition")))), gosx.Text(core.WorkbenchViewString(layer, "pageRoute"))),
 			),
 			gosx.El("div", gosx.Attrs(
 				gosx.Attr("class", "studio-site-map-workspace-layer__composition"),
 				gosx.Attr("aria-label", "Page composition"),
-				gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchMapBool(layer, "hasPageComposition"))),
+				gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(layer, "hasPageComposition"))),
 			),
-				siteMapBoardFactSpan("Page type", workbenchMapString(layer, "pageComponentLabel")),
-				siteMapBoardFactSpan("Sections", workbenchMapString(layer, "sectionCountLabel")),
-				siteMapBoardFactSpan("Controls", workbenchMapString(layer, "controlCountLabel")),
+				siteMapBoardFactSpan("Page type", core.WorkbenchViewString(layer, "pageComponentLabel")),
+				siteMapBoardFactSpan("Sections", core.WorkbenchViewString(layer, "sectionCountLabel")),
+				siteMapBoardFactSpan("Controls", core.WorkbenchViewString(layer, "controlCountLabel")),
 			),
-			gosx.El("output", nil, gosx.Text(workbenchMapString(layer, "nodeCountLabel"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(layer, "nodeCountLabel"))),
 		),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-site-map-workspace-layer__nodes")), gosx.Fragment(nodeChildren...)),
 	)
 }
 
 func renderSiteMapBoardWorkspaceNode(node map[string]any, state siteMapBoardState) []gosx.Node {
-	selected := state.selectedNodeKey != "" && state.selectedNodeKey == workbenchMapString(node, "key")
-	visible := siteMapBoardMatchesGroup(state.group, workbenchMapString(node, "group"))
+	selected := state.selectedNodeKey != "" && state.selectedNodeKey == core.WorkbenchViewString(node, "key")
+	visible := siteMapBoardMatchesGroup(state.group, core.WorkbenchViewString(node, "group"))
 	labelAttrs := []any{
-		gosx.Attr("class", workbenchMapString(node, "class")),
-		gosx.Attr("for", workbenchMapString(node, "inputID")),
-		gosx.Attr("data-studio-site-map-workspace-node", workbenchMapString(node, "key")),
-		gosx.Attr("data-studio-site-map-node-kind", workbenchMapString(node, "kind")),
-		gosx.Attr("data-studio-site-map-node-kind-label", workbenchMapString(node, "kindLabel")),
-		gosx.Attr("data-studio-site-map-node-label", workbenchMapString(node, "label")),
-		gosx.Attr("data-studio-site-map-node-summary", workbenchMapString(node, "summary")),
-		gosx.Attr("data-studio-site-map-node-source-label", workbenchMapString(node, "sourceLabel")),
-		gosx.Attr("data-studio-site-map-node-binding-label", workbenchMapString(node, "bindingLabel")),
-		gosx.Attr("data-studio-site-map-node-status-label", workbenchMapString(node, "statusLabel")),
-		gosx.Attr("data-studio-site-map-node-component-label", workbenchMapString(node, "componentLabel")),
-		gosx.Attr("data-studio-site-map-group", workbenchMapString(node, "group")),
-		gosx.Attr("data-studio-site-map-page", workbenchMapString(node, "pageKey")),
-		gosx.Attr("data-studio-site-map-route", workbenchMapString(node, "route")),
-		gosx.Attr("data-studio-site-map-source", workbenchMapString(node, "source")),
-		gosx.Attr("data-studio-site-map-binding", workbenchMapString(node, "binding")),
-		gosx.Attr("data-studio-gosx-component", workbenchMapString(node, "gosxComponent")),
+		gosx.Attr("class", core.WorkbenchViewString(node, "class")),
+		gosx.Attr("for", core.WorkbenchViewString(node, "inputID")),
+		gosx.Attr("data-studio-site-map-workspace-node", core.WorkbenchViewString(node, "key")),
+		gosx.Attr("data-studio-site-map-node-kind", core.WorkbenchViewString(node, "kind")),
+		gosx.Attr("data-studio-site-map-node-kind-label", core.WorkbenchViewString(node, "kindLabel")),
+		gosx.Attr("data-studio-site-map-node-label", core.WorkbenchViewString(node, "label")),
+		gosx.Attr("data-studio-site-map-node-summary", core.WorkbenchViewString(node, "summary")),
+		gosx.Attr("data-studio-site-map-node-source-label", core.WorkbenchViewString(node, "sourceLabel")),
+		gosx.Attr("data-studio-site-map-node-binding-label", core.WorkbenchViewString(node, "bindingLabel")),
+		gosx.Attr("data-studio-site-map-node-status-label", core.WorkbenchViewString(node, "statusLabel")),
+		gosx.Attr("data-studio-site-map-node-component-label", core.WorkbenchViewString(node, "componentLabel")),
+		gosx.Attr("data-studio-site-map-group", core.WorkbenchViewString(node, "group")),
+		gosx.Attr("data-studio-site-map-page", core.WorkbenchViewString(node, "pageKey")),
+		gosx.Attr("data-studio-site-map-route", core.WorkbenchViewString(node, "route")),
+		gosx.Attr("data-studio-site-map-source", core.WorkbenchViewString(node, "source")),
+		gosx.Attr("data-studio-site-map-binding", core.WorkbenchViewString(node, "binding")),
+		gosx.Attr("data-studio-gosx-component", core.WorkbenchViewString(node, "gosxComponent")),
 		gosx.Attr("data-studio-site-map-node-selected", siteMapBoardBoolString(selected)),
 		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(visible)),
 	}
@@ -371,41 +371,41 @@ func renderSiteMapBoardWorkspaceNode(node map[string]any, state siteMapBoardStat
 	return []gosx.Node{
 		gosx.El("input", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-workspace-node__input"),
-			gosx.Attr("id", workbenchMapString(node, "inputID")),
+			gosx.Attr("id", core.WorkbenchViewString(node, "inputID")),
 			gosx.Attr("type", "radio"),
-			gosx.Attr("name", workbenchMapString(node, "inputName")),
-			gosx.Attr("value", workbenchMapString(node, "key")),
-			gosx.Attr("aria-label", workbenchMapString(node, "label")),
+			gosx.Attr("name", core.WorkbenchViewString(node, "inputName")),
+			gosx.Attr("value", core.WorkbenchViewString(node, "key")),
+			gosx.Attr("aria-label", core.WorkbenchViewString(node, "label")),
 			gosx.Attr("checked", selected),
 		)),
 		gosx.El("label", gosx.Attrs(labelAttrs...),
-			gosx.El("span", nil, gosx.Text(workbenchMapString(node, "kindLabel"))),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(node, "label"))),
-			gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchMapBool(node, "hasSummary")))), gosx.Text(workbenchMapString(node, "summary"))),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(node, "kindLabel"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(node, "label"))),
+			gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(node, "hasSummary")))), gosx.Text(core.WorkbenchViewString(node, "summary"))),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-site-map-workspace-node__facts")),
-				gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchMapBool(node, "hasRoute")))), gosx.Text(workbenchMapString(node, "route"))),
-				gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchMapBool(node, "hasSource")))), gosx.Text(workbenchMapString(node, "sourceLabel"))),
-				gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchMapBool(node, "hasBindingLabel")))), gosx.Text(workbenchMapString(node, "bindingLabel"))),
+				gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(node, "hasRoute")))), gosx.Text(core.WorkbenchViewString(node, "route"))),
+				gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(node, "hasSource")))), gosx.Text(core.WorkbenchViewString(node, "sourceLabel"))),
+				gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(node, "hasBindingLabel")))), gosx.Text(core.WorkbenchViewString(node, "bindingLabel"))),
 			),
-			gosx.El("output", nil, gosx.Text(workbenchMapString(node, "statusLabel"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(node, "statusLabel"))),
 		),
 		gosx.El("aside", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-workspace-node-card"),
 			gosx.Attr("aria-label", "Selected site map item"),
-			gosx.Attr("data-studio-site-map-workspace-node-card", workbenchMapString(node, "key")),
-			gosx.Attr("data-studio-site-map-group", workbenchMapString(node, "group")),
+			gosx.Attr("data-studio-site-map-workspace-node-card", core.WorkbenchViewString(node, "key")),
+			gosx.Attr("data-studio-site-map-group", core.WorkbenchViewString(node, "group")),
 			gosx.Attr("data-studio-site-map-node-selected", siteMapBoardBoolString(selected)),
 			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(visible)),
 		),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-site-map-workspace-node-card__main")),
-				gosx.El("span", nil, gosx.Text(workbenchMapString(node, "kindLabel"))),
-				gosx.El("strong", nil, gosx.Text(workbenchMapString(node, "label"))),
-				gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchMapBool(node, "hasSummary")))), gosx.Text(workbenchMapString(node, "summary"))),
+				gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(node, "kindLabel"))),
+				gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(node, "label"))),
+				gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(node, "hasSummary")))), gosx.Text(core.WorkbenchViewString(node, "summary"))),
 			),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-site-map-workspace-node-card__facts")),
-				siteMapBoardOptionalFact("Page", workbenchMapString(node, "route"), workbenchMapBool(node, "hasRoute")),
-				siteMapBoardOptionalFact("Content", workbenchMapString(node, "sourceLabel"), workbenchMapBool(node, "hasSource")),
-				gosx.El("output", nil, gosx.Text(workbenchMapString(node, "statusLabel"))),
+				siteMapBoardOptionalFact("Page", core.WorkbenchViewString(node, "route"), core.WorkbenchViewBool(node, "hasRoute")),
+				siteMapBoardOptionalFact("Content", core.WorkbenchViewString(node, "sourceLabel"), core.WorkbenchViewBool(node, "hasSource")),
+				gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(node, "statusLabel"))),
 			),
 			renderSiteMapBoardSelectionActions("studio-site-map-workspace-node-card__actions", state.inspectorInputID),
 		),
@@ -417,7 +417,7 @@ func renderSiteMapBoardSelectionCard(siteMapView map[string]any, state siteMapBo
 		gosx.Attr("class", "studio-site-map-selection-card"),
 		gosx.Attr("aria-label", "Selected site map item"),
 		gosx.Attr("data-studio-site-map-selection-card", "true"),
-		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchViewBool(siteMapView, "hasDefaultWorkspaceNode"))),
+		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(siteMapView, "hasDefaultWorkspaceNode"))),
 	),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-site-map-selection-card__main")),
 			gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-site-map-selected-kind", "true")), gosx.Text(state.selectedNodeKind)),
@@ -462,7 +462,7 @@ func renderSiteMapBoardWorkspaceRail(siteMapView map[string]any, state siteMapBo
 		gosx.El("aside", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-workspace__selection"),
 			gosx.Attr("aria-label", "Selected composition node"),
-			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchViewBool(siteMapView, "hasDefaultWorkspaceNode"))),
+			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(siteMapView, "hasDefaultWorkspaceNode"))),
 		),
 			gosx.El("header", nil,
 				gosx.El("div", nil,
@@ -487,36 +487,36 @@ func renderSiteMapBoardWorkspaceRail(siteMapView map[string]any, state siteMapBo
 }
 
 func renderSiteMapBoardConnections(siteMapView map[string]any, state siteMapBoardState) gosx.Node {
-	links := workbenchViewMapList(siteMapView, "workspaceLinks")
+	links := core.WorkbenchViewMapList(siteMapView, "workspaceLinks")
 	children := make([]gosx.Node, 0, len(links))
 	for _, link := range links {
 		children = append(children, gosx.El("span", gosx.Attrs(
-			gosx.Attr("class", workbenchMapString(link, "class")),
-			gosx.Attr("data-studio-site-map-workspace-link", workbenchMapString(link, "key")),
-			gosx.Attr("data-studio-site-map-link-kind", workbenchMapString(link, "kind")),
-			gosx.Attr("data-studio-site-map-link-from", workbenchMapString(link, "fromNodeKey")),
-			gosx.Attr("data-studio-site-map-link-to", workbenchMapString(link, "toNodeKey")),
-			gosx.Attr("data-studio-site-map-link-from-page", workbenchMapString(link, "fromPageKey")),
-			gosx.Attr("data-studio-site-map-link-to-page", workbenchMapString(link, "toPageKey")),
-			gosx.Attr("data-studio-site-map-link-from-group", workbenchMapString(link, "fromGroup")),
-			gosx.Attr("data-studio-site-map-link-to-group", workbenchMapString(link, "toGroup")),
+			gosx.Attr("class", core.WorkbenchViewString(link, "class")),
+			gosx.Attr("data-studio-site-map-workspace-link", core.WorkbenchViewString(link, "key")),
+			gosx.Attr("data-studio-site-map-link-kind", core.WorkbenchViewString(link, "kind")),
+			gosx.Attr("data-studio-site-map-link-from", core.WorkbenchViewString(link, "fromNodeKey")),
+			gosx.Attr("data-studio-site-map-link-to", core.WorkbenchViewString(link, "toNodeKey")),
+			gosx.Attr("data-studio-site-map-link-from-page", core.WorkbenchViewString(link, "fromPageKey")),
+			gosx.Attr("data-studio-site-map-link-to-page", core.WorkbenchViewString(link, "toPageKey")),
+			gosx.Attr("data-studio-site-map-link-from-group", core.WorkbenchViewString(link, "fromGroup")),
+			gosx.Attr("data-studio-site-map-link-to-group", core.WorkbenchViewString(link, "toGroup")),
 			gosx.Attr("data-studio-site-map-link-selected", siteMapBoardBoolString(siteMapBoardLinkSelected(link, state.selectedNodeKey))),
 			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(siteMapBoardLinkVisible(link, state.group))),
 		),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(link, "kindLabel"))),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(link, "fromLabel"))),
-			gosx.El("span", nil, gosx.Text(workbenchMapString(link, "label"))),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(link, "toLabel"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(link, "kindLabel"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(link, "fromLabel"))),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(link, "label"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(link, "toLabel"))),
 		))
 	}
 	return gosx.El("aside", gosx.Attrs(
 		gosx.Attr("class", "studio-site-map-workspace__connections"),
 		gosx.Attr("aria-label", "Composition connections"),
-		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchViewBool(siteMapView, "hasWorkspaceLinks"))),
+		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(siteMapView, "hasWorkspaceLinks"))),
 	),
 		gosx.El("header", nil,
 			gosx.El("strong", nil, gosx.Text("Connections")),
-			gosx.El("output", nil, gosx.Text(workbenchViewString(siteMapView, "workspaceLinkCountLabel"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "workspaceLinkCountLabel"))),
 		),
 		gosx.El("div", nil, gosx.Fragment(children...)),
 	)
@@ -535,7 +535,7 @@ func renderSiteMapBoardBuilder(siteMapView map[string]any, state siteMapBoardSta
 }
 
 func renderSiteMapBoardIntents(siteMapView map[string]any, state siteMapBoardState) gosx.Node {
-	intents := workbenchViewMapList(siteMapView, "compositionIntents")
+	intents := core.WorkbenchViewMapList(siteMapView, "compositionIntents")
 	children := make([]gosx.Node, 0, len(intents))
 	for _, intent := range intents {
 		children = append(children, renderSiteMapBoardIntent(intent, state))
@@ -543,14 +543,14 @@ func renderSiteMapBoardIntents(siteMapView map[string]any, state siteMapBoardSta
 	return gosx.El("section", gosx.Attrs(
 		gosx.Attr("class", "studio-site-map-intents"),
 		gosx.Attr("data-studio-composition-intents", "true"),
-		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchViewBool(siteMapView, "hasCompositionIntents"))),
+		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(siteMapView, "hasCompositionIntents"))),
 	),
 		gosx.El("header", nil,
 			gosx.El("div", nil,
 				gosx.El("strong", nil, gosx.Text("Ready to insert")),
-				gosx.El("small", nil, gosx.Text(workbenchViewString(siteMapView, "selectedPageLabel"))),
+				gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "selectedPageLabel"))),
 			),
-			gosx.El("output", nil, gosx.Text(workbenchViewString(siteMapView, "activeCompositionIntentCountLabel"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "activeCompositionIntentCountLabel"))),
 		),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-site-map-intents__grid")), gosx.Fragment(children...)),
 	)
@@ -561,49 +561,49 @@ func renderSiteMapBoardIntent(intent map[string]any, state siteMapBoardState) go
 	stepChildren := make([]gosx.Node, 0, len(steps))
 	for _, step := range steps {
 		stepChildren = append(stepChildren, gosx.El("li", gosx.Attrs(
-			gosx.Attr("data-studio-composition-step", workbenchMapString(step, "key")),
-			gosx.Attr("data-studio-gosx-component", workbenchMapString(step, "gosxComponent")),
-			gosx.Attr("data-studio-composition-binding", workbenchMapString(step, "binding")),
+			gosx.Attr("data-studio-composition-step", core.WorkbenchViewString(step, "key")),
+			gosx.Attr("data-studio-gosx-component", core.WorkbenchViewString(step, "gosxComponent")),
+			gosx.Attr("data-studio-composition-binding", core.WorkbenchViewString(step, "binding")),
 		),
-			gosx.El("span", nil, gosx.Text(workbenchMapString(step, "label"))),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(step, "summary"))),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(step, "label"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(step, "summary"))),
 		))
 	}
 	return gosx.El("article", gosx.Attrs(
-		gosx.Attr("class", workbenchMapString(intent, "class")),
-		gosx.Attr("data-studio-composition-intent", workbenchMapString(intent, "key")),
-		gosx.Attr("data-studio-composition-kind", workbenchMapString(intent, "kind")),
-		gosx.Attr("data-studio-composition-target", workbenchMapString(intent, "targetPageKey")),
-		gosx.Attr("data-studio-composition-route", workbenchMapString(intent, "targetRoute")),
-		gosx.Attr("data-studio-gosx-component", workbenchMapString(intent, "gosxComponent")),
-		gosx.Attr("data-studio-composition-binding", workbenchMapString(intent, "binding")),
-		gosx.Attr("data-studio-composition-blueprint", workbenchMapString(intent, "pageBlueprintKey")),
-		gosx.Attr("data-studio-composition-template", workbenchMapString(intent, "componentTemplateKey")),
+		gosx.Attr("class", core.WorkbenchViewString(intent, "class")),
+		gosx.Attr("data-studio-composition-intent", core.WorkbenchViewString(intent, "key")),
+		gosx.Attr("data-studio-composition-kind", core.WorkbenchViewString(intent, "kind")),
+		gosx.Attr("data-studio-composition-target", core.WorkbenchViewString(intent, "targetPageKey")),
+		gosx.Attr("data-studio-composition-route", core.WorkbenchViewString(intent, "targetRoute")),
+		gosx.Attr("data-studio-gosx-component", core.WorkbenchViewString(intent, "gosxComponent")),
+		gosx.Attr("data-studio-composition-binding", core.WorkbenchViewString(intent, "binding")),
+		gosx.Attr("data-studio-composition-blueprint", core.WorkbenchViewString(intent, "pageBlueprintKey")),
+		gosx.Attr("data-studio-composition-template", core.WorkbenchViewString(intent, "componentTemplateKey")),
 		gosx.Attr("data-studio-composition-active", siteMapBoardBoolString(siteMapBoardIntentActive(intent, state))),
 	),
 		gosx.El("header", nil,
-			gosx.El("span", nil, gosx.Text(workbenchMapString(intent, "kindLabel"))),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(intent, "label"))),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(intent, "summary"))),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(intent, "kindLabel"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(intent, "label"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(intent, "summary"))),
 		),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-site-map-intent__facts")),
-			siteMapBoardFactSpan("Target", workbenchMapString(intent, "targetLabel")),
-			siteMapBoardFactSpan("Route", workbenchMapString(intent, "targetRoute")),
-			siteMapBoardFactSpan("Scope", workbenchMapString(intent, "targetRegion")),
+			siteMapBoardFactSpan("Target", core.WorkbenchViewString(intent, "targetLabel")),
+			siteMapBoardFactSpan("Route", core.WorkbenchViewString(intent, "targetRoute")),
+			siteMapBoardFactSpan("Scope", core.WorkbenchViewString(intent, "targetRegion")),
 		),
 		gosx.El("ol", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-intent__steps"),
-			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchMapBool(intent, "hasSteps"))),
+			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(intent, "hasSteps"))),
 		), gosx.Fragment(stepChildren...)),
 		gosx.El("footer", nil,
-			gosx.El("output", nil, gosx.Text(workbenchMapString(intent, "statusLabel"))),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(intent, "stepCountLabel"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(intent, "statusLabel"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(intent, "stepCountLabel"))),
 		),
 	)
 }
 
 func renderSiteMapBoardBlueprints(siteMapView map[string]any, state siteMapBoardState) gosx.Node {
-	blueprints := workbenchViewMapList(siteMapView, "blueprints")
+	blueprints := core.WorkbenchViewMapList(siteMapView, "blueprints")
 	children := make([]gosx.Node, 0, len(blueprints))
 	for _, blueprint := range blueprints {
 		children = append(children, renderSiteMapBoardBlueprint(blueprint, state))
@@ -617,15 +617,15 @@ func renderSiteMapBoardBlueprints(siteMapView map[string]any, state siteMapBoard
 				gosx.El("strong", nil, gosx.Text("New page starters")),
 				gosx.El("small", nil, gosx.Text("Start a page from a reusable structure.")),
 			),
-			gosx.El("output", nil, gosx.Text(workbenchViewString(siteMapView, "blueprintCountLabel"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "blueprintCountLabel"))),
 		),
 		gosx.El("p", gosx.Attrs(
 			gosx.Attr("class", "empty"),
-			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(!workbenchViewBool(siteMapView, "hasBlueprints"))),
+			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(!core.WorkbenchViewBool(siteMapView, "hasBlueprints"))),
 		), gosx.Text("No page blueprints are configured.")),
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-blueprints"),
-			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchViewBool(siteMapView, "hasBlueprints"))),
+			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(siteMapView, "hasBlueprints"))),
 		), gosx.Fragment(children...)),
 	)
 }
@@ -634,30 +634,30 @@ func renderSiteMapBoardBlueprint(blueprint map[string]any, state siteMapBoardSta
 	components := SiteMapMapList(blueprint, "components")
 	componentChildren := make([]gosx.Node, 0, len(components))
 	for _, component := range components {
-		componentChildren = append(componentChildren, gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-gosx-component", workbenchMapString(component, "gosxComponent"))), gosx.Text(workbenchMapString(component, "label"))))
+		componentChildren = append(componentChildren, gosx.El("small", gosx.Attrs(gosx.Attr("data-studio-gosx-component", core.WorkbenchViewString(component, "gosxComponent"))), gosx.Text(core.WorkbenchViewString(component, "label"))))
 	}
-	selected := state.selectedBlueprintKey != "" && state.selectedBlueprintKey == workbenchMapString(blueprint, "key")
+	selected := state.selectedBlueprintKey != "" && state.selectedBlueprintKey == core.WorkbenchViewString(blueprint, "key")
 	return gosx.El("label", gosx.Attrs(
 		gosx.Attr("class", "studio-site-map-blueprint"),
-		gosx.Attr("data-studio-site-map-blueprint", workbenchMapString(blueprint, "key")),
-		gosx.Attr("data-studio-site-map-route-pattern", workbenchMapString(blueprint, "routePattern")),
-		gosx.Attr("data-studio-gosx-component", workbenchMapString(blueprint, "gosxComponent")),
+		gosx.Attr("data-studio-site-map-blueprint", core.WorkbenchViewString(blueprint, "key")),
+		gosx.Attr("data-studio-site-map-route-pattern", core.WorkbenchViewString(blueprint, "routePattern")),
+		gosx.Attr("data-studio-gosx-component", core.WorkbenchViewString(blueprint, "gosxComponent")),
 	),
 		gosx.El("input", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-builder__input"),
-			gosx.Attr("id", workbenchMapString(blueprint, "inputID")),
+			gosx.Attr("id", core.WorkbenchViewString(blueprint, "inputID")),
 			gosx.Attr("type", "radio"),
-			gosx.Attr("name", workbenchMapString(blueprint, "inputName")),
-			gosx.Attr("value", workbenchMapString(blueprint, "key")),
+			gosx.Attr("name", core.WorkbenchViewString(blueprint, "inputName")),
+			gosx.Attr("value", core.WorkbenchViewString(blueprint, "key")),
 			gosx.Attr("checked", selected),
-			gosx.Attr("aria-label", workbenchMapString(blueprint, "label")),
+			gosx.Attr("aria-label", core.WorkbenchViewString(blueprint, "label")),
 		)),
-		gosx.El("span", nil, gosx.Text(workbenchMapString(blueprint, "label"))),
-		gosx.El("small", nil, gosx.Text(workbenchMapString(blueprint, "summary"))),
-		gosx.El("output", nil, gosx.Text(workbenchMapString(blueprint, "componentCountLabel"))),
+		gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(blueprint, "label"))),
+		gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(blueprint, "summary"))),
+		gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(blueprint, "componentCountLabel"))),
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-blueprint__plan"),
-			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchMapBool(blueprint, "hasComponents"))),
+			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(blueprint, "hasComponents"))),
 		),
 			gosx.El("strong", nil, gosx.Text("Page structure")),
 			gosx.Fragment(componentChildren...),
@@ -666,7 +666,7 @@ func renderSiteMapBoardBlueprint(blueprint map[string]any, state siteMapBoardSta
 }
 
 func renderSiteMapBoardPalette(siteMapView map[string]any, state siteMapBoardState) gosx.Node {
-	templates := workbenchViewMapList(siteMapView, "palette")
+	templates := core.WorkbenchViewMapList(siteMapView, "palette")
 	children := make([]gosx.Node, 0, len(templates))
 	for _, template := range templates {
 		children = append(children, renderSiteMapBoardTemplate(template, state))
@@ -680,11 +680,11 @@ func renderSiteMapBoardPalette(siteMapView map[string]any, state siteMapBoardSta
 				gosx.El("strong", nil, gosx.Text("Add section")),
 				gosx.El("small", nil, gosx.Text("Pick a section to place on the selected page.")),
 			),
-			gosx.El("output", nil, gosx.Text(workbenchViewString(siteMapView, "paletteCountLabel"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "paletteCountLabel"))),
 		),
 		gosx.El("p", gosx.Attrs(
 			gosx.Attr("class", "empty"),
-			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(!workbenchViewBool(siteMapView, "hasPalette"))),
+			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(!core.WorkbenchViewBool(siteMapView, "hasPalette"))),
 		), gosx.Text("No building blocks are configured.")),
 		renderSiteMapBoardChoiceGroup("studio-site-map-palette-filter", "toolbar", "Building block categories", "data-studio-site-map-palette-control", state.palette, []siteMapBoardChoice{
 			{Label: "All", Key: "all"},
@@ -697,7 +697,7 @@ func renderSiteMapBoardPalette(siteMapView map[string]any, state siteMapBoardSta
 		}),
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-palette"),
-			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchViewBool(siteMapView, "hasPalette"))),
+			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(siteMapView, "hasPalette"))),
 		), gosx.Fragment(children...)),
 	)
 }
@@ -707,48 +707,48 @@ func renderSiteMapBoardTemplate(template map[string]any, state siteMapBoardState
 	controlChildren := make([]gosx.Node, 0, len(controls))
 	for _, control := range controls {
 		controlChildren = append(controlChildren, gosx.El("small", gosx.Attrs(
-			gosx.Attr("data-studio-site-map-control", workbenchMapString(control, "key")),
-			gosx.Attr("data-studio-site-map-control-kind", workbenchMapString(control, "kind")),
-		), gosx.Text(workbenchMapString(control, "label"))))
+			gosx.Attr("data-studio-site-map-control", core.WorkbenchViewString(control, "key")),
+			gosx.Attr("data-studio-site-map-control-kind", core.WorkbenchViewString(control, "kind")),
+		), gosx.Text(core.WorkbenchViewString(control, "label"))))
 	}
-	selected := state.selectedTemplateKey != "" && state.selectedTemplateKey == workbenchMapString(template, "key")
+	selected := state.selectedTemplateKey != "" && state.selectedTemplateKey == core.WorkbenchViewString(template, "key")
 	return gosx.El("label", gosx.Attrs(
 		gosx.Attr("class", "studio-site-map-palette-card"),
-		gosx.Attr("data-studio-site-map-component-template", workbenchMapString(template, "key")),
-		gosx.Attr("data-studio-site-map-template-category", workbenchMapString(template, "categoryKey")),
-		gosx.Attr("data-studio-site-map-template-source", workbenchMapString(template, "source")),
-		gosx.Attr("data-studio-site-map-default-binding", workbenchMapString(template, "defaultBinding")),
-		gosx.Attr("data-studio-gosx-component", workbenchMapString(template, "gosxComponent")),
-		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(siteMapBoardMatchesPalette(state.palette, workbenchMapString(template, "categoryKey")))),
+		gosx.Attr("data-studio-site-map-component-template", core.WorkbenchViewString(template, "key")),
+		gosx.Attr("data-studio-site-map-template-category", core.WorkbenchViewString(template, "categoryKey")),
+		gosx.Attr("data-studio-site-map-template-source", core.WorkbenchViewString(template, "source")),
+		gosx.Attr("data-studio-site-map-default-binding", core.WorkbenchViewString(template, "defaultBinding")),
+		gosx.Attr("data-studio-gosx-component", core.WorkbenchViewString(template, "gosxComponent")),
+		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(siteMapBoardMatchesPalette(state.palette, core.WorkbenchViewString(template, "categoryKey")))),
 	),
 		gosx.El("input", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-builder__input"),
-			gosx.Attr("id", workbenchMapString(template, "inputID")),
+			gosx.Attr("id", core.WorkbenchViewString(template, "inputID")),
 			gosx.Attr("type", "radio"),
-			gosx.Attr("name", workbenchMapString(template, "inputName")),
-			gosx.Attr("value", workbenchMapString(template, "key")),
+			gosx.Attr("name", core.WorkbenchViewString(template, "inputName")),
+			gosx.Attr("value", core.WorkbenchViewString(template, "key")),
 			gosx.Attr("checked", selected),
-			gosx.Attr("aria-label", workbenchMapString(template, "label")),
+			gosx.Attr("aria-label", core.WorkbenchViewString(template, "label")),
 		)),
-		gosx.El("span", nil, gosx.Text(workbenchMapString(template, "label"))),
-		gosx.El("small", nil, gosx.Text(workbenchMapString(template, "summary"))),
+		gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(template, "label"))),
+		gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(template, "summary"))),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-site-map-palette-card__meta")),
-			gosx.El("output", nil, gosx.Text(workbenchMapString(template, "statusLabel"))),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(template, "controlLabel"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(template, "statusLabel"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(template, "controlLabel"))),
 		),
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-palette-card__plan"),
-			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchMapBool(template, "hasControls"))),
+			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(template, "hasControls"))),
 		),
 			gosx.El("strong", nil, gosx.Text("No-code controls")),
 			gosx.Fragment(controlChildren...),
 		),
-		gosx.El("strong", gosx.Attrs(gosx.Attr("class", "studio-site-map-palette-card__add")), gosx.Text(workbenchMapString(template, "addLabel"))),
+		gosx.El("strong", gosx.Attrs(gosx.Attr("class", "studio-site-map-palette-card__add")), gosx.Text(core.WorkbenchViewString(template, "addLabel"))),
 	)
 }
 
 func renderSiteMapBoardViewport(siteMapView map[string]any, state siteMapBoardState) gosx.Node {
-	pages := workbenchViewMapList(siteMapView, "pages")
+	pages := core.WorkbenchViewMapList(siteMapView, "pages")
 	children := make([]gosx.Node, 0, len(pages))
 	for _, page := range pages {
 		children = append(children, renderSiteMapBoardPage(page, state))
@@ -772,54 +772,54 @@ func renderSiteMapBoardPage(page map[string]any, state siteMapBoardState) gosx.N
 		controlNodes = append(controlNodes, renderSiteMapBoardControlCard(component))
 	}
 	return gosx.El("article", gosx.Attrs(
-		gosx.Attr("class", workbenchMapString(page, "class")),
-		gosx.Attr("data-studio-site-map-page", workbenchMapString(page, "key")),
-		gosx.Attr("data-studio-site-map-route", workbenchMapString(page, "route")),
-		gosx.Attr("data-studio-site-map-group", workbenchMapString(page, "group")),
-		gosx.Attr("data-studio-gosx-component", workbenchMapString(page, "gosxComponent")),
-		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(siteMapBoardMatchesGroup(state.group, workbenchMapString(page, "group")))),
+		gosx.Attr("class", core.WorkbenchViewString(page, "class")),
+		gosx.Attr("data-studio-site-map-page", core.WorkbenchViewString(page, "key")),
+		gosx.Attr("data-studio-site-map-route", core.WorkbenchViewString(page, "route")),
+		gosx.Attr("data-studio-site-map-group", core.WorkbenchViewString(page, "group")),
+		gosx.Attr("data-studio-gosx-component", core.WorkbenchViewString(page, "gosxComponent")),
+		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(siteMapBoardMatchesGroup(state.group, core.WorkbenchViewString(page, "group")))),
 	),
 		gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-site-map-page__head")),
 			gosx.El("label", gosx.Attrs(
 				gosx.Attr("class", "studio-site-map-page__select"),
-				gosx.Attr("data-studio-site-map-select", workbenchMapString(page, "key")),
+				gosx.Attr("data-studio-site-map-select", core.WorkbenchViewString(page, "key")),
 			),
 				gosx.El("input", gosx.Attrs(
 					gosx.Attr("class", "studio-site-map-page__input"),
 					gosx.Attr("type", "radio"),
 					gosx.Attr("name", "studioSiteMapPage"),
-					gosx.Attr("value", workbenchMapString(page, "key")),
-					gosx.Attr("checked", workbenchMapBool(page, "selected")),
-					gosx.Attr("aria-label", workbenchMapString(page, "label")),
+					gosx.Attr("value", core.WorkbenchViewString(page, "key")),
+					gosx.Attr("checked", core.WorkbenchViewBool(page, "selected")),
+					gosx.Attr("aria-label", core.WorkbenchViewString(page, "label")),
 				)),
-				gosx.El("span", nil, gosx.Text(workbenchMapString(page, "label"))),
-				gosx.El("small", nil, gosx.Text(workbenchMapString(page, "route"))),
+				gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(page, "label"))),
+				gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(page, "route"))),
 			),
 			gosx.El("a", gosx.Attrs(
-				gosx.Attr("href", workbenchMapString(page, "href")),
+				gosx.Attr("href", core.WorkbenchViewString(page, "href")),
 				gosx.Attr("data-gosx-link", "true"),
 			), gosx.Text("Open")),
 		),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-site-map-page__meta")),
-			gosx.El("output", nil, gosx.Text(workbenchMapString(page, "statusLabel"))),
-			gosx.El("span", nil, gosx.Text(workbenchMapString(page, "typeLabel"))),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(page, "groupLabel"))),
+			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(page, "statusLabel"))),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(page, "typeLabel"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(page, "groupLabel"))),
 		),
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-components"),
-			gosx.Attr("aria-label", workbenchMapString(page, "componentCountLabel")),
+			gosx.Attr("aria-label", core.WorkbenchViewString(page, "componentCountLabel")),
 		), gosx.Fragment(componentNodes...)),
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-source-stack"),
-			gosx.Attr("aria-label", workbenchMapString(page, "componentCountLabel")),
+			gosx.Attr("aria-label", core.WorkbenchViewString(page, "componentCountLabel")),
 		), gosx.Fragment(sourceNodes...)),
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-control-stack"),
-			gosx.Attr("aria-label", workbenchMapString(page, "controlCountLabel")),
+			gosx.Attr("aria-label", core.WorkbenchViewString(page, "controlCountLabel")),
 		), gosx.Fragment(controlNodes...)),
 		gosx.El("footer", gosx.Attrs(gosx.Attr("class", "studio-site-map-page__foot")),
-			gosx.El("span", nil, gosx.Text(workbenchMapString(page, "componentCountLabel"))),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(page, "controlCountLabel"))),
+			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(page, "componentCountLabel"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(page, "controlCountLabel"))),
 		),
 	)
 }
@@ -827,22 +827,22 @@ func renderSiteMapBoardPage(page map[string]any, state siteMapBoardState) gosx.N
 func renderSiteMapBoardComponent(component map[string]any) gosx.Node {
 	return gosx.El("label", gosx.Attrs(
 		gosx.Attr("class", "studio-site-map-component"),
-		gosx.Attr("data-studio-site-map-component", workbenchMapString(component, "key")),
-		gosx.Attr("data-studio-gosx-component", workbenchMapString(component, "gosxComponent")),
-		gosx.Attr("data-studio-site-map-source", workbenchMapString(component, "source")),
-		gosx.Attr("data-studio-site-map-binding", workbenchMapString(component, "binding")),
+		gosx.Attr("data-studio-site-map-component", core.WorkbenchViewString(component, "key")),
+		gosx.Attr("data-studio-gosx-component", core.WorkbenchViewString(component, "gosxComponent")),
+		gosx.Attr("data-studio-site-map-source", core.WorkbenchViewString(component, "source")),
+		gosx.Attr("data-studio-site-map-binding", core.WorkbenchViewString(component, "binding")),
 	),
 		gosx.El("input", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-component__input"),
 			gosx.Attr("type", "radio"),
 			gosx.Attr("name", "studioSiteMapComponent"),
-			gosx.Attr("value", workbenchMapString(component, "selectionKey")),
-			gosx.Attr("aria-label", workbenchMapString(component, "label")),
+			gosx.Attr("value", core.WorkbenchViewString(component, "selectionKey")),
+			gosx.Attr("aria-label", core.WorkbenchViewString(component, "label")),
 		)),
-		gosx.El("span", nil, gosx.Text(workbenchMapString(component, "label"))),
-		gosx.El("small", nil, gosx.Text(workbenchMapString(component, "sourceLabel"))),
-		gosx.El("small", gosx.Attrs(gosx.Attr("class", "studio-site-map-component__binding")), gosx.Text(workbenchMapString(component, "summary"))),
-		gosx.El("output", nil, gosx.Text(workbenchMapString(component, "statusLabel"))),
+		gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(component, "label"))),
+		gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(component, "sourceLabel"))),
+		gosx.El("small", gosx.Attrs(gosx.Attr("class", "studio-site-map-component__binding")), gosx.Text(core.WorkbenchViewString(component, "summary"))),
+		gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(component, "statusLabel"))),
 		renderSiteMapBoardControls(component),
 	)
 }
@@ -850,33 +850,33 @@ func renderSiteMapBoardComponent(component map[string]any) gosx.Node {
 func renderSiteMapBoardSourceRow(component map[string]any) gosx.Node {
 	return gosx.El("label", gosx.Attrs(
 		gosx.Attr("class", "studio-site-map-source-row"),
-		gosx.Attr("data-studio-site-map-component", workbenchMapString(component, "key")),
-		gosx.Attr("data-studio-gosx-component", workbenchMapString(component, "gosxComponent")),
-		gosx.Attr("data-studio-site-map-source", workbenchMapString(component, "source")),
-		gosx.Attr("data-studio-site-map-binding", workbenchMapString(component, "binding")),
+		gosx.Attr("data-studio-site-map-component", core.WorkbenchViewString(component, "key")),
+		gosx.Attr("data-studio-gosx-component", core.WorkbenchViewString(component, "gosxComponent")),
+		gosx.Attr("data-studio-site-map-source", core.WorkbenchViewString(component, "source")),
+		gosx.Attr("data-studio-site-map-binding", core.WorkbenchViewString(component, "binding")),
 	),
 		gosx.El("input", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-component__input"),
 			gosx.Attr("type", "radio"),
 			gosx.Attr("name", "studioSiteMapComponent"),
-			gosx.Attr("value", workbenchMapString(component, "selectionKey")),
-			gosx.Attr("aria-label", workbenchMapString(component, "label")),
+			gosx.Attr("value", core.WorkbenchViewString(component, "selectionKey")),
+			gosx.Attr("aria-label", core.WorkbenchViewString(component, "label")),
 		)),
-		gosx.El("strong", nil, gosx.Text(workbenchMapString(component, "sourceLabel"))),
-		gosx.El("span", nil, gosx.Text(workbenchMapString(component, "sourceSummary"))),
-		gosx.El("small", nil, gosx.Text(workbenchMapString(component, "summary"))),
-		gosx.El("small", nil, gosx.Text(workbenchMapString(component, "controlLabel"))),
+		gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(component, "sourceLabel"))),
+		gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(component, "sourceSummary"))),
+		gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(component, "summary"))),
+		gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(component, "controlLabel"))),
 	)
 }
 
 func renderSiteMapBoardControlCard(component map[string]any) gosx.Node {
 	return gosx.El("section", gosx.Attrs(
 		gosx.Attr("class", "studio-site-map-control-card"),
-		gosx.Attr("data-studio-site-map-component", workbenchMapString(component, "key")),
+		gosx.Attr("data-studio-site-map-component", core.WorkbenchViewString(component, "key")),
 	),
 		gosx.El("header", nil,
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(component, "label"))),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(component, "controlLabel"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(component, "label"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(component, "controlLabel"))),
 		),
 		renderSiteMapBoardControls(component),
 	)
@@ -888,22 +888,22 @@ func renderSiteMapBoardControls(component map[string]any) gosx.Node {
 	for _, control := range controls {
 		children = append(children, gosx.El("span", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-control"),
-			gosx.Attr("data-studio-site-map-control", workbenchMapString(control, "key")),
-			gosx.Attr("data-studio-site-map-control-kind", workbenchMapString(control, "kind")),
-			gosx.Attr("data-gosx-studio-authoring-operation", workbenchMapString(control, "authoringOperation")),
-			gosx.Attr("data-gosx-studio-authoring-page", workbenchMapString(control, "authoringPageKey")),
-			gosx.Attr("data-gosx-studio-authoring-component", workbenchMapString(control, "authoringComponent")),
-			gosx.Attr("data-gosx-studio-authoring-control", workbenchMapString(control, "authoringControl")),
-			gosx.Attr("data-gosx-studio-authoring-binding", workbenchMapString(control, "authoringBinding")),
+			gosx.Attr("data-studio-site-map-control", core.WorkbenchViewString(control, "key")),
+			gosx.Attr("data-studio-site-map-control-kind", core.WorkbenchViewString(control, "kind")),
+			gosx.Attr("data-gosx-studio-authoring-operation", core.WorkbenchViewString(control, "authoringOperation")),
+			gosx.Attr("data-gosx-studio-authoring-page", core.WorkbenchViewString(control, "authoringPageKey")),
+			gosx.Attr("data-gosx-studio-authoring-component", core.WorkbenchViewString(control, "authoringComponent")),
+			gosx.Attr("data-gosx-studio-authoring-control", core.WorkbenchViewString(control, "authoringControl")),
+			gosx.Attr("data-gosx-studio-authoring-binding", core.WorkbenchViewString(control, "authoringBinding")),
 		),
-			gosx.El("strong", nil, gosx.Text(workbenchMapString(control, "label"))),
-			gosx.El("small", nil, gosx.Text(workbenchMapString(control, "kindLabel"))),
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(control, "label"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(control, "kindLabel"))),
 		))
 	}
 	return gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", "studio-site-map-controls"),
-		gosx.Attr("aria-label", workbenchMapString(component, "controlLabel")),
-		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(workbenchMapBool(component, "hasControls"))),
+		gosx.Attr("aria-label", core.WorkbenchViewString(component, "controlLabel")),
+		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(component, "hasControls"))),
 	), gosx.Fragment(children...))
 }
 
@@ -913,10 +913,10 @@ func renderSiteMapBoardMinimap(siteMapView map[string]any) gosx.Node {
 		gosx.Attr("aria-label", "Site map overview"),
 	),
 		gosx.El("strong", nil, gosx.Text("Board")),
-		gosx.El("span", nil, gosx.Text(workbenchViewString(siteMapView, "pageCountLabel"))),
-		gosx.El("span", nil, gosx.Text(workbenchViewString(siteMapView, "componentCountLabel"))),
-		gosx.El("span", nil, gosx.Text(workbenchViewString(siteMapView, "controlCountLabel"))),
-		gosx.El("output", nil, gosx.Text(workbenchViewString(siteMapView, "selectedPageLabel"))),
+		gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "pageCountLabel"))),
+		gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "componentCountLabel"))),
+		gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "controlCountLabel"))),
+		gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(siteMapView, "selectedPageLabel"))),
 	)
 }
 
@@ -1006,7 +1006,7 @@ func siteMapBoardMatchesPalette(palette, candidate string) bool {
 }
 
 func siteMapBoardLayerVisible(layer map[string]any, focus string) bool {
-	key := workbenchMapString(layer, "key")
+	key := core.WorkbenchViewString(layer, "key")
 	focus = strings.TrimSpace(focus)
 	return focus == "" || focus == "all" || key == focus || key == "resources"
 }
@@ -1016,19 +1016,19 @@ func siteMapBoardLinkVisible(link map[string]any, group string) bool {
 	if group == "" || group == "all" {
 		return true
 	}
-	return workbenchMapString(link, "fromGroup") == group || workbenchMapString(link, "toGroup") == group
+	return core.WorkbenchViewString(link, "fromGroup") == group || core.WorkbenchViewString(link, "toGroup") == group
 }
 
 func siteMapBoardLinkSelected(link map[string]any, selectedNodeKey string) bool {
-	return selectedNodeKey != "" && (workbenchMapString(link, "fromNodeKey") == selectedNodeKey || workbenchMapString(link, "toNodeKey") == selectedNodeKey)
+	return selectedNodeKey != "" && (core.WorkbenchViewString(link, "fromNodeKey") == selectedNodeKey || core.WorkbenchViewString(link, "toNodeKey") == selectedNodeKey)
 }
 
 func siteMapBoardIntentActive(intent map[string]any, state siteMapBoardState) bool {
-	switch workbenchMapString(intent, "kind") {
+	switch core.WorkbenchViewString(intent, "kind") {
 	case "create-page":
-		return state.selectedBlueprintKey != "" && state.selectedBlueprintKey == workbenchMapString(intent, "pageBlueprintKey")
+		return state.selectedBlueprintKey != "" && state.selectedBlueprintKey == core.WorkbenchViewString(intent, "pageBlueprintKey")
 	case "add-component":
-		return state.selectedTemplateKey != "" && state.selectedTemplateKey == workbenchMapString(intent, "componentTemplateKey")
+		return state.selectedTemplateKey != "" && state.selectedTemplateKey == core.WorkbenchViewString(intent, "componentTemplateKey")
 	default:
 		return false
 	}

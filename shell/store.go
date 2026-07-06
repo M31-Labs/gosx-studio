@@ -1,22 +1,18 @@
-package studio
+package shell
 
 import (
 	"fmt"
 	"strings"
 
-	"m31labs.dev/gosx-cms/lifecycle"
-	"m31labs.dev/gosx-cms/media"
+	"m31labs.dev/gosx-studio/authoring"
+	"m31labs.dev/gosx-studio/core"
+	"m31labs.dev/gosx-studio/sitemap"
 )
 
-// Store is the small contract a host implements to feed Studio with content.
-type Store interface {
-	LeftPanels() []Panel
-	RightPanels() []Panel
-	MediaAssets() []media.Asset
-	Revisions() []lifecycle.Revision
-	Readiness() ShellReadiness
-	Adapters() []ResourceAdapter
-}
+// The Store interface and the cms/admin summary converters live in
+// cmsbridge.go (the single seam where shell touches gosx-cms/gosx-admin types,
+// per the restructure spec §1 "Shell summaries vs cms/admin types" seam).
+// Everything below is pure shell chrome.
 
 // HostShell composes a Store and a ShellConfig into the editor surface.
 //
@@ -27,7 +23,7 @@ type Store interface {
 func HostShell(store Store, shell ShellConfig) Shell {
 	normalized := shell.Normalize()
 	adapters := normalized.Adapters
-	authoring := NoCodeAuthoringSurface(normalized.SiteMap)
+	surface := authoring.NoCodeAuthoringSurface(normalized.SiteMap)
 	opts := Options{
 		Title:         strings.TrimSpace(normalized.Labels.EditorTitle),
 		PreviewURL:    hostShellPreviewURL(normalized),
@@ -40,8 +36,8 @@ func HostShell(store Store, shell ShellConfig) Shell {
 		Actions:       hostShellActions(normalized.Actions),
 		Extras: map[string]any{
 			"resources": hostShellResourceViews(normalized.Resources),
-			"authoring": AuthoringSurfaceView(authoring),
-			"siteMap":   AuthoringSiteMapView(authoring, SiteMapViewOptions{}),
+			"authoring": authoring.AuthoringSurfaceView(surface),
+			"siteMap":   sitemap.AuthoringSiteMapView(surface, sitemap.SiteMapViewOptions{}),
 		},
 	}
 	if store != nil {
@@ -88,9 +84,9 @@ func hostShellPreviewURL(shell ShellConfig) string {
 }
 
 func hostShellActionHref(actions []ActionConfig, key string) string {
-	key = NormalizeKey(key)
+	key = core.NormalizeKey(key)
 	for _, action := range actions {
-		if NormalizeKey(action.Key) == key {
+		if core.NormalizeKey(action.Key) == key {
 			return strings.TrimSpace(action.Href)
 		}
 	}
@@ -129,7 +125,7 @@ func hostShellSections(resources []ResourceConfig) []Section {
 	return out
 }
 
-func hostShellMetrics(siteMap SiteMap) []Metric {
+func hostShellMetrics(siteMap core.SiteMap) []Metric {
 	siteMap = siteMap.Normalize()
 	if len(siteMap.Pages) == 0 {
 		return nil
@@ -149,7 +145,7 @@ func hostShellModes(modes []ModeConfig) []Mode {
 	return out
 }
 
-func hostShellCanvas(siteMap SiteMap, fallbackTitle string) CanvasSurface {
+func hostShellCanvas(siteMap core.SiteMap, fallbackTitle string) CanvasSurface {
 	page, ok := siteMap.SelectedPage()
 	if !ok {
 		return CanvasSurface{RouteLabel: fallbackTitle, SelectionLabel: "No selection", Zoom: "fit"}
@@ -188,7 +184,7 @@ func hostShellResourceViews(resources []ResourceConfig) []map[string]any {
 	return out
 }
 
-func hostShellAdapterViews(adapters []ResourceAdapter) []map[string]any {
+func hostShellAdapterViews(adapters []core.ResourceAdapter) []map[string]any {
 	out := make([]map[string]any, 0, len(adapters))
 	for _, adapter := range adapters {
 		adapter = adapter.Normalize()
@@ -207,7 +203,7 @@ func hostShellAdapterViews(adapters []ResourceAdapter) []map[string]any {
 	return out
 }
 
-func hostShellResourceCapabilities(capabilities []ResourceCapability) []string {
+func hostShellResourceCapabilities(capabilities []core.ResourceCapability) []string {
 	out := make([]string, 0, len(capabilities))
 	for _, capability := range capabilities {
 		if value := strings.TrimSpace(string(capability)); value != "" {
@@ -217,7 +213,7 @@ func hostShellResourceCapabilities(capabilities []ResourceCapability) []string {
 	return out
 }
 
-func hostShellBindingViews(bindings []ResourceBinding) []map[string]any {
+func hostShellBindingViews(bindings []core.ResourceBinding) []map[string]any {
 	out := make([]map[string]any, 0, len(bindings))
 	for _, binding := range bindings {
 		binding.Key = strings.TrimSpace(binding.Key)

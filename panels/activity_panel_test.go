@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/core"
 )
 
 func TestRenderActivityPanelFull(t *testing.T) {
@@ -46,7 +47,7 @@ func TestRenderActivityPanelFull(t *testing.T) {
 func TestRenderActivityPanelMinimalOmitsOptionalPanels(t *testing.T) {
 	view := activityPanelTestView(false, false)
 	view["togglePressed"] = false
-	readiness := workbenchViewMap(view, "readiness")
+	readiness := core.WorkbenchViewMap(view, "readiness")
 	readiness["items"] = []map[string]any{
 		{
 			"key":         "content",
@@ -89,7 +90,7 @@ func TestRenderActivityPanelMinimalOmitsOptionalPanels(t *testing.T) {
 
 func TestRenderActivityPanelStructuredCommentsAndProposals(t *testing.T) {
 	view := activityPanelTestView(false, false)
-	comments := workbenchViewMap(view, "comments")
+	comments := core.WorkbenchViewMap(view, "comments")
 	comments["countLabel"] = "1 open"
 	comments["comments"] = []map[string]any{
 		{
@@ -106,7 +107,7 @@ func TestRenderActivityPanelStructuredCommentsAndProposals(t *testing.T) {
 			"resolveEvent": "studio.resolveComment",
 		},
 	}
-	proposals := workbenchViewMap(view, "proposals")
+	proposals := core.WorkbenchViewMap(view, "proposals")
 	proposals["countLabel"] = "1 pending"
 	proposals["proposals"] = []map[string]any{
 		{
@@ -173,7 +174,7 @@ func TestRenderActivityPanelStructuredCommentsAndProposals(t *testing.T) {
 
 func TestRenderActivityPanelStructuredActionsCanSubmit(t *testing.T) {
 	view := activityPanelTestView(false, false)
-	comments := workbenchViewMap(view, "comments")
+	comments := core.WorkbenchViewMap(view, "comments")
 	comments["countLabel"] = "1 open"
 	comments["comments"] = []map[string]any{
 		{
@@ -196,7 +197,7 @@ func TestRenderActivityPanelStructuredActionsCanSubmit(t *testing.T) {
 			"reopenDecisionValue":  "reopen:comment-hero-headline",
 		},
 	}
-	proposals := workbenchViewMap(view, "proposals")
+	proposals := core.WorkbenchViewMap(view, "proposals")
 	proposals["countLabel"] = "1 pending"
 	proposals["proposals"] = []map[string]any{
 		{

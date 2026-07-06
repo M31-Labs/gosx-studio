@@ -1,30 +1,35 @@
-package studio
+package shell
 
-import "m31labs.dev/gosx"
+import (
+	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/canvas"
+	"m31labs.dev/gosx-studio/panels"
+	"m31labs.dev/gosx-studio/sitemap"
+)
 
 type BackendEditorPageProps struct {
-	Class               string
-	Media               []BackendEditorMediaAsset
-	SaveStatus          BackendEditorActionStatus
-	AuthoringStatus     BackendEditorActionStatus
-	PublishStatus       BackendEditorActionStatus
-	PublishFlowStatus   BackendEditorActionStatus
-	RestoreStatus       BackendEditorActionStatus
-	RevisionRestored    bool
-	WorkbenchShell      gosx.Node
-	SupportNodes        []gosx.Node
-	SiteMapView         map[string]any
-	SiteMapAuthoringFormsOptions SiteMapAuthoringFormsOptions
+	Class                        string
+	Media                        []BackendEditorMediaAsset
+	SaveStatus                   BackendEditorActionStatus
+	AuthoringStatus              BackendEditorActionStatus
+	PublishStatus                BackendEditorActionStatus
+	PublishFlowStatus            BackendEditorActionStatus
+	RestoreStatus                BackendEditorActionStatus
+	RevisionRestored             bool
+	WorkbenchShell               gosx.Node
+	SupportNodes                 []gosx.Node
+	SiteMapView                  map[string]any
+	SiteMapAuthoringFormsOptions sitemap.SiteMapAuthoringFormsOptions
 	SiteMapAuthoringFormsNode    gosx.Node
-	StylePanelView      map[string]any
-	StylePanelFormID    string
-	StylePanelAction    string
-	StylePanelCSRFToken string
-	StylePanelNode      gosx.Node
-	EngineHosts         []map[string]any
-	EngineRuntime       StudioEngineRuntime
-	EngineHostsNode     gosx.Node
-	Scripts             BackendEditorScripts
+	StylePanelView               map[string]any
+	StylePanelFormID             string
+	StylePanelAction             string
+	StylePanelCSRFToken          string
+	StylePanelNode               gosx.Node
+	EngineHosts                  []map[string]any
+	EngineRuntime                canvas.StudioEngineRuntime
+	EngineHostsNode              gosx.Node
+	Scripts                      BackendEditorScripts
 }
 
 type BackendEditorMediaAsset struct {
@@ -76,7 +81,7 @@ func backendEditorSupportNodes(props BackendEditorPageProps) []gosx.Node {
 		return append(nodes, props.EngineHostsNode)
 	}
 	if len(props.EngineHosts) > 0 {
-		nodes = append(nodes, RenderStudioEngineHosts(props.EngineHosts, StudioEngineHostsOptions{
+		nodes = append(nodes, canvas.RenderStudioEngineHosts(props.EngineHosts, canvas.StudioEngineHostsOptions{
 			EngineRuntime: props.EngineRuntime,
 		}))
 	}
@@ -90,7 +95,7 @@ func backendEditorSiteMapAuthoringFormsNode(props BackendEditorPageProps) gosx.N
 	if len(props.SiteMapView) == 0 || props.SiteMapAuthoringFormsOptions.Action == "" {
 		return gosx.Node{}
 	}
-	return RenderSiteMapAuthoringForms(props.SiteMapView, props.SiteMapAuthoringFormsOptions)
+	return sitemap.RenderSiteMapAuthoringForms(props.SiteMapView, props.SiteMapAuthoringFormsOptions)
 }
 
 func backendEditorStylePanelNode(props BackendEditorPageProps) gosx.Node {
@@ -104,7 +109,7 @@ func backendEditorStylePanelNode(props BackendEditorPageProps) gosx.Node {
 	if formID == "" {
 		formID = "editorStylePaletteForm"
 	}
-	return RenderStylePanel(props.StylePanelView, formID, props.StylePanelAction, props.StylePanelCSRFToken)
+	return panels.RenderStylePanel(props.StylePanelView, formID, props.StylePanelAction, props.StylePanelCSRFToken)
 }
 
 func RenderBackendEditorMediaDatalist(media []BackendEditorMediaAsset) gosx.Node {
