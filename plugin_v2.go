@@ -2,39 +2,9 @@ package studio
 
 import "net/http"
 
-// PluginIsland is a plugin-contributed client runtime island. It is bundled into
-// the served engine script exactly like the built-in *runtime.Bundle() blobs and
-// is also served at its own script route. This is the channel that lets a plugin
-// ship browser behavior — e.g. a Stripe Payment Element island that publishes
-// window.GoSXStripeRuntime — without forking the editor core. A plugin stays
-// compiled-in (no dynamic loader); per-tenant enablement is a FeatureFlags
-// concern via FeatureFlagKey.
-type PluginIsland struct {
-	// FeatureFlagKey gates per-tenant enablement, mirroring the built-in island
-	// convention (e.g. inlineeditruntime.FeatureFlagKey). By convention it ends
-	// with "-runtime-islands".
-	FeatureFlagKey string
-	// ScriptName is the served filename and the dedupe key, e.g.
-	// "stripe-runtime.js".
-	ScriptName string
-	// Bundle returns the island IIFE — the JS that publishes the island's
-	// window.GoSX*Runtime global. It is called lazily so an island can embed its
-	// source like the built-ins.
-	Bundle func() []byte
-	// Contract couples the island's shipped JS to the typed RuntimeContract it
-	// implements, so a plugin's advertised window.* API cannot drift from the
-	// blob it ships. Reserved for the served runtime manifest; unused by bundling.
-	Contract RuntimeContract
-}
-
-// scriptBytes returns the island's bundle bytes, tolerating a nil Bundle.
-func (i PluginIsland) scriptBytes() []byte {
-	if i.Bundle == nil {
-		return nil
-	}
-	return i.Bundle()
-}
-
+// PluginIsland moved to m31labs.dev/gosx-studio/core alongside Plugin (Slice 1
+// of the package restructure); see compat_core.go for the facade alias.
+//
 // PluginRegistry accumulates the runtime artifacts contributed by registered
 // plugins. It is host-held, not global: a plugin-aware host builds one, calls
 // Register for each plugin, then serves EngineRuntimeScriptWithPlugins(reg) and
@@ -68,7 +38,7 @@ func (r *PluginRegistry) Register(p Plugin) {
 		r.index = make(map[string]int, len(p.Islands))
 	}
 	for _, island := range p.Islands {
-		if island.ScriptName == "" || len(island.scriptBytes()) == 0 {
+		if island.ScriptName == "" || len(island.ScriptBytes()) == 0 {
 			continue
 		}
 		if i, ok := r.index[island.ScriptName]; ok {
@@ -97,7 +67,7 @@ func (r *PluginRegistry) IslandBundles() [][]byte {
 	}
 	out := make([][]byte, 0, len(r.islands))
 	for _, island := range r.islands {
-		if b := island.scriptBytes(); len(b) > 0 {
+		if b := island.ScriptBytes(); len(b) > 0 {
 			out = append(out, b)
 		}
 	}
@@ -114,7 +84,7 @@ func (r *PluginRegistry) IslandRoutes() map[string]http.Handler {
 	}
 	routes := make(map[string]http.Handler, len(r.islands))
 	for _, island := range r.islands {
-		b := island.scriptBytes()
+		b := island.ScriptBytes()
 		if len(b) == 0 {
 			continue
 		}

@@ -1,7 +1,6 @@
 package studio
 
 import (
-	"fmt"
 	"strings"
 
 	"m31labs.dev/gosx"
@@ -764,22 +763,4 @@ func shellHasAction(actions []Action, key string) bool {
 		}
 	}
 	return false
-}
-
-func NormalizeKey(value string) string {
-	value = strings.TrimSpace(strings.ToLower(value))
-	value = strings.ReplaceAll(value, "_", "-")
-	value = strings.ReplaceAll(value, " ", "-")
-	return value
-}
-
-func BoolAttr(value bool) string {
-	if value {
-		return "true"
-	}
-	return "false"
-}
-
-func FmtAny(value any) string {
-	return strings.TrimSpace(fmt.Sprint(value))
 }
