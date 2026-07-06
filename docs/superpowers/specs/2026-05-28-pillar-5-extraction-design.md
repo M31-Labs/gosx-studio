@@ -1,9 +1,44 @@
 # Pillar 5 — Extraction Completion Design
 
 **Date:** 2026-05-28
-**Status:** Draft, pending review
+**Status:** Superseded by execution — see note below. Historical design
+record only; do not use as a current-state reference.
 **Owner:** odvcencio
 **Pillar:** 5 of 5 (foundation; unblocks Pillars 1-4)
+
+> **Superseded-by-execution note (2026-07-06):** the extraction happened, but
+> not on this document's plan. Two things changed the shape of the outcome
+> after this design was written:
+>
+> 1. **The package restructure** split `gosx-studio` into `core`/`authoring`/
+>    `hostruntime`/`canvas`/`sitemap`/`panels`/`backoffice`/`shell` (a
+>    deprecated root `studio` facade covers old symbols for one release
+>    cycle) — not the single flat package this document's Principle 4
+>    assumed. See `docs/ARCHITECTURE.md`.
+> 2. **The `gosx-cms` fold-in** (2026-07-06) moved all 13 `gosx-cms` packages,
+>    *including* `gosx-cms/studio` (56 files) and `gosx-cms/studio/collab`,
+>    into this module as `cms/*` / `cms/studio` / `cms/studio/collab` — it did
+>    **not** dissolve `cms/studio` into the flat/root packages the way this
+>    document's Scope and Batch 12 describe (`cmsstudio` renderers moving
+>    into `gosx-studio/` alongside `studio.go`/`shell.go`/`runtime.go`,
+>    `gosx-cms/studio/` deleted entirely). `cms/studio` still exists today as
+>    its own top-tier package; see `docs/ARCHITECTURE.md` §"Release model" for
+>    why the merge was rejected (name collisions, non-mechanical for the two
+>    downstream consumers) and [`cms/PROVENANCE.md`](../../../cms/PROVENANCE.md)
+>    for the full fold-in record. The standalone `gosx-cms` module is frozen
+>    and tombstoned at final tag `v0.2.1`, not deleted.
+>
+> The rest of this document is preserved as-written: a historical design
+> record of the originally-proposed extraction (batch plan, API sketch,
+> content/editor type split, risk table). Its specific file paths (flat
+> `gosx-studio/store.go`, `gosx-cms/studio/*.go`, etc.), batch sequencing, and
+> "12 batches" success criteria describe a plan that was **not** the one
+> executed — read them as intent-at-the-time, not as current package paths.
+> Where this document's design questions (e.g., which CMS-adjacent types
+> should relocate within `cms/`, whether `cms/studio` should eventually merge
+> into `shell`/`panels`/`backoffice`) remain genuinely open post-fold-in, they
+> are marked `(status: needs owner review, pre-fold-in assessment)` inline
+> below rather than answered here.
 
 ## Context
 

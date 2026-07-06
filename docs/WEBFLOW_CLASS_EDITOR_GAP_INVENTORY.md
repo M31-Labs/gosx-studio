@@ -4,6 +4,24 @@ This inventory defines what is missing to make GoSX Studio a full no-code web
 development editor in the Webflow class, while staying native to GoSX instead
 of becoming a generic JSON page builder.
 
+> **Post-restructure / post-fold-in note (2026-07-06):** this inventory
+> predates two structural changes documented in
+> [docs/ARCHITECTURE.md](ARCHITECTURE.md): the package restructure (the flat
+> root split into `core`/`authoring`/`hostruntime`/`canvas`/`sitemap`/`panels`/
+> `backoffice`/`shell`, plus a deprecated root `studio` facade) and the
+> `gosx-cms` fold-in (the standalone `gosx-cms` module's 13 packages now live
+> in this module as `cms/*` and `cms/studio`; the 9-package layout is those 8
+> plus `cms`). The standalone `gosx-cms` repository is frozen, tombstoned, and
+> tagged `v0.2.1`; see [`cms/PROVENANCE.md`](../cms/PROVENANCE.md). Below,
+> `gosx-cms`/`gosx-cms/studio` references have been updated to their current
+> `cms/`/`cms/studio` paths and the "one editor, one back-office, one portal"
+> definition from `README.md` supersedes the "gosx-studio, gosx-cms/studio,
+> Muddy Noni, and Pajaritos" split description. **The gap findings themselves
+> are preserved as-is** (this is a docs-refresh pass, not a re-assessment):
+> where a specific claim's current truth can't be confirmed from a docs-only
+> pass, it is marked `(status: needs owner review, pre-fold-in assessment)`
+> rather than asserted or removed.
+
 ## Target Promise
 
 The finished platform should let a non-technical site author:
@@ -28,12 +46,17 @@ host adapters. It should not erase GoSX into an untyped website blob.
 ## Current Inventory
 
 The current codebase has the right contract direction, but the product surface is
-still split across `gosx-studio`, `gosx-cms/studio`, Muddy Noni, and Pajaritos.
+still split across the `gosx-studio` module (including its folded-in
+`cms/studio` package), Muddy Noni, and Pajaritos. *(status: needs owner
+review, pre-fold-in assessment — this row predates the module fold-in, which
+moved `gosx-cms/studio` in-module without merging it into `shell`/`panels`/
+`backoffice`; whether the split described below has otherwise narrowed is
+unconfirmed here.)*
 
 | Area | Evidence | Current state |
 | --- | --- | --- |
 | Studio package boundary | `README.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md` | The docs already define Studio as the authoring layer beside CMS/Admin, not inside a host app. |
-| Host shell contract | `store.go:12`, `store.go:27` | Hosts can feed Studio panels, media, revisions, readiness, adapters, and a normalized shell. |
+| Host shell contract | `shell/store.go` (moved from root-package `store.go` in the Phase-1 restructure) | Hosts can feed Studio panels, media, revisions, readiness, adapters, and a normalized shell. |
 | Reusable workbench shell projection | `workbench_shell_view.go` | Studio now owns the shared editor shell view payload for workbench chrome, preview-shell attrs, zoom levels, rail resizers, CSRF/action metadata, and host label overrides. |
 | Reusable workbench toolbar renderer | `workbench_toolbar.go` | Studio now renders shared shell chrome from `WorkbenchShellView`: toolbar title, summary, mode controls, metrics, command palette, save status, history controls, preview link, and save button. |
 | Reusable site-map authoring panels | `sitemap_authoring_panels.go` | Studio now renders shared page metadata, editable control, reorder, duplicate, visibility, delete, composition-intent, and optional page-list panels from `AuthoringSiteMapView`. Muddy/Noni and Pajaritos feed host views/options instead of duplicating that panel markup. |
@@ -41,14 +64,14 @@ still split across `gosx-studio`, `gosx-cms/studio`, Muddy Noni, and Pajaritos.
 | Reusable site-map engine frame | `sitemap_engine.go` | Studio now renders shared site-map engine frame segments: root semantics, header chrome, stats, source legend, and renderer markers. Muddy/Noni consumes those segments around the shared site-map board renderer. |
 | Reusable site-map board renderer | `sitemap_board.go` | Studio now renders the visible site-map board from `AuthoringSiteMapView`: filters, focus controls, map lanes, selected-node details, composition intents, blueprints, palette, component/source/control views, and minimap. Muddy/Noni consumes the shared node instead of its old local `SiteMapCanvasIsland`. |
 | Reusable site-map board runtime | `sitemapruntime/` | Studio now owns the browser interaction contract for site-map board filters, detail tabs, palette selection, node selection, and fragment remount binding. Muddy/Noni runs it against the shared board renderer, and Pajaritos can mount the standalone runtime beside its server-composed shell. |
-| Authoring projection | `authoring.go:9`, `authoring.go:21`, `authoring.go:47` | `AuthoringSurface` exposes pages, selected page, palette, intents, workspace graph, and canvas layout. |
-| Authoring mutation contract | `mutations.go` | Studio now has typed operation kinds, form field names, `AuthoringMutation`, `AuthoringAdapter`, validation/result envelopes, and a GoSX action handler for host-owned persistence. |
-| Typed page/component model | `studio.go:151`, `studio.go:156`, `studio.go:292` | Pages, components, controls, canvas blocks, blueprints, templates, and composition intents exist as contracts. |
-| Runtime contracts | `studio.go:452`, runtime subpackages | Preview, workbench, selection, field, brand, style, and block layout runtimes are being moved into Studio-owned packages. |
-| Adapter declarations | `studio.go:510` | Resource adapters describe CMS/admin/page/media/lifecycle/flow surfaces, but mostly describe capability instead of executing mutations. |
+| Authoring projection | `authoring/authoring.go` (moved from root-package `authoring.go`) | `AuthoringSurface` exposes pages, selected page, palette, intents, workspace graph, and canvas layout. |
+| Authoring mutation contract | `authoring/mutations.go` (moved from root-package `mutations.go`) | Studio now has typed operation kinds, form field names, `AuthoringMutation`, `AuthoringAdapter`, validation/result envelopes, and a GoSX action handler for host-owned persistence. |
+| Typed page/component model | `core/sitemap.go`, `core/composition.go`, `core/canvas.go` (split out of the pre-restructure root-package `studio.go` into `core` during Phase 1) | Pages, components, controls, canvas blocks, blueprints, templates, and composition intents exist as contracts. |
+| Runtime contracts | `core/engines.go`, runtime subpackages (moved from root-package `studio.go`) | Preview, workbench, selection, field, brand, style, and block layout runtimes are being moved into Studio-owned packages. |
+| Adapter declarations | `core/resources.go` (moved from root-package `studio.go`) | Resource adapters describe CMS/admin/page/media/lifecycle/flow surfaces, but mostly describe capability instead of executing mutations. |
 | Product roadmap | `docs/ROADMAP.md:18` through `docs/ROADMAP.md:27` | The missing reusable `.gsx` surfaces are already named: shell, navigator, site-map, canvas, block-layout, inspector, flow designer, publish panel. |
 | Noni proving ground | `muddy-noni-commerce/app/admin/editor/page.server.go:267`, `muddy-noni-commerce/app/admin/editor/site_map.server.go:456` | Noni still owns a large custom editor implementation, but now registers the Studio authoring action and persists the home hero headline through the shared mutation contract. |
-| Noni runtime bridge | `muddy-noni-commerce/internal/gosxstudio/runtime.go:109` | Some editor runtimes still bridge through `gosx-cms/studio`, so the ownership boundary is not complete. |
+| Noni runtime bridge | `muddy-noni-commerce/internal/gosxstudio/runtime.go:109` | Some editor runtimes still bridge through `cms/studio` (folded in-module, formerly the standalone `gosx-cms/studio`), so the ownership boundary is not complete. *(status: needs owner review, pre-fold-in assessment — whether Noni's bridge still points at the same seam post-migration is unconfirmed here.)* |
 | Pajaritos proving ground | `pajaritos-forest-school/internal/site/store.go:927`, `pajaritos-forest-school/internal/site/store.go:970` | Pajaritos exposes `hostShell` plus an `authoringAction`, but still renders most editor panels through CMS Studio helper surfaces. |
 | Pajaritos Studio adapter | `pajaritos-forest-school/internal/site/store.go:556`, `pajaritos-forest-school/internal/site/store.go:1230` | A lightweight host store, site-map bridge, and first save-control mutation prove the adapter shape can serve a second app. |
 
@@ -62,7 +85,8 @@ Current:
   `CanvasEngine.gsx`, `BlockLayoutEngine.gsx`, `InspectorIsland.gsx`,
   `FlowDesigner.gsx`, and `PublishPanel.gsx`.
 - Host apps still render most visible UI through Noni-specific functions or
-  `gosx-cms/studio` helpers.
+  `cms/studio` (folded in-module, formerly the standalone `gosx-cms/studio`)
+  helpers.
 - `WorkbenchShellView` now extracts the first shared shell projection into
   `gosx-studio`, and both Noni and Pajaritos consume it for workbench metadata,
   preview-shell attributes, zoom controls, rail resizers, and save/preview
@@ -321,8 +345,8 @@ Acceptance:
 Current:
 
 - `ResourceAdapter` and `ResourceBinding` describe host resources.
-- `gosx-cms` owns content schemas, media records, lifecycle, storage, and
-  generated assets.
+- `cms/*` (folded in-module, formerly the standalone `gosx-cms` module) owns
+  content schemas, media records, lifecycle, storage, and generated assets.
 
 Missing:
 
@@ -462,8 +486,9 @@ Acceptance:
 Current:
 
 - `ShellConfig` includes labels, actions, features, resources, and permissions.
-- The roadmap calls for a product package composing `gosx-cms + gosx-admin +
-  gosx-studio`.
+- The roadmap calls for a product package composing `gosx-admin + gosx-studio`
+  (the latter now including the folded-in `cms/*` content-storage layer that
+  used to be the separate `gosx-cms` module).
 
 Missing:
 
@@ -575,14 +600,14 @@ These are the current places to mine for reusable Studio behavior.
 
 | Repository | Hotspot | Why it matters |
 | --- | --- | --- |
-| `gosx-studio` | `authoring.go` | New neutral authoring projection. This should become the data source for shell, site-map, canvas, and inspector surfaces. |
+| `gosx-studio` | `authoring/authoring.go` (moved from root-package `authoring.go`) | New neutral authoring projection. This should become the data source for shell, site-map, canvas, and inspector surfaces. |
 | `gosx-studio` | runtime packages | Existing browser behaviors should be composed into engines rather than copied as host scripts. |
 | `muddy-noni-commerce` | `app/admin/editor/site_map.server.go:456` through `app/admin/editor/site_map.server.go:1005` | Noni has site-map view, composition intent, and control-view logic that overlaps with Studio `AuthoringSurface`. |
 | `muddy-noni-commerce` | `app/admin/editor/page.server.go:267` and after | Noni owns a large shell/inspector/publish/workbench implementation that should move behind reusable Studio surfaces. |
-| `muddy-noni-commerce` | `internal/gosxstudio/runtime.go:109` | Runtime ownership still passes through `gosx-cms/studio` for workbench, command palette, and state runtime assets. |
+| `muddy-noni-commerce` | `internal/gosxstudio/runtime.go:109` | Runtime ownership still passes through `cms/studio` (folded in-module, formerly `gosx-cms/studio`) for workbench, command palette, and state runtime assets. *(status: needs owner review, pre-fold-in assessment)* |
 | `pajaritos-forest-school` | `internal/site/store.go:824` | Pajaritos still builds most CMS Studio panels locally. |
 | `pajaritos-forest-school` | `internal/site/store.go:1051` through `internal/site/store.go:1162` | Pajaritos proves that a second host can feed a Studio store and site map. |
-| `gosx-cms` | `studio/*` | This package still owns behavior that belongs either in CMS lifecycle/content or Studio authoring surfaces. |
+| `gosx-studio` | `cms/studio/*` (folded in-module 2026-07-06; formerly the standalone `gosx-cms` module's `studio/*`) | This package still owns behavior that belongs either in CMS lifecycle/content or Studio authoring surfaces — the fold-in moved it in-module but deliberately did not merge it into `shell`/`panels`/`backoffice` (name collisions, non-mechanical for the two downstream consumers; see `docs/ARCHITECTURE.md` §"Release model"). |
 
 ## Phased Work Plan
 
@@ -590,7 +615,11 @@ These are the current places to mine for reusable Studio behavior.
 
 - Freeze the names and responsibilities of CMS, Admin, Studio, and the future
   product package.
-- Decide what remains in `gosx-cms/studio` versus what moves to `gosx-studio`.
+- Decide what remains in `cms/studio` versus what moves to the root
+  `gosx-studio` packages (`shell`/`panels`/`backoffice`). *(status: needs
+  owner review, pre-fold-in assessment — the fold-in resolved the module
+  boundary but left this specific package-merge question open per
+  `docs/ARCHITECTURE.md` §"Release model".)*
 - Add migration notes for host apps.
 - Keep Noni and Pajaritos green while extraction proceeds.
 
@@ -634,8 +663,8 @@ These are the current places to mine for reusable Studio behavior.
 
 ### Phase 5: Productize
 
-- Create the product package that composes `gosx-cms + gosx-admin +
-  gosx-studio`.
+- Create the product package that composes `gosx-admin + gosx-studio` (the
+  latter already including the folded-in `cms/*` layer).
 - Add project/workspace/team setup.
 - Add hosted deployment configuration.
 - Add plugin registry and first-run project templates.
@@ -680,7 +709,11 @@ These are the current places to mine for reusable Studio behavior.
     and expose Muddy/Noni data hooks plus the Pajaritos standalone runtime
     mount.
 14. Move workbench, command palette, and state runtime ownership out of
-   `gosx-cms/studio` when the dependent hosts are ready.
+   `cms/studio` (folded in-module, formerly `gosx-cms/studio`) when the
+   dependent hosts are ready. *(status: needs owner review, pre-fold-in
+   assessment — note the fold-in kept `cms/studio/assets` as a deliberate
+   fork of `hostruntime/assets` rather than reconciling them; see
+   `docs/ARCHITECTURE.md` §"Runtime & islands".)*
 15. Implement `SiteMapEngine.gsx` against the existing `CompositionWorkspace`
    and `WorkspaceCanvas` contracts.
 16. Implement `InspectorIsland.gsx` for the current `ControlKind` set with
@@ -740,7 +773,8 @@ These are the current places to mine for reusable Studio behavior.
   `AuthoringActionHandler` mutation boundary.
 - 2026-06-01: Added `authoringruntime`, bundled it into the Studio engine
   runtime, and exposed `AuthoringRuntimeScript()` for hosts still using
-  `gosx-cms/studio` composition helpers. Muddy now proves the delegated engine
+  `cms/studio` (folded in-module, formerly `gosx-cms/studio`) composition
+  helpers. Muddy now proves the delegated engine
   bundle contains the runtime, and Pajaritos injects the standalone runtime
   into its generated workbench. Successful authoring actions can now refresh
   previews, mark the changed node/control, and publish a
