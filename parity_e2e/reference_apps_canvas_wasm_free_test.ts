@@ -28,9 +28,10 @@ import {
 //
 // This file asserts, end-to-end in headless Chromium:
 //   (a) PAINT — the canvas backing store has non-background pixels.
-//   (b) NO FULL WASM — the editor requests ONLY the islands-only runtime
-//       (gosx-runtime-islands*.wasm); the full gosx-runtime.<hash>.wasm is never
-//       fetched, and the embedded runtime manifest selects the islands artifact.
+//   (b) NO FULL WASM — the full gosx-runtime.<hash>.wasm is never fetched. A
+//       zero-WASM footprint is valid/preferred when the Studio JS runtimes provide
+//       the required globals; if any WASM or manifest runtime path is present, it
+//       must be islands-only.
 //   (c) PAN — a left-drag shifts painted content (the camera moves; pixels change).
 //   (d) ZOOM — a wheel gesture changes the JS camera scale.
 //   (e) PICK — a click on a node updates the board's selected-node attr AND the
@@ -45,8 +46,9 @@ import {
 // interaction genuinely does not work WASM-free, the offending assertion is left
 // test.fixme with the observed evidence rather than faked.
 //
-// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1 and a Muddy dist rebuilt against the
-// gosx/gosx-studio under test (`gosx build --dev .` in muddy-noni-commerce).
+// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1. The reference-app harness rebuilds
+// Muddy's ignored dist assets against the gosx/gosx-studio under test before
+// booting the server.
 
 const CANVAS_SELECTOR = "canvas[data-gosx-canvas-wasm-free='true']";
 const BOARD_SELECTOR = "[data-studio-site-map-board='true']";
@@ -77,8 +79,8 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
     });
     page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
 
-    // Record every WASM request the page makes so we can PROVE the full runtime
-    // is never fetched (only the islands-only artifact).
+    // Record every WASM request the page makes so we can prove the full runtime
+    // is never fetched. Zero requests are valid on the current JS-runtime path.
     const wasmRequests: string[] = [];
     page.on("request", (req) => {
       const url = req.url();
@@ -101,12 +103,12 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
       await page.waitForFunction(() => {
         const w = window as unknown as Record<string, unknown>;
         const rt = w.GoSXStudioSiteMapRuntime as { setState?: unknown } | undefined;
-        const painter = w.__muddyCanvas2DPainter as { paint?: unknown } | undefined;
-        const el = document.querySelector("canvas[data-gosx-canvas-wasm-free='true']") as (HTMLCanvasElement & { __muddyCanvasWasmFree?: unknown }) | null;
+        const painter = w.GoSXStudioCanvas2DPainterRuntime as { paint?: unknown } | undefined;
+        const el = document.querySelector("canvas[data-gosx-canvas-wasm-free='true']") as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: unknown }) | null;
         return !!painter && typeof painter.paint === "function" &&
           !!rt && typeof rt.setState === "function" &&
           document.documentElement.getAttribute("data-gosx-canvas-wasm-free-client") === "true" &&
-          !!el && !!el.__muddyCanvasWasmFree &&
+          !!el && !!el.GoSXStudioCanvasWasmFree &&
           el.getAttribute("data-gosx-canvas-wasm-free-bound") === "true";
       }, null, { timeout: 120_000 });
 
@@ -123,6 +125,7 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
         "the full-WASM canvas entrypoints (__gosx_render_canvas / __gosx_canvas_event / __gosx_canvas_set_backend) must be ABSENT in wasm-free mode",
       ).toBe(true);
 
+      await canvas.scrollIntoViewIfNeeded();
       const box = await canvas.boundingBox();
       expect(box, "canvas should have a layout box").not.toBeNull();
       expect(box!.width, "canvas CSS width > 0").toBeGreaterThan(0);
@@ -159,36 +162,28 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
       const paintedCount = await pollForPaint(page);
       expect(paintedCount, "the WASM-free board must paint non-background pixels").toBeGreaterThan(0);
 
-      // ── (b) NO FULL WASM — only the islands-only runtime is fetched ──────────
+      // ── (b) NO FULL WASM — zero or islands-only runtime footprint ───────────
       // Give the network a beat to settle, then inspect.
       await page.waitForTimeout(250);
-      const fullWasm = wasmRequests.filter((u) => /gosx-runtime\.[0-9a-f]+\.wasm/i.test(u) || /\/gosx\/runtime\.wasm/i.test(u));
-      const islandsWasm = wasmRequests.filter((u) => /gosx-runtime-islands/i.test(u) || /runtime-islands\.wasm/i.test(u));
+      const manifestRuntime = await runtimeManifestPath(page);
+      const fullWasm = wasmRequests.filter(isFullRuntimeWasm);
+      const islandsWasm = wasmRequests.filter(isIslandsRuntimePath);
+      const zeroWasmNoManifestRuntime = wasmRequests.length === 0 && manifestRuntime === "";
+      const islandsOnlyFootprint = fullWasm.length === 0 &&
+        wasmRequests.every(isIslandsRuntimePath) &&
+        (manifestRuntime === "" || isIslandsRuntimePath(manifestRuntime));
+      const footprintEvidence = { manifestRuntime, wasmRequests, fullWasm, islandsWasm, zeroWasmNoManifestRuntime };
+      await testInfo.attach("wasm-free-low-wasm-footprint-evidence.json", {
+        contentType: "application/json",
+        body: JSON.stringify(footprintEvidence, null, 2),
+      });
       expect(
         fullWasm,
         `the FULL gosx-runtime.<hash>.wasm must never be fetched in wasm-free mode; observed wasm requests=${JSON.stringify(wasmRequests)}`,
       ).toEqual([]);
       expect(
-        islandsWasm.length,
-        `the LIGHT islands-only runtime should be the only WASM fetched; observed=${JSON.stringify(wasmRequests)}`,
-      ).toBeGreaterThanOrEqual(1);
-      // Cross-check the embedded runtime manifest (the exact JSON the gosx
-      // bootstrap's loadManifest() reads from <script id="gosx-manifest">) — its
-      // runtime.path is the WASM artifact the bootstrap loads. In wasm-free mode
-      // (no shared-runtime engine) gosx selects the islands-only artifact.
-      const manifestRuntime = await page.evaluate(() => {
-        const el = document.getElementById("gosx-manifest");
-        if (!el) return "";
-        try {
-          const m = JSON.parse(el.textContent || "") as { runtime?: { path?: string } };
-          return m?.runtime?.path || "";
-        } catch {
-          return "";
-        }
-      });
-      expect(
-        /islands/i.test(manifestRuntime),
-        `the runtime manifest should select the islands-only WASM; manifest.runtime.path=${JSON.stringify(manifestRuntime)}`,
+        zeroWasmNoManifestRuntime || islandsOnlyFootprint,
+        `wasm-free mode must have either zero WASM with no manifest runtime path, or an islands-only WASM footprint; footprint=${JSON.stringify(footprintEvidence)}`,
       ).toBe(true);
 
       // Discover the rects the DOM board can resolve, with on-screen + world
@@ -257,6 +252,7 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
       // so the marquee box coordinates match the live view.
       const rectsForMarquee = await pollForRects(page);
       expect(rectsForMarquee.length, "rects should resolve before marquee").toBeGreaterThanOrEqual(2);
+      await canvas.scrollIntoViewIfNeeded();
       const boxM = (await canvas.boundingBox())!;
       const pair = closestPair(rectsForMarquee);
       const targetIds = [pair.a.id, pair.b.id];
@@ -289,6 +285,7 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
       // reason, and compute the nav plan from the live geometry.
       const rectsForNav = await pollForRects(page);
       expect(rectsForNav.length, "rects should resolve before nav").toBeGreaterThanOrEqual(2);
+      await canvas.scrollIntoViewIfNeeded();
       const boxN = (await canvas.boundingBox())!;
       const navPlan = chooseNavTarget(rectsForNav);
       expect(navPlan, `need a node with a computable spatial neighbor for nav; rects=${rectsForNav.length}`).not.toBeNull();
@@ -322,9 +319,9 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
 // build the SAME world→screen transform the painter applies.
 async function readBundleRects(page: Page): Promise<RectInfo[]> {
   return page.evaluate(({ canvasSel, boardSel }) => {
-    const el = document.querySelector(canvasSel) as (HTMLCanvasElement & { __muddyCanvasWasmFree?: { camera: () => { x: number; y: number; z: number }; bundle: () => unknown } }) | null;
-    if (!el || !el.__muddyCanvasWasmFree) return [];
-    const hook = el.__muddyCanvasWasmFree;
+    const el = document.querySelector(canvasSel) as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: { camera: () => { x: number; y: number; z: number }; bundle: () => unknown } }) | null;
+    if (!el || !el.GoSXStudioCanvasWasmFree) return [];
+    const hook = el.GoSXStudioCanvasWasmFree;
     const bundle = hook.bundle() as { objects?: Array<{ id?: string; kind?: string; pickable?: boolean; bounds?: { minX?: number; maxX?: number; minY?: number; maxY?: number } }> } | null;
     if (!bundle) return [];
     const cam = hook.camera();
@@ -373,16 +370,16 @@ async function pollForRects(page: Page): Promise<RectInfo[]> {
 
 async function readCamera(page: Page): Promise<{ x: number; y: number; z: number }> {
   return page.evaluate((sel) => {
-    const el = document.querySelector(sel) as (HTMLCanvasElement & { __muddyCanvasWasmFree?: { camera: () => { x: number; y: number; z: number } } }) | null;
-    if (!el || !el.__muddyCanvasWasmFree) return { x: NaN, y: NaN, z: NaN };
-    return el.__muddyCanvasWasmFree.camera();
+    const el = document.querySelector(sel) as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: { camera: () => { x: number; y: number; z: number } } }) | null;
+    if (!el || !el.GoSXStudioCanvasWasmFree) return { x: NaN, y: NaN, z: NaN };
+    return el.GoSXStudioCanvasWasmFree.camera();
   }, CANVAS_SELECTOR);
 }
 
 async function resetCamera(page: Page): Promise<void> {
   await page.evaluate((sel) => {
-    const el = document.querySelector(sel) as (HTMLCanvasElement & { __muddyCanvasWasmFree?: { setCamera: (x: number, y: number, z: number) => void } }) | null;
-    el?.__muddyCanvasWasmFree?.setCamera(0, 0, 1);
+    const el = document.querySelector(sel) as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: { setCamera: (x: number, y: number, z: number) => void } }) | null;
+    el?.GoSXStudioCanvasWasmFree?.setCamera(0, 0, 1);
   }, CANVAS_SELECTOR);
 }
 
@@ -580,4 +577,25 @@ async function pollForPaint(page: Page): Promise<number> {
     await page.waitForTimeout(250);
   }
   return last;
+}
+
+async function runtimeManifestPath(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const el = document.getElementById("gosx-manifest");
+    if (!el) return "";
+    try {
+      const m = JSON.parse(el.textContent || "") as { runtime?: { path?: string } };
+      return m?.runtime?.path || "";
+    } catch {
+      return "";
+    }
+  });
+}
+
+function isFullRuntimeWasm(url: string): boolean {
+  return /gosx-runtime\.[0-9a-f]+\.wasm/i.test(url) || /\/gosx\/runtime\.wasm/i.test(url);
+}
+
+function isIslandsRuntimePath(url: string): boolean {
+  return /gosx-runtime-islands/i.test(url) || /runtime-islands\.wasm/i.test(url);
 }

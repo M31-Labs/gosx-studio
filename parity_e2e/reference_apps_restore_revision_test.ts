@@ -41,8 +41,9 @@ import { revealModeIfPresent, startMuddyCanvasHTMLSurface } from "./reference_ap
 //       run (timestamp + random nonce, HTML-safe chars only) so no assertion can
 //       false-pass on stale/seed content; the restore assertion polls/awaits.
 //
-// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1 and a Muddy build rebuilt against the
-// gosx/gosx-studio under test (`go run ./cmd/muddy-noni` via the shared harness).
+// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1. The shared harness refreshes
+// Muddy's ignored dist assets and boots the server against the gosx/gosx-studio
+// under test.
 
 const CANVAS_SELECTOR = "canvas[data-gosx-canvas-wasm-free='true']";
 const BOARD_SELECTOR = "[data-studio-site-map-board='true']";
@@ -242,14 +243,14 @@ async function openEditorToHeroSurface(page: Page, baseURL: string, consoleError
   await page.waitForFunction(() => {
     const w = window as unknown as Record<string, unknown>;
     const rt = w.GoSXStudioSiteMapRuntime as { setState?: unknown } | undefined;
-    const painter = w.__muddyCanvas2DPainter as { paint?: unknown; renderCanvasBoardHTML?: unknown } | undefined;
-    const inlineEdit = w.__muddyCanvasInlineEdit as { install?: unknown; persist?: unknown } | undefined;
-    const el = document.querySelector("canvas[data-gosx-canvas-wasm-free='true']") as (HTMLCanvasElement & { __muddyCanvasWasmFree?: unknown }) | null;
+    const painter = w.GoSXStudioCanvas2DPainterRuntime as { paint?: unknown; renderCanvasBoardHTML?: unknown } | undefined;
+    const inlineEdit = w.GoSXStudioCanvasInlineEditRuntime as { install?: unknown; persist?: unknown } | undefined;
+    const el = document.querySelector("canvas[data-gosx-canvas-wasm-free='true']") as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: unknown }) | null;
     return !!painter && typeof painter.paint === "function" && typeof painter.renderCanvasBoardHTML === "function" &&
       !!rt && typeof rt.setState === "function" &&
       !!inlineEdit && typeof inlineEdit.install === "function" && typeof inlineEdit.persist === "function" &&
       document.documentElement.getAttribute("data-gosx-canvas-wasm-free-client") === "true" &&
-      !!el && !!el.__muddyCanvasWasmFree;
+      !!el && !!el.GoSXStudioCanvasWasmFree;
   }, null, { timeout: 120_000 });
 
   await waitForHeroEditable(page);

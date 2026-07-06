@@ -199,6 +199,143 @@ func TestInlineEditRuntimeOnCommitHook(t *testing.T) {
 	}
 }
 
+func TestInlineEditRuntimePublishesPreviewTextSessionMethods(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"startPreviewTextEdit",
+		"syncPreviewTextEdit",
+		"finishPreviewTextEdit",
+		"startPreviewTextSession",
+		"syncPreviewTextSession",
+		"finishPreviewTextSession",
+		"handlePreviewTextInputEvent",
+		"handlePreviewTextKeyEvent",
+		"handlePreviewTextPasteEvent",
+		"handlePreviewTextBlurEvent",
+		"previewTextEditState",
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() must expose preview text session method %q:\n%s", fragment, body)
+		}
+	}
+}
+
+func TestInlineEditRuntimeOwnsPreviewTextDocumentEventPolicy(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"function previewTextEventEdit(frame, event)",
+		"function handlePreviewTextInputEvent(frame, event, host)",
+		`syncPreviewTextSession(frame, "input", host)`,
+		"function handlePreviewTextKeyEvent(frame, event, host)",
+		`event.key === "Escape"`,
+		`finishPreviewTextSession(frame, false, "escape", host)`,
+		`event.key === "Enter" && !event.shiftKey`,
+		`finishPreviewTextSession(frame, true, "enter", host)`,
+		"function handlePreviewTextPasteEvent(frame, event, host)",
+		`event.clipboardData && event.clipboardData.getData`,
+		`event.clipboardData.getData("text/plain")`,
+		"var doc = frameDocument(frame)",
+		"selection.deleteFromDocument()",
+		"selection.getRangeAt(0).insertNode(doc.createTextNode(text))",
+		"selection.collapseToEnd()",
+		`syncPreviewTextSession(frame, "paste", host)`,
+		"function handlePreviewTextBlurEvent(frame, event, host)",
+		`finishPreviewTextSession(frame, true, "blur", host)`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() missing preview inline-text document event fragment %q:\n%s", fragment, body)
+		}
+	}
+}
+
+func TestInlineEditRuntimeOwnsPreviewTextSessionLifecycle(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"frame.__gosxStudioInlineEdit",
+		`detail.editable !== "text"`,
+		`frame.__gosxStudioPreviewDockTarget`,
+		`target.setAttribute("contenteditable", "plaintext-only")`,
+		`target.setAttribute("spellcheck", "true")`,
+		`target.setAttribute("data-gosx-studio-inline-editing", "true")`,
+		`target.removeAttribute("contenteditable")`,
+		`target.removeAttribute("data-gosx-studio-inline-editing")`,
+		`data-gosx-studio-inline-field`,
+		"placeCaretAtEnd",
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() must own preview inline-text lifecycle fragment %q:\n%s", fragment, body)
+		}
+	}
+}
+
+func TestInlineEditRuntimePreviewTextOperationsAndEvents(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"inline_text_start",
+		"set_text",
+		"inline_text_cancel",
+		"gosxstudio:inline-text-start",
+		"gosxstudio:inline-text",
+		"gosxstudio:inline-text-commit",
+		"gosxstudio:inline-text-cancel",
+		"inlineTextPayload",
+		"inlineTextEventDetail",
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() missing preview inline-text operation/event fragment %q:\n%s", fragment, body)
+		}
+	}
+}
+
+func TestInlineEditRuntimePreviewTextCallbacks(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"opts.form",
+		"opts.controlForField",
+		"opts.selection",
+		"opts.setDirty",
+		"opts.emitOperation",
+		"opts.emitEditorOperation",
+		"opts.emitEvent",
+		"opts.onFinish",
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() missing preview inline-text callback hook %q:\n%s", fragment, body)
+		}
+	}
+}
+
+func TestInlineEditRuntimeOwnsPreviewTextSessionAdapter(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"function previewTextSessionOptions(frame, host)",
+		"form: host.form || null",
+		"target: host.target || (frame && frame.__gosxStudioPreviewDockTarget)",
+		"controlForField: host.controlForField",
+		`form.getAttribute("data-studio-selection")`,
+		`form.getAttribute("data-studio-selection-kind")`,
+		"selection: selection || edit.blockKey || edit.field || \"\"",
+		`host.setStatus("dirty", "Draft changed", reason || "inline-text")`,
+		"host.setDirty(reason || \"inline-text\")",
+		"typeof host.emitOperation === \"function\"",
+		"host.emitOperation(type, operation)",
+		"typeof host.emitEditorOperation === \"function\"",
+		"host.emitEditorOperation(type, operation)",
+		"host.emitEvent(name, detail)",
+		"typeof host.onFinish === \"function\"",
+		"host.onFinish(finishedFrame, edit, reason, commit)",
+		"typeof host.updateDock === \"function\"",
+		"host.updateDock(finishedFrame, edit, reason, commit)",
+		"startPreviewTextEdit(frame, detail, reason, previewTextSessionOptions(frame, host))",
+		"syncPreviewTextEdit(frame, reason, previewTextSessionOptions(frame, host))",
+		"finishPreviewTextEdit(frame, commit, reason, previewTextSessionOptions(frame, host))",
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() missing preview text session adapter fragment %q:\n%s", fragment, body)
+		}
+	}
+}
+
 // TestInlineEditRuntimeNoPersistRepaintSafeLogic verifies that muddy-specific
 // bundle-rewriting is NOT ported into the generic island. The prohibition is
 // documented in a header comment (it is fine for the word to appear there), but
@@ -213,7 +350,7 @@ func TestInlineEditRuntimeNoPersistRepaintSafeLogic(t *testing.T) {
 	for _, muddySpecific := range []string{
 		"__muddyInlineEditInstalled",
 		"data-gosx-canvas-bundle",
-		"__muddyCanvasInlineEdit",
+		"legacyCanvasInlineEditAlias",
 		"PAINTER_CACHE",
 		"__gosxHTMLMarkup",
 	} {

@@ -124,6 +124,255 @@ func TestRenderWorkbenchCommandPaletteUsesShellViewCommands(t *testing.T) {
 	}
 }
 
+func TestRenderWorkbenchZoomControlsUsesDefaultShellView(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site"}, WorkbenchShellViewOptions{
+		Zoom: "100",
+	})
+	html := gosx.RenderHTML(RenderWorkbenchZoomControls(view, WorkbenchZoomControlsOptions{}))
+	for _, want := range []string{
+		`class="studio-zoombar"`,
+		`role="toolbar"`,
+		`aria-label="Canvas zoom"`,
+		`data-studio-zoom-island="true"`,
+		`data-studio-zoom-current="100"`,
+		`data-gosx-studio-zoom-controls-renderer="gosx-studio"`,
+		`type="button" data-studio-zoom="fit" aria-pressed="false">Fit</button>`,
+		`type="button" data-studio-zoom="75" aria-pressed="false">75%</button>`,
+		`type="button" data-studio-zoom="100" aria-pressed="true">100%</button>`,
+		`type="button" data-studio-zoom="125" aria-pressed="false">125%</button>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in zoom controls html: %s", want, html)
+		}
+	}
+}
+
+func TestRenderWorkbenchZoomControlsHonorsCustomLevelsAndClass(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site"}, WorkbenchShellViewOptions{
+		Zoom: "fit",
+		ZoomLevels: []WorkbenchZoomLevel{
+			{Key: "fit", Label: "Fit"},
+			{Key: "200", Label: "200%", Active: true},
+		},
+	})
+	html := gosx.RenderHTML(RenderWorkbenchZoomControls(view, WorkbenchZoomControlsOptions{
+		Class: "custom-zoombar",
+		Label: "Preview zoom",
+	}))
+	for _, want := range []string{
+		`class="custom-zoombar"`,
+		`aria-label="Preview zoom"`,
+		`data-studio-zoom-current="200"`,
+		`data-gosx-studio-zoom-controls-renderer="gosx-studio"`,
+		`data-studio-zoom="fit" aria-pressed="false">Fit</button>`,
+		`data-studio-zoom="200" aria-pressed="true">200%</button>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in custom zoom controls html: %s", want, html)
+		}
+	}
+	if strings.Contains(html, `data-studio-zoom="100"`) {
+		t.Fatalf("custom zoom controls should not render default levels: %s", html)
+	}
+}
+
+func TestRenderWorkbenchViewportControlsUsesDefaultShellView(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site"}, WorkbenchShellViewOptions{
+		ViewportKey: "tablet",
+	})
+	html := gosx.RenderHTML(RenderWorkbenchViewportControls(view, WorkbenchViewportControlsOptions{}))
+	for _, want := range []string{
+		`class="studio-viewport-switcher"`,
+		`role="toolbar"`,
+		`aria-label="Preview viewport"`,
+		`data-studio-viewport-current="tablet"`,
+		`data-gosx-studio-viewport-controls-renderer="gosx-studio"`,
+		`type="button" data-studio-viewport="desktop" data-studio-viewport-width="100%" aria-pressed="false">Desktop</button>`,
+		`type="button" data-studio-viewport="tablet" data-studio-viewport-width="48rem" aria-pressed="true">Tablet</button>`,
+		`type="button" data-studio-viewport="mobile" data-studio-viewport-width="24rem" aria-pressed="false">Mobile</button>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in viewport controls html: %s", want, html)
+		}
+	}
+}
+
+func TestRenderWorkbenchViewportControlsHonorsCustomViewportsAndClass(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{
+		Title: "Client Site",
+		Viewports: []Viewport{
+			NewViewport("desktop", "Desktop", "100%", false),
+			NewViewport("wide", "Wide", "72rem", true),
+		},
+	}, WorkbenchShellViewOptions{})
+	html := gosx.RenderHTML(RenderWorkbenchViewportControls(view, WorkbenchViewportControlsOptions{
+		Class: "custom-viewportbar",
+		Label: "Preview size",
+	}))
+	for _, want := range []string{
+		`class="custom-viewportbar"`,
+		`aria-label="Preview size"`,
+		`data-studio-viewport-current="wide"`,
+		`data-gosx-studio-viewport-controls-renderer="gosx-studio"`,
+		`data-studio-viewport="desktop" data-studio-viewport-width="100%" aria-pressed="false">Desktop</button>`,
+		`data-studio-viewport="wide" data-studio-viewport-width="72rem" aria-pressed="true">Wide</button>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in custom viewport controls html: %s", want, html)
+		}
+	}
+	if strings.Contains(html, `data-studio-viewport="mobile"`) {
+		t.Fatalf("custom viewport controls should not render default viewports: %s", html)
+	}
+}
+
+func TestRenderWorkbenchCanvasToolsUsesDefaultShellView(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site"}, WorkbenchShellViewOptions{})
+	html := gosx.RenderHTML(RenderWorkbenchCanvasTools(view, WorkbenchCanvasToolsOptions{}))
+	for _, want := range []string{
+		`class="studio-canvas-tools"`,
+		`role="toolbar"`,
+		`aria-label="Canvas tools"`,
+		`data-gosx-studio-canvas-tools-renderer="gosx-studio"`,
+		`type="button" data-studio-rail-toggle="left" aria-pressed="true">Layers</button>`,
+		`type="button" data-studio-rail-toggle="right" aria-pressed="true">Inspector</button>`,
+		`type="button" data-studio-activity-toggle="true" aria-pressed="true">Activity</button>`,
+		`type="button" data-studio-focus-toggle="true" aria-pressed="false">Focus</button>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in canvas tools html: %s", want, html)
+		}
+	}
+}
+
+func TestRenderWorkbenchCanvasToolsHonorsShellLabelsAndClass(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site"}, WorkbenchShellViewOptions{
+		LeftRailLabel:  "Pages",
+		RightRailLabel: "Fields",
+		ActivityLabel:  "Timeline",
+		FocusLabel:     "Inspect",
+	})
+	html := gosx.RenderHTML(RenderWorkbenchCanvasTools(view, WorkbenchCanvasToolsOptions{
+		Class: "custom-canvas-tools",
+		Label: "Editor tools",
+	}))
+	for _, want := range []string{
+		`class="custom-canvas-tools"`,
+		`aria-label="Editor tools"`,
+		`data-gosx-studio-canvas-tools-renderer="gosx-studio"`,
+		`data-studio-rail-toggle="left" aria-pressed="true">Pages</button>`,
+		`data-studio-rail-toggle="right" aria-pressed="true">Fields</button>`,
+		`data-studio-activity-toggle="true" aria-pressed="true">Timeline</button>`,
+		`data-studio-focus-toggle="true" aria-pressed="false">Inspect</button>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in custom canvas tools html: %s", want, html)
+		}
+	}
+}
+
+func TestRenderWorkbenchCanvasBarUsesDefaultShellView(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site"}, WorkbenchShellViewOptions{
+		RouteLabel:     "Home",
+		SelectionLabel: "Hero selected",
+	})
+	html := gosx.RenderHTML(RenderWorkbenchCanvasBar(view, WorkbenchCanvasBarOptions{
+		Controls: []gosx.Node{
+			gosx.El("span", gosx.Attrs(gosx.Attr("data-test-control", "one")), gosx.Text("Control")),
+		},
+	}))
+	for _, want := range []string{
+		`class="studio-canvas-bar"`,
+		`data-gosx-studio-canvas-bar-renderer="gosx-studio"`,
+		`<p class="kicker">Canvas</p>`,
+		`<strong>Home</strong>`,
+		`class="studio-breadcrumbs"`,
+		`aria-label="Canvas selection"`,
+		`<span>Site</span>`,
+		`<output data-studio-selection-label="true">Hero selected</output>`,
+		`data-test-control="one"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in canvas bar html: %s", want, html)
+		}
+	}
+}
+
+func TestRenderWorkbenchCanvasBarHonorsOverrides(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site"}, WorkbenchShellViewOptions{})
+	html := gosx.RenderHTML(RenderWorkbenchCanvasBar(view, WorkbenchCanvasBarOptions{
+		Class:           "custom-canvas-bar",
+		TitleClass:      "custom-title",
+		KickerClass:     "custom-kicker",
+		Kicker:          "Preview",
+		RouteLabel:      "Products",
+		BreadcrumbClass: "custom-breadcrumbs",
+		BreadcrumbLabel: "Preview route",
+		BreadcrumbRoot:  "Store",
+		SelectionLabel:  "Product grid selected",
+		Controls: []gosx.Node{
+			gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("data-studio-zoom", "fit")), gosx.Text("Fit")),
+		},
+	}))
+	for _, want := range []string{
+		`class="custom-canvas-bar"`,
+		`data-gosx-studio-canvas-bar-renderer="gosx-studio"`,
+		`class="custom-title"`,
+		`<p class="custom-kicker">Preview</p>`,
+		`<strong>Products</strong>`,
+		`class="custom-breadcrumbs"`,
+		`aria-label="Preview route"`,
+		`<span>Store</span>`,
+		`<output data-studio-selection-label="true">Product grid selected</output>`,
+		`data-studio-zoom="fit"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in custom canvas bar html: %s", want, html)
+		}
+	}
+}
+
+func TestRenderWorkbenchCanvasStatusUsesDefaultShellView(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site"}, WorkbenchShellViewOptions{
+		RouteLabel:     "Home",
+		ViewportLabel:  "Tablet",
+		SelectionLabel: "Hero selected",
+	})
+	html := gosx.RenderHTML(RenderWorkbenchCanvasStatus(view, WorkbenchCanvasStatusOptions{}))
+	for _, want := range []string{
+		`class="studio-canvas-status"`,
+		`data-gosx-studio-canvas-status-renderer="gosx-studio"`,
+		`<span>Home</span>`,
+		`<span data-studio-viewport-label="true">Tablet</span>`,
+		`<output data-studio-selection-label="true">Hero selected</output>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in canvas status html: %s", want, html)
+		}
+	}
+}
+
+func TestRenderWorkbenchCanvasStatusHonorsOverrides(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site"}, WorkbenchShellViewOptions{})
+	html := gosx.RenderHTML(RenderWorkbenchCanvasStatus(view, WorkbenchCanvasStatusOptions{
+		Class:          "custom-canvas-status",
+		RouteLabel:     "Products",
+		ViewportLabel:  "Mobile",
+		SelectionLabel: "Product grid selected",
+	}))
+	for _, want := range []string{
+		`class="custom-canvas-status"`,
+		`data-gosx-studio-canvas-status-renderer="gosx-studio"`,
+		`<span>Products</span>`,
+		`<span data-studio-viewport-label="true">Mobile</span>`,
+		`<output data-studio-selection-label="true">Product grid selected</output>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in custom canvas status html: %s", want, html)
+		}
+	}
+}
+
 func TestRenderWorkbenchToolbarHonorsDisabledActions(t *testing.T) {
 	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site", PreviewURL: "/"}, WorkbenchShellViewOptions{})
 	html := gosx.RenderHTML(RenderWorkbenchToolbar(view, WorkbenchToolbarOptions{

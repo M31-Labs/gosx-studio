@@ -2,6 +2,7 @@
   if (typeof window === "undefined") return;
 
   var BOARD = "[data-studio-site-map-board='true']";
+  var LAYOUT_ACTION = "data-gosx-studio-site-map-layout-action";
   var BOUND = "data-gosx-studio-site-map-runtime-bound";
   var BOUND_PROP = "__gosxStudioSiteMapRuntimeBound";
 
@@ -695,6 +696,66 @@
     }
   }
 
+  function finiteNumber(value) {
+    var number = Number(value);
+    return isFinite(number) ? number : null;
+  }
+
+  function csrfToken() {
+    var input = document.querySelector('input[name="csrf_token"]');
+    return input ? input.value : "";
+  }
+
+  function layoutAction(root) {
+    var source = attr(root, LAYOUT_ACTION, "");
+    if (source) return source;
+    var host = closest(root, "[" + LAYOUT_ACTION + "]");
+    return host ? attr(host, LAYOUT_ACTION, "") : "";
+  }
+
+  function postLayoutPosition(action, key, x, y) {
+    var body = new URLSearchParams();
+    body.set("siteMapNodeKey", key);
+    body.set("siteMapNodeX", String(x));
+    body.set("siteMapNodeY", String(y));
+    var token = csrfToken();
+    if (token) body.set("csrf_token", token);
+    return fetch(action, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+      body: body.toString(),
+    }).catch(function () {});
+  }
+
+  function bindLayoutPersistence(root) {
+    var action = layoutAction(root);
+    if (!action || typeof fetch !== "function" || typeof URLSearchParams !== "function") return;
+    var pending = Object.create(null);
+    var timers = Object.create(null);
+    function flush(key) {
+      var position = pending[key];
+      delete pending[key];
+      if (!position) return;
+      postLayoutPosition(action, key, position.x, position.y);
+    }
+    root.addEventListener("gosxstudio:sitemap-node-moved", function (event) {
+      var detail = event && event.detail ? event.detail : {};
+      var key = typeof detail.key === "string" ? detail.key.trim() : "";
+      var x = finiteNumber(detail.x);
+      var y = finiteNumber(detail.y);
+      if (!key || x === null || y === null) return;
+      pending[key] = { x: x, y: y };
+      window.clearTimeout(timers[key]);
+      timers[key] = window.setTimeout(function () {
+        flush(key);
+      }, 120);
+    });
+  }
+
   function bind(root) {
     if (!root || root[BOUND_PROP] === true) return root;
     root[BOUND_PROP] = true;
@@ -714,6 +775,7 @@
     root.addEventListener("keydown", function (event) {
       handleKeydown(root, event);
     });
+    bindLayoutPersistence(root);
     sync(root);
     return root;
   }

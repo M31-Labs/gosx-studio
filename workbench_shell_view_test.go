@@ -80,6 +80,10 @@ func TestWorkbenchShellViewProjectsReusableEditorChrome(t *testing.T) {
 	if len(zoomLevels) != 4 || zoomLevels[0]["key"] != "fit" || zoomLevels[0]["pressed"] != true {
 		t.Fatalf("expected default zoom levels: %#v", zoomLevels)
 	}
+	viewports := view["viewports"].([]map[string]any)
+	if len(viewports) != 2 || viewports[1]["key"] != "tablet" || viewports[1]["width"] != "48rem" || viewports[1]["pressed"] != "true" {
+		t.Fatalf("expected shell viewport projection: %#v", viewports)
+	}
 	left := view["leftResizer"].(map[string]any)
 	right := view["rightResizer"].(map[string]any)
 	if left["default"] != "320" || right["default"] != "416" {

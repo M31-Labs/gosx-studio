@@ -53,6 +53,38 @@ func TestInspectorRuntimeJSNoSubmitLogic(t *testing.T) {
 	if strings.Contains(body, "fetch(") {
 		t.Fatalf("InspectorRuntimeScript() must not implement fetch; submit is owned by authoringruntime:\n%s", body)
 	}
+	for _, forbidden := range []string{
+		`addEventListener("submit"`,
+		`addEventListener('submit'`,
+		"requestSubmit",
+		"form.submit",
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("InspectorRuntimeScript() must not implement submit handling %q; submit is owned by authoringruntime:\n%s", forbidden, body)
+		}
+	}
+}
+
+func TestInspectorRuntimeJSHomeInspectorDelegation(t *testing.T) {
+	body := string(InspectorRuntimeScript())
+	for _, want := range []string{
+		"bindHomeInspector",
+		"data-studio-home-inspector-panel",
+		"data-studio-inspector-group",
+		"data-studio-inspector-group-active",
+		"data-studio-home-inspector-fields",
+		"data-studio-inspector-dirty",
+		"data-studio-inspector-dirty-label",
+		"data-studio-inspector-state",
+		`addEventListener("click"`,
+		`addEventListener("input"`,
+		`addEventListener("change"`,
+		"aria-pressed",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("InspectorRuntimeScript() missing Home inspector delegated contract %q:\n%s", want, body)
+		}
+	}
 }
 
 func TestBundleIsNonEmpty(t *testing.T) {
@@ -62,5 +94,8 @@ func TestBundleIsNonEmpty(t *testing.T) {
 	}
 	if !strings.Contains(bundle, "window.GoSXStudioInspectorRuntime") {
 		t.Fatalf("Bundle() must contain the inspector runtime global:\n%s", bundle)
+	}
+	if !strings.Contains(bundle, "data-studio-home-inspector-panel") {
+		t.Fatalf("Bundle() must contain the Home inspector delegated runtime contract:\n%s", bundle)
 	}
 }

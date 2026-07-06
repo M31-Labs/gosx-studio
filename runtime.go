@@ -11,6 +11,10 @@ import (
 	"m31labs.dev/gosx-studio/authoringruntime"
 	"m31labs.dev/gosx-studio/blocklayoutruntime"
 	"m31labs.dev/gosx-studio/brandruntime"
+	"m31labs.dev/gosx-studio/canvascontextualpanelruntime"
+	"m31labs.dev/gosx-studio/canvasinlineeditruntime"
+	"m31labs.dev/gosx-studio/canvasselectionbridgeruntime"
+	"m31labs.dev/gosx-studio/canvaswasmfreeruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/inlineeditruntime"
 	"m31labs.dev/gosx-studio/inspectorruntime"
@@ -96,6 +100,68 @@ func EngineRuntimeHandler() http.Handler {
 // island is additionally reachable on its own URL.
 func EngineRuntimeHandlerWithPlugins(reg *PluginRegistry) http.Handler {
 	return ScriptHandler("studio-engines.js", EngineRuntimeScriptWithPlugins(reg))
+}
+
+// CanvasInlineEditScript returns the CanvasBoard inline-edit bridge. The bridge
+// delegates commit behavior to GoSXStudioInlineEditRuntime and owns only the
+// CanvasBoard repaint-safe source-of-truth refresh.
+func CanvasInlineEditScript() []byte {
+	return canvasinlineeditruntime.CanvasInlineEditScript()
+}
+
+// CanvasDefaultInlineInstallerScript returns the default CanvasBoard inline-edit
+// installer that scopes installation to the marked default editor CanvasBoard.
+func CanvasDefaultInlineInstallerScript() []byte {
+	return canvasinlineeditruntime.CanvasDefaultInlineInstallerScript()
+}
+
+// CanvasContextualPanelScript returns the CanvasBoard contextual inspector
+// panel. The panel persists field edits through the Studio Canvas inline-edit
+// runtime API.
+func CanvasContextualPanelScript() []byte {
+	return canvascontextualpanelruntime.CanvasContextualPanelScript()
+}
+
+// CanvasSelectionBridgeScript returns the opt-in full-WASM CanvasBoard
+// selection bridge. It publishes window.GoSXStudioCanvasSelectionBridgeRuntime.
+func CanvasSelectionBridgeScript() []byte {
+	return canvasselectionbridgeruntime.CanvasSelectionBridgeScript()
+}
+
+// Canvas2DPainterScript returns the WASM-free Canvas2D painter. It publishes
+// window.GoSXStudioCanvas2DPainterRuntime.
+func Canvas2DPainterScript() []byte {
+	return canvaswasmfreeruntime.Canvas2DPainterScript()
+}
+
+// CanvasWASMFreeClientScript returns the WASM-free CanvasBoard browser client.
+// It publishes window.GoSXStudioCanvasWASMFreeClientRuntime.
+func CanvasWASMFreeClientScript() []byte {
+	return canvaswasmfreeruntime.CanvasWASMFreeClientScript()
+}
+
+func CanvasInlineEditHandler() http.Handler {
+	return ScriptHandler("canvas-inline-edit.js", CanvasInlineEditScript())
+}
+
+func CanvasDefaultInlineInstallerHandler() http.Handler {
+	return ScriptHandler("canvas-default-inline-installer.js", CanvasDefaultInlineInstallerScript())
+}
+
+func CanvasContextualPanelHandler() http.Handler {
+	return ScriptHandler("canvas-contextual-panel.js", CanvasContextualPanelScript())
+}
+
+func CanvasSelectionBridgeHandler() http.Handler {
+	return ScriptHandler("canvas-selection-bridge.js", CanvasSelectionBridgeScript())
+}
+
+func Canvas2DPainterHandler() http.Handler {
+	return ScriptHandler("canvas2d-painter.js", Canvas2DPainterScript())
+}
+
+func CanvasWASMFreeClientHandler() http.Handler {
+	return ScriptHandler("canvas-wasm-free-client.js", CanvasWASMFreeClientScript())
 }
 
 // PreviewSubscriberScript returns the JS bundle the storefront mounts

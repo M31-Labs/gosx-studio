@@ -24,9 +24,9 @@
 // island_runtime.js publishes:
 //   window.__gosx_style_runtime_island_bindCSS
 //   window.__gosx_style_runtime_island_bindFonts
-// that the slice-5 BridgeShim delegates to when the
-// Post 2026-05-27 the legacy JS bundle is gone; the island path is the
-// only path. See Phase 3 burn-down.
+// that the slice-5 BridgeShim delegates to directly. Post 2026-05-27 the
+// legacy JS bundle is gone; the island path is the only path. See Phase 3
+// burn-down.
 
 package styleruntime
 

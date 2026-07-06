@@ -9,18 +9,17 @@
 // with .gsx-authored islands living in this package's *.gsx files. Each
 // island publishes itself onto a well-known window global (see BridgeShim
 // below); the JS shim emitted by BridgeShim delegates
-// window.GoSXStudioWorkbenchRuntime calls to those globals when the
-// FeatureFlagKey flag is on in studio.ShellConfig.FeatureFlags.
+// window.GoSXStudioWorkbenchRuntime calls directly to those globals.
+// FeatureFlagKey remains as a host probe/string contract only; it no longer
+// gates the shim at runtime.
 //
-// Both implementations ship additively for at least seven days of CI green
-// (see ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-7-workbenchruntime.md
-// Section G). After the deletion window closes, the legacy JS implementation
-// (bindWorkbenchRailResizers / bindWorkbenchChrome / setWorkbenchMode /
-// syncWorkbenchViewport / activateWorkbenchViewport / currentWorkbenchBreakpoint /
+// The legacy JS implementation (bindWorkbenchRailResizers /
+// bindWorkbenchChrome / setWorkbenchMode / syncWorkbenchViewport /
+// activateWorkbenchViewport / currentWorkbenchBreakpoint /
 // setWorkbenchStyleState / syncWorkbenchZoom / activateWorkbenchZoom /
 // toggleWorkbenchRail / toggleWorkbenchFocus / toggleWorkbenchActivity /
 // saveWorkbenchLayout / currentWorkbenchRailWidth / setWorkbenchRailWidth)
-// is removed and the shim collapses to a thin pass-through.
+// has been removed; the shim is now a thin pass-through to island globals.
 //
 // # Method fan-out
 //
@@ -30,11 +29,11 @@
 //
 //  1. Chrome binding (2 methods):
 //
-//   - bindRailResizers(root) — binds the [data-studio-resizer] pointer drag
+//     - bindRailResizers(root) — binds the [data-studio-resizer] pointer drag
 //     + arrow-key handlers on the left/right rail handles; writes
 //     --studio-{left,right}-width on the workbench form and dispatches
 //     gosxstudio:rail-width-change / gosxstudio:rail-width-commit.
-//   - bindChrome(root) — binds the workbench form's click delegate that
+//     - bindChrome(root) — binds the workbench form's click delegate that
 //     fans out to setMode / syncViewport / syncZoom / setStyleState /
 //     toggleRail / toggleFocus / toggleActivity; binds the rail-width
 //     change/commit listeners that persist via saveLayout; applies the
@@ -42,32 +41,32 @@
 //
 //  2. Mode + state (3 methods):
 //
-//   - setMode(form, mode, scroll) — sets data-studio-mode on the form,
+//     - setMode(form, mode, scroll) — sets data-studio-mode on the form,
 //     toggles is-mode-active / hidden / aria-hidden on
 //     [data-studio-mode-panel] siblings, scrolls active panel into view
 //     when requested, updates [data-studio-mode-label] readouts, emits
 //     gosxstudio:workbench-mode-change.
-//   - setStyleState(form, state) — sets data-studio-style-state on the
+//     - setStyleState(form, state) — sets data-studio-style-state on the
 //     form, toggles aria-pressed on style-state buttons, writes
 //     data-style-state / data-style-breakpoint / data-style-valid on
 //     style-scope wrappers, emits gosxstudio:workbench-style-state-change.
-//   - saveLayout(form) — server-action wrapper: writes the form's left/
+//     - saveLayout(form) — server-action wrapper: writes the form's left/
 //     right rail widths + activity state to localStorage under
 //     gosx-studio-editor-layout key.
 //
 //  3. Viewport (3 methods):
 //
-//   - syncViewport(form, viewport) — sets data-studio-breakpoint on the
+//     - syncViewport(form, viewport) — sets data-studio-breakpoint on the
 //     form, data-studio-preview-viewport on the .editor-preview-shell (only
 //     when the viewport island is not already managing it), updates
 //     [data-studio-viewport-label] readouts, emits
 //     gosxstudio:workbench-viewport-change, refreshes the canvas via a
 //     resize event.
-//   - activateViewport(form, viewport) — clicks the matching
+//     - activateViewport(form, viewport) — clicks the matching
 //     [data-studio-viewport="<x>"] button if present; otherwise calls
 //     syncViewport directly. Routes user-initiated viewport activation so
 //     command-palette and toolbar both go through the same dispatch.
-//   - currentBreakpoint(form) — pure read: returns the form's
+//     - currentBreakpoint(form) — pure read: returns the form's
 //     data-studio-breakpoint attribute (or the preview-shell's
 //     data-studio-preview-viewport fallback, or "desktop"). Slice 7
 //     implements this as a derivation from form state, not a method on the
@@ -75,35 +74,35 @@
 //
 //  4. Zoom (2 methods):
 //
-//   - syncZoom(form, zoom) — sets data-studio-canvas-zoom on the
+//     - syncZoom(form, zoom) — sets data-studio-canvas-zoom on the
 //     [data-studio-canvas] element, emits gosxstudio:workbench-zoom-change,
 //     refreshes the canvas.
-//   - activateZoom(form, zoom) — clicks the matching
+//     - activateZoom(form, zoom) — clicks the matching
 //     [data-studio-zoom="<x>"] button if present; otherwise calls syncZoom
 //     directly. Routes user-initiated zoom activation through the same
 //     dispatch as the toolbar/command-palette.
 //
 //  5. Toggles (3 methods):
 //
-//   - toggleRail(form, side) — flips data-studio-{left,right} between
+//     - toggleRail(form, side) — flips data-studio-{left,right} between
 //     "open" and "collapsed", sets data-studio-focus="false", re-syncs the
 //     rail toggle aria-pressed states, emits gosxstudio:workbench-rail-change,
 //     refreshes the canvas.
-//   - toggleFocus(form) — flips data-studio-focus between "true" and
+//     - toggleFocus(form) — flips data-studio-focus between "true" and
 //     "false", re-syncs the rail toggle aria-pressed states, emits
 //     gosxstudio:workbench-focus-change, refreshes the canvas.
-//   - toggleActivity(form) — flips data-studio-activity-state between
+//     - toggleActivity(form) — flips data-studio-activity-state between
 //     "open" and "collapsed", re-syncs activity-toggle buttons (Show/Hide
 //     text + aria-pressed), persists via saveLayout, emits
 //     gosxstudio:workbench-activity-change, refreshes the canvas.
 //
 //  6. Rail width (2 methods):
 //
-//   - currentRailWidth(form, side, handle) — pure read: returns the form's
+//     - currentRailWidth(form, side, handle) — pure read: returns the form's
 //     --studio-{left,right}-width custom property as an integer (or the
 //     sidebar's bounding-rect width fallback, or the handle's bounds
 //     fallback). Slice 7 implements this as a derivation from form state.
-//   - setRailWidth(form, side, width, handle, committed) — clamps width to
+//     - setRailWidth(form, side, width, handle, committed) — clamps width to
 //     the handle's min/max bounds, writes --studio-{left,right}-width on
 //     the form, updates the handle's aria-valuenow, emits
 //     gosxstudio:rail-width-change or gosxstudio:rail-width-commit based on
@@ -126,9 +125,10 @@ import (
 //go:embed island_runtime.js
 var islandRuntimeJS []byte
 
-// FeatureFlagKey is the studio.ShellConfig.FeatureFlags key consumers set to
-// activate the .gsx-island WorkbenchRuntime path. Default value (omitted
-// from a host's flag map) keeps the legacy JS implementation active.
+// FeatureFlagKey is retained as the studio.ShellConfig.FeatureFlags host
+// probe/string contract for WorkbenchRuntime islands. The BridgeShim no
+// longer reads this key or gates runtime calls on the corresponding
+// data-gosx-studio-feature-flag-* attribute.
 //
 // Phase 3 naming convention: "<contract>-runtime-islands". Slices 1, 2, 3,
 // 4, 5, 6 each declare their own constant of the same shape.
@@ -136,27 +136,28 @@ const FeatureFlagKey = "workbench-runtime-islands"
 
 // IslandGlobals lists the window globals each Workbench island publishes
 // itself at when it mounts. The shim returned by BridgeShim looks these up
-// at call time so unmounted islands fall back to the legacy implementation.
+// at call time; unmounted islands return undefined from the public runtime
+// method.
 //
 // Naming convention: window.__gosx_workbench_runtime_island_<methodName>.
 // WorkbenchRuntime declares fifteen public methods, so the struct holds
 // fifteen fields.
 var IslandGlobals = struct {
-	BindRailResizers   string
-	BindChrome         string
-	SetMode            string
-	SyncViewport       string
-	ActivateViewport   string
-	CurrentBreakpoint  string
-	SetStyleState      string
-	SyncZoom           string
-	ActivateZoom       string
-	ToggleRail         string
-	ToggleFocus        string
-	ToggleActivity     string
-	SaveLayout         string
-	CurrentRailWidth   string
-	SetRailWidth       string
+	BindRailResizers  string
+	BindChrome        string
+	SetMode           string
+	SyncViewport      string
+	ActivateViewport  string
+	CurrentBreakpoint string
+	SetStyleState     string
+	SyncZoom          string
+	ActivateZoom      string
+	ToggleRail        string
+	ToggleFocus       string
+	ToggleActivity    string
+	SaveLayout        string
+	CurrentRailWidth  string
+	SetRailWidth      string
 }{
 	BindRailResizers:  "__gosx_workbench_runtime_island_bindRailResizers",
 	BindChrome:        "__gosx_workbench_runtime_island_bindChrome",
@@ -176,27 +177,11 @@ var IslandGlobals = struct {
 }
 
 // BridgeShim returns the JavaScript snippet that gosx-studio's runtime
-// bundle appends to gate window.GoSXStudioWorkbenchRuntime through the
-// FeatureFlagKey flag.
+// bundle appends to expose window.GoSXStudioWorkbenchRuntime.
 //
-// When the host has marked FeatureFlagKey true (read by the consumer and
-// surfaced to the page via the data-gosx-studio-feature-flag-<flag>
-// attribute on <html> or any element with that attribute), the shim
-// dispatches each method to its corresponding IslandGlobals entry on
-// window. When the flag is off or the island global is missing (island
-// never mounted), the shim falls back to the legacy JS implementation that
-// lived in the now-deleted legacy bundle.
-//
-// The shim itself never imports the legacy implementation directly; it
-// references the existing in-bundle functions by name (bindWorkbenchRailResizers
-// / bindWorkbenchChrome / setWorkbenchMode / syncWorkbenchViewport /
-// activateWorkbenchViewport / currentWorkbenchBreakpoint /
-// setWorkbenchStyleState / syncWorkbenchZoom / activateWorkbenchZoom /
-// toggleWorkbenchRail / toggleWorkbenchFocus / toggleWorkbenchActivity /
-// saveWorkbenchLayout / currentWorkbenchRailWidth / setWorkbenchRailWidth)
-// so the bundle remains a single self-contained IIFE. After Section G
-// deletes the legacy functions, the shim is rewritten to remove the
-// fallback branch.
+// The shim dispatches each method directly to its corresponding IslandGlobals
+// entry on window. If an island global is missing because the island has not
+// mounted, that public runtime method returns undefined.
 func BridgeShim() []byte {
 	return []byte(bridgeShimJS)
 }
@@ -226,29 +211,10 @@ func Bundle() []byte {
 const bridgeShimJS = `;(function () {
   // Phase 3 slice-7 WorkbenchRuntime island bridge.
   // See gosx-studio/workbenchruntime/runtime.go for the contract.
-  // Feature flag: ` + FeatureFlagKey + `
+  // Host probe key retained for ShellConfig contracts: ` + FeatureFlagKey + `
   if (typeof window === "undefined") return;
-  // The consumer surfaces ShellConfig.FeatureFlags via a
-  // data-gosx-studio-feature-flag-<key>="true" attribute on the document
-  // root (or any ancestor of the editor mount). This keeps the flag
-  // decision out of cookies / query params at the bundle level so SSR and
-  // CSR observations agree. The attribute name below MUST be the literal
-  // "data-gosx-studio-feature-flag-workbench-runtime-islands" so a grep over
-  // the bundle finds it; the test
-  // TestEngineRuntimeIncludesWorkbenchRuntimeIslandBundle enforces this.
-  var FLAG_ATTR = "data-gosx-studio-feature-flag-workbench-runtime-islands";
-  function flagEnabled() {
-    try {
-      if (document.documentElement && document.documentElement.getAttribute(FLAG_ATTR) === "true") return true;
-      var marked = document.querySelector("[" + FLAG_ATTR + "='true']");
-      return !!marked;
-    } catch (e) {
-      return false;
-    }
-  }
   function delegate(islandGlobal) {
     return function () {
-      if (!flagEnabled()) return undefined;
       var island = window[islandGlobal];
       if (typeof island === "function") {
         return island.apply(null, arguments);
@@ -256,17 +222,9 @@ const bridgeShimJS = `;(function () {
       return undefined;
     };
   }
-  // Install the runtime object. Pre-2026-05-27 the BridgeShim wrapped the
-  // legacy bundle's fifteen workbench functions (bindWorkbenchRailResizers
-  // / bindWorkbenchChrome / setWorkbenchMode / syncWorkbenchViewport /
-  // activateWorkbenchViewport / currentWorkbenchBreakpoint /
-  // setWorkbenchStyleState / syncWorkbenchZoom / activateWorkbenchZoom /
-  // toggleWorkbenchRail / toggleWorkbenchFocus / toggleWorkbenchActivity /
-  // saveWorkbenchLayout / currentWorkbenchRailWidth / setWorkbenchRailWidth)
-  // as fallback paths; with the legacy bundle deleted in Phase 3 Section E
-  // those identifiers are undefined and the fallback branches were dead
-  // code. v0.5.0 removes the dead branches — the island global is the only
-  // path. The literal island-global names below MUST match
+  // Install the runtime object. The island global is the only execution
+  // path; if a global has not mounted yet, that method returns undefined.
+  // The literal island-global names below MUST match
   // workbenchruntime.IslandGlobals in runtime.go — the test
   // TestBridgeShimDelegatesToIslandGlobals enforces this.
   window.GoSXStudioWorkbenchRuntime = {

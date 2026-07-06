@@ -123,7 +123,10 @@ node/overlay counts, canvas layout sampling, and publish-readiness item count.
 
 It now runs in default `gosx-studio` CI via
 `.github/workflows/reference-apps.yml`, which checks out the sibling repos in
-the same layout used locally. Run it locally with:
+the same layout used locally. The harness refreshes Muddy/Noni's generated
+`dist/` assets with `gosx build --dev .` before booting Muddy, so ignored WASM
+and bootstrap assets do not need a separate manual build step. Run it locally
+with:
 
 ```bash
 npm run test:reference-apps
@@ -133,6 +136,7 @@ Override sibling locations if needed:
 
 ```bash
 GOSX_STUDIO_REFERENCE_APP_E2E=1 \
+GOSX_STUDIO_GOSX_BIN=~/go/bin/gosx \
 GOSX_STUDIO_MUDDY_REPO=~/work/muddy-noni-commerce \
 GOSX_STUDIO_PAJARITOS_REPO=~/work/pajaritos-forest-school \
   npx playwright test reference_apps_authoring_test.ts reference_apps_visual_a11y_test.ts reference_apps_performance_test.ts

@@ -48,8 +48,6 @@
 // window.__gosx_blocklayout_runtime_island_updateVisibilityState that calls
 // previewRuntime().setBlockVisibility(key, visible).
 //
-// During the additive shipping window (Section G of the slice plan), the
-// BridgeShim only invokes this island when ShellConfig.FeatureFlags has
 // Post 2026-05-27 the legacy JS bundle is gone; the island path is the
 // only path. See Phase 3 burn-down.
 // also delegates to PreviewRuntime).

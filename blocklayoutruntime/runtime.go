@@ -7,8 +7,9 @@
 // updateBlockLibraryState, updateVisibilityState) with .gsx-authored islands
 // living in this package's *.gsx files. Each island publishes itself onto a
 // well-known window global (see BridgeShim below); the JS shim emitted by
-// BridgeShim delegates window.GoSXStudioBlockLayoutRuntime calls to those
-// globals when the FeatureFlagKey flag is on in studio.ShellConfig.FeatureFlags.
+// BridgeShim delegates window.GoSXStudioBlockLayoutRuntime calls directly to
+// those globals. FeatureFlagKey remains as a host probe/string contract only;
+// it no longer gates the shim at runtime.
 //
 // Both implementations ship additively for at least seven days of CI green
 // (see ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-4-blocklayoutruntime.md
@@ -24,27 +25,27 @@
 //
 //  1. Pure helpers (read-only DOM queries):
 //
-//   - rows(list) — Array.from(list.querySelectorAll("[data-block-studio-block]")).
-//   - rowKey(row) — row.getAttribute("data-block-studio-block") || "".
-//   - rowForKey(root, key) — root.querySelector('[data-block-studio-block="<key>"]').
+//     - rows(list) — Array.from(list.querySelectorAll("[data-block-studio-block]")).
+//     - rowKey(row) — row.getAttribute("data-block-studio-block") || "".
+//     - rowForKey(root, key) — root.querySelector('[data-block-studio-block="<key>"]').
 //
 //  2. Editor-side mutations (block-list ordering / visibility / library state):
 //
-//   - moveRow(list, row, "up"|"down") — DOM swap + renumber + selectRow.
-//   - renumber(list, source) — re-indexes order inputs + data-block-studio-index +
+//     - moveRow(list, row, "up"|"down") — DOM swap + renumber + selectRow.
+//     - renumber(list, source) — re-indexes order inputs + data-block-studio-index +
 //     toggles up/down disabled states + dispatches blockstudio:reorder /
 //     input / change events.
-//   - selectRow(root, key) — toggles .is-selected class + scrollIntoView +
+//     - selectRow(root, key) — toggles .is-selected class + scrollIntoView +
 //     dispatches blockstudio:select CustomEvent.
-//   - commitReorder(list, key, targetKey, "before"|"after") — DOM insertBefore +
+//     - commitReorder(list, key, targetKey, "before"|"after") — DOM insertBefore +
 //     renumber + selectRow; returns false on no-op.
-//   - updateBlockLibraryState(root) — syncs every [data-editor-add-block]
+//     - updateBlockLibraryState(root) — syncs every [data-editor-add-block]
 //     button's className / aria-pressed / label text against the
 //     corresponding row's visibility checkbox.
 //
 //  3. Transitional iframe-crossing (1 method):
 //
-//   - updateVisibilityState(check) — mutates the editor-side row's classes /
+//     - updateVisibilityState(check) — mutates the editor-side row's classes /
 //     status text / pill className, then calls
 //     window.GoSXStudioPreviewRuntime.setBlockVisibility(key, visible) to
 //     update the storefront preview iframe, then updates library state.
@@ -69,9 +70,10 @@ import (
 //go:embed island_runtime.js
 var islandRuntimeJS []byte
 
-// FeatureFlagKey is the studio.ShellConfig.FeatureFlags key consumers set to
-// activate the .gsx-island BlockLayoutRuntime path. Default value (omitted
-// from a host's flag map) keeps the legacy JS implementation active.
+// FeatureFlagKey is retained as the studio.ShellConfig.FeatureFlags host
+// probe/string contract for BlockLayoutRuntime islands. The BridgeShim no
+// longer reads this key or gates runtime calls on the corresponding
+// data-gosx-studio-feature-flag-* attribute.
 //
 // Phase 3 naming convention: "<contract>-runtime-islands". Slices 1, 2, 3,
 // 5..7 each declare their own constant of the same shape.
@@ -79,7 +81,8 @@ const FeatureFlagKey = "block-layout-runtime-islands"
 
 // IslandGlobals lists the window globals each BlockLayout island publishes
 // itself at when it mounts. The shim returned by BridgeShim looks these up
-// at call time so unmounted islands fall back to the legacy implementation.
+// at call time; unmounted islands return undefined from the public runtime
+// method.
 //
 // Naming convention: window.__gosx_blocklayout_runtime_island_<methodName>.
 // BlockLayoutRuntime declares nine slice-4 per-call methods (rows, rowKey,
@@ -128,24 +131,11 @@ var IslandGlobals = struct {
 }
 
 // BridgeShim returns the JavaScript snippet that gosx-studio's runtime
-// bundle appends to gate window.GoSXStudioBlockLayoutRuntime through the
-// FeatureFlagKey flag.
+// bundle appends to expose window.GoSXStudioBlockLayoutRuntime.
 //
-// When the host has marked FeatureFlagKey true (read by the consumer and
-// surfaced to the page via the data-gosx-studio-feature-flag-<flag>
-// attribute on <html> or any element with that attribute), the shim
-// dispatches each method to its corresponding IslandGlobals entry on
-// window. When the flag is off or the island global is missing (island
-// never mounted), the shim falls back to the legacy JS implementation that
-// lived in the now-deleted legacy bundle.
-//
-// The shim itself never imports the legacy implementation directly; it
-// references the existing in-bundle functions by name (blockRows /
-// blockRowKey / blockRowForKey / moveBlockLayoutRow / renumberBlockLayoutList
-// / selectBlockLayoutRow / commitBlockLayoutReorder /
-// updateBlockLayoutLibraryState / updateBlockLayoutVisibilityState) so the
-// bundle remains a single self-contained IIFE. After Section G deletes the
-// legacy functions, the shim is rewritten to remove the fallback branch.
+// The shim dispatches each method directly to its corresponding IslandGlobals
+// entry on window. If an island global is missing because the island has not
+// mounted, that public runtime method returns undefined.
 func BridgeShim() []byte {
 	return []byte(bridgeShimJS)
 }
@@ -177,29 +167,10 @@ func Bundle() []byte {
 const bridgeShimJS = `;(function () {
   // Phase 3 slice-4 BlockLayoutRuntime island bridge.
   // See gosx-studio/blocklayoutruntime/runtime.go for the contract.
-  // Feature flag: ` + FeatureFlagKey + `
+  // Host probe key retained for ShellConfig contracts: ` + FeatureFlagKey + `
   if (typeof window === "undefined") return;
-  // The consumer surfaces ShellConfig.FeatureFlags via a
-  // data-gosx-studio-feature-flag-<key>="true" attribute on the document
-  // root (or any ancestor of the editor mount). This keeps the flag
-  // decision out of cookies / query params at the bundle level so SSR and
-  // CSR observations agree. The attribute name below MUST be the literal
-  // "data-gosx-studio-feature-flag-block-layout-runtime-islands" so a grep
-  // over the bundle finds it; the test
-  // TestEngineRuntimeIncludesBlockLayoutRuntimeIslandBundle enforces this.
-  var FLAG_ATTR = "data-gosx-studio-feature-flag-block-layout-runtime-islands";
-  function flagEnabled() {
-    try {
-      if (document.documentElement && document.documentElement.getAttribute(FLAG_ATTR) === "true") return true;
-      var marked = document.querySelector("[" + FLAG_ATTR + "='true']");
-      return !!marked;
-    } catch (e) {
-      return false;
-    }
-  }
   function delegate(islandGlobal) {
     return function () {
-      if (!flagEnabled()) return undefined;
       var island = window[islandGlobal];
       if (typeof island === "function") {
         return island.apply(null, arguments);
@@ -207,15 +178,9 @@ const bridgeShimJS = `;(function () {
       return undefined;
     };
   }
-  // Install the runtime object. Pre-2026-05-27 the BridgeShim wrapped the
-  // legacy bundle's nine block-layout binders (blockRows / blockRowKey /
-  // blockRowForKey / moveBlockLayoutRow / renumberBlockLayoutList /
-  // selectBlockLayoutRow / commitBlockLayoutReorder /
-  // updateBlockLayoutLibraryState / updateBlockLayoutVisibilityState) as
-  // fallback paths; with the legacy bundle deleted in Phase 3 Section E
-  // those identifiers are undefined and the fallback branches were dead
-  // code. v0.5.0 removes the dead branches — the island global is the only
-  // path. The literal island-global names below MUST match
+  // Install the runtime object. The island global is the only execution
+  // path; if a global has not mounted yet, that method returns undefined.
+  // The literal island-global names below MUST match
   // blocklayoutruntime.IslandGlobals in runtime.go — the test
   // TestBridgeShimDelegatesToIslandGlobals enforces this.
   window.GoSXStudioBlockLayoutRuntime = {

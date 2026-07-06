@@ -6,6 +6,7 @@ import (
 	"m31labs.dev/gosx-studio/blocklayoutruntime"
 	"m31labs.dev/gosx-studio/brandruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
+	"m31labs.dev/gosx-studio/inlineeditruntime"
 	"m31labs.dev/gosx-studio/previewruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
 	"m31labs.dev/gosx-studio/styleruntime"
@@ -13,13 +14,19 @@ import (
 )
 
 const (
-	RuntimeRoot             = "/_gosx/studio"
-	StylesheetPath          = RuntimeRoot + "/studio.css"
-	EngineRuntimePath       = RuntimeRoot + "/studio-engines.js"
-	WorkbenchRuntimePath    = RuntimeRoot + "/workbench-runtime.js"
-	CommandRuntimePath      = RuntimeRoot + "/command-palette.js"
-	StateRuntimePath        = RuntimeRoot + "/state-runtime.js"
-	PreviewSubscriberPath   = RuntimeRoot + "/preview-subscriber.js"
+	RuntimeRoot                      = "/_gosx/studio"
+	StylesheetPath                   = RuntimeRoot + "/studio.css"
+	EngineRuntimePath                = RuntimeRoot + "/studio-engines.js"
+	WorkbenchRuntimePath             = RuntimeRoot + "/workbench-runtime.js"
+	CommandRuntimePath               = RuntimeRoot + "/command-palette.js"
+	StateRuntimePath                 = RuntimeRoot + "/state-runtime.js"
+	PreviewSubscriberPath            = RuntimeRoot + "/preview-subscriber.js"
+	CanvasSelectionBridgePath        = RuntimeRoot + "/canvas-selection-bridge.js"
+	CanvasInlineEditPath             = RuntimeRoot + "/canvas-inline-edit.js"
+	Canvas2DPainterPath              = RuntimeRoot + "/canvas2d-painter.js"
+	CanvasWASMFreeClientPath         = RuntimeRoot + "/canvas-wasm-free-client.js"
+	CanvasContextualPanelPath        = RuntimeRoot + "/canvas-contextual-panel.js"
+	CanvasDefaultInlineInstallerPath = RuntimeRoot + "/canvas-default-inline-installer.js"
 
 	CanvasEngineName      = "GoSXStudioCanvas"
 	SiteMapEngineName     = "GoSXStudioSiteMap"
@@ -141,7 +148,7 @@ func DefaultShellConfig() ShellConfig {
 			{Key: "schedule", Label: "Schedule", Method: "POST"},
 			{Key: "restore", Label: "Restore", Method: "POST"},
 		},
-		Permissions:  PermissionConfig{CanEdit: true, CanPublish: true, CanManage: true},
+		Permissions: PermissionConfig{CanEdit: true, CanPublish: true, CanManage: true},
 		FeatureFlags: map[string]bool{
 			"brand-media-picker": true,
 			"publish-review":     true,
@@ -158,6 +165,7 @@ func DefaultShellConfig() ShellConfig {
 			styleruntime.FeatureFlagKey:       true,
 			workbenchruntime.FeatureFlagKey:   true,
 			previewruntime.FeatureFlagKey:     true,
+			inlineeditruntime.FeatureFlagKey:  true,
 		},
 	}
 }
@@ -199,12 +207,39 @@ func (config ShellConfig) Resource(key string) (ResourceConfig, bool) {
 	return ResourceConfig{}, false
 }
 
+func (config ShellConfig) Engine(key string) (EngineConfig, bool) {
+	key = strings.TrimSpace(key)
+	for _, engine := range config.Normalize().Engines {
+		if engine.Key == key {
+			return engine, true
+		}
+	}
+	return EngineConfig{}, false
+}
+
 func (config ShellConfig) Adapter(kind ResourceKind) (ResourceAdapter, bool) {
 	return ResourceAdapterByKind(config.Normalize().Adapters, kind)
 }
 
 func (config ShellConfig) FeatureEnabled(key string) bool {
 	return config.Normalize().FeatureFlags[strings.TrimSpace(key)]
+}
+
+func EngineHostView(engine EngineConfig, className string) map[string]any {
+	engine.Key = strings.TrimSpace(engine.Key)
+	engine.Name = strings.TrimSpace(engine.Name)
+	engine.MountID = strings.TrimSpace(engine.MountID)
+	engine.Capabilities = normalizeShellStringList(engine.Capabilities)
+	out := map[string]any{
+		"key":          engine.Key,
+		"name":         engine.Name,
+		"mountId":      engine.MountID,
+		"capabilities": strings.Join(engine.Capabilities, " "),
+	}
+	if className = strings.TrimSpace(className); className != "" {
+		out["class"] = className
+	}
+	return out
 }
 
 func normalizeModes(values []ModeConfig, defaults []ModeConfig) []ModeConfig {

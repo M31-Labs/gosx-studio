@@ -52,6 +52,20 @@ func TestRenderSiteMapEngineSegmentsOwnsFrameChrome(t *testing.T) {
 	if strings.Contains(html, "GoSX Studio") {
 		t.Fatalf("site-map engine frame must not inject visible platform copy:\n%s", html)
 	}
+	if strings.Contains(html, `data-gosx-studio-site-map-layout-action`) {
+		t.Fatalf("site-map engine should not emit layout persistence action by default:\n%s", html)
+	}
+}
+
+func TestRenderSiteMapEngineSegmentsEmitsLayoutActionWhenConfigured(t *testing.T) {
+	segments := RenderSiteMapEngineSegments(map[string]any{}, SiteMapEngineOptions{
+		LayoutAction: "/admin/editor/__actions/siteMapLayout",
+	})
+	html := gosx.RenderHTML(segments.RootOpen)
+
+	if !strings.Contains(html, `data-gosx-studio-site-map-layout-action="/admin/editor/__actions/siteMapLayout"`) {
+		t.Fatalf("site-map engine root missing layout action attr:\n%s", html)
+	}
 }
 
 func TestRenderSiteMapEngineComposesVisibleSurfaceAndExternalForms(t *testing.T) {

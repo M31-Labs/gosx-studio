@@ -4,10 +4,9 @@
 // markers in the editor DOM. This script publishes the
 // window.__gosx_brand_runtime_island_bindLogo and
 // window.__gosx_brand_runtime_island_updateHeaderLogo globals that
-// brandruntime.BridgeShim delegates to when the "brand-runtime-islands"
-// feature flag is on. It is emitted into the studio runtime bundle by
-// brandruntime.IslandRuntimeJS() (see runtime.go) and runs before
-// BridgeShim() at bundle init time.
+// brandruntime.BridgeShim delegates to. It is emitted into the studio
+// runtime bundle by brandruntime.IslandRuntimeJS() (see runtime.go) and runs
+// before BridgeShim() at bundle init time.
 //
 // The two functions below replace window.GoSXStudioBrandRuntime.bindLogo
 // and window.GoSXStudioBrandRuntime.updateHeaderLogo while preserving exact
@@ -35,16 +34,13 @@
 // preview iframe header stays in sync with the editor authoring state.
 // Writes a $brand.logo signal for the island's own bookkeeping.
 //
-// # updateHeaderLogo (transitional iframe delegation)
+// # updateHeaderLogo
 //
 // Per ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md,
-// long-term cross-frame mutations route through $preview.* shared signals.
-// The slice 6 PreviewRuntime burn-down will ship a $preview.brand.headerLogo
-// subscriber on the preview side. Until then, slice 3's updateHeaderLogo
-// island keeps the legacy iframe contract by delegating to
-// window.GoSXStudioPreviewRuntime.updateHeaderLogo — same DOM mutation, just
-// owned by the brand island. Slice 6 will flip the mechanism to a shared-
-// signal write without revisiting brand ownership.
+// cross-frame mutations route through $preview.* shared signals. The
+// updateHeaderLogo island publishes $preview.brand.headerLogo so the
+// preview-side subscriber can update the .brand DOM inside the iframe. It
+// also writes $brand.headerLogo for editor-frame consumers.
 //
 // # Idempotency
 //
@@ -140,15 +136,10 @@
     }
   }
 
-  // updateHeaderLogo(payload) — slice 6 transitional cleanup (Section G.2).
-  //
-  // The previous shape delegated cross-frame mutation to
-  // window.GoSXStudioPreviewRuntime.updateHeaderLogo (the 1130-line
-  // bridge in gosx-studio/assets/preview-runtime.js). Slice 6 swaps the
-  // delivery mechanism: instead of reach-across-frame DOM mutation, we
-  // publish to $preview.brand.headerLogo and let the cross-frame relay
-  // (ADR 0009) deliver the write to the iframe's subscriber where the
-  // .brand element gets the actual class/src/CSS-variable updates.
+  // updateHeaderLogo(payload) publishes to $preview.brand.headerLogo and lets
+  // the cross-frame relay (ADR 0009) deliver the write to the iframe's
+  // subscriber, where the .brand element gets the actual
+  // class/src/CSS-variable updates.
   //
   // Editor-side bookkeeping retains the $brand.headerLogo signal so any
   // editor-frame consumer (e.g., the readout in brand_header_logo.gsx)
@@ -169,8 +160,8 @@
     });
     // $brand.headerLogo is the editor-side observable retained for
     // brand-island bookkeeping (used by sibling islands in the editor
-    // frame). The slice-6 cleanup keeps this — it's an editor-frame-only
-    // contract that doesn't cross the iframe boundary.
+    // frame). This editor-frame-only contract does not cross the iframe
+    // boundary.
     writeSharedSignal("$brand.headerLogo", {
       url: payload.url || "",
       width: payload.width || "96",
@@ -342,8 +333,7 @@
   // Publish the island globals. The names are the contracts referenced by
   // brandruntime.IslandGlobals in runtime.go; the BridgeShim there
   // delegates window.GoSXStudioBrandRuntime.bindLogo /
-  // window.GoSXStudioBrandRuntime.updateHeaderLogo calls here when the
-  // feature flag is on.
+  // window.GoSXStudioBrandRuntime.updateHeaderLogo calls here.
   window.__gosx_brand_runtime_island_bindLogo = bindBrandLogoIsland;
   window.__gosx_brand_runtime_island_updateHeaderLogo = updateHeaderLogoIsland;
 })();

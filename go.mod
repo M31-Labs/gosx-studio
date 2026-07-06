@@ -9,7 +9,8 @@ replace m31labs.dev/gosx-admin => ../gosx-admin
 replace m31labs.dev/gosx-cms => ../gosx-cms
 
 require (
-	m31labs.dev/gosx v0.26.0
+	golang.org/x/image v0.38.0
+	m31labs.dev/gosx v0.29.2
 	m31labs.dev/gosx-admin v0.1.1
 	m31labs.dev/gosx-cms v0.0.0-00010101000000-000000000000
 )
@@ -17,7 +18,7 @@ require (
 require (
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/odvcencio/corkscrewdb v0.2.0 // indirect
-	github.com/odvcencio/gotreesitter v0.20.1 // indirect
+	github.com/odvcencio/gotreesitter v0.20.4 // indirect
 	github.com/odvcencio/turboquant v0.1.3 // indirect
 	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
@@ -28,6 +29,6 @@ require (
 	lukechampine.com/blake3 v1.4.1 // indirect
 	m31labs.dev/eos v0.1.4 // indirect
 	m31labs.dev/mll v0.1.0 // indirect
-	m31labs.dev/prism v0.1.2 // indirect
+	m31labs.dev/prism v0.1.3 // indirect
 	m31labs.dev/turboquant v0.2.0 // indirect
 )

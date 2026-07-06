@@ -8,8 +8,7 @@
 // resetControlValue) with .gsx-authored islands living in this package's
 // *.gsx files. Each island publishes itself onto a well-known window global
 // (see BridgeShim below); the JS shim emitted by BridgeShim delegates
-// window.GoSXStudioStyleRuntime calls to those globals when the
-// FeatureFlagKey flag is on in studio.ShellConfig.FeatureFlags.
+// window.GoSXStudioStyleRuntime calls directly to those globals.
 //
 // Both implementations ship additively for at least seven days of CI green
 // (see ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-5-styleruntime.md
@@ -25,46 +24,46 @@
 //
 //  1. Editor-side binding (4 methods — bind input controls to Bridge signals):
 //
-//   - bindTheme(root) — binds theme kit / template / palette / image-ratio /
+//     - bindTheme(root) — binds theme kit / template / palette / image-ratio /
 //     custom-template / style-class / color-token controls; on input/change
 //     dispatches updateTheme (which calls into PreviewRuntime.applyTheme).
-//   - bindWorkbench(root) — binds the editor-workbench form's click / pointer /
+//     - bindWorkbench(root) — binds the editor-workbench form's click / pointer /
 //     focus listeners so style controls / resets fire setControlValue /
 //     resetControlValue and the impact panel previews / restores on hover /
 //     focus.
-//   - bindCSS(root) — binds the [data-editor-css] textarea so input dispatches
+//     - bindCSS(root) — binds the [data-editor-css] textarea so input dispatches
 //     PreviewRuntime.applyCSS(value).
-//   - bindFonts(root) — binds the three [data-editor-font-name] /
+//     - bindFonts(root) — binds the three [data-editor-font-name] /
 //     [data-editor-font-url] slot pairs so input/change recomputes the
 //     combined @font-face + :root font-variable CSS and dispatches
 //     PreviewRuntime.applyFonts(css).
 //
 //  2. Editor-side state (3 methods — toggle button states / signal writes):
 //
-//   - syncControlButtons(root) — for every [data-studio-style-control],
+//     - syncControlButtons(root) — for every [data-studio-style-control],
 //     [data-studio-style-readout], [data-studio-style-reset] in root, sync
 //     aria-pressed / .is-selected / textContent against the live form values
 //     and kit defaults.
-//   - setControlValue(name, value) — sets the named control's value (radio /
+//     - setControlValue(name, value) — sets the named control's value (radio /
 //     input / select), dispatches input/change events, then runs
 //     syncControlButtons + showImpact(name, value, true).
-//   - resetControlValue(name) — looks up kit default for name and calls
+//     - resetControlValue(name) — looks up kit default for name and calls
 //     setControlValue(name, default).
 //
 //  3. Transitional iframe-crossing (3 methods):
 //
-//   - applyTheme() — reads theme form state (kit / template / palette / ratio /
+//     - applyTheme() — reads theme form state (kit / template / palette / ratio /
 //     custom-template / style classes / colors), then calls
 //     window.GoSXStudioPreviewRuntime.applyTheme(payload) to apply the
 //     storefront preview's class+token mutation, then updates theme swatches /
 //     kit cards / template cards / custom-template builder, then runs
 //     syncControlButtons(document).
-//   - showImpact(name, value, committed) — looks up impact metadata for the
+//     - showImpact(name, value, committed) — looks up impact metadata for the
 //     named control, calls window.GoSXStudioPreviewRuntime.applyStyleImpact
 //     (selector) for the count, then writes the editor-side impact-readout
 //     labels (label / summary / count / scope / state) and toggles the
 //     impact panel's is-live / has-change classes.
-//   - restoreImpact() — restores the last committed style impact via
+//     - restoreImpact() — restores the last committed style impact via
 //     showImpact, or clears the readouts to a "No active recipe" state and
 //     calls window.GoSXStudioPreviewRuntime.applyStyleImpact("").
 //
@@ -90,9 +89,9 @@ import (
 //go:embed island_runtime.js
 var islandRuntimeJS []byte
 
-// FeatureFlagKey is the studio.ShellConfig.FeatureFlags key consumers set to
-// activate the .gsx-island StyleRuntime path. Default value (omitted from a
-// host's flag map) keeps the legacy JS implementation active.
+// FeatureFlagKey is retained as the host probe / attribute string contract for
+// consumers that still surface Phase 3 runtime-island markers. It no longer
+// gates BridgeShim dispatch.
 //
 // Phase 3 naming convention: "<contract>-runtime-islands". Slices 1, 2, 3, 4,
 // 6, 7 each declare their own constant of the same shape.
@@ -100,7 +99,7 @@ const FeatureFlagKey = "style-runtime-islands"
 
 // IslandGlobals lists the window globals each Style island publishes itself
 // at when it mounts. The shim returned by BridgeShim looks these up at call
-// time so unmounted islands fall back to the legacy implementation.
+// time; unmounted islands return undefined.
 //
 // Naming convention: window.__gosx_style_runtime_island_<methodName>.
 // StyleRuntime declares ten public methods (bindTheme, bindWorkbench,
@@ -132,24 +131,12 @@ var IslandGlobals = struct {
 }
 
 // BridgeShim returns the JavaScript snippet that gosx-studio's runtime
-// bundle appends to gate window.GoSXStudioStyleRuntime through the
-// FeatureFlagKey flag.
+// bundle appends to publish window.GoSXStudioStyleRuntime as a direct island
+// delegate.
 //
-// When the host has marked FeatureFlagKey true (read by the consumer and
-// surfaced to the page via the data-gosx-studio-feature-flag-<flag>
-// attribute on <html> or any element with that attribute), the shim
-// dispatches each method to its corresponding IslandGlobals entry on
-// window. When the flag is off or the island global is missing (island
-// never mounted), the shim falls back to the legacy JS implementation that
-// lived in the now-deleted legacy bundle.
-//
-// The shim itself never imports the legacy implementation directly; it
-// references the existing in-bundle functions by name (bindTheme /
-// bindStyleWorkbench / bindCSS / bindFonts / updateTheme /
-// syncStyleControlButtons / showStyleImpact / restoreStyleImpact /
-// setStyleControlValue / resetStyleControlValue) so the bundle remains a
-// single self-contained IIFE. After Section G deletes the legacy
-// functions, the shim is rewritten to remove the fallback branch.
+// Each method dispatches to its corresponding IslandGlobals entry on window.
+// If the island global is missing because the island never mounted, the
+// method returns undefined.
 func BridgeShim() []byte {
 	return []byte(bridgeShimJS)
 }
@@ -181,29 +168,10 @@ func Bundle() []byte {
 const bridgeShimJS = `;(function () {
   // Phase 3 slice-5 StyleRuntime island bridge.
   // See gosx-studio/styleruntime/runtime.go for the contract.
-  // Feature flag: ` + FeatureFlagKey + `
+  // Host probe key retained by Go consumers: ` + FeatureFlagKey + `
   if (typeof window === "undefined") return;
-  // The consumer surfaces ShellConfig.FeatureFlags via a
-  // data-gosx-studio-feature-flag-<key>="true" attribute on the document
-  // root (or any ancestor of the editor mount). This keeps the flag
-  // decision out of cookies / query params at the bundle level so SSR and
-  // CSR observations agree. The attribute name below MUST be the literal
-  // "data-gosx-studio-feature-flag-style-runtime-islands" so a grep over
-  // the bundle finds it; the test
-  // TestEngineRuntimeIncludesStyleRuntimeIslandBundle enforces this.
-  var FLAG_ATTR = "data-gosx-studio-feature-flag-style-runtime-islands";
-  function flagEnabled() {
-    try {
-      if (document.documentElement && document.documentElement.getAttribute(FLAG_ATTR) === "true") return true;
-      var marked = document.querySelector("[" + FLAG_ATTR + "='true']");
-      return !!marked;
-    } catch (e) {
-      return false;
-    }
-  }
   function delegate(islandGlobal) {
     return function () {
-      if (!flagEnabled()) return undefined;
       var island = window[islandGlobal];
       if (typeof island === "function") {
         return island.apply(null, arguments);
@@ -211,16 +179,10 @@ const bridgeShimJS = `;(function () {
       return undefined;
     };
   }
-  // Install the runtime object. Pre-2026-05-27 the BridgeShim wrapped the
-  // legacy bundle's ten style functions (bindTheme / bindStyleWorkbench /
-  // bindCSS / bindFonts / updateTheme / syncStyleControlButtons /
-  // showStyleImpact / restoreStyleImpact / setStyleControlValue /
-  // resetStyleControlValue) as fallback paths; with the legacy bundle
-  // deleted in Phase 3 Section E those identifiers are undefined and the
-  // fallback branches were dead code. v0.5.0 removes the dead branches —
-  // the island global is the only path. The literal island-global names
-  // below MUST match styleruntime.IslandGlobals in runtime.go — the test
-  // TestBridgeShimDelegatesToIslandGlobals enforces this.
+  // Install the runtime object. The island global is the only path. The
+  // literal island-global names below MUST match styleruntime.IslandGlobals
+  // in runtime.go — the test TestBridgeShimDelegatesToIslandGlobals enforces
+  // this.
   window.GoSXStudioStyleRuntime = {
     bindTheme: delegate("__gosx_style_runtime_island_bindTheme"),
     bindWorkbench: delegate("__gosx_style_runtime_island_bindWorkbench"),

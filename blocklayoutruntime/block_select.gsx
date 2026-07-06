@@ -16,11 +16,8 @@
 // blockstudio:select event fans out within the editor frame; the preview
 // iframe is unaffected. The runtime bundle's island_runtime.js publishes:
 //   window.__gosx_blocklayout_runtime_island_selectRow
-// that the slice-4 BridgeShim delegates to when the
-// "block-layout-runtime-islands" feature flag is on.
+// that the slice-4 BridgeShim delegates to directly.
 //
-// During the additive shipping window (Section G of the slice plan), the
-// BridgeShim only invokes this island when ShellConfig.FeatureFlags has
 // Post 2026-05-27 the legacy JS bundle is gone; the island path is the
 // only path. See Phase 3 burn-down.
 // GoSXStudioSelectionRuntime.bind also calls into selectRow as part of its

@@ -29,10 +29,9 @@
 // applyTextUpdate / requestInlineEdit / cycleField fan-outs into the
 // preview iframe still go through GoSXStudioPreviewRuntime (slice 6).
 //
-// During the additive shipping window (Section B of the slice plan), the
-// BridgeShim only invokes this island when ShellConfig.FeatureFlags has
-// Post 2026-05-27 the legacy JS bundle is gone; the island path is the
-// only path. See Phase 3 burn-down.
+// FeatureFlagKey remains a stable ShellConfig.FeatureFlags host probe/attribute,
+// but SelectionRuntime binding delegates directly to this island and has no
+// feature-flag-off path. See Phase 3 burn-down.
 
 package selectionruntime
 

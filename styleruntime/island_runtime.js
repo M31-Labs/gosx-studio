@@ -4,10 +4,9 @@
 // style_impact.gsx, style_controls.gsx) are mount-point markers in the
 // editor DOM. This script publishes the ten
 // window.__gosx_style_runtime_island_<method> globals that
-// styleruntime.BridgeShim delegates to when the "style-runtime-islands"
-// feature flag is on. It is emitted into the studio runtime bundle by
-// styleruntime.IslandRuntimeJS() (see runtime.go) and runs before
-// BridgeShim() at bundle init time.
+// styleruntime.BridgeShim delegates to directly. It is emitted into the
+// studio runtime bundle by styleruntime.IslandRuntimeJS() (see runtime.go)
+// and runs before BridgeShim() at bundle init time.
 //
 // The ten functions below replace window.GoSXStudioStyleRuntime.{
 // bindTheme, bindWorkbench, bindCSS, bindFonts, applyTheme,

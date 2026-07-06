@@ -3,23 +3,24 @@
 // The .gsx islands (field_bind.gsx, field_mirror.gsx, field_clipboard.gsx)
 // are mount-point markers in the editor DOM. This script publishes the
 // window.__gosx_field_runtime_island_* globals that fieldruntime.BridgeShim
-// delegates to when the "field-runtime-islands" feature flag is on. It is
-// emitted into the studio runtime bundle by fieldruntime.IslandRuntimeJS()
-// (see runtime.go) and runs before BridgeShim() at bundle init time.
+// delegates to directly. It is emitted into the studio runtime bundle by
+// fieldruntime.IslandRuntimeJS() (see runtime.go) and runs before
+// BridgeShim() at bundle init time.
 //
 // Each function below replaces a method on window.GoSXStudioFieldRuntime
 // while preserving exact observable behavior:
 //
 //   bindMirroring(root)
-//     Scans root for [data-editor-source], [data-editor-frame-attr-target];
+//     Scans root for [data-editor-source], [data-studio-field-source],
+//     [data-editor-frame-attr-target];
 //     attaches an input listener that, on every keystroke (frame-throttled
 //     via rAF), writes the value to the shared signal
 //     $preview.field.<sourceKey>. Slice 6's preview subscriber receives the
 //     signal via the cross-frame relay (per ADR 0009) and applies the
 //     textContent / attribute update inside the iframe. Slice 6's
 //     transitional cleanup (Section G.1 of the slice-6 plan) removed the
-//     legacy GoSXStudioPreviewRuntime.applyTextUpdate fallback — the
-//     signal write is the sole delivery mechanism now.
+//     old GoSXStudioPreviewRuntime.applyTextUpdate branch — the signal
+//     write is the sole delivery mechanism now.
 //
 //   bindClipboard(root)
 //     Idempotently installs the document-level click handler for
@@ -65,15 +66,77 @@
     return doc;
   }
 
+  var mirroredPreviewFieldSelector = "[data-editor-source], [data-studio-field-source], [data-editor-frame-attr-target]";
+
+  function fieldRuntimePatch(field) {
+    if (!field || !field.name || field.disabled) return null;
+    var type = String(field.type || "").toLowerCase();
+    if (field.name === "csrf_token" || type === "button" || type === "submit" || type === "reset" || type === "file") return null;
+    return {
+      name: field.name,
+      source: field.getAttribute("data-studio-field-source") || field.getAttribute("data-editor-source") || field.name,
+      editable: field.getAttribute("data-studio-field-editable") || "",
+      value: type === "checkbox" || type === "radio" ? (field.checked ? (field.value || "on") : "") : (field.value || ""),
+      checked: !!field.checked,
+      type: type,
+      tag: String(field.tagName || "").toLowerCase()
+    };
+  }
+
+  function fieldRuntimeOperationEnvelope(form, reason, field) {
+    var patch = fieldRuntimePatch(field);
+    if (!patch) return null;
+    return {
+      mutation: true,
+      reason: reason || "field",
+      target: {
+        field: patch.source || patch.name || "",
+        name: patch.name || "",
+        editable: patch.editable || "",
+        selection: form && form.getAttribute ? (form.getAttribute("data-studio-selection") || "") : "",
+        kind: form && form.getAttribute ? (form.getAttribute("data-studio-selection-kind") || "") : ""
+      },
+      payload: {
+        field: patch
+      }
+    };
+  }
+
+  function installFieldOperationBuilder() {
+    var marker = doc.documentElement;
+    if (!marker || marker.dataset.gosxStudioFieldOperationBuilderBound === "true") return;
+    marker.dataset.gosxStudioFieldOperationBuilderBound = "true";
+    marker.addEventListener("gosxstudio:field-operation-build", function (event) {
+      var envelope = event.detail || {};
+      envelope.result = fieldRuntimeOperationEnvelope(envelope.form, envelope.reason, envelope.field);
+    });
+  }
+
+  function installPreviewPatchResolver() {
+    var marker = doc.documentElement;
+    if (!marker || marker.dataset.gosxStudioFieldPreviewPatchResolverBound === "true") return;
+    marker.dataset.gosxStudioFieldPreviewPatchResolverBound = "true";
+    marker.addEventListener("gosxstudio:field-preview-patch-resolve", function (event) {
+      var envelope = event.detail || {};
+      var field = envelope.field;
+      var mirrored = !!(field && field.matches && field.matches(mirroredPreviewFieldSelector));
+      envelope.result = {
+        mirrored: mirrored,
+        transport: !mirrored,
+        reason: mirrored ? "fieldruntime-mirrored-" + (envelope.reason || "patch") : "fieldruntime-concrete-" + (envelope.reason || "patch")
+      };
+    });
+  }
+
   // Set a shared signal value through the WASM bridge. The bridge exposes
   // window.__gosx_set_shared_signal_json(name, valueJSON) after the
   // runtime boots; the cross-frame relay (per ADR 0009 +
   // Bridge.EnableCrossFrameRelay) routes writes whose name starts with
   // "$preview." to the storefront iframe's Bridge, where slice 6's
   // preview_subscriber observes them and applies the matching DOM
-  // mutation. Before the bridge boots, the call is a no-op — but the
-  // BridgeShim's flag gate ensures we only run this path when the host
-  // has opted in (which implies the bridge is mounted).
+  // mutation. Before the bridge boots, the call is a no-op; a later bind
+  // or preview-frame load refresh can write the current value once the
+  // shared-signal bridge is available.
   function writeSharedSignal(name, value) {
     try {
       var setter = window.__gosx_set_shared_signal_json;
@@ -87,11 +150,13 @@
 
   function bindFieldMirroringIsland(root) {
     var scope = resolveScope(root);
-    var inputs = scope.querySelectorAll("[data-editor-source], [data-editor-frame-attr-target]");
+    installPreviewPatchResolver();
+    installFieldOperationBuilder();
+    var inputs = scope.querySelectorAll(mirroredPreviewFieldSelector);
     Array.prototype.forEach.call(inputs, function (input) {
       if (input.dataset.gosxStudioFieldMirrorIslandBound === "true") return;
       input.dataset.gosxStudioFieldMirrorIslandBound = "true";
-      var key = input.getAttribute("data-editor-source");
+      var key = input.getAttribute("data-editor-source") || input.getAttribute("data-studio-field-source");
       var frameTarget = input.getAttribute("data-editor-frame-target");
       var attrTarget = input.getAttribute("data-editor-frame-attr-target");
       var attrName = input.getAttribute("data-editor-frame-attr");
@@ -125,16 +190,17 @@
       };
       var update = frameTask(updateNow);
       input.addEventListener("input", update);
-      if (frameTarget || attrTarget) {
+      if (key || frameTarget || attrTarget) {
         // Re-trigger on iframe load so the preview gets the current value
         // after a navigation. Matches legacy bindStudioFrameLoad behavior.
-        Array.prototype.forEach.call(doc.querySelectorAll(".editor-preview-frame"), function (iframe) {
-          var attr = "data-editor-frame-text-island-" + String(key || input.name || attrName || "field")
+        Array.prototype.forEach.call(doc.querySelectorAll(".editor-preview-frame, [data-studio-preview-frame]"), function (iframe) {
+          var bindingKey = [key, input.name, frameTarget, attrTarget, attrName].filter(Boolean).join("-") || "field";
+          var attr = "data-editor-frame-text-island-" + String(bindingKey)
             .replace(/[^a-z0-9_-]/gi, "-")
             .toLowerCase();
           if (iframe.getAttribute(attr) === "true") return;
           iframe.setAttribute(attr, "true");
-          iframe.addEventListener("load", function () { window.requestAnimationFrame(update); });
+          iframe.addEventListener("load", update);
         });
       }
       updateNow();
@@ -212,7 +278,7 @@
 
   // Publish the island globals. The names are the contract referenced by
   // fieldruntime.IslandGlobals in runtime.go; the BridgeShim there delegates
-  // window.GoSXStudioFieldRuntime calls here when the feature flag is on.
+  // window.GoSXStudioFieldRuntime calls here directly.
   window.__gosx_field_runtime_island_bind = bindFieldRuntimeIsland;
   window.__gosx_field_runtime_island_bindMirroring = bindFieldMirroringIsland;
   window.__gosx_field_runtime_island_bindClipboard = bindFieldClipboardIsland;

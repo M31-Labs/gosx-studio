@@ -36,12 +36,9 @@
 // preview-viewport switcher that writes data-studio-viewport-current on a
 // .studio-viewport-switcher root and toggles aria-pressed on its
 // [data-studio-viewport] buttons. Slice 7's WorkbenchViewport island is
-// the canonical gosx-studio-side home for that contract. When the
-// workbench-runtime-islands feature flag is on, muddy-noni renders
-// WorkbenchViewport as the mount-point instead of the inline island. The
-// inline island stays as the flag-off fallback during the additive
-// shipping window so production traffic keeps using the legacy path until
-// the deletion window closes (see slice plan Section F).
+// the canonical gosx-studio-side home for that contract. The host renders
+// WorkbenchViewport as the mount-point and the WorkbenchRuntime bridge
+// delegates directly to the island globals.
 //
 // See the slice plan at
 // ~/.hyphae/spaces/m31labs-gosx/plans/2026-05-26-phase-3-slice-7-workbenchruntime.md

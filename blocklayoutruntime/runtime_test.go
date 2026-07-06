@@ -7,12 +7,11 @@ import (
 
 // The blocklayoutruntime package is the Go-side surface for the Phase 3
 // slice-4 burn-down of GoSXStudioBlockLayoutRuntime. It owns:
-//  1. The feature-flag key consumers add to studio.ShellConfig.FeatureFlags
-//     to flip the island path (legacy bundle deleted 2026-05-27)
-//     to the .gsx-authored islands in this package.
+//  1. The feature-flag key retained as a studio.ShellConfig host probe/string
+//     contract for the .gsx-authored islands in this package.
 //  2. The JS shim that the legacy bundle appends so the
-//     window.GoSXStudioBlockLayoutRuntime methods delegate to the islands
-//     when the flag is on.
+//     window.GoSXStudioBlockLayoutRuntime methods delegate directly to the
+//     islands.
 //  3. The island runtime JS that publishes window.__gosx_blocklayout_runtime_*
 //     globals the BridgeShim delegates to.
 //
@@ -26,9 +25,9 @@ func TestFeatureFlagKey(t *testing.T) {
 	if FeatureFlagKey == "" {
 		t.Fatal("FeatureFlagKey must be set")
 	}
-	// Naming convention: "<contract>-runtime-islands". Every Phase 3 slice
-	// reuses this convention so the consumer's URL-param handling can flip
-	// each contract's flag through a single helper.
+	// Naming convention: "<contract>-runtime-islands". The key remains a
+	// host-visible probe/string contract even though BridgeShim no longer
+	// gates calls on it.
 	if FeatureFlagKey != "block-layout-runtime-islands" {
 		t.Fatalf("FeatureFlagKey must be %q per Phase 3 slice-4 contract; got %q", "block-layout-runtime-islands", FeatureFlagKey)
 	}
@@ -37,18 +36,55 @@ func TestFeatureFlagKey(t *testing.T) {
 	}
 }
 
+func TestDOMContractConstants(t *testing.T) {
+	checks := map[string]string{
+		"RowAttr":       RowAttr,
+		"OrderAttr":     OrderAttr,
+		"IndexAttr":     IndexAttr,
+		"HandleAttr":    HandleAttr,
+		"MoveAttr":      MoveAttr,
+		"AddBlockAttr":  AddBlockAttr,
+		"VisibleAttr":   VisibleAttr,
+		"PillAttr":      PillAttr,
+		"SelectedClass": SelectedClass,
+		"ReorderEvent":  ReorderEvent,
+		"SelectEvent":   SelectEvent,
+	}
+	want := map[string]string{
+		"RowAttr":       "data-block-studio-block",
+		"OrderAttr":     "data-block-studio-order",
+		"IndexAttr":     "data-block-studio-index",
+		"HandleAttr":    "data-block-studio-handle",
+		"MoveAttr":      "data-block-studio-move",
+		"AddBlockAttr":  "data-editor-add-block",
+		"VisibleAttr":   "data-editor-block-visible",
+		"PillAttr":      "data-editor-block-pill",
+		"SelectedClass": "is-selected",
+		"ReorderEvent":  "blockstudio:reorder",
+		"SelectEvent":   "blockstudio:select",
+	}
+	for name, got := range checks {
+		if got != want[name] {
+			t.Fatalf("%s = %q, want %q", name, got, want[name])
+		}
+	}
+}
+
 func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 	shim := string(BridgeShim())
 	if shim == "" {
 		t.Fatal("BridgeShim() must return a non-empty JS snippet")
 	}
-	// The shim must reference each method-specific island global, the public
-	// global it shims (window.GoSXStudioBlockLayoutRuntime), and the feature
-	// flag so the legacy path stays reachable when the flag is off. The
+	// The shim must reference each method-specific island global and the
+	// public global it shims (window.GoSXStudioBlockLayoutRuntime). The
 	// IslandGlobals struct holds the canonical names; any drift between the
 	// struct and the shim is caught here.
 	for _, fragment := range []string{
 		"window.GoSXStudioBlockLayoutRuntime",
+		"function delegate(islandGlobal)",
+		"var island = window[islandGlobal]",
+		"return island.apply(null, arguments)",
+		"return undefined",
 		IslandGlobals.Rows,
 		IslandGlobals.RowKey,
 		IslandGlobals.RowForKey,
@@ -66,10 +102,22 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 		// from the same spore — bindBlockLayoutList + bindBlockLayoutHandleDrag).
 		IslandGlobals.BindList,
 		IslandGlobals.BindHandleDrag,
-		FeatureFlagKey,
 	} {
 		if !strings.Contains(shim, fragment) {
 			t.Fatalf("BridgeShim() missing %q:\n%s", fragment, shim)
+		}
+	}
+	for _, stale := range []string{
+		"FLAG" + "_ATTR",
+		"flag" + "Enabled",
+		"data-gosx-studio-feature-flag-" + "block-layout-runtime-islands",
+		"if (!" + "flag" + "Enabled()) return undefined",
+		"legacy path",
+		"fallback " + "branch",
+		"fallback " + "path",
+	} {
+		if strings.Contains(shim, stale) {
+			t.Fatalf("BridgeShim() contains stale gate/fallback fragment %q:\n%s", stale, shim)
 		}
 	}
 }
@@ -90,8 +138,8 @@ func TestIslandRuntimeJSPublishesRowsGlobal(t *testing.T) {
 	// DOM contract — the block-list query selector. If muddy-noni renames
 	// data-block-studio-block, this test fails and the slice author surfaces
 	// the drift before parity tests start lying.
-	if !strings.Contains(body, "data-block-studio-block") {
-		t.Fatalf("IslandRuntimeJS() rows must query data-block-studio-block")
+	if !strings.Contains(body, RowAttr) {
+		t.Fatalf("IslandRuntimeJS() rows must query %s", RowAttr)
 	}
 }
 
@@ -154,14 +202,14 @@ func TestIslandRuntimeJSPublishesRenumberGlobal(t *testing.T) {
 	// these silently breaks the reorder fan-out.
 	for _, contract := range []string{
 		// Order-input attribute the legacy reads + writes.
-		"data-block-studio-order",
+		OrderAttr,
 		// Move-button disabled state — the up/down buttons sit on every row
 		// and disable at the list ends.
-		"data-block-studio-move",
+		MoveAttr,
 		// Index attribute that records the row's position after renumbering.
-		"data-block-studio-index",
+		IndexAttr,
 		// CustomEvent name the form's reorder listener watches.
-		"blockstudio:reorder",
+		ReorderEvent,
 		// Default source string when caller passes no source argument.
 		"block-layout-engine",
 	} {
@@ -184,12 +232,12 @@ func TestIslandRuntimeJSPublishesSelectRowGlobal(t *testing.T) {
 	}
 	// CustomEvent contract — the selection commandbar + inspector form watch
 	// for blockstudio:select.
-	if !strings.Contains(body, "blockstudio:select") {
-		t.Fatalf("IslandRuntimeJS() selectRow must dispatch %q", "blockstudio:select")
+	if !strings.Contains(body, SelectEvent) {
+		t.Fatalf("IslandRuntimeJS() selectRow must dispatch %q", SelectEvent)
 	}
 	// CSS class used to highlight the selected row in the editor.
-	if !strings.Contains(body, "is-selected") {
-		t.Fatalf("IslandRuntimeJS() selectRow must toggle is-selected class")
+	if !strings.Contains(body, SelectedClass) {
+		t.Fatalf("IslandRuntimeJS() selectRow must toggle %s class", SelectedClass)
 	}
 }
 
@@ -229,9 +277,9 @@ func TestIslandRuntimeJSPublishesUpdateBlockLibraryStateGlobal(t *testing.T) {
 	// silently breaks the library-button sync after a visibility toggle.
 	for _, contract := range []string{
 		// Source-of-truth attribute for the library button -> block-key map.
-		"data-editor-add-block",
+		AddBlockAttr,
 		// Visibility checkbox the helper reads to decide button state.
-		"data-editor-block-visible",
+		VisibleAttr,
 		// Base-class attribute the legacy reads to compose the final
 		// className (button + base + button--ghost is-active / button--secondary).
 		"data-editor-button-base",
@@ -266,7 +314,7 @@ func TestIslandRuntimeJSPublishesUpdateVisibilityStateGlobal(t *testing.T) {
 		// text + pill labels users see in the editor.
 		"editor-block--hidden",
 		"data-editor-block-status",
-		"data-editor-block-pill",
+		PillAttr,
 		"status--ready",
 		// Slice 6 transitional cleanup (Section G.3) — the cross-frame
 		// mutation now rides on $preview.block.<key>.visible. The signal
@@ -341,8 +389,8 @@ func TestIslandRuntimeJSPublishesBindLibraryGlobal(t *testing.T) {
 	for _, contract := range []string{
 		// DOM contracts the click handler queries against.
 		"data-editor-workbench",
-		"data-editor-add-block",
-		"data-editor-block-visible",
+		AddBlockAttr,
+		VisibleAttr,
 		// Idempotency marker (camelCase dataset key form).
 		"gosxStudioBlockLibraryIslandBound",
 	} {
@@ -375,7 +423,7 @@ func TestIslandRuntimeJSPublishesBindVisibilityGlobal(t *testing.T) {
 	}
 	for _, contract := range []string{
 		// DOM contract the change handler queries against.
-		"data-editor-block-visible",
+		VisibleAttr,
 		// Idempotency marker (camelCase dataset key form).
 		"gosxStudioBlockVisibilityIslandBound",
 	} {
@@ -411,8 +459,8 @@ func TestIslandRuntimeJSPublishesBindListGlobal(t *testing.T) {
 	}
 	for _, contract := range []string{
 		// DOM contracts the click handler queries against.
-		"data-block-studio-block",
-		"data-block-studio-move",
+		RowAttr,
+		MoveAttr,
 		// Idempotency marker (camelCase dataset key form).
 		"gosxStudioBlockListIslandBound",
 		// Initial renumber pass — preserves the legacy boot-time
@@ -452,8 +500,8 @@ func TestIslandRuntimeJSPublishesBindHandleDragGlobal(t *testing.T) {
 	}
 	for _, contract := range []string{
 		// DOM contracts the pointer chain queries against.
-		"data-block-studio-handle",
-		"data-block-studio-block",
+		HandleAttr,
+		RowAttr,
 		// Pointer event names — NOT HTML5 drag events.
 		"pointerdown",
 		"pointermove",
@@ -477,9 +525,8 @@ func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 		t.Fatal("Bundle() must return a non-empty JS snippet")
 	}
 	// Island runtime must come before the BridgeShim — the shim consults
-	// the global the island runtime publishes. Order matters: if the shim
-	// ran first it would close over an undefined global and every dispatch
-	// would fall through to the legacy path, silently disabling the slice.
+	// the global the island runtime publishes. Order matters so the direct
+	// delegate can call mounted island globals on first use.
 	islandIdx := strings.Index(bundle, IslandGlobals.Rows+" ")
 	shimIdx := strings.Index(bundle, "window.GoSXStudioBlockLayoutRuntime =")
 	if islandIdx < 0 || shimIdx < 0 {

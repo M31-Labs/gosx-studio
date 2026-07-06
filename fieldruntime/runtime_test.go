@@ -5,6 +5,19 @@ import (
 	"testing"
 )
 
+func jsFunctionBody(t *testing.T, script, name string) string {
+	t.Helper()
+	start := strings.Index(script, "function "+name+"(")
+	if start < 0 {
+		t.Fatalf("script missing function %s", name)
+	}
+	next := strings.Index(script[start+len("function "+name+"("):], "\n  function ")
+	if next < 0 {
+		return script[start:]
+	}
+	return script[start : start+len("function "+name+"(")+next]
+}
+
 // The fieldruntime package is the Go-side surface for the Phase 3 slice-1
 // island implementation of GoSXStudioFieldRuntime. It owns:
 //   1. The feature-flag key (retained for host-probe API stability — the
@@ -37,19 +50,36 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 	if shim == "" {
 		t.Fatal("BridgeShim() must return a non-empty JS snippet")
 	}
-	// The shim must reference the global the islands publish themselves at,
-	// must reference window.GoSXStudioFieldRuntime (the public global it
-	// shims), and must reference the feature flag so the legacy path stays
-	// reachable when the flag is off.
+	// The shim must reference the global the islands publish themselves at
+	// and window.GoSXStudioFieldRuntime (the public global it shims). It
+	// must delegate directly; FeatureFlagKey is retained for host probes,
+	// not for runtime gating.
 	for _, fragment := range []string{
 		"window.GoSXStudioFieldRuntime",
 		"__gosx_field_runtime_island_bind",
 		"__gosx_field_runtime_island_bindMirroring",
 		"__gosx_field_runtime_island_bindClipboard",
-		FeatureFlagKey,
+		`return island.apply(null, arguments);`,
 	} {
 		if !strings.Contains(shim, fragment) {
 			t.Fatalf("BridgeShim() missing %q:\n%s", fragment, shim)
+		}
+	}
+	for _, stale := range []string{
+		"flag" + "Enabled",
+		"FLAG" + "_ATTR",
+		"feature flag is" + " on",
+		"BridgeShim only" + " invokes",
+		"fallback" + " branch",
+		"fallback" + " path",
+		"legacy" + " fallback",
+		"applyTextUpdate" + " fallback",
+		"still JS during" + " slice 1",
+		FeatureFlagKey,
+		"data-gosx-studio-feature-flag-field-runtime-islands",
+	} {
+		if strings.Contains(shim, stale) {
+			t.Fatalf("BridgeShim() contains stale feature-gate/fallback fragment %q:\n%s", stale, shim)
 		}
 	}
 }
@@ -88,9 +118,11 @@ func TestIslandRuntimeJSPublishesIslandGlobals(t *testing.T) {
 		}
 	}
 	// Mirroring must preserve the data-editor-source / data-editor-frame-*
-	// attribute contract from legacy bindFieldMirroring.
+	// attribute contract from legacy bindFieldMirroring and the public
+	// data-studio-field-source Studio field contract.
 	for _, contract := range []string{
 		"data-editor-source",
+		"data-studio-field-source",
 		"data-editor-frame-attr-target",
 		"data-editor-frame-attr-prefix",
 		"data-editor-frame-attr-suffix",
@@ -98,6 +130,104 @@ func TestIslandRuntimeJSPublishesIslandGlobals(t *testing.T) {
 		if !strings.Contains(body, contract) {
 			t.Fatalf("IslandRuntimeJS() mirroring contract missing %q", contract)
 		}
+	}
+}
+
+func TestIslandRuntimeJSMirrorsStudioFieldSourceControls(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, fragment := range []string{
+		`var mirroredPreviewFieldSelector = "[data-editor-source], [data-studio-field-source], [data-editor-frame-attr-target]";`,
+		`querySelectorAll(mirroredPreviewFieldSelector)`,
+		`input.getAttribute("data-editor-source") || input.getAttribute("data-studio-field-source")`,
+		`writeSharedSignal("$preview.field." + key, input.value)`,
+		`writeSharedSignal("$preview.text." + detailKey, {`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing data-studio-field-source mirroring fragment %q", fragment)
+		}
+	}
+}
+
+func TestIslandRuntimeJSOwnsMirroredPreviewPatchTransportPolicy(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, fragment := range []string{
+		`function installPreviewPatchResolver()`,
+		`installPreviewPatchResolver();`,
+		`marker.addEventListener("gosxstudio:field-preview-patch-resolve", function (event) {`,
+		`var envelope = event.detail || {};`,
+		`var field = envelope.field;`,
+		`var mirrored = !!(field && field.matches && field.matches(mirroredPreviewFieldSelector));`,
+		`envelope.result = {`,
+		`mirrored: mirrored,`,
+		`transport: !mirrored,`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing mirrored preview patch resolver fragment %q", fragment)
+		}
+	}
+	resolverBody := jsFunctionBody(t, body, "installPreviewPatchResolver")
+	if strings.Contains(resolverBody, `gosxstudio:preview-patch`) {
+		t.Fatalf("FieldRuntime preview patch resolver must only answer policy and not emit preview patch events:\n%s", resolverBody)
+	}
+}
+
+func TestIslandRuntimeJSOwnsFieldOperationBuilder(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, fragment := range []string{
+		`function fieldRuntimePatch(field)`,
+		`if (!field || !field.name || field.disabled) return null;`,
+		`field.name === "csrf_token" || type === "button" || type === "submit" || type === "reset" || type === "file"`,
+		`source: field.getAttribute("data-studio-field-source") || field.getAttribute("data-editor-source") || field.name`,
+		`editable: field.getAttribute("data-studio-field-editable") || "",`,
+		`value: type === "checkbox" || type === "radio" ? (field.checked ? (field.value || "on") : "") : (field.value || ""),`,
+		`checked: !!field.checked,`,
+		`tag: String(field.tagName || "").toLowerCase()`,
+		`function fieldRuntimeOperationEnvelope(form, reason, field)`,
+		`var patch = fieldRuntimePatch(field);`,
+		`mutation: true,`,
+		`reason: reason || "field",`,
+		`selection: form && form.getAttribute ? (form.getAttribute("data-studio-selection") || "") : "",`,
+		`kind: form && form.getAttribute ? (form.getAttribute("data-studio-selection-kind") || "") : ""`,
+		`payload: {`,
+		`field: patch`,
+		`function installFieldOperationBuilder()`,
+		`marker.addEventListener("gosxstudio:field-operation-build", function (event) {`,
+		`var envelope = event.detail || {};`,
+		`envelope.result = fieldRuntimeOperationEnvelope(envelope.form, envelope.reason, envelope.field);`,
+		`installFieldOperationBuilder();`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing field operation builder fragment %q", fragment)
+		}
+	}
+	builderBody := jsFunctionBody(t, body, "installFieldOperationBuilder")
+	for _, forbidden := range []string{
+		`emitEditorOperation`,
+		`gosxstudio:editor-operation`,
+		`gosxstudio:preview-patch`,
+		`gosxstudio:editor-preview-patch-build-post`,
+		`postMessage`,
+	} {
+		if strings.Contains(builderBody, forbidden) {
+			t.Fatalf("FieldRuntime operation builder must only return an envelope and not emit/post; found %q in:\n%s", forbidden, builderBody)
+		}
+	}
+}
+
+func TestIslandRuntimeJSRefreshesMirroredFieldSourcesOnPreviewFrameLoad(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	for _, fragment := range []string{
+		`if (key || frameTarget || attrTarget) {`,
+		`doc.querySelectorAll(".editor-preview-frame, [data-studio-preview-frame]")`,
+		`var bindingKey = [key, input.name, frameTarget, attrTarget, attrName].filter(Boolean).join("-") || "field";`,
+		`iframe.addEventListener("load", update);`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("IslandRuntimeJS() missing mirrored preview-frame load refresh fragment %q", fragment)
+		}
+	}
+	if strings.Contains(body, `iframe.addEventListener("load", function () { window.requestAnimationFrame(update); });`) {
+		t.Fatalf("IslandRuntimeJS() preview-frame load refresh should use frameTask-wrapped update, not direct requestAnimationFrame")
 	}
 }
 

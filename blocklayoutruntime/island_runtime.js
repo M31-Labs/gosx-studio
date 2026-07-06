@@ -4,9 +4,8 @@
 // block_library.gsx, block_visibility.gsx) are mount-point markers in the
 // editor DOM. This script publishes the nine
 // window.__gosx_blocklayout_runtime_island_<method> globals that
-// blocklayoutruntime.BridgeShim delegates to when the
-// "block-layout-runtime-islands" feature flag is on. It is emitted into the
-// studio runtime bundle by blocklayoutruntime.IslandRuntimeJS() (see
+// blocklayoutruntime.BridgeShim delegates to directly. It is emitted into
+// the studio runtime bundle by blocklayoutruntime.IslandRuntimeJS() (see
 // runtime.go) and runs before BridgeShim() at bundle init time.
 //
 // The nine functions below replace window.GoSXStudioBlockLayoutRuntime.{

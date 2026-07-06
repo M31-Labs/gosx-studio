@@ -7,7 +7,7 @@
 // and the parity matrix at
 // ~/.hyphae/spaces/m31labs-gosx/specs/gosx-studio-runtime-parity-matrix.md.
 //
-// # Transitional iframe contract
+// # Preview signal contract
 //
 // updateHeaderLogo historically reaches across the storefront preview iframe
 // to mutate the .brand / .brand__logo DOM elements directly (set src, alt,
@@ -17,25 +17,13 @@
 // Per
 // ~/.hyphae/spaces/m31labs-gosx/decisions/0008-iframe-preview-stays-via-shared-signal-portal.md,
 // the iframe stays and cross-frame mutations route through $preview.* shared
-// signals subscribed by the preview document. The long-term destination for
-// this method is a $preview.brand.headerLogo signal subscribed by the
-// preview-side header .gsx component. That subscriber ships in slice 6
-// (GoSXStudioPreviewRuntime burn-down).
-//
-// Until slice 6 ships, this island keeps the same iframe contract by
-// delegating to window.GoSXStudioPreviewRuntime.updateHeaderLogo. Ownership
-// has moved to the brand island; the mechanism is identical. Slice 6 will
-// flip the mechanism to a $preview.brand.headerLogo write without
-// revisiting brand ownership.
+// signals subscribed by the preview document. This island publishes
+// $preview.brand.headerLogo for the preview frame and $brand.headerLogo for
+// editor-frame consumers.
 //
 // The island is a mount-point marker — the consumer places it inside the
 // Studio chrome and the runtime bundle's island_runtime.js publishes
-// window.__gosx_brand_runtime_island_updateHeaderLogo that calls
-// previewRuntime().updateHeaderLogo(payload).
-//
-// Post 2026-05-27 the legacy JS bundle is gone; the island path always
-// runs. The shim's data-gosx-studio-feature-flag-brand-runtime-islands
-// flag is retained for host-probe API stability.
+// window.__gosx_brand_runtime_island_updateHeaderLogo.
 
 package brandruntime
 
@@ -47,9 +35,7 @@ import (
 // BrandHeaderLogoProps lets the consumer pass an opaque selector
 // identifying the preview-frame root the updateHeaderLogo island should
 // scope to. Defaults to the editor document when unset; the actual
-// cross-frame write happens via the legacy PreviewRuntime delegation
-// (slice 6 will replace this with a $preview.brand.headerLogo shared
-// signal write that doesn't need a DOM root).
+// cross-frame write happens via the $preview.brand.headerLogo shared signal.
 type BrandHeaderLogoProps struct {
 	RootSelector string
 }

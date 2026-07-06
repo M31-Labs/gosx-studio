@@ -34,9 +34,7 @@
 // window.__gosx_workbench_runtime_island_bindChrome /
 // window.__gosx_workbench_runtime_island_setMode /
 // window.__gosx_workbench_runtime_island_saveLayout that the slice-7
-// BridgeShim delegates to when the "workbench-runtime-islands" feature flag
-// Post 2026-05-27 the legacy JS bundle is gone; the island path is the
-// only path. See Phase 3 burn-down.
+// BridgeShim delegates to directly.
 //
 // All three methods are editor-chrome — no iframe crossing required (this
 // slice is independent of the slice 6 cross-frame-transport block).

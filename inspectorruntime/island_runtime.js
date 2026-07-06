@@ -20,6 +20,9 @@
 //   [data-gosx-studio-inspector-control]  — wrapper element for an inspector field.
 //   [data-gosx-studio-inspector-kind]     — the control kind string on the wrapper.
 //   [data-gosx-studio-inspector-cancel]   — Cancel button (optional; type=reset also accepted).
+//   [data-studio-home-inspector-panel]     — server-rendered inspector shell with group/dirty state.
+//   [data-studio-inspector-group]          — delegated group selector button.
+//   [data-studio-home-inspector-fields]    — field list whose input/change events mark the panel dirty.
 
 ;(function () {
   if (typeof window === "undefined") return;
@@ -30,6 +33,10 @@
   var KIND_ATTR = "data-gosx-studio-inspector-kind";
   var CANCEL_ATTR = "data-gosx-studio-inspector-cancel";
   var DIRTY_ATTR = "data-gosx-studio-inspector-dirty";
+  var HOME_PANEL_SELECTOR = "[data-studio-home-inspector-panel]";
+  var HOME_GROUP_SELECTOR = "[data-studio-inspector-group]";
+  var HOME_FIELDS_SELECTOR = "[data-studio-home-inspector-fields]";
+  var HOME_STATE_SELECTOR = "[data-studio-inspector-state]";
 
   // Return the primary interactive widget inside a control wrapper.
   // Looks for the first input, textarea, or select that is not hidden.
@@ -152,9 +159,84 @@
     }
   }
 
+  function homePanelFor(target) {
+    if (!target || typeof target.closest !== "function") {
+      return null;
+    }
+    return target.closest(HOME_PANEL_SELECTOR);
+  }
+
+  function setHomeInspectorGroup(panel, group) {
+    if (!panel || !group) {
+      return;
+    }
+    panel.setAttribute("data-studio-inspector-group-active", group);
+    var buttons = panel.querySelectorAll(HOME_GROUP_SELECTOR);
+    for (var i = 0; i < buttons.length; i++) {
+      var button = buttons[i];
+      var pressed = button.getAttribute("data-studio-inspector-group") === group;
+      button.setAttribute("aria-pressed", pressed ? "true" : "false");
+    }
+  }
+
+  function markHomeInspectorDirty(panel) {
+    if (!panel) {
+      return;
+    }
+    var dirtyLabel = panel.getAttribute("data-studio-inspector-dirty-label") || "Unsaved changes";
+    var state = panel.querySelector(HOME_STATE_SELECTOR);
+    panel.setAttribute("data-studio-inspector-dirty", "true");
+    if (state) {
+      state.setAttribute("data-studio-inspector-state", dirtyLabel);
+      state.textContent = dirtyLabel;
+    }
+  }
+
+  function onHomeInspectorClick(event) {
+    var target = event.target;
+    var button = target && typeof target.closest === "function"
+      ? target.closest(HOME_GROUP_SELECTOR)
+      : null;
+    if (!button) {
+      return;
+    }
+    var panel = homePanelFor(button);
+    if (!panel) {
+      return;
+    }
+    setHomeInspectorGroup(panel, button.getAttribute("data-studio-inspector-group"));
+  }
+
+  function onHomeInspectorFieldMutation(event) {
+    var target = event.target;
+    var fields = target && typeof target.closest === "function"
+      ? target.closest(HOME_FIELDS_SELECTOR)
+      : null;
+    if (!fields) {
+      return;
+    }
+    markHomeInspectorDirty(homePanelFor(fields));
+  }
+
+  function bindHomeInspector(root) {
+    if (!root) root = doc;
+    var markerTarget = root.nodeType === 9 ? root.documentElement : root;
+    var marker = "data-gosx-studio-home-inspector-runtime-bound";
+    if (markerTarget && markerTarget.getAttribute && markerTarget.getAttribute(marker) === "true") {
+      return;
+    }
+    if (markerTarget && markerTarget.setAttribute) {
+      markerTarget.setAttribute(marker, "true");
+    }
+    root.addEventListener("click", onHomeInspectorClick);
+    root.addEventListener("input", onHomeInspectorFieldMutation);
+    root.addEventListener("change", onHomeInspectorFieldMutation);
+  }
+
   window.GoSXStudioInspectorRuntime = {
     bind: bind,
-    bindAll: bindAll
+    bindAll: bindAll,
+    bindHomeInspector: bindHomeInspector
   };
 
   // Auto-mount on document ready. Idempotent via marker attribute.
@@ -164,6 +246,7 @@
       if (doc.documentElement && doc.documentElement.getAttribute(marker) === "true") return;
       if (doc.documentElement) doc.documentElement.setAttribute(marker, "true");
       window.GoSXStudioInspectorRuntime.bindAll(doc.body || doc);
+      window.GoSXStudioInspectorRuntime.bindHomeInspector(doc);
     } catch (e) {
       // Auto-mount must never break the page.
     }

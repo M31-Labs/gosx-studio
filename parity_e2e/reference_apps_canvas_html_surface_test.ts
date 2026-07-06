@@ -35,8 +35,9 @@ import { startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
 // either behavior genuinely does not work WASM-free, the offending assertion is
 // left with the observed evidence rather than faked.
 //
-// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1 and a Muddy dist rebuilt against the
-// gosx/gosx-studio under test (`gosx build .` in muddy-noni-commerce).
+// Requires GOSX_STUDIO_REFERENCE_APP_E2E=1. The shared harness refreshes
+// Muddy's ignored dist assets and boots the server against the gosx/gosx-studio
+// under test.
 
 const CANVAS_SELECTOR = "canvas[data-gosx-canvas-wasm-free='true']";
 const BOARD_SELECTOR = "[data-studio-site-map-board='true']";
@@ -74,12 +75,12 @@ test.describe("@reference-apps canvas2d site-map WASM-free HTML surface", () => 
       await page.waitForFunction(() => {
         const w = window as unknown as Record<string, unknown>;
         const rt = w.GoSXStudioSiteMapRuntime as { setState?: unknown } | undefined;
-        const painter = w.__muddyCanvas2DPainter as { paint?: unknown; renderCanvasBoardHTML?: unknown } | undefined;
-        const el = document.querySelector("canvas[data-gosx-canvas-wasm-free='true']") as (HTMLCanvasElement & { __muddyCanvasWasmFree?: unknown }) | null;
+        const painter = w.GoSXStudioCanvas2DPainterRuntime as { paint?: unknown; renderCanvasBoardHTML?: unknown } | undefined;
+        const el = document.querySelector("canvas[data-gosx-canvas-wasm-free='true']") as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: unknown }) | null;
         return !!painter && typeof painter.paint === "function" && typeof painter.renderCanvasBoardHTML === "function" &&
           !!rt && typeof rt.setState === "function" &&
           document.documentElement.getAttribute("data-gosx-canvas-wasm-free-client") === "true" &&
-          !!el && !!el.__muddyCanvasWasmFree;
+          !!el && !!el.GoSXStudioCanvasWasmFree;
       }, null, { timeout: 120_000 });
 
       // The injected html surface must serialize into the inline bundle's html
@@ -87,8 +88,8 @@ test.describe("@reference-apps canvas2d site-map WASM-free HTML surface", () => 
       // never reached bundle.html. Read it straight off the live bundle so a
       // failure here pinpoints the fixture seam vs. the overlay rendering.
       const heroInBundle = await page.evaluate((sel) => {
-        const el = document.querySelector(sel) as (HTMLCanvasElement & { __muddyCanvasWasmFree?: { bundle: () => unknown } }) | null;
-        const hook = el && el.__muddyCanvasWasmFree;
+        const el = document.querySelector(sel) as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: { bundle: () => unknown } }) | null;
+        const hook = el && el.GoSXStudioCanvasWasmFree;
         if (!hook) return { hasHook: false, html: [] as unknown[] };
         const bundle = hook.bundle() as { html?: Array<{ id?: string; markup?: string }> } | null;
         const html = (bundle && Array.isArray(bundle.html)) ? bundle.html : [];
