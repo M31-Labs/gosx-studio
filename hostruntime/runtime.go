@@ -1,4 +1,14 @@
-package studio
+// Package hostruntime owns the embedded runtime/asset bundles Studio serves
+// over HTTP: the concatenated engine-runtime JS, the workbench/command/state
+// runtime scripts, the CSS stylesheet, the canvas island scripts, and the
+// public /_gosx/studio/* URL paths and mounting helper for all of them.
+//
+// This package moved here from the studio root in Slice 3 of the package
+// restructure (see .tiller/scratch/gosx-studio-restructure-spec-v0.1.md,
+// risk R2). The assets/ directory MUST live alongside this file because
+// go:embed paths are package-dir-relative and cannot reference a parent
+// directory.
+package hostruntime
 
 import (
 	"bytes"

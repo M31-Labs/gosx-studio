@@ -1,14 +1,16 @@
-package studio
+package hostruntime
 
 import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"m31labs.dev/gosx-studio/core"
 )
 
-func testIsland(name string, body []byte) PluginIsland {
-	return PluginIsland{
+func testIsland(name string, body []byte) core.PluginIsland {
+	return core.PluginIsland{
 		FeatureFlagKey: "test-runtime-islands",
 		ScriptName:     name,
 		Bundle:         func() []byte { return body },
@@ -32,7 +34,7 @@ func TestEngineRuntimeScriptWithEmptyRegistryIsByteIdentical(t *testing.T) {
 func TestPluginIslandAppearsAfterBuiltins(t *testing.T) {
 	marker := []byte("/*__test_island_marker__*/window.GoSXTestRuntime={};")
 	reg := NewPluginRegistry()
-	reg.Register(Plugin{Key: "test", Islands: []PluginIsland{testIsland("test-runtime.js", marker)}})
+	reg.Register(core.Plugin{Key: "test", Islands: []core.PluginIsland{testIsland("test-runtime.js", marker)}})
 
 	bundle := EngineRuntimeScriptWithPlugins(reg)
 	if !bytes.Contains(bundle, marker) {
@@ -52,7 +54,7 @@ func TestPluginIslandAppearsAfterBuiltins(t *testing.T) {
 func TestPluginIslandRouteServesJavaScript(t *testing.T) {
 	marker := []byte("window.GoSXTestRuntime={};")
 	reg := NewPluginRegistry()
-	reg.Register(Plugin{Key: "test", Islands: []PluginIsland{testIsland("test-runtime.js", marker)}})
+	reg.Register(core.Plugin{Key: "test", Islands: []core.PluginIsland{testIsland("test-runtime.js", marker)}})
 
 	h, ok := reg.IslandRoutes()["test-runtime.js"]
 	if !ok {
@@ -72,8 +74,8 @@ func TestPluginIslandRouteServesJavaScript(t *testing.T) {
 // template dedupe semantics; the later registration wins.
 func TestPluginRegistryDedupesByScriptName(t *testing.T) {
 	reg := NewPluginRegistry()
-	reg.Register(Plugin{Islands: []PluginIsland{testIsland("dup.js", []byte("v1"))}})
-	reg.Register(Plugin{Islands: []PluginIsland{testIsland("dup.js", []byte("v2"))}})
+	reg.Register(core.Plugin{Islands: []core.PluginIsland{testIsland("dup.js", []byte("v1"))}})
+	reg.Register(core.Plugin{Islands: []core.PluginIsland{testIsland("dup.js", []byte("v2"))}})
 	if n := len(reg.Islands()); n != 1 {
 		t.Fatalf("duplicate ScriptName must replace in place, got %d islands", n)
 	}
@@ -85,7 +87,7 @@ func TestPluginRegistryDedupesByScriptName(t *testing.T) {
 // Islands with no ScriptName or a nil/empty Bundle are dropped on registration.
 func TestPluginRegistryDropsInvalidIslands(t *testing.T) {
 	reg := NewPluginRegistry()
-	reg.Register(Plugin{Islands: []PluginIsland{
+	reg.Register(core.Plugin{Islands: []core.PluginIsland{
 		{ScriptName: "", Bundle: func() []byte { return []byte("x") }}, // no name
 		{ScriptName: "nil-bundle.js"},                                  // nil bundle
 		{ScriptName: "empty.js", Bundle: func() []byte { return nil }}, // empty bundle
@@ -101,7 +103,7 @@ func TestPluginRegistryDropsInvalidIslands(t *testing.T) {
 // A nil receiver is safe (defensive: hosts may pass a zero registry).
 func TestNilPluginRegistryIsSafe(t *testing.T) {
 	var reg *PluginRegistry
-	reg.Register(Plugin{Islands: []PluginIsland{testIsland("x.js", []byte("y"))}})
+	reg.Register(core.Plugin{Islands: []core.PluginIsland{testIsland("x.js", []byte("y"))}})
 	if reg.Islands() != nil || reg.IslandBundles() != nil || reg.IslandRoutes() != nil {
 		t.Fatal("nil registry accessors must return nil")
 	}

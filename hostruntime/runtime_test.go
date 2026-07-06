@@ -1,4 +1,4 @@
-package studio
+package hostruntime
 
 import (
 	"net/http"

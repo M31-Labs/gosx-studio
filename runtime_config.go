@@ -1,12 +1,24 @@
 package studio
 
-import "net/http"
-
-// Mounter is the minimal host-app contract needed to serve Studio runtime
-// assets from an HTTP router.
-type Mounter interface {
-	Mount(pattern string, handler http.Handler)
-}
+// This file (originally host_runtime.go) is what remains at the studio root
+// after Slice 3 of the package restructure (see
+// .tiller/scratch/gosx-studio-restructure-spec-v0.1.md) moved the
+// Mounter/MountRuntimes asset-mounting pair, the runtime/asset bundle code,
+// and the public /_gosx/studio/* path constants into
+// m31labs.dev/gosx-studio/hostruntime (see compat_hostruntime.go for the
+// facade aliases).
+//
+// RuntimeConfig itself stays here (not in hostruntime) for now: it embeds
+// ShellConfig, which is shell-package territory (Slice 8) and still lives
+// only at this root package today. hostruntime must not import the root
+// package (that would be a compile-time import cycle, since this package
+// already imports hostruntime for the Slice 3 facade), and shell is DAG-below
+// hostruntime (shell imports hostruntime, never the reverse), so
+// RuntimeConfig cannot move until ShellConfig has its own package in Slice 8.
+// It is deferred there rather than forced into hostruntime early. It
+// continues to compile unchanged today via the compat_hostruntime.go shims
+// for AssetHref and the runtime path constants, which resolve as unqualified
+// package-level names in this same package.
 
 // RuntimeConfig is the reusable host-facing runtime/config bundle for Studio
 // browser assets and shell defaults.
@@ -63,25 +75,6 @@ func (c RuntimeConfig) Showcase3DEngineHost() map[string]any {
 
 func (c RuntimeConfig) CanvasPreviewShell() CanvasPreviewShell {
 	return c.HostConfig().Canvas.PreviewShell
-}
-
-// MountRuntimes mounts all Studio-owned runtime assets at their public paths.
-func MountRuntimes(app Mounter) {
-	if app == nil {
-		return
-	}
-	app.Mount("GET "+StylesheetPath, StylesheetHandler())
-	app.Mount("GET "+EngineRuntimePath, EngineRuntimeHandler())
-	app.Mount("GET "+WorkbenchRuntimePath, WorkbenchRuntimeHandler())
-	app.Mount("GET "+CommandRuntimePath, CommandRuntimeHandler())
-	app.Mount("GET "+StateRuntimePath, StateRuntimeHandler())
-	app.Mount("GET "+PreviewSubscriberPath, PreviewSubscriberHandler())
-	app.Mount("GET "+CanvasSelectionBridgePath, CanvasSelectionBridgeHandler())
-	app.Mount("GET "+Canvas2DPainterPath, Canvas2DPainterHandler())
-	app.Mount("GET "+CanvasWASMFreeClientPath, CanvasWASMFreeClientHandler())
-	app.Mount("GET "+CanvasInlineEditPath, CanvasInlineEditHandler())
-	app.Mount("GET "+CanvasContextualPanelPath, CanvasContextualPanelHandler())
-	app.Mount("GET "+CanvasDefaultInlineInstallerPath, CanvasDefaultInlineInstallerHandler())
 }
 
 func (c RuntimeConfig) engineHost(key string, className string) map[string]any {
