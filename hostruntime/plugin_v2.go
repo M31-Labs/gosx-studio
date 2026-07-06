@@ -1,9 +1,14 @@
-package studio
+package hostruntime
 
-import "net/http"
+import (
+	"net/http"
 
-// PluginIsland moved to m31labs.dev/gosx-studio/core alongside Plugin (Slice 1
-// of the package restructure); see compat_core.go for the facade alias.
+	"m31labs.dev/gosx-studio/core"
+)
+
+// PluginIsland (core.PluginIsland) and Plugin (core.Plugin) live in
+// m31labs.dev/gosx-studio/core (Slice 1 of the package restructure); see
+// compat_core.go for the facade alias.
 //
 // PluginRegistry accumulates the runtime artifacts contributed by registered
 // plugins. It is host-held, not global: a plugin-aware host builds one, calls
@@ -14,8 +19,14 @@ import "net/http"
 // This is the keystone of the Plugin v2 contract: the island channel. Later
 // channels (server routes, namespaced mutations, public renderers, config
 // surfaces) accumulate on the same registry.
+//
+// PluginRegistry moved here from the studio root in Slice 3 of the package
+// restructure (see .tiller/scratch/gosx-studio-restructure-spec-v0.1.md):
+// Slice 1 deliberately left it at the root because it is HTTP-coupled
+// (IslandRoutes serves http.Handler) and depends on ScriptHandler, which
+// lives alongside the other runtime-asset mounting code here.
 type PluginRegistry struct {
-	islands []PluginIsland
+	islands []core.PluginIsland
 	index   map[string]int // ScriptName -> position, for idempotent replace
 }
 
@@ -30,7 +41,7 @@ func NewPluginRegistry() *PluginRegistry {
 // template semantics, so re-registering a plugin is idempotent and config
 // updates take effect. Islands with an empty ScriptName or a nil/empty Bundle
 // are dropped, matching template normalization.
-func (r *PluginRegistry) Register(p Plugin) {
+func (r *PluginRegistry) Register(p core.Plugin) {
 	if r == nil {
 		return
 	}
@@ -51,7 +62,7 @@ func (r *PluginRegistry) Register(p Plugin) {
 }
 
 // Islands returns the registered islands in registration order.
-func (r *PluginRegistry) Islands() []PluginIsland {
+func (r *PluginRegistry) Islands() []core.PluginIsland {
 	if r == nil {
 		return nil
 	}

@@ -13,21 +13,12 @@ import (
 	"m31labs.dev/gosx-studio/workbenchruntime"
 )
 
+// RuntimeRoot and the runtime asset path constants moved to
+// m31labs.dev/gosx-studio/hostruntime in Slice 3 of the package restructure
+// (see .tiller/scratch/gosx-studio-restructure-spec-v0.1.md); see
+// compat_hostruntime.go for the facade aliases that keep the bare names
+// (StylesheetPath, EngineRuntimePath, ...) resolving in this package.
 const (
-	RuntimeRoot                      = "/_gosx/studio"
-	StylesheetPath                   = RuntimeRoot + "/studio.css"
-	EngineRuntimePath                = RuntimeRoot + "/studio-engines.js"
-	WorkbenchRuntimePath             = RuntimeRoot + "/workbench-runtime.js"
-	CommandRuntimePath               = RuntimeRoot + "/command-palette.js"
-	StateRuntimePath                 = RuntimeRoot + "/state-runtime.js"
-	PreviewSubscriberPath            = RuntimeRoot + "/preview-subscriber.js"
-	CanvasSelectionBridgePath        = RuntimeRoot + "/canvas-selection-bridge.js"
-	CanvasInlineEditPath             = RuntimeRoot + "/canvas-inline-edit.js"
-	Canvas2DPainterPath              = RuntimeRoot + "/canvas2d-painter.js"
-	CanvasWASMFreeClientPath         = RuntimeRoot + "/canvas-wasm-free-client.js"
-	CanvasContextualPanelPath        = RuntimeRoot + "/canvas-contextual-panel.js"
-	CanvasDefaultInlineInstallerPath = RuntimeRoot + "/canvas-default-inline-installer.js"
-
 	CanvasEngineName      = "GoSXStudioCanvas"
 	SiteMapEngineName     = "GoSXStudioSiteMap"
 	FlowDesignerName      = "GoSXStudioFlowDesigner"
