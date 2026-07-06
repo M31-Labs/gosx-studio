@@ -6,6 +6,13 @@ import "testing"
 // dev-locked control. The locked control's value/binding still travel with the
 // template (so the dev-set wiring is preserved) but the editor must never offer
 // it as an editable field.
+//
+// This is a root-local duplicate of authoring.lockedFixtureControls: the two
+// packages both need the fixture (one for authoringSiteMap* view helpers that
+// remain at root pending the sitemap slice, the other for authoring.go's
+// mutation-boundary control views), and the fixture is small enough that
+// duplicating it is simpler and safer than exporting test-only helpers across
+// a package boundary.
 func lockedFixtureControls() []Control {
 	return []Control{
 		{
@@ -61,38 +68,6 @@ func TestControlLockedRawTemplateRetainsLockedControl(t *testing.T) {
 	}
 	if locked.Binding != "plugin.stripe.checkout" || locked.Value != "/api/checkout" {
 		t.Fatalf("locked control wiring should travel with the template: %#v", *locked)
-	}
-}
-
-func TestAuthoringControlViewsExcludeLocked(t *testing.T) {
-	views := authoringControlViews(Page{}, Component{}, lockedFixtureControls())
-	keys := controlViewKeys(views)
-	if len(keys) != 1 || keys[0] != "product" {
-		t.Fatalf("authoringControlViews should expose only the editable control, got %#v", keys)
-	}
-	if views[0]["locked"] != false {
-		t.Fatalf("editable control view should expose locked=false, got %#v", views[0]["locked"])
-	}
-}
-
-func TestAuthoringComponentTemplateViewsExcludeLocked(t *testing.T) {
-	templates := []ComponentTemplate{{
-		Key:           "stripe-buy",
-		Label:         "Buy button",
-		GoSXComponent: "StripeBuyButton",
-		Controls:      lockedFixtureControls(),
-	}}
-	views := authoringComponentTemplateViews(templates)
-	if len(views) != 1 {
-		t.Fatalf("expected one template view, got %d", len(views))
-	}
-	controls := views[0]["controls"].([]map[string]any)
-	keys := controlViewKeys(controls)
-	if len(keys) != 1 || keys[0] != "product" {
-		t.Fatalf("template view should expose only the editable control, got %#v", keys)
-	}
-	if views[0]["controlCount"] != 2 {
-		t.Fatalf("controlCount should reflect the raw template (both controls), got %#v", views[0]["controlCount"])
 	}
 }
 

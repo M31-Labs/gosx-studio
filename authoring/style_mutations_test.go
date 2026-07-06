@@ -1,10 +1,14 @@
-package studio
+package authoring
 
-import "testing"
+import (
+	"testing"
 
-func styleTestPageComponent() (Page, Component) {
-	page := Page{Key: "home", Label: "Home", Route: "/"}
-	component := Component{Key: "hero", Label: "Hero", Binding: "blocks.hero"}
+	"m31labs.dev/gosx-studio/core"
+)
+
+func styleTestPageComponent() (core.Page, core.Component) {
+	page := core.Page{Key: "home", Label: "Home", Route: "/"}
+	component := core.Component{Key: "hero", Label: "Hero", Binding: "blocks.hero"}
 	return page, component
 }
 
@@ -139,7 +143,7 @@ func TestSupportedStylePropertiesSortedAndCoversDesign(t *testing.T) {
 // Non-style mutations must be unaffected: their FormValues carry no style fields.
 func TestNonStyleMutationOmitsStyleFields(t *testing.T) {
 	page, component := styleTestPageComponent()
-	control := Control{Key: "title", Kind: ControlText, Binding: "blocks.hero.title", Value: "Hello"}
+	control := core.Control{Key: "title", Kind: core.ControlText, Binding: "blocks.hero.title", Value: "Hello"}
 	values := AuthoringMutationForControl(page, component, control).FormValues()
 	for _, field := range []string{AuthoringFieldStyleProperty, AuthoringFieldStyleValue, AuthoringFieldBreakpoint, AuthoringFieldState} {
 		if _, present := values[field]; present {

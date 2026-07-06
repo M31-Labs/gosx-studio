@@ -1,8 +1,10 @@
-package studio
+package authoring
 
 import (
 	"sort"
 	"strings"
+
+	"m31labs.dev/gosx-studio/core"
 )
 
 // Responsive breakpoints for per-element styling, aligned with the editor's
@@ -124,7 +126,7 @@ func isSupportedStyleState(state string) bool {
 // AuthoringMutationForStyle builds a set-style mutation that sets one CSS
 // property on a component for the given breakpoint and element state. An empty
 // breakpoint or state defaults to base / default.
-func AuthoringMutationForStyle(page Page, component Component, property, value, breakpoint, state string) AuthoringMutation {
+func AuthoringMutationForStyle(page core.Page, component core.Component, property, value, breakpoint, state string) AuthoringMutation {
 	page = page.Normalize()
 	component = component.Normalize()
 	return AuthoringMutation{

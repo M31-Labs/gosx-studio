@@ -1,56 +1,60 @@
-package studio
+package authoring
 
-import "testing"
+import (
+	"testing"
+
+	"m31labs.dev/gosx-studio/core"
+)
 
 func TestNoCodeAuthoringSurfaceBuildsDraftOperations(t *testing.T) {
-	siteMap := SiteMap{Pages: []Page{
+	siteMap := core.SiteMap{Pages: []core.Page{
 		{
 			Key:           "home",
 			Label:         "Home",
 			Route:         "/",
-			Group:         PageGroupSite,
+			Group:         core.PageGroupSite,
 			GoSXComponent: "HomePage",
 			Selected:      true,
-			Components: []Component{
+			Components: []core.Component{
 				{
 					Key:           "hero",
 					Label:         "Hero",
 					Summary:       "Lead message",
 					GoSXComponent: "HomeHero",
-					Source:        ComponentSourceHost,
+					Source:        core.ComponentSourceHost,
 					Binding:       "pages.home.hero",
 					Editable:      true,
-					Controls: []Control{
-						{Key: "headline", Label: "Headline", Kind: ControlText, Binding: "pages.home.hero.headline", Value: "Forest days"},
+					Controls: []core.Control{
+						{Key: "headline", Label: "Headline", Kind: core.ControlText, Binding: "pages.home.hero.headline", Value: "Forest days"},
 					},
 				},
 			},
 		},
-	}, Library: CompositionLibrary{
-		PageBlueprints: []PageBlueprint{{
+	}, Library: core.CompositionLibrary{
+		PageBlueprints: []core.PageBlueprint{{
 			Key:           "landing",
 			Label:         "Landing page",
 			Summary:       "A focused page with a hero and signup block.",
 			RoutePattern:  "/new-page",
-			Group:         PageGroupContent,
+			Group:         core.PageGroupContent,
 			GoSXComponent: "LandingPage",
 			Status:        "Ready",
-			Components: []ComponentTemplate{
-				{Key: "hero", Label: "Hero", GoSXComponent: "HomeHero", Source: ComponentSourceHost, DefaultBinding: "pages.new.hero"},
-				{Key: "signup", Label: "Signup", GoSXComponent: "SignupFlow", Source: ComponentSourceCMS, DefaultBinding: "flows.signup"},
+			Components: []core.ComponentTemplate{
+				{Key: "hero", Label: "Hero", GoSXComponent: "HomeHero", Source: core.ComponentSourceHost, DefaultBinding: "pages.new.hero"},
+				{Key: "signup", Label: "Signup", GoSXComponent: "SignupFlow", Source: core.ComponentSourceCMS, DefaultBinding: "flows.signup"},
 			},
 		}},
-		ComponentTemplates: []ComponentTemplate{{
+		ComponentTemplates: []core.ComponentTemplate{{
 			Key:            "gallery",
 			Label:          "Gallery",
 			Summary:        "Show selected images on the page.",
 			Category:       "Media",
 			GoSXComponent:  "ImageGallery",
-			Source:         ComponentSourceCMS,
+			Source:         core.ComponentSourceCMS,
 			DefaultBinding: "media.gallery",
 			AddLabel:       "Add gallery",
-			Controls: []Control{
-				{Key: "source", Label: "Source", Kind: ControlMedia, Binding: "media.gallery"},
+			Controls: []core.Control{
+				{Key: "source", Label: "Source", Kind: core.ControlMedia, Binding: "media.gallery"},
 			},
 		}},
 	}}
@@ -64,7 +68,7 @@ func TestNoCodeAuthoringSurfaceBuildsDraftOperations(t *testing.T) {
 		t.Fatalf("intent count = %d", surface.IntentCount())
 	}
 	createPage := surface.CreatePageIntents[0]
-	if createPage.Key != "create-page:landing" || createPage.NormalizedKind() != CompositionIntentCreatePage || createPage.TargetRoute != "/new-page" {
+	if createPage.Key != "create-page:landing" || createPage.NormalizedKind() != core.CompositionIntentCreatePage || createPage.TargetRoute != "/new-page" {
 		t.Fatalf("create-page intent = %#v", createPage)
 	}
 	if createPage.StepCount() != 3 || createPage.Steps[1].GoSXComponent != "HomeHero" || createPage.Steps[2].Binding != "flows.signup" {
@@ -83,33 +87,33 @@ func TestNoCodeAuthoringSurfaceBuildsDraftOperations(t *testing.T) {
 }
 
 func TestAuthoringSurfaceViewProjectsNoCodePlatformModel(t *testing.T) {
-	surface := NoCodeAuthoringSurface(SiteMap{Pages: []Page{{
+	surface := NoCodeAuthoringSurface(core.SiteMap{Pages: []core.Page{{
 		Key:           "contact",
 		Label:         "Contact",
 		Route:         "/contact",
-		Group:         PageGroupFlows,
+		Group:         core.PageGroupFlows,
 		GoSXComponent: "ContactPage",
-		Components: []Component{{
+		Components: []core.Component{{
 			Key:           "form",
 			Label:         "Contact form",
 			GoSXComponent: "ContactFlow",
-			Source:        ComponentSourceCMS,
+			Source:        core.ComponentSourceCMS,
 			Binding:       "flows.contact",
 			Editable:      true,
-			Controls: []Control{{
+			Controls: []core.Control{{
 				Key:      "submit-label",
 				Label:    "Submit label",
-				Kind:     ControlText,
+				Kind:     core.ControlText,
 				Binding:  "flows.contact.submit.label",
 				Required: true,
 			}},
 		}},
-	}}, Library: CompositionLibrary{
-		ComponentTemplates: []ComponentTemplate{{
+	}}, Library: core.CompositionLibrary{
+		ComponentTemplates: []core.ComponentTemplate{{
 			Key:           "faq",
 			Label:         "FAQ",
 			GoSXComponent: "FAQSection",
-			Source:        ComponentSourceHost,
+			Source:        core.ComponentSourceHost,
 		}},
 	}})
 

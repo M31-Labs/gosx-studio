@@ -1,4 +1,4 @@
-package studio
+package authoring
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"m31labs.dev/gosx-studio/core"
 
 	"m31labs.dev/gosx/action"
 )
@@ -26,10 +28,10 @@ func (adapter *stubAuthoringAdapter) ApplyAuthoringMutation(ctx context.Context,
 }
 
 func TestAuthoringMutationFromIntentBuildsActionPayload(t *testing.T) {
-	intent := CompositionIntent{
+	intent := core.CompositionIntent{
 		Key:                  "add-component:home:gallery",
 		Label:                "Add gallery",
-		Kind:                 CompositionIntentAddComponent,
+		Kind:                 core.CompositionIntentAddComponent,
 		TargetPageKey:        "home",
 		TargetPageLabel:      "Home",
 		TargetRoute:          "/",
@@ -42,7 +44,7 @@ func TestAuthoringMutationFromIntentBuildsActionPayload(t *testing.T) {
 	mutation := AuthoringMutationFromIntent(intent)
 	values := mutation.FormValues()
 
-	if mutation.Kind != AuthoringOperationApplyIntent || mutation.IntentKind != CompositionIntentAddComponent {
+	if mutation.Kind != AuthoringOperationApplyIntent || mutation.IntentKind != core.CompositionIntentAddComponent {
 		t.Fatalf("unexpected mutation kind: %#v", mutation)
 	}
 	if values[AuthoringFieldOperation] != "apply-intent" || values[AuthoringFieldIntentKey] != "add-component:home:gallery" {
@@ -66,7 +68,7 @@ func TestAuthoringMutationFromIntentBuildsActionPayload(t *testing.T) {
 }
 
 func TestAuthoringMutationForPageBuildsUpdatePayload(t *testing.T) {
-	mutation := AuthoringMutationForPage(Page{
+	mutation := AuthoringMutationForPage(core.Page{
 		Key:      "page_philosophy",
 		Label:    "Our Philosophy",
 		Route:    "/pages/philosophy",
@@ -83,11 +85,11 @@ func TestAuthoringMutationForPageBuildsUpdatePayload(t *testing.T) {
 }
 
 func TestAuthoringMutationForComponentVisibilityBuildsTogglePayload(t *testing.T) {
-	mutation := AuthoringMutationForComponentVisibility(Page{
+	mutation := AuthoringMutationForComponentVisibility(core.Page{
 		Key:   "home",
 		Label: "Home",
 		Route: "/",
-	}, Component{
+	}, core.Component{
 		Key:     "contact",
 		Label:   "Contact band",
 		Binding: "home.section.contact",
@@ -106,11 +108,11 @@ func TestAuthoringMutationForComponentVisibilityBuildsTogglePayload(t *testing.T
 }
 
 func TestAuthoringMutationForComponentReorderBuildsPositionPayload(t *testing.T) {
-	mutation := AuthoringMutationForComponentReorder(Page{
+	mutation := AuthoringMutationForComponentReorder(core.Page{
 		Key:   "home",
 		Label: "Home",
 		Route: "/",
-	}, Component{
+	}, core.Component{
 		Key:     "gallery",
 		Label:   "Gallery",
 		Binding: "home.section.gallery",
@@ -129,11 +131,11 @@ func TestAuthoringMutationForComponentReorderBuildsPositionPayload(t *testing.T)
 }
 
 func TestAuthoringMutationForComponentDeleteBuildsComponentPayload(t *testing.T) {
-	mutation := AuthoringMutationForComponentDelete(Page{
+	mutation := AuthoringMutationForComponentDelete(core.Page{
 		Key:   "home",
 		Label: "Home",
 		Route: "/",
-	}, Component{
+	}, core.Component{
 		Key:     "gallery",
 		Label:   "Gallery",
 		Binding: "home.section.gallery",
@@ -149,11 +151,11 @@ func TestAuthoringMutationForComponentDeleteBuildsComponentPayload(t *testing.T)
 }
 
 func TestAuthoringMutationForComponentDuplicateBuildsTemplatePayload(t *testing.T) {
-	mutation := AuthoringMutationForComponentDuplicate(Page{
+	mutation := AuthoringMutationForComponentDuplicate(core.Page{
 		Key:   "home",
 		Label: "Home",
 		Route: "/",
-	}, Component{
+	}, core.Component{
 		Key:         "hero-copy",
 		TemplateKey: "hero",
 		Label:       "Hero copy",
@@ -208,7 +210,7 @@ func TestAuthoringMutationFromFormNormalizesAndValidates(t *testing.T) {
 	missing, validation := AuthoringMutationFromForm(map[string]string{
 		AuthoringFieldOperation:  "apply-intent",
 		AuthoringFieldIntentKey:  "create-page:landing",
-		AuthoringFieldIntentKind: string(CompositionIntentCreatePage),
+		AuthoringFieldIntentKind: string(core.CompositionIntentCreatePage),
 	})
 	if validation.OK() || missing.PageBlueprintKey != "" {
 		t.Fatalf("expected missing blueprint error, mutation=%#v validation=%#v", missing, validation)

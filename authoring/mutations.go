@@ -1,10 +1,12 @@
-package studio
+package authoring
 
 import (
 	"context"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"m31labs.dev/gosx-studio/core"
 
 	"m31labs.dev/gosx/action"
 )
@@ -71,7 +73,7 @@ type AuthoringAdapter interface {
 type AuthoringMutation struct {
 	Kind                 AuthoringOperationKind
 	IntentKey            string
-	IntentKind           CompositionIntentKind
+	IntentKind           core.CompositionIntentKind
 	PageKey              string
 	PageLabel            string
 	PageRoute            string
@@ -80,7 +82,7 @@ type AuthoringMutation struct {
 	ComponentLabel       string
 	ComponentTemplateKey string
 	ControlKey           string
-	ControlKind          ControlKind
+	ControlKind          core.ControlKind
 	Binding              string
 	TargetRegion         string
 	Value                string
@@ -167,7 +169,7 @@ func AuthoringActionHandler(adapter AuthoringAdapter) action.Handler {
 	}
 }
 
-func AuthoringMutationFromIntent(intent CompositionIntent) AuthoringMutation {
+func AuthoringMutationFromIntent(intent core.CompositionIntent) AuthoringMutation {
 	intent = intent.Normalize()
 	return AuthoringMutation{
 		Kind:                 AuthoringOperationApplyIntent,
@@ -184,7 +186,7 @@ func AuthoringMutationFromIntent(intent CompositionIntent) AuthoringMutation {
 	}.Normalize()
 }
 
-func AuthoringMutationForControl(page Page, component Component, control Control) AuthoringMutation {
+func AuthoringMutationForControl(page core.Page, component core.Component, control core.Control) AuthoringMutation {
 	page = page.Normalize()
 	component = component.Normalize()
 	control = control.Normalize()
@@ -202,7 +204,7 @@ func AuthoringMutationForControl(page Page, component Component, control Control
 	}.Normalize()
 }
 
-func AuthoringMutationForPage(page Page) AuthoringMutation {
+func AuthoringMutationForPage(page core.Page) AuthoringMutation {
 	page = page.Normalize()
 	return AuthoringMutation{
 		Kind:      AuthoringOperationUpdatePage,
@@ -212,7 +214,7 @@ func AuthoringMutationForPage(page Page) AuthoringMutation {
 	}.Normalize()
 }
 
-func AuthoringMutationForComponentReorder(page Page, component Component, position int) AuthoringMutation {
+func AuthoringMutationForComponentReorder(page core.Page, component core.Component, position int) AuthoringMutation {
 	page = page.Normalize()
 	component = component.Normalize()
 	return AuthoringMutation{
@@ -228,7 +230,7 @@ func AuthoringMutationForComponentReorder(page Page, component Component, positi
 	}.Normalize()
 }
 
-func AuthoringMutationForComponentVisibility(page Page, component Component, visible bool) AuthoringMutation {
+func AuthoringMutationForComponentVisibility(page core.Page, component core.Component, visible bool) AuthoringMutation {
 	page = page.Normalize()
 	component = component.Normalize()
 	return AuthoringMutation{
@@ -244,7 +246,7 @@ func AuthoringMutationForComponentVisibility(page Page, component Component, vis
 	}.Normalize()
 }
 
-func AuthoringMutationForComponentDelete(page Page, component Component) AuthoringMutation {
+func AuthoringMutationForComponentDelete(page core.Page, component core.Component) AuthoringMutation {
 	page = page.Normalize()
 	component = component.Normalize()
 	return AuthoringMutation{
@@ -258,7 +260,7 @@ func AuthoringMutationForComponentDelete(page Page, component Component) Authori
 	}.Normalize()
 }
 
-func AuthoringMutationForComponentDuplicate(page Page, component Component, position int) AuthoringMutation {
+func AuthoringMutationForComponentDuplicate(page core.Page, component core.Component, position int) AuthoringMutation {
 	page = page.Normalize()
 	component = component.Normalize()
 	return AuthoringMutation{
@@ -279,7 +281,7 @@ func AuthoringMutationFromForm(form map[string]string) (AuthoringMutation, Autho
 	mutation := AuthoringMutation{
 		Kind:                 AuthoringOperationKind(formValue(form, AuthoringFieldOperation)),
 		IntentKey:            formValue(form, AuthoringFieldIntentKey),
-		IntentKind:           CompositionIntentKind(formValue(form, AuthoringFieldIntentKind)),
+		IntentKind:           core.CompositionIntentKind(formValue(form, AuthoringFieldIntentKind)),
 		PageKey:              formValue(form, AuthoringFieldPageKey),
 		PageLabel:            formValue(form, AuthoringFieldPageLabel),
 		PageRoute:            formValue(form, AuthoringFieldPageRoute),
@@ -288,7 +290,7 @@ func AuthoringMutationFromForm(form map[string]string) (AuthoringMutation, Autho
 		ComponentLabel:       formValue(form, AuthoringFieldComponentLabel),
 		ComponentTemplateKey: formValue(form, AuthoringFieldComponentTemplateKey),
 		ControlKey:           formValue(form, AuthoringFieldControlKey),
-		ControlKind:          ControlKind(formValue(form, AuthoringFieldControlKind)),
+		ControlKind:          core.ControlKind(formValue(form, AuthoringFieldControlKind)),
 		Binding:              formValue(form, AuthoringFieldBinding),
 		TargetRegion:         formValue(form, AuthoringFieldTargetRegion),
 		Value:                formValue(form, AuthoringFieldValue),
@@ -379,11 +381,11 @@ func (mutation AuthoringMutation) Validate() AuthoringValidation {
 			validation.AddFieldError(AuthoringFieldIntentKind, "Choose an intent kind.")
 		}
 		switch mutation.IntentKind {
-		case CompositionIntentCreatePage:
+		case core.CompositionIntentCreatePage:
 			if mutation.PageBlueprintKey == "" {
 				validation.AddFieldError(AuthoringFieldPageBlueprintKey, "Choose a page blueprint.")
 			}
-		case CompositionIntentAddComponent:
+		case core.CompositionIntentAddComponent:
 			if mutation.PageKey == "" {
 				validation.AddFieldError(AuthoringFieldPageKey, "Choose a target page.")
 			}

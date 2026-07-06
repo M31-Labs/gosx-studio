@@ -1,24 +1,28 @@
-package studio
+package authoring
 
-import "strings"
+import (
+	"strings"
+
+	"m31labs.dev/gosx-studio/core"
+)
 
 // AuthoringSurface is the no-code projection a host can hand to Studio UI.
 //
 // It keeps the host's GoSX component names and opaque bindings intact while
 // presenting page, palette, intent, and graph data in editor-facing terms.
 type AuthoringSurface struct {
-	SiteMap             SiteMap
-	SelectedPage        Page
+	SiteMap             core.SiteMap
+	SelectedPage        core.Page
 	HasSelectedPage     bool
-	Workspace           CompositionWorkspace
-	Canvas              WorkspaceCanvas
-	CreatePageIntents   []CompositionIntent
-	AddComponentIntents []CompositionIntent
+	Workspace           core.CompositionWorkspace
+	Canvas              core.WorkspaceCanvas
+	CreatePageIntents   []core.CompositionIntent
+	AddComponentIntents []core.CompositionIntent
 }
 
 // NoCodeAuthoringSurface derives the editor-facing no-code model from a site
 // map. Hosts still own persistence; Studio owns the neutral operation language.
-func NoCodeAuthoringSurface(siteMap SiteMap) AuthoringSurface {
+func NoCodeAuthoringSurface(siteMap core.SiteMap) AuthoringSurface {
 	siteMap = siteMap.Normalize()
 	selectedPage, hasSelectedPage := siteMap.SelectedPage()
 	workspace := siteMap.CompositionWorkspace()
@@ -33,8 +37,8 @@ func NoCodeAuthoringSurface(siteMap SiteMap) AuthoringSurface {
 	}
 }
 
-func (surface AuthoringSurface) Intents() []CompositionIntent {
-	out := make([]CompositionIntent, 0, len(surface.CreatePageIntents)+len(surface.AddComponentIntents))
+func (surface AuthoringSurface) Intents() []core.CompositionIntent {
+	out := make([]core.CompositionIntent, 0, len(surface.CreatePageIntents)+len(surface.AddComponentIntents))
 	out = append(out, normalizeCompositionIntents(surface.CreatePageIntents)...)
 	out = append(out, normalizeCompositionIntents(surface.AddComponentIntents)...)
 	return out
@@ -48,7 +52,7 @@ func AuthoringSurfaceView(surface AuthoringSurface) map[string]any {
 	siteMap := surface.SiteMap.Normalize()
 	selectedPage := surface.SelectedPage.Normalize()
 	if !surface.HasSelectedPage {
-		selectedPage = Page{}
+		selectedPage = core.Page{}
 	}
 	workspace := surface.Workspace.Normalize()
 	canvas := surface.Canvas
@@ -77,25 +81,25 @@ func AuthoringSurfaceView(surface AuthoringSurface) map[string]any {
 	}
 }
 
-func authoringCreatePageIntents(library CompositionLibrary) []CompositionIntent {
+func authoringCreatePageIntents(library core.CompositionLibrary) []core.CompositionIntent {
 	library = library.Normalize()
-	out := make([]CompositionIntent, 0, len(library.PageBlueprints))
+	out := make([]core.CompositionIntent, 0, len(library.PageBlueprints))
 	for _, blueprint := range library.PageBlueprints {
 		out = append(out, authoringCreatePageIntent(blueprint))
 	}
 	return normalizeCompositionIntents(out)
 }
 
-func authoringCreatePageIntent(blueprint PageBlueprint) CompositionIntent {
+func authoringCreatePageIntent(blueprint core.PageBlueprint) core.CompositionIntent {
 	blueprint = blueprint.Normalize()
-	steps := []CompositionStep{{
+	steps := []core.CompositionStep{{
 		Key:           "route",
 		Label:         firstNonEmpty(blueprint.RoutePattern, "New route"),
 		Summary:       firstNonEmpty(authoringRouteSummary(blueprint.RoutePattern), "Create page route"),
 		GoSXComponent: blueprint.GoSXComponent,
 	}}
 	for _, component := range blueprint.Components {
-		steps = append(steps, CompositionStep{
+		steps = append(steps, core.CompositionStep{
 			Key:           "component:" + component.Key,
 			Label:         component.Label,
 			Summary:       firstNonEmpty(component.Summary, "Add "+component.Label+" section."),
@@ -103,11 +107,11 @@ func authoringCreatePageIntent(blueprint PageBlueprint) CompositionIntent {
 			Binding:       component.DefaultBinding,
 		})
 	}
-	return CompositionIntent{
+	return core.CompositionIntent{
 		Key:                "create-page:" + workspaceToken(blueprint.Key),
 		Label:              "Create " + blueprint.Label,
 		Summary:            "Adds " + firstNonEmpty(blueprint.RoutePattern, "a new route") + " with " + countLabel(blueprint.ComponentCount(), "building block", "building blocks") + ".",
-		Kind:               CompositionIntentCreatePage,
+		Kind:               core.CompositionIntentCreatePage,
 		TargetRoute:        blueprint.RoutePattern,
 		TargetRegion:       blueprint.GroupLabel(),
 		PageBlueprintKey:   blueprint.Key,
@@ -118,23 +122,23 @@ func authoringCreatePageIntent(blueprint PageBlueprint) CompositionIntent {
 	}.Normalize()
 }
 
-func authoringAddComponentIntents(page Page, hasPage bool, library CompositionLibrary) []CompositionIntent {
+func authoringAddComponentIntents(page core.Page, hasPage bool, library core.CompositionLibrary) []core.CompositionIntent {
 	if !hasPage {
 		return nil
 	}
 	page = page.Normalize()
 	library = library.Normalize()
-	out := make([]CompositionIntent, 0, len(library.ComponentTemplates))
+	out := make([]core.CompositionIntent, 0, len(library.ComponentTemplates))
 	for _, template := range library.ComponentTemplates {
 		out = append(out, authoringAddComponentIntent(page, template))
 	}
 	return normalizeCompositionIntents(out)
 }
 
-func authoringAddComponentIntent(page Page, template ComponentTemplate) CompositionIntent {
+func authoringAddComponentIntent(page core.Page, template core.ComponentTemplate) core.CompositionIntent {
 	template = template.Normalize()
 	label := firstNonEmpty(template.AddLabel, "Add "+template.Label)
-	steps := []CompositionStep{
+	steps := []core.CompositionStep{
 		{
 			Key:           "target",
 			Label:         page.Label,
@@ -150,18 +154,18 @@ func authoringAddComponentIntent(page Page, template ComponentTemplate) Composit
 		},
 	}
 	if template.ControlCount() > 0 {
-		steps = append(steps, CompositionStep{
+		steps = append(steps, core.CompositionStep{
 			Key:     "controls",
 			Label:   countLabel(template.ControlCount(), "field", "fields"),
 			Summary: "Expose no-code controls",
 			Binding: template.DefaultBinding,
 		})
 	}
-	return CompositionIntent{
+	return core.CompositionIntent{
 		Key:                  "add-component:" + workspaceToken(page.Key) + ":" + workspaceToken(template.Key),
 		Label:                label,
 		Summary:              "Places " + template.Label + " on " + firstNonEmpty(page.Route, page.Label) + " and exposes " + countLabel(template.ControlCount(), "field", "fields") + ".",
-		Kind:                 CompositionIntentAddComponent,
+		Kind:                 core.CompositionIntentAddComponent,
 		TargetPageKey:        page.Key,
 		TargetPageLabel:      page.Label,
 		TargetRoute:          page.Route,
@@ -183,7 +187,7 @@ func authoringRouteSummary(route string) string {
 	return "Create route " + route
 }
 
-func authoringPageViews(pages []Page) []map[string]any {
+func authoringPageViews(pages []core.Page) []map[string]any {
 	out := make([]map[string]any, 0, len(pages))
 	for _, page := range pages {
 		out = append(out, authoringPageView(page))
@@ -191,7 +195,7 @@ func authoringPageViews(pages []Page) []map[string]any {
 	return out
 }
 
-func authoringPageView(page Page) map[string]any {
+func authoringPageView(page core.Page) map[string]any {
 	page = page.Normalize()
 	return map[string]any{
 		"key":            page.Key,
@@ -209,7 +213,7 @@ func authoringPageView(page Page) map[string]any {
 	}
 }
 
-func authoringComponentViews(page Page, components []Component) []map[string]any {
+func authoringComponentViews(page core.Page, components []core.Component) []map[string]any {
 	out := make([]map[string]any, 0, len(components))
 	for _, component := range components {
 		out = append(out, authoringComponentView(page, component))
@@ -217,7 +221,7 @@ func authoringComponentViews(page Page, components []Component) []map[string]any
 	return out
 }
 
-func authoringComponentView(page Page, component Component) map[string]any {
+func authoringComponentView(page core.Page, component core.Component) map[string]any {
 	component = component.Normalize()
 	return map[string]any{
 		"key":                 component.Key,
@@ -227,7 +231,7 @@ func authoringComponentView(page Page, component Component) map[string]any {
 		"hasSummary":          component.Summary != "",
 		"goSXComponent":       component.GoSXComponent,
 		"source":              string(component.NormalizedSource()),
-		"sourceLabel":         ComponentSourceLabel(component.Source),
+		"sourceLabel":         core.ComponentSourceLabel(component.Source),
 		"binding":             component.Binding,
 		"status":              component.Status,
 		"editable":            component.Editable,
@@ -242,7 +246,7 @@ func authoringComponentView(page Page, component Component) map[string]any {
 	}
 }
 
-func authoringControlViews(page Page, component Component, controls []Control) []map[string]any {
+func authoringControlViews(page core.Page, component core.Component, controls []core.Control) []map[string]any {
 	page = page.Normalize()
 	component = component.Normalize()
 	out := make([]map[string]any, 0, len(controls))
@@ -281,7 +285,7 @@ func authoringControlViews(page Page, component Component, controls []Control) [
 	return out
 }
 
-func authoringControlOptionViews(options []ControlOption) []map[string]string {
+func authoringControlOptionViews(options []core.ControlOption) []map[string]string {
 	out := make([]map[string]string, 0, len(options))
 	for _, option := range options {
 		option.Value = strings.TrimSpace(option.Value)
@@ -294,7 +298,7 @@ func authoringControlOptionViews(options []ControlOption) []map[string]string {
 	return out
 }
 
-func authoringLibraryView(library CompositionLibrary) map[string]any {
+func authoringLibraryView(library core.CompositionLibrary) map[string]any {
 	library = library.Normalize()
 	return map[string]any{
 		"pageBlueprints":     authoringPageBlueprintViews(library.PageBlueprints),
@@ -304,7 +308,7 @@ func authoringLibraryView(library CompositionLibrary) map[string]any {
 	}
 }
 
-func authoringPageBlueprintViews(blueprints []PageBlueprint) []map[string]any {
+func authoringPageBlueprintViews(blueprints []core.PageBlueprint) []map[string]any {
 	out := make([]map[string]any, 0, len(blueprints))
 	for _, blueprint := range blueprints {
 		blueprint = blueprint.Normalize()
@@ -324,7 +328,7 @@ func authoringPageBlueprintViews(blueprints []PageBlueprint) []map[string]any {
 	return out
 }
 
-func authoringComponentTemplateViews(templates []ComponentTemplate) []map[string]any {
+func authoringComponentTemplateViews(templates []core.ComponentTemplate) []map[string]any {
 	out := make([]map[string]any, 0, len(templates))
 	for _, template := range templates {
 		template = template.Normalize()
@@ -340,13 +344,13 @@ func authoringComponentTemplateViews(templates []ComponentTemplate) []map[string
 			"status":         template.Status,
 			"addLabel":       firstNonEmpty(template.AddLabel, "Add "+template.Label),
 			"controlCount":   template.ControlCount(),
-			"controls":       authoringControlViews(Page{}, Component{}, template.Controls),
+			"controls":       authoringControlViews(core.Page{}, core.Component{}, template.Controls),
 		})
 	}
 	return out
 }
 
-func authoringIntentViews(intents []CompositionIntent) []map[string]any {
+func authoringIntentViews(intents []core.CompositionIntent) []map[string]any {
 	out := make([]map[string]any, 0, len(intents))
 	for _, intent := range normalizeCompositionIntents(intents) {
 		mutation := AuthoringMutationFromIntent(intent)
@@ -376,7 +380,7 @@ func authoringIntentViews(intents []CompositionIntent) []map[string]any {
 	return out
 }
 
-func authoringStepViews(steps []CompositionStep) []map[string]any {
+func authoringStepViews(steps []core.CompositionStep) []map[string]any {
 	out := make([]map[string]any, 0, len(steps))
 	for _, step := range normalizeCompositionSteps(steps) {
 		out = append(out, map[string]any{
@@ -390,7 +394,7 @@ func authoringStepViews(steps []CompositionStep) []map[string]any {
 	return out
 }
 
-func authoringWorkspaceView(workspace CompositionWorkspace, canvas WorkspaceCanvas) map[string]any {
+func authoringWorkspaceView(workspace core.CompositionWorkspace, canvas core.WorkspaceCanvas) map[string]any {
 	workspace = workspace.Normalize()
 	return map[string]any{
 		"layers":     authoringWorkspaceLayerViews(workspace.Layers),
@@ -403,7 +407,7 @@ func authoringWorkspaceView(workspace CompositionWorkspace, canvas WorkspaceCanv
 	}
 }
 
-func authoringWorkspaceLayerViews(layers []WorkspaceLayer) []map[string]any {
+func authoringWorkspaceLayerViews(layers []core.WorkspaceLayer) []map[string]any {
 	out := make([]map[string]any, 0, len(layers))
 	for _, layer := range layers {
 		layer.Key = strings.TrimSpace(layer.Key)
@@ -422,7 +426,7 @@ func authoringWorkspaceLayerViews(layers []WorkspaceLayer) []map[string]any {
 	return out
 }
 
-func authoringWorkspaceNodeViews(nodes []WorkspaceNode) []map[string]any {
+func authoringWorkspaceNodeViews(nodes []core.WorkspaceNode) []map[string]any {
 	out := make([]map[string]any, 0, len(nodes))
 	for _, node := range nodes {
 		node = node.Normalize()
@@ -434,15 +438,15 @@ func authoringWorkspaceNodeViews(nodes []WorkspaceNode) []map[string]any {
 			"label":         node.Label,
 			"summary":       node.Summary,
 			"kind":          string(node.NormalizedKind()),
-			"kindLabel":     WorkspaceNodeKindLabel(node.Kind),
+			"kindLabel":     core.WorkspaceNodeKindLabel(node.Kind),
 			"layerKey":      node.LayerKey,
 			"pageKey":       node.PageKey,
 			"route":         node.Route,
 			"group":         string(node.Group),
-			"groupLabel":    PageGroupLabel(node.Group),
+			"groupLabel":    core.PageGroupLabel(node.Group),
 			"goSXComponent": node.GoSXComponent,
 			"source":        string(node.Source),
-			"sourceLabel":   ComponentSourceLabel(node.Source),
+			"sourceLabel":   core.ComponentSourceLabel(node.Source),
 			"binding":       node.Binding,
 			"status":        node.Status,
 			"selected":      node.Selected,
@@ -451,7 +455,7 @@ func authoringWorkspaceNodeViews(nodes []WorkspaceNode) []map[string]any {
 	return out
 }
 
-func authoringWorkspaceLinkViews(links []WorkspaceLink) []map[string]any {
+func authoringWorkspaceLinkViews(links []core.WorkspaceLink) []map[string]any {
 	out := make([]map[string]any, 0, len(links))
 	for _, link := range links {
 		link = link.Normalize()
@@ -463,7 +467,7 @@ func authoringWorkspaceLinkViews(links []WorkspaceLink) []map[string]any {
 			"label":       link.Label,
 			"summary":     link.Summary,
 			"kind":        string(link.NormalizedKind()),
-			"kindLabel":   WorkspaceLinkKindLabel(link.Kind),
+			"kindLabel":   core.WorkspaceLinkKindLabel(link.Kind),
 			"fromNodeKey": link.FromNodeKey,
 			"toNodeKey":   link.ToNodeKey,
 		})
@@ -471,7 +475,7 @@ func authoringWorkspaceLinkViews(links []WorkspaceLink) []map[string]any {
 	return out
 }
 
-func authoringWorkspaceCanvasView(canvas WorkspaceCanvas) map[string]any {
+func authoringWorkspaceCanvasView(canvas core.WorkspaceCanvas) map[string]any {
 	return map[string]any{
 		"viewBox": canvas.ViewBox,
 		"nodes":   authoringWorkspacePointViews(canvas.Nodes),
@@ -479,7 +483,7 @@ func authoringWorkspaceCanvasView(canvas WorkspaceCanvas) map[string]any {
 	}
 }
 
-func authoringWorkspacePointViews(points []WorkspaceNodePoint) []map[string]any {
+func authoringWorkspacePointViews(points []core.WorkspaceNodePoint) []map[string]any {
 	out := make([]map[string]any, 0, len(points))
 	for _, point := range points {
 		if strings.TrimSpace(point.NodeKey) == "" {
@@ -495,7 +499,7 @@ func authoringWorkspacePointViews(points []WorkspaceNodePoint) []map[string]any 
 	return out
 }
 
-func authoringWorkspacePathViews(paths []WorkspaceLinkPath) []map[string]any {
+func authoringWorkspacePathViews(paths []core.WorkspaceLinkPath) []map[string]any {
 	out := make([]map[string]any, 0, len(paths))
 	for _, path := range paths {
 		if strings.TrimSpace(path.Key) == "" {
@@ -504,7 +508,7 @@ func authoringWorkspacePathViews(paths []WorkspaceLinkPath) []map[string]any {
 		out = append(out, map[string]any{
 			"key":         path.Key,
 			"kind":        string(path.Kind),
-			"kindLabel":   WorkspaceLinkKindLabel(path.Kind),
+			"kindLabel":   core.WorkspaceLinkKindLabel(path.Kind),
 			"fromNodeKey": path.FromNodeKey,
 			"toNodeKey":   path.ToNodeKey,
 			"path":        path.Path,
@@ -517,7 +521,7 @@ func authoringWorkspacePathViews(paths []WorkspaceLinkPath) []map[string]any {
 	return out
 }
 
-func authoringPageGroupCountViews(counts []PageGroupCount) []map[string]any {
+func authoringPageGroupCountViews(counts []core.PageGroupCount) []map[string]any {
 	out := make([]map[string]any, 0, len(counts))
 	for _, count := range counts {
 		out = append(out, map[string]any{
@@ -529,8 +533,13 @@ func authoringPageGroupCountViews(counts []PageGroupCount) []map[string]any {
 	return out
 }
 
-func normalizeCompositionIntents(values []CompositionIntent) []CompositionIntent {
-	out := make([]CompositionIntent, 0, len(values))
+// NormalizeCompositionIntents normalizes and filters a slice of composition
+// intents, dropping any without a Key or Label. It is exported so root-only
+// files that have not yet moved to their own subpackages (e.g. sitemap_view.go,
+// pending the sitemap slice) can call it through a temporary compat shim; see
+// compat_authoring.go's unexported shim section.
+func NormalizeCompositionIntents(values []core.CompositionIntent) []core.CompositionIntent {
+	out := make([]core.CompositionIntent, 0, len(values))
 	for _, value := range values {
 		value = value.Normalize()
 		if value.Key == "" || value.Label == "" {
@@ -539,4 +548,8 @@ func normalizeCompositionIntents(values []CompositionIntent) []CompositionIntent
 		out = append(out, value)
 	}
 	return out
+}
+
+func normalizeCompositionIntents(values []core.CompositionIntent) []core.CompositionIntent {
+	return NormalizeCompositionIntents(values)
 }
