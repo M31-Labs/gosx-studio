@@ -1,56 +1,94 @@
 # GoSX Studio
 
-GoSX Studio is the website customization and authoring layer for GoSX sites.
+GoSX Studio is the web-editing admin portal for no-code, user-authored
+websites. It is the entire surface a site owner lives in day to day: canvas
+design, content, commerce, media, and settings back-office, all in one
+GoSX-rendered shell. Think Webflow-shaped — host-configured, GoSX-rendered,
+one editor, one back-office, one portal.
 
-It is intentionally separate from:
+Reference deployments: **Muddy Noni** (commerce) and **Pajaritos** (school
+site).
 
-- `gosx-cms`: content management, content schemas, lifecycle, media, and content storage.
-- `gosx-admin`: back-office operator tools, resource CRUD, dashboards, and Retool-style internal surfaces.
-- `gosx-studio`: site canvas, inspectors, no-code authoring, theme controls, flow editing, publish tools, and showcase plugins.
+Earlier docs described Studio as "the authoring layer, intentionally separate
+from `gosx-cms` and `gosx-admin`." That framing is retired — the code moved
+past it. Studio is the portal; `gosx-admin` is a generic back-office toolkit
+dependency (Studio consumes only `gosx-admin/blockstudio`); `gosx-cms` is
+content storage that a Phase 2 fold-in is expected to bring inside this module
+(see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §"Release model").
 
-Noni's Mud Relics is the proving ground for the combined product: CMS plus Admin plus Studio. The site is already proving the CMS and Admin sides. The Studio work should move here so the authoring layer becomes reusable instead of remaining embedded in one ecommerce app.
+## What hosts provide vs. what Studio provides
 
-## Initial Scope
+Hosts supply adapters, persistence, permissions, routes, and copy. Studio
+supplies contracts, chrome, panels, canvas engines, back-office pages, and
+runtime islands.
 
-- Extract the current Noni editor surface into reusable `.gsx` Studio components.
-- Keep host apps responsible for adapters, resources, permissions, actions, data, and labels.
-- Represent every authored site as an editable site map: pages compose GoSX components, and those components expose no-code controls.
-- Use GoSX engines for heavy interactions: canvas, graph editing, drag/drop, inline preview overlays, 3D viewers, and timeline-style tools.
-- Use GoSX islands for smaller reactive panels: inspectors, publish readiness, filters, pickers, and local field validation.
-- Keep visible product language plain: "Website editor", "Home", "Look", "Brand", "Publish", and "Advanced".
+Concretely, the host application supplies:
 
-## Package Boundary
+- content adapters
+- shell labels, modes, panels, and resource links
+- permission adapters
+- server actions
+- route bindings
+- product copy
+- feature flags
+- design tokens
 
-This module starts with contracts and plugin placement. The first extraction target is the Studio surface now being proven in `muddy-noni-commerce`.
+Studio supplies:
 
-The first public contracts are intentionally small:
+- `.gsx` surfaces for visible editor UI
+- GoSX engines for heavy client-side interactions
+- GoSX islands for focused reactive controls
+- extension points for plugins
+- common authoring language for non-technical operators
 
-- `SiteMap`, `Page`, and `Component` describe no-code page composition in terms of GoSX components, editor-facing page groups, broad source kinds, opaque host/CMS bindings, and readiness status.
-- `CanvasWorkspace`, `CanvasBlock`, `CanvasViewport`, `CanvasZoomLevel`, `CanvasAction`, and `CanvasPreviewShell` describe the live page-canvas surface: preview breakpoints, zoom choices, selectable GoSX-backed blocks, no-code controls, dock actions, GoSX-authored overlay templates, inline editing affordances, and style-impact markers.
-- `Control` and `ControlOption` describe the editor-facing fields each component exposes: text, media, choices, links, color, source bindings, flows, and Scene3D/model controls.
-- `CompositionLibrary`, `PageBlueprint`, and `ComponentTemplate` describe the editor-facing building blocks that a site-map engine can expose as page starters and a component palette.
-- `CompositionIntent` and `CompositionStep` describe draft no-code operations such as creating a page from a blueprint or adding a component template to the selected route.
-- `AuthoringSurface` and `NoCodeAuthoringSurface` assemble the site map, selected page, palette, draft intents, workspace graph, and canvas layout into the host-facing no-code platform model exposed by `HostShell`.
-- `AuthoringMutation`, `AuthoringAdapter`, and `AuthoringActionHandler` describe the typed server-action boundary for applying no-code edits while host apps retain persistence, validation, preview refresh, and publish ownership.
-- `ResourceAdapter` and `ResourceBinding` describe host-owned media, pages, products, orders, contacts, settings, revisions, lifecycle, and flow resources without importing host internals.
-- `Engine` declares heavy interaction surfaces and the capabilities a host app can mount.
-- `RuntimeContract`, `RuntimeMethod`, and `RuntimePayloadField` declare the browser runtime APIs that engines expose, including the preview, workbench, brand, style, and block-layout globals used by canvas editing.
-- `HostConfig` ties product labels, features, engines, and the editable site map together.
-- `ShellConfig` describes the reusable Studio chrome a host app configures: operator labels, modes, panels, resource links, engine globals, server actions, permissions, feature flags, and canvas preview shell.
-- `WorkbenchShellView` and the `RenderWorkbench*` chrome renderers provide the
-  first shared shell render path: hosts feed one normalized workbench
-  projection, then Studio renders toolbar title, mode controls, metrics,
-  command palette, status, history, preview, and save controls without
-  host-local chrome code.
-- Runtime assets and handlers serve the shared Studio stylesheet plus the combined preview and engine runtime at the public `/_gosx/studio/*` paths. Host apps can mount these assets while keeping their own CMS/Admin scripts behind separate adapters.
-- `plugins/showcase3d` defines the CMS/Studio contract for source photos, generated model artifacts, provenance, moderation, lifecycle readiness, no-code placement controls, and Scene3D viewer descriptors.
+## Package map
 
-The eventual combined product should consume:
+The module is a strict import DAG: `core` sits at the bottom, `shell`
+composes everything above it, and peers never import each other. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full diagram.
 
-```text
-gosx-cms + gosx-admin + gosx-studio
-```
+| Package | Responsibility |
+|---|---|
+| `core` | Pure data contracts and defaults: the site-map/canvas/composition/flow/engine/resource type system, zero UI or host imports. |
+| `authoring` | The typed server-action mutation boundary: operations, form codec, adapter interface, action handler, authoring surface assembly, and the style/appearance/section-field mutation family. |
+| `hostruntime` | Embedded runtime assets, bundle concatenation, and the public `/_gosx/studio/*` paths and HTTP mounting. |
+| `canvas` | Page-canvas engine hosting and server-rendered surface markup (artboards, thumbnails, block-layout DOM contract). |
+| `sitemap` | The visual site-map board: graph engine render, board/view projections, authoring panels/forms, site navigator. |
+| `panels` | Editor inspector/designer panels and their `.gsx` islands (right/left rail content units). |
+| `backoffice` | The CRUD portal surfaces — dashboard, per-domain index/detail pages, media library, settings, search, storefront preview. First-class per the portal definition. |
+| `shell` | The portal shell: host-facing `ShellConfig`/`Shell`/`Store` contracts, readiness rail, workbench chrome renderers, and the editor workbench composition root. |
+| `*runtime` islands (`fieldruntime`, `selectionruntime`, `workbenchruntime`, `styleruntime`, `previewruntime`, `blocklayoutruntime`, `brandruntime`, `inspectorruntime`, `sitemapruntime`, `authoringruntime`, `inlineeditruntime`, `canvas*runtime`) | The go:embed browser-runtime bundles the shell/canvas/sitemap/panels packages mount — one package per engine's client-side JS/WASM surface. |
+| `plugins/showcase3d` | The CMS/Studio contract for source photos, generated model artifacts, provenance, moderation, lifecycle readiness, no-code placement controls, and Scene3D viewer descriptors. |
+| `studio` (root) | Deprecated compatibility facade — type aliases and forwarding wrappers only, no logic. See "Versioning & compatibility" below. |
 
-That combined product should not live inside Noni's site. Noni's site should remain a high-signal reference implementation and proving ground.
+## Quick start
 
-See `docs/WEBFLOW_CLASS_EDITOR_GAP_INVENTORY.md` for the detailed gap inventory and work plan toward a Webflow-class no-code editor.
+1. Mount the embedded runtime assets and stylesheet: `hostruntime.MountRuntimes` /
+   `hostruntime.DefaultRuntimeConfig`.
+2. Configure the portal shell: `shell.ShellConfig` / `shell.DefaultShellConfig`
+   (labels, modes, panels, resource links, engine globals, feature flags).
+3. Wire the mutation boundary: `authoring.AuthoringActionHandler` against your
+   `authoring.AuthoringAdapter` implementation.
+4. Render the editor route with `shell.RenderBackendEditorPage`, and the CRUD
+   routes with the `backoffice` package's per-domain `Render*` pages.
+
+The canonical host adapter is muddy-noni-commerce's
+`internal/studiohost/adapter.go`, which builds a `hostruntime.RuntimeConfig`
+and `shell.ShellConfig` (host labels, resource links, panels, actions) end to
+end.
+
+## Versioning & compatibility
+
+The root `studio` package is a **deprecated compatibility facade** for one
+release cycle (v0.6.x): every symbol muddy, pajaritos, and `gosx-cms/studio`
+used before the package restructure still resolves through a type alias or
+thin forwarding wrapper, each marked `// Deprecated:`. New code should import
+the subpackages above directly (`core`, `authoring`, `shell`, `canvas`,
+`sitemap`, `panels`, `backoffice`, `hostruntime`) rather than the root.
+
+A `gosx-cms` module fold-in is planned for Phase 2, after this facade window
+closes — see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §"Release model"
+for the plan and current status.
+
+See `docs/WEBFLOW_CLASS_EDITOR_GAP_INVENTORY.md` for the detailed gap
+inventory and work plan toward a Webflow-class no-code editor.

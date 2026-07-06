@@ -1,5 +1,16 @@
 # Roadmap
 
+> **Status note (package restructure, 2026-07):** Sections 1-3 describe the
+> original extraction-from-Noni plan and are substantially complete — the
+> site map, control, composition, engine, and runtime contracts described
+> below now live in the `core`/`authoring`/`canvas`/`sitemap`/`panels`
+> packages (see [ARCHITECTURE.md](ARCHITECTURE.md)), and back-office CRUD
+> surfaces (not originally scoped here) shipped as the first-class
+> `backoffice` package. Section 4 ("Productization") describes an earlier
+> plan to compose three separate libraries into a product; that plan is
+> superseded by the fold-in direction in ARCHITECTURE.md's "Release model"
+> — see the correction below Section 4.
+
 ## 1. Extraction Boundary
 
 - Define the Studio host configuration API.
@@ -39,10 +50,23 @@ The first proposed plugin is Showcase 3D: CMS stores source photos and generated
 
 ## 4. Productization
 
-Create a product package that composes:
+Superseded — see [ARCHITECTURE.md](ARCHITECTURE.md) §"Release model" for the
+current plan. Original text, kept for history:
 
-```text
-gosx-cms + gosx-admin + gosx-studio
-```
+> Create a product package that composes:
+>
+> ```text
+> gosx-cms + gosx-admin + gosx-studio
+> ```
+>
+> That product can ship the full no-code web platform. Individual libraries
+> should remain independently useful and testable.
 
-That product can ship the full no-code web platform. Individual libraries should remain independently useful and testable.
+The current plan does not compose three separate libraries into a fourth
+product package. Instead: `gosx-studio` **is** the product (the portal;
+see [README.md](../README.md)); `gosx-cms`'s content-storage packages are
+planned to fold directly into this module in a gated Phase 2 (breaking the
+`gosx-studio`⇄`gosx-cms` module cycle in the process); and `gosx-admin`
+remains a separate, generic back-office toolkit that Studio depends on for
+one package (`blockstudio`) rather than a peer library composed alongside
+Studio and CMS.

@@ -363,3 +363,52 @@ func RenderStylePanel(view map[string]any, formID, action, csrfToken string) gos
 // workbench_frame.go) was removed in Slice 8 when workbench_frame.go moved to
 // the shell package; shell references panels.BlockLibraryPanelMapAttrs
 // directly, so no root shim remains.
+
+// --- Style/config/custom-CSS section view builders (panels/style_view.go) ---
+//
+// style_view.go stayed at root through Slice 8 because the Style/section-field
+// branch added it after the spec's §1 file table was written (see the
+// Slice-8 spore); Slice 9 relocates it into m31labs.dev/gosx-studio/panels,
+// its spec §3 home (BuildStyleControlView/StyleSection/StyleControlSpec are
+// the panels-row aliases pajaritos uses).
+
+// Deprecated: use panels.StyleControlOption.
+type StyleControlOption = panels.StyleControlOption
+
+// Deprecated: use panels.StyleControlSpec.
+type StyleControlSpec = panels.StyleControlSpec
+
+// Deprecated: use panels.StyleSection.
+type StyleSection = panels.StyleSection
+
+// Deprecated: use panels.StyleValueLookup.
+type StyleValueLookup = panels.StyleValueLookup
+
+// Deprecated: use panels.BuildStyleControlView.
+func BuildStyleControlView(
+	sections []StyleSection,
+	specs []StyleControlSpec,
+	valueLookup StyleValueLookup,
+	pageKey, action, csrfToken string,
+) map[string]any {
+	return panels.BuildStyleControlView(sections, specs, valueLookup, pageKey, action, csrfToken)
+}
+
+// Deprecated: use panels.ConfigControlOption.
+type ConfigControlOption = panels.ConfigControlOption
+
+// Deprecated: use panels.ConfigControlSpec.
+type ConfigControlSpec = panels.ConfigControlSpec
+
+// Deprecated: use panels.ConfigSection.
+type ConfigSection = panels.ConfigSection
+
+// Deprecated: use panels.BuildSectionConfigView.
+func BuildSectionConfigView(sections []ConfigSection, pageKey, action, csrfToken string) map[string]any {
+	return panels.BuildSectionConfigView(sections, pageKey, action, csrfToken)
+}
+
+// Deprecated: use panels.BuildCustomCSSView.
+func BuildCustomCSSView(currentCSS, action, csrfToken string) map[string]any {
+	return panels.BuildCustomCSSView(currentCSS, action, csrfToken)
+}

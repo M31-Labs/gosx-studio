@@ -1,5 +1,12 @@
 # Public Readiness
 
+> **Historical note:** `M31-Labs/gosx-studio` went public some time ago — the
+> "Current Gate" and "Before Visibility Changes" sections below describe the
+> pre-visibility-change state and are kept as history, not as an active gate.
+> The portal definition and package structure also postdate this document;
+> see [README.md](../README.md) and [ARCHITECTURE.md](ARCHITECTURE.md) for
+> the current framing.
+
 `M31-Labs/gosx-studio` is intended to become the public package for the website authoring layer.
 
 ## Current Gate
