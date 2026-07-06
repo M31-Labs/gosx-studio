@@ -1,9 +1,10 @@
-package studio
+package sitemap
 
 import (
 	"strings"
 
 	"m31labs.dev/gosx"
+	"m31labs.dev/gosx-studio/core"
 )
 
 type SiteMapAuthoringFormsOptions struct {
@@ -36,12 +37,12 @@ func RenderSiteMapAuthoringForms(siteMapView map[string]any, options SiteMapAuth
 		id      string
 		kind    string
 	}{
-		{workbenchViewBool(siteMapView, "hasMetadataPage"), FirstNonEmpty(options.MetadataFormID, defaultSiteMapMetadataFormID), "metadata"},
-		{workbenchViewBool(siteMapView, "hasEditableControl"), FirstNonEmpty(options.ControlFormID, defaultSiteMapControlFormID), "editable-control"},
-		{workbenchViewBool(siteMapView, "hasReorderComponent"), FirstNonEmpty(options.ReorderFormID, defaultSiteMapReorderFormID), "reorder"},
-		{workbenchViewBool(siteMapView, "hasDuplicateComponent"), FirstNonEmpty(options.DuplicateFormID, defaultSiteMapDuplicateFormID), "duplicate"},
-		{workbenchViewBool(siteMapView, "hasVisibilityComponent"), FirstNonEmpty(options.VisibilityFormID, defaultSiteMapVisibilityFormID), "visibility"},
-		{workbenchViewBool(siteMapView, "hasDeleteComponent"), FirstNonEmpty(options.DeleteFormID, defaultSiteMapDeleteFormID), "delete"},
+		{workbenchViewBool(siteMapView, "hasMetadataPage"), core.FirstNonEmpty(options.MetadataFormID, defaultSiteMapMetadataFormID), "metadata"},
+		{workbenchViewBool(siteMapView, "hasEditableControl"), core.FirstNonEmpty(options.ControlFormID, defaultSiteMapControlFormID), "editable-control"},
+		{workbenchViewBool(siteMapView, "hasReorderComponent"), core.FirstNonEmpty(options.ReorderFormID, defaultSiteMapReorderFormID), "reorder"},
+		{workbenchViewBool(siteMapView, "hasDuplicateComponent"), core.FirstNonEmpty(options.DuplicateFormID, defaultSiteMapDuplicateFormID), "duplicate"},
+		{workbenchViewBool(siteMapView, "hasVisibilityComponent"), core.FirstNonEmpty(options.VisibilityFormID, defaultSiteMapVisibilityFormID), "visibility"},
+		{workbenchViewBool(siteMapView, "hasDeleteComponent"), core.FirstNonEmpty(options.DeleteFormID, defaultSiteMapDeleteFormID), "delete"},
 	}
 	for _, form := range operationForms {
 		if !form.enabled {
@@ -76,7 +77,7 @@ func renderSiteMapAuthoringForm(id string, action string, options SiteMapAuthori
 	if token := strings.TrimSpace(options.CSRFToken); token != "" {
 		children = append(children, gosx.El("input", gosx.Attrs(
 			gosx.Attr("type", "hidden"),
-			gosx.Attr("name", FirstNonEmpty(options.CSRFName, "csrf_token")),
+			gosx.Attr("name", core.FirstNonEmpty(options.CSRFName, "csrf_token")),
 			gosx.Attr("value", token),
 		)))
 	}

@@ -1,4 +1,4 @@
-package studio
+package sitemap
 
 import (
 	"strings"
@@ -105,7 +105,7 @@ func TestRenderSiteMapEngineComposesVisibleSurfaceAndExternalForms(t *testing.T)
 	engine := RenderSiteMapEngine(view, SiteMapEngineOptions{
 		EngineHost: SiteMapEngineHostFromMap(map[string]any{
 			"key":          "site-map",
-			"name":         SiteMapEngineName,
+			"name":         siteMapEngineDefaultName,
 			"mountId":      "gosx-studio-site-map-engine",
 			"class":        "studio-site-map-engine-host",
 			"capabilities": "canvas pointer keyboard text-input animation",
