@@ -3,8 +3,8 @@ package shell
 import (
 	"testing"
 
-	"m31labs.dev/gosx-cms/lifecycle"
-	"m31labs.dev/gosx-cms/media"
+	"m31labs.dev/gosx-studio/cms/lifecycle"
+	"m31labs.dev/gosx-studio/cms/media"
 	"m31labs.dev/gosx-studio/core"
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
