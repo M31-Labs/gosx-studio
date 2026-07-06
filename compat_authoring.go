@@ -264,3 +264,35 @@ func ApplySetStyle(m AuthoringMutation, write StyleDraftWriter) (AuthoringMutati
 func ApplySaveAppearance(m AuthoringMutation, allowedKeys []string, write AppearanceWriter) (AuthoringMutationResult, error) {
 	return authoring.ApplySaveAppearance(m, allowedKeys, write)
 }
+
+// --- Section-field binding grammar (authoring/section_binding.go) ---
+//
+// section_binding.go and handlers.go stayed at root through Slice 8 because
+// the Style/section-field branch added them after the spec's §1 file table
+// was written (see the Slice-8 spore); Slice 9 relocates them into
+// m31labs.dev/gosx-studio/authoring, their spec §3 home (siblings of
+// ApplySetStyle/ApplySaveAppearance — same mutation-boundary apply/parse
+// family).
+
+// Deprecated: use authoring.ParseSectionFieldBinding.
+func ParseSectionFieldBinding(binding string) (sectionKey, field string, ok bool) {
+	return authoring.ParseSectionFieldBinding(binding)
+}
+
+// Deprecated: use authoring.SectionFieldBinding.
+func SectionFieldBinding(sectionKey, field string) string {
+	return authoring.SectionFieldBinding(sectionKey, field)
+}
+
+// Deprecated: use authoring.StyleFormIDPart.
+func StyleFormIDPart(s string) string { return authoring.StyleFormIDPart(s) }
+
+// --- Section-field mutation handler (authoring/handlers.go) ---
+
+// Deprecated: use authoring.SectionFieldWriter.
+type SectionFieldWriter = authoring.SectionFieldWriter
+
+// Deprecated: use authoring.ApplySaveSectionField.
+func ApplySaveSectionField(m AuthoringMutation, write SectionFieldWriter, labelForField func(field string) string) (AuthoringMutationResult, error) {
+	return authoring.ApplySaveSectionField(m, write, labelForField)
+}

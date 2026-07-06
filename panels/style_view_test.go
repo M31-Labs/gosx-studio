@@ -1,7 +1,9 @@
-package studio
+package panels
 
 import (
 	"testing"
+
+	"m31labs.dev/gosx-studio/authoring"
 )
 
 func TestBuildStyleControlViewFullShape(t *testing.T) {
@@ -112,15 +114,15 @@ func TestBuildStyleControlViewFullShape(t *testing.T) {
 	if shells[0]["hasCsrf"] != true {
 		t.Fatalf("shell hasCsrf must be true when token non-empty: %v", shells[0])
 	}
-	if shells[0]["breakpoint"] != StyleBreakpointBase {
+	if shells[0]["breakpoint"] != authoring.StyleBreakpointBase {
 		t.Fatalf("shell breakpoint must be base: %v", shells[0]["breakpoint"])
 	}
-	if shells[0]["state"] != StyleStateDefault {
+	if shells[0]["state"] != authoring.StyleStateDefault {
 		t.Fatalf("shell state must be default: %v", shells[0]["state"])
 	}
 
 	// formID matches convention: editorSetStyle-<key>-<property-sanitized>
-	expectedFormID := "editorSetStyle-" + StyleFormIDPart("hero") + "-" + StyleFormIDPart("text-align")
+	expectedFormID := "editorSetStyle-" + authoring.StyleFormIDPart("hero") + "-" + authoring.StyleFormIDPart("text-align")
 	if shells[0]["formID"] != expectedFormID {
 		t.Fatalf("shell formID wrong: got %v want %v", shells[0]["formID"], expectedFormID)
 	}

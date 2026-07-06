@@ -1,6 +1,10 @@
-package studio
+package panels
 
-import "strings"
+import (
+	"strings"
+
+	"m31labs.dev/gosx-studio/authoring"
+)
 
 // StyleControlOption is one selectable value in a swatch or segment widget.
 // Value is the CSS value; Label is its display name.
@@ -81,7 +85,7 @@ func BuildStyleControlView(
 			if valueLookup != nil {
 				value = valueLookup(key, spec.Property)
 			}
-			formID := "editorSetStyle-" + StyleFormIDPart(key) + "-" + StyleFormIDPart(spec.Property)
+			formID := "editorSetStyle-" + authoring.StyleFormIDPart(key) + "-" + authoring.StyleFormIDPart(spec.Property)
 			options := make([]map[string]any, 0, len(spec.Options))
 			for _, opt := range spec.Options {
 				options = append(options, map[string]any{
@@ -108,8 +112,8 @@ func BuildStyleControlView(
 				"pageKey":      pageKey,
 				"componentKey": key,
 				"property":     spec.Property,
-				"breakpoint":   StyleBreakpointBase,
-				"state":        StyleStateDefault,
+				"breakpoint":   authoring.StyleBreakpointBase,
+				"state":        authoring.StyleStateDefault,
 				"csrf":         csrfToken,
 				"hasCsrf":      hasCsrf,
 			})
@@ -190,7 +194,7 @@ func BuildSectionConfigView(
 		}
 		controls := make([]map[string]any, 0, len(section.Specs))
 		for _, spec := range section.Specs {
-			formID := "editorCfg-" + StyleFormIDPart(key) + "-" + StyleFormIDPart(spec.Field)
+			formID := "editorCfg-" + authoring.StyleFormIDPart(key) + "-" + authoring.StyleFormIDPart(spec.Field)
 			value := ""
 			if section.ValueLookup != nil {
 				value = section.ValueLookup(spec.Field)
@@ -218,7 +222,7 @@ func BuildSectionConfigView(
 				"pageKey":      pageKey,
 				"componentKey": key,
 				"controlKey":   spec.Field,
-				"binding":      SectionFieldBinding(key, spec.Field),
+				"binding":      authoring.SectionFieldBinding(key, spec.Field),
 				"csrf":         csrfToken,
 				"hasCsrf":      hasCsrf,
 			})
