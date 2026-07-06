@@ -1,4 +1,4 @@
-package studio
+package canvas
 
 import (
 	"sort"
@@ -6,6 +6,8 @@ import (
 
 	"m31labs.dev/gosx"
 	"m31labs.dev/gosx/engine"
+
+	"m31labs.dev/gosx-studio/core"
 )
 
 type StudioEngineHostsOptions struct {
@@ -29,7 +31,7 @@ func RenderStudioEngineHosts(hosts []map[string]any, options StudioEngineHostsOp
 
 func studioEngineHostsRootAttrs(options StudioEngineHostsOptions) gosx.AttrList {
 	defaults := map[string]any{
-		"class":                                  FirstNonEmpty(options.Class, "studio-engine-hosts"),
+		"class":                                  core.FirstNonEmpty(options.Class, "studio-engine-hosts"),
 		"aria-hidden":                            "true",
 		"data-gosx-studio-engines":               "true",
 		"data-gosx-studio-engine-hosts-renderer": "gosx-studio",
@@ -65,12 +67,12 @@ func studioEngineHostsRootAttrs(options StudioEngineHostsOptions) gosx.AttrList 
 }
 
 func renderStudioEngineHost(host map[string]any, options StudioEngineHostsOptions) gosx.Node {
-	key := workbenchMapString(host, "key")
-	name := workbenchMapString(host, "name")
-	mountID := workbenchMapString(host, "mountId")
-	className := workbenchMapString(host, "class")
-	engineSource := FirstNonEmpty(workbenchMapString(host, "engineSource"), options.EngineSource, "gosx")
-	capabilities := siteMapEngineCapabilities(siteMapEngineCapabilityStrings(host["capabilities"]))
+	key := mapString(host, "key")
+	name := mapString(host, "name")
+	mountID := mapString(host, "mountId")
+	className := mapString(host, "class")
+	engineSource := core.FirstNonEmpty(mapString(host, "engineSource"), options.EngineSource, "gosx")
+	capabilities := engineCapabilities(engineCapabilityStrings(host["capabilities"]))
 	mountAttrs := map[string]any{
 		"class":                     className,
 		"data-gosx-studio-engine":   key,
@@ -91,7 +93,7 @@ func renderStudioEngineHost(host map[string]any, options StudioEngineHostsOption
 		gosx.Attr("id", mountID),
 		gosx.Attr("class", className),
 		gosx.Attr("data-gosx-engine", name),
-		gosx.Attr("data-gosx-engine-id", FirstNonEmpty("static-"+NormalizeKey(key), "static-engine")),
+		gosx.Attr("data-gosx-engine-id", core.FirstNonEmpty("static-"+core.NormalizeKey(key), "static-engine")),
 		gosx.Attr("data-gosx-engine-kind", string(engine.KindSurface)),
 		gosx.Attr("data-gosx-enhance", "engine"),
 		gosx.Attr("data-gosx-enhance-layer", "runtime"),
@@ -101,7 +103,7 @@ func renderStudioEngineHost(host map[string]any, options StudioEngineHostsOption
 		gosx.Attr("data-studio-engine-source", engineSource),
 	}
 	if len(capabilities) > 0 {
-		attrs = append(attrs, gosx.Attr("data-gosx-engine-capabilities", strings.Join(siteMapEngineCapabilityNames(capabilities), " ")))
+		attrs = append(attrs, gosx.Attr("data-gosx-engine-capabilities", strings.Join(engineCapabilityNames(capabilities), " ")))
 	}
 	return gosx.El("div", gosx.Attrs(attrs...))
 }

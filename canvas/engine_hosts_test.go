@@ -1,4 +1,4 @@
-package studio
+package canvas
 
 import (
 	"strings"
@@ -30,7 +30,7 @@ func (runtime *recordingStudioEngineRuntime) Engine(cfg engine.Config, fallback 
 		attrs = append(attrs, gosx.Attr(name, value))
 	}
 	if len(cfg.Capabilities) > 0 {
-		attrs = append(attrs, gosx.Attr("data-gosx-engine-capabilities", strings.Join(siteMapEngineCapabilityNames(cfg.Capabilities), " ")))
+		attrs = append(attrs, gosx.Attr("data-gosx-engine-capabilities", strings.Join(engineCapabilityNames(cfg.Capabilities), " ")))
 	}
 	return gosx.El("div", gosx.Attrs(attrs...))
 }
@@ -39,7 +39,7 @@ func TestRenderStudioEngineHostsUsesEngineRuntimeForSurfaceContract(t *testing.T
 	runtime := &recordingStudioEngineRuntime{}
 	html := gosx.RenderHTML(RenderStudioEngineHosts([]map[string]any{{
 		"key":          "flow-designer",
-		"name":         FlowDesignerName,
+		"name":         "GoSXStudioFlowDesigner",
 		"mountId":      "gosx-studio-flow-engine",
 		"class":        "studio-flow-engine-host",
 		"capabilities": []string{"canvas", "pointer", "keyboard", "text-input", "animation"},
@@ -49,7 +49,7 @@ func TestRenderStudioEngineHostsUsesEngineRuntimeForSurfaceContract(t *testing.T
 		t.Fatalf("runtime call count = %d, want 1", len(runtime.calls))
 	}
 	cfg := runtime.calls[0]
-	if cfg.Name != FlowDesignerName || cfg.Kind != engine.KindSurface || cfg.MountID != "gosx-studio-flow-engine" {
+	if cfg.Name != "GoSXStudioFlowDesigner" || cfg.Kind != engine.KindSurface || cfg.MountID != "gosx-studio-flow-engine" {
 		t.Fatalf("runtime config = %#v", cfg)
 	}
 	for name, want := range map[string]any{
@@ -87,7 +87,7 @@ func TestRenderStudioEngineHostsUsesEngineRuntimeForSurfaceContract(t *testing.T
 func TestRenderStudioEngineHostsFallbackRendersSurfaceContract(t *testing.T) {
 	html := gosx.RenderHTML(RenderStudioEngineHosts([]map[string]any{{
 		"key":          "flow-designer",
-		"name":         FlowDesignerName,
+		"name":         "GoSXStudioFlowDesigner",
 		"mountId":      "gosx-studio-flow-engine",
 		"class":        "studio-flow-engine-host",
 		"capabilities": []string{"canvas", "pointer", "keyboard", "text-input", "animation"},
@@ -118,14 +118,14 @@ func TestRenderStudioEngineHostsRendersMultipleHosts(t *testing.T) {
 	html := gosx.RenderHTML(RenderStudioEngineHosts([]map[string]any{
 		{
 			"key":          "flow-designer",
-			"name":         FlowDesignerName,
+			"name":         "GoSXStudioFlowDesigner",
 			"mountId":      "gosx-studio-flow-engine",
 			"class":        "studio-flow-engine-host",
 			"capabilities": "canvas pointer",
 		},
 		{
 			"key":          "showcase-3d",
-			"name":         Showcase3DEngineName,
+			"name":         "GoSXStudioShowcase3D",
 			"mountId":      "gosx-studio-showcase-3d-engine",
 			"class":        "studio-showcase-engine-host",
 			"capabilities": []any{"canvas", "webgl", "webgpu", "pointer"},
@@ -207,7 +207,7 @@ func TestRenderStudioEngineHostsRootAttrsOverride(t *testing.T) {
 func TestRenderStudioEngineHostsDoesNotEmitFormsOrCSRF(t *testing.T) {
 	html := gosx.RenderHTML(RenderStudioEngineHosts([]map[string]any{{
 		"key":          "flow-designer",
-		"name":         FlowDesignerName,
+		"name":         "GoSXStudioFlowDesigner",
 		"mountId":      "gosx-studio-flow-engine",
 		"class":        "studio-flow-engine-host",
 		"capabilities": "canvas pointer keyboard",

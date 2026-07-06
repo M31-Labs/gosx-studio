@@ -1,4 +1,4 @@
-package studio
+package canvas
 
 import (
 	"encoding/json"
@@ -13,33 +13,73 @@ type siteMapCanvasBoardPayload struct {
 	Nodes []gosx.CanvasBoardNode `json:"nodes"`
 }
 
-// siteMapCanvasTestView builds the same AuthoringSiteMapView shape that
-// sitemap_board_test.go exercises, so the Canvas2D derivation is validated
-// against the exact data the DOM board renders from.
+// siteMapCanvasTestView hand-builds the same "workspaceLayers"/"workspaceLinks"
+// map[string]any shape that m31labs.dev/gosx-studio (root package)'s
+// AuthoringSiteMapView(NoCodeAuthoringSurface(...), SiteMapViewOptions{})
+// produces for one home page with a bound "hero" component (the sitemap
+// package's real view-building pipeline, Slice 5 territory, and the
+// underlying SiteMap fixture used before this slice moved canvas out — see
+// sitemap_board_test.go for the DOM board's equivalent fixture). canvas may
+// import only core (spec .tiller/scratch/gosx-studio-restructure-spec-v0.1.md
+// §1 Import DAG), so this fixture is a literal reproduction of that pipeline's
+// output shape rather than a call through authoring/sitemap. It carries only
+// the fields RenderSiteMapCanvasEngine/siteMapCanvasNodes actually read (key,
+// kind, group, route, label on nodes; key, fromNodeKey, toNodeKey on links) —
+// verified against the real pipeline's JSON output for this exact fixture
+// before the move (2 layers: "home" with page:home + component:home:hero,
+// "resources" with resource:home-section-hero; 2 links: contains + binds).
 func siteMapCanvasTestView() map[string]any {
-	return AuthoringSiteMapView(NoCodeAuthoringSurface(SiteMap{
-		Pages: []Page{{
-			Key:           "home",
-			Label:         "Home",
-			Route:         "/",
-			Group:         PageGroupSite,
-			GoSXComponent: "HomePage",
-			Status:        "Editable",
-			Editable:      true,
-			Selected:      true,
-			Components: []Component{{
-				Key:           "hero",
-				TemplateKey:   "hero",
-				Label:         "Hero",
-				GoSXComponent: "HomeHero",
-				Source:        ComponentSourceHost,
-				Binding:       "home.section.hero",
-				Status:        "Visible",
-				Editable:      true,
-				Visible:       true,
-			}},
-		}},
-	}), SiteMapViewOptions{})
+	return map[string]any{
+		"workspaceLayers": []map[string]any{
+			{
+				"key":   "home",
+				"label": "Home",
+				"nodes": []map[string]any{
+					{
+						"key":   "page:home",
+						"kind":  "page",
+						"group": "site",
+						"route": "/",
+						"label": "Home",
+					},
+					{
+						"key":   "component:home:hero",
+						"kind":  "component",
+						"group": "site",
+						"route": "/",
+						"label": "Hero",
+					},
+				},
+			},
+			{
+				"key":   "resources",
+				"label": "Resources",
+				"nodes": []map[string]any{
+					{
+						"key":   "resource:home-section-hero",
+						"kind":  "resource",
+						"group": "site",
+						"route": "",
+						"label": "Hero content",
+					},
+				},
+			},
+		},
+		"workspaceLinks": []map[string]any{
+			{
+				"key":         "contains:home:hero",
+				"kind":        "contains",
+				"fromNodeKey": "page:home",
+				"toNodeKey":   "component:home:hero",
+			},
+			{
+				"key":         "binds:home:hero:home-section-hero",
+				"kind":        "binds",
+				"fromNodeKey": "component:home:hero",
+				"toNodeKey":   "resource:home-section-hero",
+			},
+		},
+	}
 }
 
 func TestSiteMapCanvasNodesDeriveFromWorkspaceLayers(t *testing.T) {

@@ -1,9 +1,11 @@
-package studio
+package canvas
 
 import (
 	"strings"
 
 	"m31labs.dev/gosx"
+
+	"m31labs.dev/gosx-studio/core"
 )
 
 type SiteMapCanvasSurfaceMode string
@@ -30,23 +32,23 @@ func RenderSiteMapCanvasSurface(siteMapView map[string]any, options SiteMapCanva
 	canvasOptions := options.Canvas
 	canvasOptions.Enabled = true
 	canvasOptions.PageArtboardsOnly = true
-	canvasOptions.Class = FirstNonEmpty(canvasOptions.Class, "studio-site-map-canvas")
+	canvasOptions.Class = core.FirstNonEmpty(canvasOptions.Class, "studio-site-map-canvas")
 	canvasOptions.WASMFree = mode == SiteMapCanvasSurfaceWASMFree
 
 	canvas := RenderSiteMapCanvasEngine(siteMapView, canvasOptions)
 	if mode == SiteMapCanvasSurfaceWASMFree {
 		return gosx.Fragment(canvas,
-			siteMapCanvasSurfaceScript(Canvas2DPainterPath, options.AssetVersion,
+			siteMapCanvasSurfaceScript(canvas2DPainterPath, options.AssetVersion,
 				gosx.Attr("data-gosx-studio-canvas2d-painter", "true"),
 				gosx.Attr("data-studio-site-map-canvas-default", "true"),
 			),
-			siteMapCanvasSurfaceScript(CanvasInlineEditPath, options.AssetVersion,
+			siteMapCanvasSurfaceScript(canvasInlineEditPath, options.AssetVersion,
 				gosx.Attr("data-gosx-studio-canvas-inline-edit", "true"),
 			),
-			siteMapCanvasSurfaceScript(CanvasContextualPanelPath, options.AssetVersion,
+			siteMapCanvasSurfaceScript(canvasContextualPanelPath, options.AssetVersion,
 				gosx.Attr("data-gosx-studio-canvas-contextual-panel", "true"),
 			),
-			siteMapCanvasSurfaceScript(CanvasWASMFreeClientPath, options.AssetVersion,
+			siteMapCanvasSurfaceScript(canvasWASMFreeClientPath, options.AssetVersion,
 				gosx.Attr("data-gosx-studio-canvas-wasm-free-client", "true"),
 			),
 		)
@@ -57,11 +59,11 @@ func RenderSiteMapCanvasSurface(siteMapView map[string]any, options SiteMapCanva
 		bridgeAttrs = append(bridgeAttrs, gosx.Attr("data-studio-site-map-canvas-default", "true"))
 	}
 	return gosx.Fragment(canvas,
-		siteMapCanvasSurfaceScript(CanvasSelectionBridgePath, options.AssetVersion, bridgeAttrs...),
-		siteMapCanvasSurfaceScript(CanvasInlineEditPath, options.AssetVersion,
+		siteMapCanvasSurfaceScript(canvasSelectionBridgePath, options.AssetVersion, bridgeAttrs...),
+		siteMapCanvasSurfaceScript(canvasInlineEditPath, options.AssetVersion,
 			gosx.Attr("data-gosx-studio-canvas-inline-edit", "true"),
 		),
-		siteMapCanvasSurfaceScript(CanvasDefaultInlineInstallerPath, options.AssetVersion,
+		siteMapCanvasSurfaceScript(canvasDefaultInlineInstallerPath, options.AssetVersion,
 			gosx.Attr("data-gosx-studio-canvas-inline-edit-installer", "true"),
 		),
 	)
@@ -82,7 +84,7 @@ func normalizeSiteMapCanvasSurfaceMode(mode SiteMapCanvasSurfaceMode) SiteMapCan
 
 func siteMapCanvasSurfaceScript(path string, version string, attrs ...any) gosx.Node {
 	all := []any{
-		gosx.Attr("src", AssetHref(path, version)),
+		gosx.Attr("src", assetHref(path, version)),
 		gosx.Attr("defer", true),
 	}
 	all = append(all, attrs...)
