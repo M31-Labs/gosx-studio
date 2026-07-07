@@ -409,15 +409,67 @@ test.describe("GoSXStudioBrandRuntime parity", () => {
   });
 });
 
+// The brand-logo URL/width/offset inputs live in the right-rail "Brand"
+// inspector panel (data-studio-mode-panel="brand"), which is not the active
+// panel by default — the editor boots into the "Home" mode
+// (see editorStudioShellModes in muddy-noni-commerce/app/admin/editor/
+// page.server.go). The inputs are present in the DOM but `hidden` (the
+// WorkbenchRuntime island sets `panel.hidden = true` on every
+// [data-studio-mode-panel] that isn't the active mode — see
+// workbenchruntime/island_runtime.js setModeIsland). Switch to the Brand
+// tab first so the fixture actually exercises bindLogo instead of timing
+// out on a hidden input. Workbench tab-switching is fully islands-based
+// already (see the "BridgeShim auto-mount sentinel" test above — the
+// workbench marker is unconditional), so clicking this control behaves
+// identically in baseline and candidate modes and doesn't affect what this
+// test is actually asserting (brandruntime.bindLogo parity).
+async function activateBrandInspectorPanel(page: Page): Promise<void> {
+  const brandTab = page.locator('[data-studio-mode-control="brand"]').first();
+  if ((await brandTab.count()) === 0) return;
+  await brandTab.click();
+  // Wait for the panel to actually become visible before returning; the
+  // WorkbenchRuntime island toggles `hidden` synchronously on click, but
+  // give it a moment in case a future revision defers the toggle (e.g. to
+  // a rAF or transition-end handler).
+  await page
+    .locator(BRAND_URL_INPUT_SELECTOR)
+    .first()
+    .waitFor({ state: "visible", timeout: 2_000 })
+    .catch(() => {
+      // If it's still not visible, let typeBrandLogoFixture's own
+      // count()/fill() surface the failure with its usual diagnostics.
+    });
+}
+
+// Inside the Brand panel itself, the URL/alt fields and the width/offset
+// fields are further split into their own pure-CSS radio-tab groups
+// (`studio-brand-panel__group-*` in muddy-noni-commerce/app/admin/editor —
+// see the `:checked ~ [data-studio-brand-group-slot=...]` sibling-selector
+// rules in public/site.css). "Logo" (url/alt) is selected by default;
+// "Placement" (width/offsetX/offsetY) is not, so the width/offset inputs
+// are visually hidden until the "Placement" tab label is clicked. Checking
+// the radio via its <label> mirrors real authoring — a user must click the
+// "Placement" tab to reach those fields too.
+async function activateBrandGroup(page: Page, group: string): Promise<void> {
+  const groupTab = page.locator(`[data-studio-brand-group-label="${group}"]`).first();
+  if ((await groupTab.count()) === 0) return;
+  await groupTab.click();
+}
+
 async function typeBrandLogoFixture(page: Page): Promise<void> {
   const url = page.locator(BRAND_URL_INPUT_SELECTOR).first();
   if ((await url.count()) === 0) {
     test.skip(true, "no brand logo URL input present in editor route — fixture drift");
     return;
   }
+  await activateBrandInspectorPanel(page);
+  // "Logo" is the default-selected group, but assert it explicitly in case
+  // a prior scenario in the same page left a different group selected.
+  await activateBrandGroup(page, "logo");
   // Fill the URL, width, and offsets with a deterministic fixture. fill()
   // dispatches input + change events the binding listens for.
   await url.fill("https://example.com/parity-logo.png");
+  await activateBrandGroup(page, "placement");
   const width = page.locator(BRAND_WIDTH_INPUT_SELECTOR).first();
   if ((await width.count()) > 0) await width.fill("128");
   const offsetX = page.locator(BRAND_OFFSET_X_INPUT_SELECTOR).first();
