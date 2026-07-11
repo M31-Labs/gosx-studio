@@ -23,6 +23,8 @@ func TestRuntimeOwnsTrustedRealtimeContracts(t *testing.T) {
 		`storageSet(sequenceKey`,
 		`data-studio-requires-author`,
 		`data-studio-requires-design`,
+		`[data-gosx-studio-operation-kind]`,
+		`node.closest("[data-studio-layout-control]")`,
 		`pending[operationID].resolve(ack)`,
 		`available: function ()`,
 		`permissions({}); connect();`,

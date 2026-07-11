@@ -61,6 +61,7 @@
       panel.setAttribute("data-studio-collab-can-design", value.design ? "true" : "false");
       qsa(document, "[data-studio-requires-author]").forEach(function (node) { node.disabled = !value.author; node.setAttribute("aria-disabled", value.author ? "false" : "true"); });
       qsa(document, "[data-studio-requires-design]").forEach(function (node) { node.disabled = !value.design; node.setAttribute("aria-disabled", value.design ? "false" : "true"); });
+      qsa(document, "[data-gosx-studio-operation-kind]").forEach(function (node) { var design = !!node.getAttribute("data-gosx-studio-style-property") || !!node.closest("[data-studio-layout-control]"); var allowed = design ? !!value.design : !!value.author; node.disabled = !allowed; node.setAttribute("aria-disabled", allowed ? "false" : "true"); });
     }
     function initials(name) {
       return String(name || "?").trim().split(/\s+/).slice(0, 2).map(function (part) { return part.charAt(0).toUpperCase(); }).join("") || "?";
