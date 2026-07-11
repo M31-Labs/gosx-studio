@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { startMuddyCanvas } from "./reference_apps_harness";
+import { revealModeIfPresent, startMuddyCanvas } from "./reference_apps_harness";
 import {
   canvasFingerprint2D,
   formatCanvasRenderEvidence,
@@ -49,6 +49,10 @@ test.describe("@reference-apps canvas2d site-map board live interaction", () => 
     try {
       await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
       await expect(page.locator("[data-studio-workbench='true']").first()).toBeAttached();
+      // The legacy site-map/canvas board now lives inside the "Advanced" mode
+      // panel (studio-pagecanvas-handoff moved it there once a PageCanvas
+      // surface is present); reveal it before touching the canvas below.
+      await revealModeIfPresent(page, "advanced");
 
       const canvas = page.locator(CANVAS_SELECTOR).first();
       await expect(canvas, "canvas2d placeholder should be emitted under MUDDY_SITEMAP_CANVAS=1").toBeAttached({ timeout: 30_000 });

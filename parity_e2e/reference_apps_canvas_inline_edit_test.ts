@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
+import { revealModeIfPresent, startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
 
 // Live-proof e2e for the M2 canvas inline-edit LOOP — edit a contenteditable HTML
 // surface field on the WASM-free Canvas2D board and prove it PERSISTS across a
@@ -68,6 +68,10 @@ test.describe("@reference-apps canvas2d site-map WASM-free inline-edit loop", ()
     try {
       await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
       await expect(page.locator("[data-studio-workbench='true']").first()).toBeAttached();
+      // The legacy site-map/canvas board now lives inside the "Advanced" mode
+      // panel (studio-pagecanvas-handoff moved it there once a PageCanvas
+      // surface is present); reveal it before touching the board below.
+      await revealModeIfPresent(page, "advanced");
       await expect(page.locator(BOARD_SELECTOR).first(), "DOM site-map board element must stay in the markup (selection sink)").toBeAttached();
 
       const canvas = page.locator(CANVAS_SELECTOR).first();
@@ -178,6 +182,7 @@ test.describe("@reference-apps canvas2d site-map WASM-free inline-edit loop", ()
       // store.Settings().Hero.Headline. A reload must therefore re-serve the marker
       // — proving the edit reached the cms store, not just the live DOM.
       await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
+      await revealModeIfPresent(page, "advanced");
 
       const reloadedEditable = page.locator(EDITABLE_HERO).first();
       await expect(

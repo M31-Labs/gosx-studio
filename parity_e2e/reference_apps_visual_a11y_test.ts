@@ -27,7 +27,10 @@ const referenceApps: ReferenceAppGate[] = [
     authoringIntentKey: "create-page:landing",
     canvasSelector: "[data-studio-site-map-workspace='true'], [data-studio-site-map-canvas='true']",
     publishSelector: "[data-studio-publish-panel='true']",
-    canvasMode: "home",
+    // studio-pagecanvas-handoff moved the legacy site-map/canvas board (and, for
+    // Pajaritos, the publishing panel) behind the "Advanced" mode panel once a
+    // PageCanvas surface is present; "home" no longer reveals this content.
+    canvasMode: "advanced",
     previewMode: "preview",
     publishMode: "publish",
   },
@@ -37,6 +40,13 @@ const referenceApps: ReferenceAppGate[] = [
     authoringIntentKey: "create-page:program-page",
     canvasSelector: "#website-map",
     publishSelector: "#publishing",
+    canvasMode: "advanced",
+    // The preview frame lives in the page-canvas ("Home") stage, which
+    // studio.css hides outright while data-studio-mode="advanced"
+    // (`.editor-workbench[data-studio-mode="advanced"] .studio-page-canvas`);
+    // switch back to a non-advanced mode before the preview-frame gate.
+    previewMode: "home",
+    publishMode: "advanced",
     assertPublishing: expectPajaritosPublishingReadiness,
   },
 ];
@@ -80,6 +90,11 @@ async function runVisualA11yGate(page: Page, baseURL: string, app: ReferenceAppG
 async function expectEditorShell(page: Page, app: ReferenceAppGate) {
   await expect(page.locator("[data-gosx-studio-workbench='true']").first()).toBeAttached();
   await expect(page.locator("[data-studio-workbench='true']").first()).toBeAttached();
+  // The composition-intent forms below are part of the legacy site-map engine,
+  // which now lives inside the "Advanced" mode panel (studio-pagecanvas-handoff
+  // moved it there once a PageCanvas surface is present); reveal it before the
+  // pointer-receives assertion, which requires the button to be visible.
+  await revealModeIfPresent(page, "advanced");
   await expect(page.locator("[data-studio-toolbar='true']").first()).toBeVisible();
   await expect(page.locator("[data-studio-composition-intent-forms='true']").first()).toBeAttached();
   await expect(page.locator("h1, [data-studio-toolbar='true'] strong").first()).toBeVisible();
@@ -243,15 +258,22 @@ async function expectEditorAccessibilityBasics(page: Page, app: ReferenceAppGate
 }
 
 async function expectVisualIntegrity(page: Page, app: ReferenceAppGate, viewport: "desktop" | "mobile") {
-  const checks = [
+  // The composition forms + canvas live inside the "Advanced" mode panel,
+  // while the preview frame lives in the page-canvas ("Home") stage, which
+  // studio.css hides outright while data-studio-mode="advanced". The two are
+  // mutually exclusive, so reveal each mode immediately before the checks
+  // that depend on it (mirrors expectCanvasGate / expectPreviewGate above).
+  await revealModeIfPresent(page, app.canvasMode);
+  const advancedChecks = [
     { label: "toolbar", selector: "[data-studio-toolbar='true']" },
     { label: "composition forms", selector: "[data-studio-composition-intent-forms='true']" },
     { label: "canvas", selector: app.canvasSelector },
-    { label: "preview", selector: "[data-studio-preview-frame]" },
   ];
-  for (const check of checks) {
+  for (const check of advancedChecks) {
     await expectSurfaceWithinViewport(page, check.selector, `${app.name} ${viewport} ${check.label}`);
   }
+  await revealModeIfPresent(page, app.previewMode);
+  await expectSurfaceWithinViewport(page, "[data-studio-preview-frame]", `${app.name} ${viewport} preview`);
 
   const clippedText = await page.evaluate(() => {
     const issues: string[] = [];

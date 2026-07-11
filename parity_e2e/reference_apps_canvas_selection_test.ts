@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { startMuddyCanvas } from "./reference_apps_harness";
+import { revealModeIfPresent, startMuddyCanvas } from "./reference_apps_harness";
 import {
   formatCanvasRenderEvidence,
   waitForCanvasBoardRenderEvidence,
@@ -60,6 +60,10 @@ test.describe("@reference-apps canvas2d site-map selection bridge", () => {
     try {
       await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
       await expect(page.locator("[data-studio-workbench='true']").first()).toBeAttached();
+      // The legacy site-map/canvas board now lives inside the "Advanced" mode
+      // panel (studio-pagecanvas-handoff moved it there once a PageCanvas
+      // surface is present); reveal it before touching the board below.
+      await revealModeIfPresent(page, "advanced");
       await expect(page.locator(BOARD_SELECTOR).first(), "DOM site-map board should be present (the bridge feeds its selection state)").toBeAttached();
 
       const canvas = page.locator(CANVAS_SELECTOR).first();

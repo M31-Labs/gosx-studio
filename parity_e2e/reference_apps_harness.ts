@@ -595,7 +595,7 @@ export async function startMuddyCanvasWASMFree(request: APIRequestContext): Prom
 // WASM-free client with no full CanvasBoard WASM. The HTML-surface injection is
 // opt-in; only the canvas-html-surface parity e2e flips it on.
 export async function startMuddyCanvasHTMLSurface(request: APIRequestContext): Promise<ServerHandle> {
-  return startMuddy(request, { MUDDY_EDITOR_SCENE_DOM: "1" });
+  return startMuddy(request, { MUDDY_CANVAS_WASM_FREE: "1", MUDDY_EDITOR_SCENE_DOM: "1" });
 }
 
 export async function startPajaritos(request: APIRequestContext): Promise<ServerHandle> {
@@ -611,6 +611,7 @@ export async function startPajaritos(request: APIRequestContext): Promise<Server
       PAJARITOS_LIFECYCLE_DB_PATH: path.join(tempDir, "lifecycle.db"),
       PAJARITOS_FLOW_STORE_PATH: path.join(tempDir, "flows.json"),
       PAJARITOS_LIFECYCLE_WORKER: "0",
+      PAJARITOS_MOCK_AUTH: "1",
     },
     tempDir,
   });

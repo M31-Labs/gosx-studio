@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { gotoEditor, startMuddyCanvasFullWASM } from "./reference_apps_harness";
+import { gotoEditor, revealModeIfPresent, startMuddyCanvasFullWASM } from "./reference_apps_harness";
 import {
   formatCanvasRenderEvidence,
   waitForCanvasBoardRenderEvidence,
@@ -67,6 +67,10 @@ test.describe("@reference-apps canvas2d marquee + keyboard nav", () => {
     const server = await startMuddyCanvasFullWASM(request);
     try {
       await gotoEditor(page, server.baseURL);
+      // The legacy site-map/canvas board now lives inside the "Advanced" mode
+      // panel (studio-pagecanvas-handoff moved it there once a PageCanvas
+      // surface is present); reveal it before touching the board below.
+      await revealModeIfPresent(page, "advanced");
 
       await expect(page.locator(BOARD_SELECTOR).first(), "DOM site-map board element must stay in the markup (bridge target)").toBeAttached();
       const canvas = page.locator(CANVAS_SELECTOR).first();

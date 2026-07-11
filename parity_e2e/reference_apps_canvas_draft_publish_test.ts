@@ -312,8 +312,12 @@ async function openEditorToHeroSurface(page: Page, baseURL: string, consoleError
 }
 
 // waitForHeroEditable waits for the injected hero surface to (re)mount into the
-// camera-positioned overlay and become visible.
+// camera-positioned overlay and become visible. Called after the initial editor
+// load AND after every reload (draft/publish/discard cycles), so it must
+// re-reveal the "Advanced" mode panel each time: the legacy site-map/canvas
+// board (which hosts this overlay) resets to hidden on every fresh page load.
 async function waitForHeroEditable(page: Page) {
+  await revealModeIfPresent(page, "advanced");
   const overlayHero = page.locator(OVERLAY_HERO).first();
   await expect(
     overlayHero,

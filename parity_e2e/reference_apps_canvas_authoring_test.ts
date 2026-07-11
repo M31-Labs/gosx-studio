@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   applyCompositionIntentInPlace,
   gotoEditor,
+  revealModeIfPresent,
   startMuddyCanvas,
 } from "./reference_apps_harness";
 import {
@@ -72,6 +73,10 @@ test.describe("@reference-apps canvas2d authoring parity", () => {
     const server = await startMuddyCanvas(request);
     try {
       await gotoEditor(page, server.baseURL);
+      // The legacy site-map/canvas board under test here now lives inside the
+      // "Advanced" mode panel (studio-pagecanvas-handoff moved it there once a
+      // PageCanvas surface is present); reveal it before touching the board.
+      await revealModeIfPresent(page, "advanced");
 
       // The canvas must be the genuinely-active visual: surface attached, the
       // full-build canvas painter installed, the board painting real content,
@@ -106,6 +111,7 @@ test.describe("@reference-apps canvas2d authoring parity", () => {
       await expect(page.locator("table"), "CMS pages list should render").toBeAttached();
       await expect(page.locator("td:has-text('new-page')"), "landing draft should not exist before create-page").toHaveCount(0);
       await gotoEditor(page, server.baseURL);
+      await revealModeIfPresent(page, "advanced");
       await expect(page.locator(CANVAS_SELECTOR).first()).toBeAttached({ timeout: 30_000 });
 
       const createResult = await applyCompositionIntentInPlace(page, "create-page:landing", {
@@ -127,6 +133,7 @@ test.describe("@reference-apps canvas2d authoring parity", () => {
 
       // Return to the canvas-active editor for the add-component path.
       await gotoEditor(page, server.baseURL);
+      await revealModeIfPresent(page, "advanced");
       await expect(page.locator(CANVAS_SELECTOR).first(), "canvas stays active after returning to the editor").toBeAttached({ timeout: 30_000 });
 
       // ── add-component: a NEW section that appears in the reloaded canvas graph ─
@@ -142,6 +149,7 @@ test.describe("@reference-apps canvas2d authoring parity", () => {
       // RELOAD the canvas-active editor and prove the added section persisted
       // AND now appears in the reloaded canvas graph.
       await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await revealModeIfPresent(page, "advanced");
       await expect(page.locator(CANVAS_SELECTOR).first(), "canvas stays active after reload").toBeAttached({ timeout: 30_000 });
       await expect(
         page.locator(`${BOARD_SELECTOR} [data-studio-site-map-workspace-node='${NEW_NODE_KEY}']`).first(),

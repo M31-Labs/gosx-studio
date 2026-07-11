@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
+import { revealModeIfPresent, startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
 
 // Live-proof e2e for the WASM-FREE Canvas2D in-surface DOM editing path — the M0
 // "HTML surface" payoff.
@@ -63,6 +63,9 @@ test.describe("@reference-apps canvas2d site-map WASM-free HTML surface", () => 
     try {
       await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
       await expect(page.locator("[data-studio-workbench='true']").first()).toBeAttached();
+      // HAZEL PROOF-OF-FIX: the legacy site-map/canvas board (incl. the HTML
+      // surface overlay under test) now lives inside the "Advanced" mode panel.
+      await revealModeIfPresent(page, "advanced");
       await expect(page.locator(BOARD_SELECTOR).first(), "DOM site-map board element must stay in the markup (selection sink)").toBeAttached();
 
       const canvas = page.locator(CANVAS_SELECTOR).first();

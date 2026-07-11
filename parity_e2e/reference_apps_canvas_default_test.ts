@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   applyCompositionIntentInPlace,
   gotoEditor,
+  revealModeIfPresent,
   startMuddyCanvas,
   startMuddyCanvasDefault,
 } from "./reference_apps_harness";
@@ -57,6 +58,10 @@ test.describe("@reference-apps low-WASM default canvas", () => {
     const server = await startMuddyCanvasDefault(request);
     try {
       await gotoEditor(page, server.baseURL);
+      // The legacy site-map/canvas board under test here now lives inside the
+      // "Advanced" mode panel (studio-pagecanvas-handoff moved it there once a
+      // PageCanvas surface is present); reveal it before touching the board.
+      await revealModeIfPresent(page, "advanced");
 
       await expect(page.locator(BOARD_SELECTOR).first(), "DOM site-map board element must stay in the markup").toBeAttached();
       await expect(page.locator(FORMS_SELECTOR), "managed authoring forms must stay present").toBeAttached();
@@ -158,6 +163,7 @@ test.describe("@reference-apps low-WASM default canvas", () => {
       await page.goto(`${server.baseURL}/admin/pages`, { waitUntil: "domcontentloaded", timeout: 60_000 });
       await expect(page.locator("td:has-text('new-page')"), "landing draft should not exist before create-page").toHaveCount(0);
       await gotoEditor(page, server.baseURL);
+      await revealModeIfPresent(page, "advanced");
       const createResult = await applyCompositionIntentInPlace(page, "create-page:landing", {
         expectedMessage: "Landing created.",
         expectedChangeKind: "page",
@@ -169,6 +175,7 @@ test.describe("@reference-apps low-WASM default canvas", () => {
       await expect(page.locator("tr", { has: page.locator("td:has-text('new-page')") }), "created landing draft should persist").toHaveCount(1);
 
       await gotoEditor(page, server.baseURL);
+      await revealModeIfPresent(page, "advanced");
       await expect(page.locator(`[data-studio-site-map-workspace-node='${NEW_NODE_KEY}']`), "the new hero instance must not exist before add-component").toHaveCount(0);
       const addResult = await applyCompositionIntentInPlace(page, "add-component:home:hero", {
         expectedMessage: "Hero added to Home.",
@@ -204,6 +211,7 @@ async function parityAgainstCoRender(
   const coRender = await startMuddyCanvas(request);
   try {
     await gotoEditor(page, coRender.baseURL);
+    await revealModeIfPresent(page, "advanced");
     await expect(page.locator(GRAPH_SURFACE_SELECTOR).first(), "co-render keeps the DOM graph visible").toBeVisible();
     await page.waitForFunction(() => {
       const w = window as unknown as Record<string, unknown>;

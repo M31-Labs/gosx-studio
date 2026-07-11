@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { startMuddyCanvas } from "./reference_apps_harness";
+import { revealModeIfPresent, startMuddyCanvas } from "./reference_apps_harness";
 import {
   formatCanvasRenderEvidence,
   waitForCanvasBoardRenderEvidence,
@@ -67,6 +67,10 @@ test.describe("@reference-apps canvas2d site-map board live paint", () => {
 
       // The editor shell must be present (proves we got the editor route).
       await expect(page.locator("[data-studio-workbench='true']").first()).toBeAttached();
+      // The legacy site-map/canvas board now lives inside the "Advanced" mode
+      // panel (studio-pagecanvas-handoff moved it there once a PageCanvas
+      // surface is present); reveal it before touching the canvas below.
+      await revealModeIfPresent(page, "advanced");
 
       // The canvas2d placeholder must be emitted server-side under the flag.
       const canvas = page.locator("canvas[data-gosx-surface-kind='canvas2d']").first();

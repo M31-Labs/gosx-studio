@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { startMuddyCanvasWASMFree } from "./reference_apps_harness";
+import { revealModeIfPresent, startMuddyCanvasWASMFree } from "./reference_apps_harness";
 import {
   formatCanvasRenderEvidence,
   waitForCanvasBoardRenderEvidence,
@@ -91,6 +91,10 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
     try {
       await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
       await expect(page.locator("[data-studio-workbench='true']").first()).toBeAttached();
+      // HAZEL PROOF-OF-FIX: the legacy site-map/canvas board now lives inside the
+      // "Advanced" mode panel (studio-pagecanvas-handoff moved it there once a
+      // PageCanvas surface is present) and is hidden until that mode is active.
+      await revealModeIfPresent(page, "advanced");
       await expect(page.locator(BOARD_SELECTOR).first(), "DOM site-map board element must stay in the markup (selection sink)").toBeAttached();
 
       const canvas = page.locator(CANVAS_SELECTOR).first();
