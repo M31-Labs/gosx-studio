@@ -8,7 +8,7 @@ replace m31labs.dev/gosx-admin => ../gosx-admin
 
 require (
 	golang.org/x/image v0.38.0
-	m31labs.dev/gosx v0.29.2
+	m31labs.dev/gosx v0.29.5-0.20260711104148-8aecfc532f1d
 	m31labs.dev/gosx-admin v0.2.0
 	modernc.org/sqlite v1.50.1
 )
