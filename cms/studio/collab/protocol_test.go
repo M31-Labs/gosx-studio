@@ -75,6 +75,8 @@ func TestServiceFixesResourceOutsideOperationWire(t *testing.T) {
 
 type captureOperationStore struct{ command ApplyCommand }
 
+func (*captureOperationStore) SeedHeads(context.Context, ResourceKey, []SeedHead) error { return nil }
+
 func (s *captureOperationStore) Apply(_ context.Context, c ApplyCommand) (OperationAck, *ProtocolError) {
 	s.command = c
 	return OperationAck{}, nil

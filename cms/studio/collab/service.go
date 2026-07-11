@@ -30,6 +30,9 @@ func NewService(resource ResourceKey, store OperationStore) (*Service, error) {
 }
 
 func (s *Service) Resource() ResourceKey { return s.resource }
+func (s *Service) Seed(ctx context.Context, heads ...SeedHead) error {
+	return s.store.SeedHeads(ctx, s.resource, heads)
+}
 func (s *Service) Submit(ctx context.Context, principal Principal, request authoring.OperationRequest) (OperationAck, *ProtocolError) {
 	return s.store.Apply(ctx, ApplyCommand{Resource: s.resource, Principal: principal.Clone(), Request: request, Now: s.clock()})
 }

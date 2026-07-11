@@ -40,7 +40,16 @@ type OutboxEntry struct {
 	Projected   *time.Time
 }
 
+// SeedHead records one existing host draft value before the first accepted
+// collaboration operation for that target. It creates no actor attempt,
+// accepted sequence, or projection outbox entry.
+type SeedHead struct {
+	Target authoring.OperationTarget
+	Value  authoring.OperationValue
+}
+
 type OperationStore interface {
+	SeedHeads(context.Context, ResourceKey, []SeedHead) error
 	Apply(context.Context, ApplyCommand) (OperationAck, *ProtocolError)
 	Tail(context.Context, ResourceKey, uint64, int) ([]OperationAck, error)
 	Attempts(context.Context, ResourceKey) ([]Attempt, error)

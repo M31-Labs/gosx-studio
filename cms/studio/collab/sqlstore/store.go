@@ -43,6 +43,62 @@ func Open(path string) (*Store, error) {
 func (s *Store) Close() error { return s.db.Close() }
 func (s *Store) DB() *sql.DB  { return s.db }
 
+func (s *Store) SeedHeads(ctx context.Context, resource collab.ResourceKey, heads []collab.SeedHead) error {
+	resource = resource.Normalize()
+	if err := resource.Validate(); err != nil {
+		return err
+	}
+	if len(heads) == 0 {
+		return nil
+	}
+	normalized := make([]collab.SeedHead, 0, len(heads))
+	for _, head := range heads {
+		head.Target = head.Target.Normalize()
+		kind := authoring.OperationSetField
+		if head.Target.Property != "" {
+			kind = authoring.OperationSetStyle
+		}
+		request := authoring.OperationRequest{ID: "seed-validation", Kind: kind, Target: head.Target}
+		if protocolErr := (collab.OperationSubmit{Request: request}).Validate(); protocolErr != nil {
+			return protocolErr
+		}
+		normalized = append(normalized, head)
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	now := time.Now().UTC()
+	key := resource.StableKey()
+	if _, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO studio_resources(resource_key,tenant_id,project_id,resource_kind,resource_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`, key, resource.TenantID, resource.ProjectID, resource.Kind, resource.ID, timestamp(now), timestamp(now)); err != nil {
+		return err
+	}
+	for _, head := range normalized {
+		kind := authoring.OperationSetField
+		if head.Target.Property != "" {
+			kind = authoring.OperationSetStyle
+		}
+		targetKey := head.Target.Key(kind)
+		var existingHead, existingValue string
+		var present int
+		scanErr := tx.QueryRowContext(ctx, `SELECT head_operation_id,value_present,value FROM studio_field_heads WHERE resource_key=? AND target_key=?`, key, targetKey).Scan(&existingHead, &present, &existingValue)
+		if scanErr == nil {
+			if present != boolInt(head.Value.Present) || existingValue != head.Value.Value {
+				return fmt.Errorf("collaboration seed conflict for %s", head.Target.String())
+			}
+			continue
+		}
+		if !errors.Is(scanErr, sql.ErrNoRows) {
+			return scanErr
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO studio_field_heads(resource_key,target_key,head_operation_id,sequence,value_present,value,updated_at) VALUES(?,?,?,?,?,?,?)`, key, targetKey, "", 0, boolInt(head.Value.Present), head.Value.Value, timestamp(now)); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func (s *Store) migrate(ctx context.Context) error {
 	statements := []string{
 		`PRAGMA foreign_keys = ON`,

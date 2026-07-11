@@ -288,6 +288,121 @@ func TestViewerRefusalIsDurableAndWritesNoOutbox(t *testing.T) {
 	}
 }
 
+func TestSeedHeadsPreserveExistingDraftAndCreateNoHistory(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "studio.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	heads := []collab.SeedHead{
+		{Target: field("seed", "title", "", "").Target, Value: authoring.PresentValue("Existing title")},
+		{Target: field("seed-absent", "optional", "", "").Target, Value: authoring.OperationValue{}},
+		{Target: authoring.OperationTarget{Route: "/", PageID: "home", ComponentKey: "home:hero", Property: "color", Breakpoint: "mobile", State: "hover"}, Value: authoring.PresentValue("")},
+	}
+	if err := s.SeedHeads(context.Background(), resource(), heads); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SeedHeads(context.Background(), resource(), heads); err != nil {
+		t.Fatalf("idempotent seed: %v", err)
+	}
+	attempts, err := s.Attempts(context.Background(), resource())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(attempts) != 0 {
+		t.Fatalf("seed attempts=%#v", attempts)
+	}
+	outbox, err := s.PendingOutbox(context.Background(), resource(), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(outbox) != 0 {
+		t.Fatalf("seed outbox=%#v", outbox)
+	}
+	tail, err := s.Tail(context.Background(), resource(), 0, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tail) != 0 {
+		t.Fatalf("seed tail=%#v", tail)
+	}
+	hash1, err := s.StateHash(context.Background(), resource())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	hash2, err := s.StateHash(context.Background(), resource())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hash1 != hash2 {
+		t.Fatalf("seed hash changed across reopen %s != %s", hash1, hash2)
+	}
+	styleRequest := authoring.OperationRequest{ID: "style-change", Kind: authoring.OperationSetStyle, Target: heads[2].Target, Value: "red"}
+	styleAck, pe := apply(t, s, designer("d"), styleRequest)
+	if pe != nil || !styleAck.Record.Before.Present || styleAck.Record.Before.Value != "" || styleAck.Record.Target.Breakpoint != "mobile" || styleAck.Record.Target.State != "hover" {
+		t.Fatalf("seeded style=%#v err=%v", styleAck, pe)
+	}
+	undoStyle := authoring.OperationRequest{ID: "style-undo", Kind: authoring.OperationUndo, Target: styleAck.Record.Target, HistoryOperationID: "style-change", ExpectedTargetHead: "style-change"}
+	styleRestored, pe := apply(t, s, designer("d"), undoStyle)
+	if pe != nil || !styleRestored.Record.After.Present || styleRestored.Record.After.Value != "" {
+		t.Fatalf("style undo=%#v err=%v", styleRestored, pe)
+	}
+	ack, pe := apply(t, s, principal("a"), field("change", "title", "Changed", ""))
+	if pe != nil || !ack.Record.Before.Present || ack.Record.Before.Value != "Existing title" {
+		t.Fatalf("first op=%#v err=%v", ack, pe)
+	}
+	undo := authoring.OperationRequest{ID: "undo", Kind: authoring.OperationUndo, Target: ack.Record.Target, HistoryOperationID: "change", ExpectedTargetHead: "change"}
+	restored, pe := apply(t, s, principal("a"), undo)
+	if pe != nil || !restored.Record.After.Present || restored.Record.After.Value != "Existing title" {
+		t.Fatalf("undo=%#v err=%v", restored, pe)
+	}
+}
+
+func TestSeedHeadsRejectConflictingReseedAndConcurrentSeedIsAtomic(t *testing.T) {
+	s, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	target := field("seed", "title", "", "").Target
+	if err := s.SeedHeads(context.Background(), resource(), []collab.SeedHead{{Target: target, Value: authoring.PresentValue("one")}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SeedHeads(context.Background(), resource(), []collab.SeedHead{{Target: target, Value: authoring.PresentValue("two")}}); err == nil {
+		t.Fatal("conflicting reseed must fail")
+	}
+	other := field("seed-other", "other", "", "").Target
+	var wg sync.WaitGroup
+	errorsSeen := make([]error, 2)
+	for i, value := range []string{"alpha", "beta"} {
+		wg.Add(1)
+		go func(i int, value string) {
+			defer wg.Done()
+			errorsSeen[i] = s.SeedHeads(context.Background(), resource(), []collab.SeedHead{{Target: other, Value: authoring.PresentValue(value)}})
+		}(i, value)
+	}
+	wg.Wait()
+	successes, failures := 0, 0
+	for _, err := range errorsSeen {
+		if err == nil {
+			successes++
+		} else {
+			failures++
+		}
+	}
+	if successes != 1 || failures != 1 {
+		t.Fatalf("concurrent seeds=%#v", errorsSeen)
+	}
+}
+
 func TestCapabilitiesAreOperationSpecificIncludingUndo(t *testing.T) {
 	s, err := Open(":memory:")
 	if err != nil {
