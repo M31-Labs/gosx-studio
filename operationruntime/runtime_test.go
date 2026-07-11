@@ -12,6 +12,11 @@ func TestScriptContainsDurableOperationContract(t *testing.T) {
 			t.Fatalf("script missing %q", want)
 		}
 	}
+	for _, want := range []string{"data-gosx-studio-operation-value-source", "data-studio-layout-control", "data-studio-layout-value", "Inherited after reload"} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("script missing responsive layout contract %q", want)
+		}
+	}
 	for _, forbidden := range []string{
 		`(kind === "set-field" || kind === "set-style"`,
 		`(kind === "set-field" || kind === "reset-style"`,

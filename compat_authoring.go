@@ -251,6 +251,18 @@ func IsSupportedStyleProperty(property string) bool {
 	return authoring.IsSupportedStyleProperty(property)
 }
 
+type LayoutValueOption = authoring.LayoutValueOption
+type LayoutControl = authoring.LayoutControl
+
+func ResponsiveLayoutControls() []LayoutControl { return authoring.ResponsiveLayoutControls() }
+func ResponsiveLayoutProperties() []string      { return authoring.ResponsiveLayoutProperties() }
+func IsResponsiveLayoutProperty(property string) bool {
+	return authoring.IsResponsiveLayoutProperty(property)
+}
+func ValidateLayoutValue(property, value string) (string, bool) {
+	return authoring.ValidateLayoutValue(property, value)
+}
+
 // Deprecated: use authoring.SupportedStyleBreakpoints.
 func SupportedStyleBreakpoints() []string { return authoring.SupportedStyleBreakpoints() }
 

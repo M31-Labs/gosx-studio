@@ -47,6 +47,7 @@ var supportedStyleProperties = map[string]struct{}{
 	"gap": {},
 	// Flex / layout
 	"flex-direction": {}, "justify-content": {}, "align-items": {}, "flex-wrap": {},
+	"grid-template-columns": {},
 	// Typography
 	"color": {}, "font-size": {}, "font-weight": {}, "font-family": {},
 	"line-height": {}, "letter-spacing": {}, "text-align": {}, "text-transform": {}, "text-decoration": {},
@@ -179,6 +180,10 @@ func validateStyleMutation(validation *AuthoringValidation, mutation AuthoringMu
 	}
 	if reason := styleValueRejection(mutation.StyleValue); reason != "" {
 		validation.AddFieldError(AuthoringFieldStyleValue, reason)
+	} else if IsResponsiveLayoutProperty(mutation.StyleProperty) {
+		if reason, ok := ValidateLayoutValue(mutation.StyleProperty, mutation.StyleValue); !ok {
+			validation.AddFieldError(AuthoringFieldStyleValue, reason)
+		}
 	}
 	if !isSupportedStyleBreakpoint(normalizeStyleBreakpoint(mutation.Breakpoint)) {
 		validation.AddFieldError(AuthoringFieldBreakpoint, "Choose a supported breakpoint.")

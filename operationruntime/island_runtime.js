@@ -34,7 +34,8 @@
     var operationID = data.operationID || "";
     var undo = form.querySelector("[data-gosx-studio-operation-kind='undo']");
     var redo = form.querySelector("[data-gosx-studio-operation-kind='redo']");
-    if (kind === "set-field" && undo && redo) {
+    var layout = form.hasAttribute("data-studio-layout-control");
+    if ((kind === "set-field" || (layout && (kind === "set-style" || kind === "reset-style"))) && undo && redo) {
       undo.removeAttribute("disabled");
       undo.setAttribute("data-gosx-studio-history-operation-id", operationID);
       redo.setAttribute("disabled", "disabled");
@@ -57,6 +58,18 @@
       var valueNode = form.querySelector("[data-studio-operation-value]");
       if (valueNode) valueNode.value = String(data.value);
     }
+    if (layout) {
+      var select = form.querySelector("[data-studio-layout-value]");
+      var presence = form.querySelector("[data-studio-layout-presence]");
+      var reset = form.querySelector("[data-gosx-studio-operation-kind='reset-style']");
+      if (select && data.value !== undefined && data.value !== null && String(data.value) !== "") select.value = String(data.value);
+      if (presence && (kind === "set-style" || kind === "reset-style")) {
+        var explicit = kind === "set-style";
+        presence.setAttribute("data-studio-layout-presence", explicit ? "true" : "false");
+        presence.textContent = explicit ? "Explicit override" : "Inherited after reload";
+        if (reset) explicit ? reset.removeAttribute("disabled") : reset.setAttribute("disabled", "disabled");
+      }
+    }
   }
   function runtime(form) {
     var selected = { route: form.getAttribute("data-studio-target-route") || "/", pageId: form.getAttribute("data-studio-target-page-id") || "", field: form.getAttribute("data-studio-target-field") || "", componentKey: form.getAttribute("data-studio-target-component") || "" };
@@ -76,6 +89,7 @@
       // scopes have independent target heads and must start empty (or use the
       // per-target map), otherwise a prior headline save falsely conflicts.
       if (expectedHead === "" && kind === "set-field" && effectiveKey === targetKey(target, {})) expectedHead = form.getAttribute("data-studio-target-head") || "";
+      if (expectedHead === "" && form.hasAttribute("data-studio-layout-control")) expectedHead = form.getAttribute("data-studio-target-head") || "";
       var payload = { gosx_studio_operation: kind, gosx_studio_operation_id: extra.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()), gosx_studio_page_route: extra.route || target.route || "/", gosx_studio_page_key: extra.pageId || target.pageId || target.page || "", gosx_studio_component_key: extra.componentKey || target.componentKey || target.blockKey || "", gosx_studio_binding: extra.field || target.field || "", gosx_studio_value: value || "", gosx_studio_style_property: extra.property || target.property || "", gosx_studio_style_value: value || "", gosx_studio_breakpoint: extra.breakpoint || target.breakpoint || "base", gosx_studio_state: extra.state || target.state || "default", gosx_studio_expected_revision: extra.revision || form.getAttribute("data-studio-document-revision") || "0", gosx_studio_expected_target_head: expectedHead, gosx_studio_history_operation_id: extra.historyOperationId || "" };
       return post(form, payload).then(function (response) {
         if (!response.ok) throw new Error("Operation failed (" + response.status + ")");
@@ -102,6 +116,11 @@
         event.preventDefault();
         var kind = button.getAttribute("data-gosx-studio-operation-kind");
         var value = button.getAttribute("data-gosx-studio-operation-value") || "";
+        var valueSource = button.getAttribute("data-gosx-studio-operation-value-source");
+        if (valueSource) {
+          var sourceNode = form.querySelector(valueSource) || document.querySelector(valueSource);
+          if (sourceNode) value = "value" in sourceNode ? sourceNode.value : (sourceNode.textContent || "");
+        }
         if (!value && kind === "set-field") {
           var editorValue = form.querySelector("[data-studio-operation-value]");
           if (editorValue) value = "value" in editorValue ? editorValue.value : (editorValue.textContent || "");

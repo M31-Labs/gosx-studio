@@ -45,6 +45,15 @@ func ApplySetStyle(m AuthoringMutation, write StyleDraftWriter) (AuthoringMutati
 			Values:      m.FormValues(),
 		}, nil
 	}
+	if IsResponsiveLayoutProperty(m.StyleProperty) {
+		if reason, ok := ValidateLayoutValue(m.StyleProperty, m.StyleValue); !ok {
+			return AuthoringMutationResult{
+				Message:     "That layout value is not allowed.",
+				FieldErrors: map[string]string{AuthoringFieldStyleValue: reason},
+				Values:      m.FormValues(),
+			}, nil
+		}
+	}
 	if err := write(m.ComponentKey, m.StyleProperty, m.StyleValue, m.Breakpoint, m.State); err != nil {
 		return AuthoringMutationResult{}, err
 	}

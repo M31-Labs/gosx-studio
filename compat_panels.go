@@ -57,6 +57,13 @@ func RenderDirectEditPanel(options DirectEditPanelOptions) gosx.Node {
 	return panels.RenderDirectEditPanel(options)
 }
 
+type ResponsiveLayoutValue = panels.ResponsiveLayoutValue
+type ResponsiveLayoutInspectorOptions = panels.ResponsiveLayoutInspectorOptions
+
+func RenderResponsiveLayoutInspector(options ResponsiveLayoutInspectorOptions) gosx.Node {
+	return panels.RenderResponsiveLayoutInspector(options)
+}
+
 // --- Activity panel (panels/activity_panel.go) ---
 
 // Deprecated: use panels.ActivityPanelOptions.
