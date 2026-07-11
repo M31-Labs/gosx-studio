@@ -73,6 +73,12 @@ jobs:
             muddy-noni-commerce/go.sum
             pajaritos-forest-school/go.sum
 
+      - name: Install gosx CLI
+        working-directory: gosx
+        run: |
+          go install ./cmd/gosx
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
