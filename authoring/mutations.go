@@ -139,6 +139,10 @@ type AuthoringMutationResult struct {
 	DocumentRevision uint64
 	TargetHead       string
 	OperationID      string
+	// Value is the authoritative target value after a durable operation. Hosts
+	// return it for Undo/Redo so the editor can update the selected control
+	// immediately without reloading the entire workbench.
+	Value string
 }
 
 type AuthoringChange struct {
@@ -709,6 +713,7 @@ func AuthoringMutationResultView(result AuthoringMutationResult) map[string]any 
 		"documentRevision": result.DocumentRevision,
 		"targetHead":       result.TargetHead,
 		"operationID":      result.OperationID,
+		"value":            result.Value,
 	}
 }
 

@@ -34,14 +34,25 @@
     var operationID = data.operationID || "";
     var undo = form.querySelector("[data-gosx-studio-operation-kind='undo']");
     var redo = form.querySelector("[data-gosx-studio-operation-kind='redo']");
-    if (kind === "undo" && undo && redo) {
+    if ((kind === "set-field" || kind === "set-style" || kind === "reset-style") && undo && redo) {
+      undo.removeAttribute("disabled");
+      undo.setAttribute("data-gosx-studio-history-operation-id", operationID);
+      redo.setAttribute("disabled", "disabled");
+      redo.setAttribute("data-gosx-studio-history-operation-id", "");
+    } else if (kind === "undo" && undo && redo) {
       undo.setAttribute("disabled", "disabled");
+      undo.setAttribute("data-gosx-studio-history-operation-id", "");
       redo.removeAttribute("disabled");
       redo.setAttribute("data-gosx-studio-history-operation-id", operationID);
     } else if (kind === "redo" && undo && redo) {
       redo.setAttribute("disabled", "disabled");
+      redo.setAttribute("data-gosx-studio-history-operation-id", "");
       undo.removeAttribute("disabled");
       undo.setAttribute("data-gosx-studio-history-operation-id", operationID);
+    }
+    if (data.value !== undefined && data.value !== null) {
+      var valueNode = form.querySelector("[data-studio-operation-value]");
+      if (valueNode) valueNode.value = String(data.value);
     }
   }
   function runtime(form) {

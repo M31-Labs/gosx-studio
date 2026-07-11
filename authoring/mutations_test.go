@@ -419,3 +419,15 @@ func TestSaveAppearanceMutationAdapterReceivesColorFields(t *testing.T) {
 		t.Fatalf("unexpected action result: %#v", result)
 	}
 }
+
+func TestAuthoringMutationResultViewCarriesAuthoritativeDurableValue(t *testing.T) {
+	view := AuthoringMutationResultView(AuthoringMutationResult{
+		DocumentRevision: 4,
+		TargetHead:       "head-4",
+		OperationID:      "op-4",
+		Value:            "  meaningful content  ",
+	})
+	if got := view["value"]; got != "  meaningful content  " {
+		t.Fatalf("durable value must preserve content exactly, got %#v", got)
+	}
+}
