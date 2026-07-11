@@ -43,7 +43,10 @@
       var effectiveKey = targetKey(target, extra);
       var expectedHead = extra.head;
       if (expectedHead === undefined) expectedHead = targetHeads[effectiveKey] || "";
-      if (expectedHead === "" && effectiveKey === targetKey(target, {})) expectedHead = form.getAttribute("data-studio-target-head") || "";
+      // The form cursor belongs to its selected content target. Style/reset
+      // scopes have independent target heads and must start empty (or use the
+      // per-target map), otherwise a prior headline save falsely conflicts.
+      if (expectedHead === "" && kind === "set-field" && effectiveKey === targetKey(target, {})) expectedHead = form.getAttribute("data-studio-target-head") || "";
       var payload = { gosx_studio_operation: kind, gosx_studio_operation_id: extra.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()), gosx_studio_page_route: extra.route || target.route || "/", gosx_studio_page_key: extra.pageId || target.pageId || target.page || "", gosx_studio_component_key: extra.componentKey || target.componentKey || target.blockKey || "", gosx_studio_binding: extra.field || target.field || "", gosx_studio_value: value || "", gosx_studio_style_property: extra.property || target.property || "", gosx_studio_style_value: value || "", gosx_studio_breakpoint: extra.breakpoint || target.breakpoint || "base", gosx_studio_state: extra.state || target.state || "default", gosx_studio_expected_revision: extra.revision || form.getAttribute("data-studio-document-revision") || "0", gosx_studio_expected_target_head: expectedHead, gosx_studio_history_operation_id: extra.historyOperationId || "" };
       return post(form, payload).then(function (response) {
         if (!response.ok) throw new Error("Operation failed (" + response.status + ")");
