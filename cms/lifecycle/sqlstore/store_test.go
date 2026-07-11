@@ -63,6 +63,23 @@ func TestStoreMigratesAndRoundTripsRevisions(t *testing.T) {
 	if snapshot["title"] != "Home" {
 		t.Fatalf("unexpected snapshot title %q", snapshot["title"])
 	}
+
+	if err := store.DeleteRevisionContext(ctx, "page", "home", first.ID); err != nil {
+		t.Fatalf("delete revision: %v", err)
+	}
+	if _, ok, err := store.RevisionByIDContext(ctx, "page", "home", first.ID); err != nil || ok {
+		t.Fatalf("expected deleted revision to be gone, ok=%v err=%v", ok, err)
+	}
+	stillThere, err := store.ListRevisionsContext(ctx, lifecycle.RevisionFilter{ResourceKind: "page", ResourceID: "home"})
+	if err != nil {
+		t.Fatalf("list revisions after delete: %v", err)
+	}
+	if len(stillThere) != 1 || stillThere[0].ID != "rev-2" {
+		t.Fatalf("expected only rev-2 to remain after deleting rev-1, got %#v", stillThere)
+	}
+	if err := store.DeleteRevision("page", "home", "does-not-exist"); err != nil {
+		t.Fatalf("expected deleting a missing revision id to be a no-op, got %v", err)
+	}
 }
 
 func TestStorePersistsDecisionsNotesAndAudit(t *testing.T) {

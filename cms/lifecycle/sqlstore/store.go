@@ -113,6 +113,24 @@ func (s *Store) RevisionByID(resourceKind, resourceID, revisionID string) (lifec
 	return revision, ok
 }
 
+// DeleteRevision physically removes one revision row. It is additive: no
+// existing method/interface is affected by its presence, and RevisionStore
+// (cms/store.RevisionStore) is unchanged. It exists so
+// cms/lifecycle/engine's retention enforcement (spec §2, RetentionPolicy) has
+// a real store to trim against -- Store structurally satisfies the engine's
+// optional RevisionPruner capability without either package importing the
+// other.
+func (s *Store) DeleteRevision(resourceKind, resourceID, revisionID string) error {
+	return s.DeleteRevisionContext(context.Background(), resourceKind, resourceID, revisionID)
+}
+
+func (s *Store) DeleteRevisionContext(ctx context.Context, resourceKind, resourceID, revisionID string) error {
+	_, err := s.db.ExecContext(ctx, `
+		DELETE FROM lifecycle_revisions WHERE id = ? AND resource_kind = ? AND resource_id = ?
+	`, strings.TrimSpace(revisionID), strings.TrimSpace(resourceKind), strings.TrimSpace(resourceID))
+	return err
+}
+
 func (s *Store) RevisionByIDContext(ctx context.Context, resourceKind, resourceID, revisionID string) (lifecycle.Revision, bool, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, resource_kind, resource_id, resource_title, action, summary, snapshot, created_at

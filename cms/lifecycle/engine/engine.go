@@ -269,6 +269,14 @@ func (e *Engine) Publish(ctx context.Context, cmd PublishCommand) (PublishResult
 	if err := e.recordPublishCompleted(ctx, cmd, result); err != nil {
 		return PublishResult{}, err
 	}
+	// Retention (spec §2) runs only after every ledger/host write has
+	// already succeeded, so a failed publish never loses restore-point
+	// history it didn't need to trim. The restore point just minted and the
+	// optimistic-head revision id (if any) are protected even though, as the
+	// newest entries, the retention window would already keep them.
+	if _, err := e.enforceRetention(cmd.Target, restorePointID, cmd.ExpectedRevisionID); err != nil {
+		return PublishResult{}, err
+	}
 	return result, nil
 }
 
@@ -309,6 +317,16 @@ func (e *Engine) Restore(ctx context.Context, cmd RestoreCommand) (RestoreResult
 		},
 		Created: e.now(),
 	}); err != nil {
+		return RestoreResult{}, err
+	}
+
+	// Retention (spec §2) must never delete cmd.RevisionID: it is the
+	// restore point (or other prior revision) this exact transition is
+	// reading from -- an "in-flight restore" source -- even if it would
+	// otherwise fall outside the retention window. The freshly minted
+	// pre-restore restore point is protected too, though as the newest entry
+	// the window already keeps it.
+	if _, err := e.enforceRetention(cmd.Target, restorePointID, cmd.RevisionID); err != nil {
 		return RestoreResult{}, err
 	}
 
