@@ -888,7 +888,7 @@
     function applyPreviewSelection(frame, target, detail, options) {
       detail = detail || previewSelectionDetail(target);
       options = options || {};
-      if (!detail.field && !detail.blockKey && !detail.nodeID) return false;
+      if (!detail.field && !detail.blockKey && !detail.nodeID && !detail.pageID) return false;
       clearPreviewSelections();
       clearInspectorSelection();
       var selectedTargets = detail.field ? previewTargets(frame, { field: { source: detail.field, name: detail.field } }) : [];

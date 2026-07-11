@@ -72,6 +72,12 @@ type BackendEditorWorkbenchPanelStackProps = shellpkg.BackendEditorWorkbenchPane
 // Deprecated: use shell.BackendEditorPublishPanelStackProps.
 type BackendEditorPublishPanelStackProps = shellpkg.BackendEditorPublishPanelStackProps
 
+// Deprecated: use shell.WorkbenchPageCanvasRoute.
+type WorkbenchPageCanvasRoute = shellpkg.WorkbenchPageCanvasRoute
+
+// Deprecated: use shell.WorkbenchPageCanvasOptions.
+type WorkbenchPageCanvasOptions = shellpkg.WorkbenchPageCanvasOptions
+
 // Deprecated: use shell.RenderBackendEditorWorkbench.
 func RenderBackendEditorWorkbench(props BackendEditorWorkbenchProps) gosx.Node {
 	return shellpkg.RenderBackendEditorWorkbench(props)
@@ -115,6 +121,11 @@ func RenderBackendEditorWorkbenchContent(props BackendEditorWorkbenchContentProp
 // Deprecated: use shell.RenderBackendEditorWorkbenchPanelStack.
 func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelStackProps) gosx.Node {
 	return shellpkg.RenderBackendEditorWorkbenchPanelStack(props)
+}
+
+// Deprecated: use shell.RenderWorkbenchPageCanvas.
+func RenderWorkbenchPageCanvas(options WorkbenchPageCanvasOptions) gosx.Node {
+	return shellpkg.RenderWorkbenchPageCanvas(options)
 }
 
 // Deprecated: use shell.RenderBackendEditorPublishPanelStack.

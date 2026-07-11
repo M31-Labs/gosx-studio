@@ -473,7 +473,7 @@
     function applyPreviewSelection(frame, target, detail, options) {
       detail = detail || previewSelectionDetail(target);
       options = options || {};
-      if (!detail.field && !detail.blockKey && !detail.nodeID) return false;
+      if (!detail.field && !detail.blockKey && !detail.nodeID && !detail.pageID) return false;
       if (typeof window.__gosx_preview_runtime_island_applySelection !== "function") return false;
       var result = window.__gosx_preview_runtime_island_applySelection({
         form: form,
@@ -673,6 +673,16 @@
       }, previewDocumentHost());
       if (typeof window.__gosx_preview_runtime_island_bindFrames !== "function") return null;
       return window.__gosx_preview_runtime_island_bindFrames(form, host) || null;
+    }
+
+    function bindPreviewFramesWhenReady(attempt) {
+      attempt = Number(attempt) || 0;
+      var result = bindPreviewFrames();
+      if (result || attempt >= 20) return result;
+      window.setTimeout(function () {
+        bindPreviewFramesWhenReady(attempt + 1);
+      }, 25);
+      return null;
     }
 
     function previewDocumentHost() {
@@ -1058,7 +1068,7 @@
 
     restoreLayout(form);
     bindResizers();
-    bindPreviewFrames();
+    bindPreviewFramesWhenReady(0);
     updateResizerValue("left", currentRailWidth("left"));
     updateResizerValue("right", currentRailWidth("right"));
     setMode(form.getAttribute("data-studio-mode") || "", { reason: "init" });

@@ -1,6 +1,9 @@
 package studio
 
-import "m31labs.dev/gosx"
+import (
+	"m31labs.dev/gosx"
+	studioshell "m31labs.dev/gosx-studio/shell"
+)
 
 type StudioToolbarOptions struct {
 	Class        string
@@ -99,13 +102,11 @@ func RenderPreviewFrame(options PreviewFrameOptions) gosx.Node {
 			gosx.Attr("class", toolbarClass),
 			gosx.Attr("data-studio-preview-toolbar", "true"),
 		), gosx.Fragment(toolbarChildren...)),
-		gosx.El("iframe", gosx.Attrs(
-			gosx.Attr("class", frameClass),
-			gosx.Attr("src", url),
-			gosx.Attr("title", iframeTitle),
-			gosx.Attr("data-studio-preview-frame", "true"),
-			gosx.Attr("data-studio-preview-src", url),
-		)),
+		studioshell.RenderWorkbenchPreviewFrame(studioshell.WorkbenchPreviewFrameOptions{
+			Class: frameClass,
+			URL:   url,
+			Title: iframeTitle,
+		}),
 	)
 }
 

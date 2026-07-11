@@ -87,6 +87,27 @@ func TestStylesheetSupportsBackendPanelCSSOnlyControls(t *testing.T) {
 	}
 }
 
+func TestStylesheetOwnsRenderedPageCanvasModeAndLayoutContract(t *testing.T) {
+	css := string(Stylesheet())
+	for _, fragment := range []string{
+		`.studio-page-canvas {`,
+		`grid-template-rows: auto minmax(0, 1fr) auto auto;`,
+		`.studio-page-canvas__stage > [data-studio-preview-frame]`,
+		`.studio-advanced-canvas-board {`,
+		`.editor-workbench[data-studio-mode="advanced"] .studio-page-canvas`,
+		`.editor-workbench > [data-studio-workbench][data-studio-mode="advanced"] .studio-page-canvas`,
+		`.editor-workbench[data-studio-mode="advanced"] .studio-advanced-canvas-board`,
+		`.editor-workbench > [data-studio-workbench][data-studio-mode="advanced"] .studio-advanced-canvas-board`,
+		`.editor-workbench:not([data-studio-mode="advanced"]) .studio-advanced-canvas-board`,
+		`.editor-workbench > [data-studio-workbench]:not([data-studio-mode="advanced"]) .studio-advanced-canvas-board`,
+		`[data-gosx-studio-preview-tab-stop]:focus-visible`,
+	} {
+		if !strings.Contains(css, fragment) {
+			t.Fatalf("Studio stylesheet missing page-canvas contract %q", fragment)
+		}
+	}
+}
+
 func TestStylesheetFlowRadioSelectionShowsOnlyCheckedEditor(t *testing.T) {
 	css := string(Stylesheet())
 	defaultHide := `.studio-flow-designer__editors .studio-flow-editor`

@@ -608,3 +608,36 @@ func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 		t.Fatalf("Bundle() must place island runtime before shim (island=%d shim=%d)", islandIdx, shimIdx)
 	}
 }
+
+func TestIslandRuntimePersistsOnlyRouteScopedSelectionLocator(t *testing.T) {
+	script := string(IslandRuntimeJS())
+	for _, fragment := range []string{
+		`function selectionLocatorStorageKey(form, route)`,
+		`window.location.origin + window.location.pathname`,
+		`window.sessionStorage.setItem(selectionLocatorStorageKey(form, locator.route), JSON.stringify(locator))`,
+		`route: normalizeSelectionLocatorRoute(detail.route || "/")`,
+		`pageID: compactText(detail.pageID)`,
+		`field: compactText(detail.field)`,
+		`blockKey: compactText(detail.blockKey)`,
+		`nodeID: compactText(detail.nodeID)`,
+		`kind: compactText(detail.kind`,
+		`function syncInspectorForExactSelection(key)`,
+		`function pageNavigatorIdentityForRoute(route)`,
+		`form.setAttribute("data-studio-preview-route-current", route)`,
+		`syncPageNavigatorSelection(pageID, route)`,
+		`syncInspectorForExactSelection(pageID)`,
+		`gosxstudio:preview-selection-restore-request`,
+		`selection-runtime-bound`,
+		`gosxstudio:preview-selection-locator-restore`,
+		`gosxstudio:preview-selection-locator-stale`,
+	} {
+		if !strings.Contains(script, fragment) {
+			t.Fatalf("selection locator runtime missing %q", fragment)
+		}
+	}
+	for _, forbidden := range []string{`locator.content`, `locator.value`, `locator.html`, `locator.text`} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("selection locator must not persist content via %q", forbidden)
+		}
+	}
+}

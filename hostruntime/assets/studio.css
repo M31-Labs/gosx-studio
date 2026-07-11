@@ -2201,6 +2201,110 @@ button.button {
   position: relative;
 }
 
+/* Canonical rendered-page canvas structure. Hosts may restyle these surfaces
+ * with the shared tokens, but mode visibility and safe sizing stay Studio-owned. */
+.studio-page-canvas {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.studio-canvas-shell--page-canvas {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.studio-canvas-shell--page-canvas > .studio-canvas-board:has([data-gosx-studio-page-canvas]) {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.studio-canvas-shell--page-canvas [data-gosx-studio-board-slot] {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+}
+
+.studio-page-canvas__toolbar {
+  position: relative;
+  z-index: 40;
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.studio-page-canvas__routes {
+  display: inline-flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: var(--space-chip-y);
+}
+
+.studio-page-canvas__stage {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  place-items: stretch center;
+  overflow: auto;
+}
+
+.studio-page-canvas__stage > [data-studio-preview-frame] {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 100%;
+  margin-inline: auto;
+  border: 0;
+}
+
+.studio-page-canvas__diagnostic:empty {
+  display: none;
+}
+
+/* The first PageCanvas checkpoint uses the persistent Layers + Inspector rails.
+ * Keep the legacy floating dock out of the rendered page and its toolbar; it
+ * remains available for hosts that still use the legacy preview surface. */
+.studio-page-canvas > [data-gosx-studio-preview-dock] {
+  display: none;
+  pointer-events: none;
+}
+
+.studio-advanced-canvas-board {
+  display: none;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.editor-workbench[data-studio-mode="advanced"] .studio-page-canvas,
+.editor-workbench > [data-studio-workbench][data-studio-mode="advanced"] .studio-page-canvas {
+  display: none;
+}
+
+.editor-workbench[data-studio-mode="advanced"] .studio-advanced-canvas-board,
+.editor-workbench > [data-studio-workbench][data-studio-mode="advanced"] .studio-advanced-canvas-board {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.editor-workbench:not([data-studio-mode="advanced"]) .studio-advanced-canvas-board,
+.editor-workbench > [data-studio-workbench]:not([data-studio-mode="advanced"]) .studio-advanced-canvas-board {
+  display: none;
+}
+
+html[data-gosx-studio-preview-selectable] [data-gosx-studio-preview-tab-stop]:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
 [data-gosx-studio-preview-dock] {
   position: absolute;
   z-index: 30;

@@ -1,6 +1,8 @@
 package shell
 
 import (
+	"strings"
+
 	"m31labs.dev/gosx"
 	"m31labs.dev/gosx-studio/canvas"
 	"m31labs.dev/gosx-studio/core"
@@ -9,14 +11,15 @@ import (
 )
 
 type BackendEditorWorkbenchProps struct {
-	View         map[string]any
-	AuthoringURL string
-	Toolbar      gosx.Node
-	CanvasBar    gosx.Node
-	CanvasStatus gosx.Node
-	LeftRail     []gosx.Node
-	Board        []gosx.Node
-	RightRail    []gosx.Node
+	View             map[string]any
+	AuthoringURL     string
+	Toolbar          gosx.Node
+	CanvasBar        gosx.Node
+	CanvasStatus     gosx.Node
+	DisableCanvasBar bool
+	LeftRail         []gosx.Node
+	Board            []gosx.Node
+	RightRail        []gosx.Node
 }
 
 type BackendEditorWorkbenchContentProps struct {
@@ -27,6 +30,7 @@ type BackendEditorWorkbenchContentProps struct {
 	CanvasStatus    gosx.Node
 	SiteNavigator   gosx.Node
 	BlockLayout     gosx.Node
+	PageCanvas      gosx.Node
 	SiteMapEngine   gosx.Node
 	SiteMapCanvas   gosx.Node
 	InspectorChrome gosx.Node
@@ -54,6 +58,8 @@ type BackendEditorWorkbenchPanelStackProps struct {
 	BlockLayoutEngineHost           gosx.Node
 	BlockLibraryPanel               gosx.Node
 	BlockLibraryPanelView           map[string]any
+	PageCanvas                      gosx.Node
+	PageCanvasOptions               WorkbenchPageCanvasOptions
 	SiteMapEngine                   gosx.Node
 	SiteMapView                     map[string]any
 	SiteMapEngineOptions            sitemap.SiteMapEngineOptions
@@ -100,7 +106,9 @@ func RenderBackendEditorWorkbench(props BackendEditorWorkbenchProps) gosx.Node {
 		toolbar = RenderBackendEditorWorkbenchToolbar(props.View)
 	}
 	canvasBar := props.CanvasBar
-	if core.WorkbenchNodeEmpty(canvasBar) {
+	if props.DisableCanvasBar {
+		canvasBar = gosx.Fragment()
+	} else if core.WorkbenchNodeEmpty(canvasBar) {
 		canvasBar = RenderBackendEditorWorkbenchCanvasBar(props.View)
 	}
 	canvasStatus := props.CanvasStatus
@@ -115,6 +123,9 @@ func RenderBackendEditorWorkbench(props BackendEditorWorkbenchProps) gosx.Node {
 		LeftRail:       []gosx.Node{RenderBackendEditorLeftRail(props.LeftRail...)},
 		Board:          []gosx.Node{RenderBackendEditorBoard(props.Board...)},
 		RightRail:      []gosx.Node{RenderBackendEditorRightRail(props.RightRail...)},
+	}
+	if props.DisableCanvasBar {
+		options.CanvasShellClass = "studio-canvas-shell studio-canvas-shell--page-canvas"
 	}
 	if !core.WorkbenchNodeEmpty(canvasBar) {
 		options.CanvasBar = []gosx.Node{canvasBar}
@@ -174,20 +185,36 @@ func RenderBackendEditorWorkbenchCanvasStatus(view map[string]any) gosx.Node {
 }
 
 func RenderBackendEditorWorkbenchContent(props BackendEditorWorkbenchContentProps) gosx.Node {
+	board := []gosx.Node{}
+	if !core.WorkbenchNodeEmpty(props.PageCanvas) {
+		board = append(board, props.PageCanvas)
+		legacy := []gosx.Node{}
+		legacy = appendWorkbenchNode(legacy, props.SiteMapEngine)
+		legacy = appendWorkbenchNode(legacy, props.SiteMapCanvas)
+		if len(legacy) > 0 {
+			board = append(board, gosx.El("section", gosx.Attrs(
+				gosx.Attr("class", "studio-advanced-canvas-board"),
+				gosx.Attr("data-studio-mode-panel", "advanced"),
+				gosx.Attr("data-studio-advanced-canvas-board", "true"),
+				gosx.Attr("aria-label", "Site architecture"),
+			), gosx.Fragment(legacy...)))
+		}
+	} else {
+		board = appendWorkbenchNode(board, props.SiteMapEngine)
+		board = appendWorkbenchNode(board, props.SiteMapCanvas)
+	}
 	return RenderBackendEditorWorkbench(BackendEditorWorkbenchProps{
-		View:         props.View,
-		AuthoringURL: props.AuthoringURL,
-		Toolbar:      props.Toolbar,
-		CanvasBar:    props.CanvasBar,
-		CanvasStatus: props.CanvasStatus,
+		View:             props.View,
+		AuthoringURL:     props.AuthoringURL,
+		Toolbar:          props.Toolbar,
+		CanvasBar:        props.CanvasBar,
+		CanvasStatus:     props.CanvasStatus,
+		DisableCanvasBar: !core.WorkbenchNodeEmpty(props.PageCanvas),
 		LeftRail: []gosx.Node{
 			props.SiteNavigator,
 			props.BlockLayout,
 		},
-		Board: []gosx.Node{
-			props.SiteMapEngine,
-			props.SiteMapCanvas,
-		},
+		Board: board,
 		RightRail: []gosx.Node{
 			props.InspectorChrome,
 			props.HomeInspector,
@@ -306,6 +333,14 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 	if core.WorkbenchNodeEmpty(siteMapCanvas) && len(props.SiteMapView) > 0 {
 		siteMapCanvas = canvas.RenderSiteMapCanvasSurface(props.SiteMapView, props.SiteMapCanvasSurfaceOptions)
 	}
+	pageCanvas := props.PageCanvas
+	if core.WorkbenchNodeEmpty(pageCanvas) && (strings.TrimSpace(props.PageCanvasOptions.URL) != "" || len(props.PageCanvasOptions.Routes) > 0) {
+		pageCanvasOptions := props.PageCanvasOptions
+		if len(pageCanvasOptions.View) == 0 {
+			pageCanvasOptions.View = props.View
+		}
+		pageCanvas = RenderWorkbenchPageCanvas(pageCanvasOptions)
+	}
 
 	return RenderBackendEditorWorkbenchContent(BackendEditorWorkbenchContentProps{
 		View:            props.View,
@@ -315,6 +350,7 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 		CanvasStatus:    props.CanvasStatus,
 		SiteNavigator:   siteNavigator,
 		BlockLayout:     blockLayout,
+		PageCanvas:      pageCanvas,
 		SiteMapEngine:   siteMapEngine,
 		SiteMapCanvas:   siteMapCanvas,
 		InspectorChrome: inspectorChrome,

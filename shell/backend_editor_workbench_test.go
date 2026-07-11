@@ -1142,6 +1142,37 @@ func TestRenderBackendEditorWorkbenchSlotHelpers(t *testing.T) {
 	}
 }
 
+func TestRenderBackendEditorWorkbenchContentMakesPageCanvasPrimaryAndLegacyBoardAdvancedOnly(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendEditorWorkbenchContent(BackendEditorWorkbenchContentProps{
+		View:          map[string]any{"mode": "home"},
+		PageCanvas:    gosx.El("section", gosx.Attrs(gosx.Attr("data-test-page-canvas", "true"))),
+		SiteMapEngine: gosx.El("section", gosx.Attrs(gosx.Attr("data-test-site-map", "true"))),
+		SiteMapCanvas: gosx.El("canvas", gosx.Attrs(gosx.Attr("data-test-site-map-canvas", "true"))),
+	}))
+	pageIndex := strings.Index(html, `data-test-page-canvas="true"`)
+	advancedIndex := strings.Index(html, `data-studio-advanced-canvas-board="true"`)
+	mapIndex := strings.Index(html, `data-test-site-map="true"`)
+	if pageIndex < 0 || advancedIndex < 0 || mapIndex < 0 || !(pageIndex < advancedIndex && advancedIndex < mapIndex) {
+		t.Fatalf("expected page canvas first and legacy site map inside Advanced wrapper:\n%s", html)
+	}
+	if !strings.Contains(html, `data-studio-mode-panel="advanced"`) {
+		t.Fatalf("legacy board must be Advanced-only:\n%s", html)
+	}
+	if strings.Contains(html, `class="studio-canvas-bar"`) {
+		t.Fatalf("PageCanvas must own the sole viewport control set:\n%s", html)
+	}
+}
+
+func TestRenderBackendEditorWorkbenchContentPreservesLegacyBoardWithoutPageCanvas(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendEditorWorkbenchContent(BackendEditorWorkbenchContentProps{
+		View:          map[string]any{"mode": "home"},
+		SiteMapEngine: gosx.El("section", gosx.Attrs(gosx.Attr("data-test-site-map", "true"))),
+	}))
+	if !strings.Contains(html, `data-test-site-map="true"`) || strings.Contains(html, `data-studio-advanced-canvas-board="true"`) {
+		t.Fatalf("hosts without PageCanvas must retain the legacy board contract:\n%s", html)
+	}
+}
+
 // publishPanelTestView and publishPanelDecisionTestView are frozen,
 // byte-identical copies of panels/publish_panel_test.go's test fixtures
 // (unexported, so unreachable across the package boundary) needed by this

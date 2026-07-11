@@ -71,8 +71,8 @@ func TestRenderHomeLayerSelectionUsesTypedProps(t *testing.T) {
 		`<div class="studio-home-layer-picker" data-studio-home-layer-picker="true" data-studio-home-layer-selected="hero">`,
 		`<output data-studio-selection-label="true" aria-live="polite">Hero</output>`,
 		`<div class="studio-home-layer-picker__list" role="toolbar" aria-label="Select home section">`,
-		`<button type="button" data-studio-home-layer-pick="hero" aria-pressed>Hero</button>`,
-		`<button type="button" data-studio-home-layer-pick="featured">Featured</button>`,
+		`<button type="button" data-studio-home-layer-pick="hero" aria-pressed="true">Hero</button>`,
+		`<button type="button" data-studio-home-layer-pick="featured" aria-pressed="false">Featured</button>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("home layer selection render missing %q:\n%s", fragment, html)

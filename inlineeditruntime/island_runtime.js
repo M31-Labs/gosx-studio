@@ -322,9 +322,12 @@
       control: control,
       originalText: text,
       originalValue: control && "value" in control ? control.value || "" : text,
-      lastText: text
+      lastText: text,
+      hadHref: target.hasAttribute && target.hasAttribute("href"),
+      originalHref: target.hasAttribute && target.hasAttribute("href") ? target.getAttribute("href") || "" : ""
     };
     frame.__gosxStudioInlineEdit = edit;
+    if (edit.hadHref) target.removeAttribute("href");
     target.setAttribute("contenteditable", "plaintext-only");
     target.setAttribute("spellcheck", "true");
     target.setAttribute("data-gosx-studio-inline-editing", "true");
@@ -383,6 +386,7 @@
       });
       emitPreviewTextEvent(opts, "gosxstudio:inline-text-cancel", edit, reason || "cancel", edit.originalValue || "");
     }
+    if (edit.hadHref) edit.target.setAttribute("href", edit.originalHref);
     edit.target.removeAttribute("contenteditable");
     edit.target.removeAttribute("data-gosx-studio-inline-editing");
     if (opts.form && typeof opts.form.removeAttribute === "function") {

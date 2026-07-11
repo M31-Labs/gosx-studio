@@ -141,6 +141,65 @@
     return String(value || "").replace(/\s+/g, " ").trim();
   }
 
+  function selectionLocatorStorageKey(form, route) {
+    var scope = form && (form.id || form.getAttribute("data-studio-shell") || form.getAttribute("action"));
+    return "gosx-studio-selection:" + compactText(window.location.origin + window.location.pathname + ":" + (scope || "studio") + ":" + normalizeSelectionLocatorRoute(route));
+  }
+
+  function normalizeSelectionLocatorRoute(route) {
+    route = String(route || "").trim();
+    if (!route) return "/";
+    try {
+      return new URL(route, window.location.origin).pathname || "/";
+    } catch (error) {
+      return route.split("#")[0].split("?")[0] || "/";
+    }
+  }
+
+  function selectionLocator(detail) {
+    detail = detail || {};
+    return {
+      route: normalizeSelectionLocatorRoute(detail.route || "/"),
+      pageID: compactText(detail.pageID),
+      field: compactText(detail.field),
+      blockKey: compactText(detail.blockKey),
+      nodeID: compactText(detail.nodeID),
+      kind: compactText(detail.kind || (detail.field ? "field" : detail.blockKey ? "block" : detail.nodeID ? "node" : ""))
+    };
+  }
+
+  function writeSelectionLocator(form, detail) {
+    var locator = selectionLocator(detail);
+    if (!locator.field && !locator.blockKey && !locator.nodeID && !locator.pageID) return false;
+    try {
+      window.sessionStorage.setItem(selectionLocatorStorageKey(form, locator.route), JSON.stringify(locator));
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function readSelectionLocator(form, route) {
+    try {
+      var value = JSON.parse(window.sessionStorage.getItem(selectionLocatorStorageKey(form, route)) || "null");
+      if (!value || typeof value !== "object") return null;
+      var locator = selectionLocator(value);
+      if (locator.route !== normalizeSelectionLocatorRoute(route)) return null;
+      if (!locator.field && !locator.blockKey && !locator.nodeID && !locator.pageID) return null;
+      return locator;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function clearSelectionLocator(form, route) {
+    try {
+      window.sessionStorage.removeItem(selectionLocatorStorageKey(form, route));
+    } catch (error) {
+      return;
+    }
+  }
+
   function editorWorkbench(root) {
     var scope = root && root.querySelector ? root : doc;
     return scope.querySelector ? scope.querySelector("[data-studio-workbench]") : null;
@@ -284,13 +343,17 @@
       });
     }
 
-    function syncInspectorForSelection(key) {
-      key = key || selectedKey();
+    function syncInspectorForExactSelection(key) {
+      key = String(key || "").trim();
       Array.prototype.forEach.call(form.querySelectorAll("[data-studio-inspector-for]"), function (node) {
         var visible = inspectorMatchesSelection(node.getAttribute("data-studio-inspector-for"), key);
         node.hidden = !visible;
         node.classList.toggle("is-inspector-hidden", !visible);
       });
+    }
+
+    function syncInspectorForSelection(key) {
+      syncInspectorForExactSelection(key || selectedKey());
     }
 
     function workspaceScopeForKey(key) {
@@ -349,6 +412,31 @@
       Array.prototype.forEach.call(form.querySelectorAll("[data-studio-home-layer-selected]"), function (picker) {
         picker.setAttribute("data-studio-home-layer-selected", key || "");
       });
+    }
+
+    function syncPageNavigatorSelection(pageID, route) {
+      route = normalizeSelectionLocatorRoute(route || "/");
+      Array.prototype.forEach.call(form.querySelectorAll("[data-studio-site-page]"), function (link) {
+        var key = link.getAttribute("data-studio-site-page") || "";
+        var href = normalizeSelectionLocatorRoute(link.getAttribute("href") || "");
+        var selected = (!!pageID && key === pageID) || (!!route && href === route && (key.indexOf("page:") === 0));
+        link.classList.toggle("is-selected", selected);
+        if (selected) link.setAttribute("aria-current", "page");
+        else if (link.getAttribute("aria-current") === "page") link.removeAttribute("aria-current");
+      });
+    }
+
+    function pageNavigatorIdentityForRoute(route) {
+      route = normalizeSelectionLocatorRoute(route || "/");
+      var pageID = "";
+      Array.prototype.some.call(form.querySelectorAll("[data-studio-site-page]"), function (link) {
+        var key = link.getAttribute("data-studio-site-page") || "";
+        var href = normalizeSelectionLocatorRoute(link.getAttribute("href") || "");
+        if (key.indexOf("page:") !== 0 || href !== route) return false;
+        pageID = key;
+        return true;
+      });
+      return pageID;
     }
 
     // Sub-behavior 3: field focus management.
@@ -572,6 +660,23 @@
         target.setAttribute("data-gosx-studio-inspector-selected", "true");
         if (target.classList) target.classList.add(target === row ? "is-studio-field-active" : "is-preview-selected");
       });
+      var panel = source && source.closest ? source.closest("[data-studio-home-inspector-panel]") : null;
+      var group = source && source.getAttribute ? source.getAttribute("data-studio-field-group") || "" : "";
+      if (!group && row) group = row.getAttribute("data-studio-field-group") || "";
+      if (panel && group) {
+        panel.setAttribute("data-studio-inspector-group-active", group);
+        Array.prototype.forEach.call(panel.querySelectorAll("[data-studio-inspector-group]"), function (button) {
+          button.setAttribute("aria-pressed", button.getAttribute("data-studio-inspector-group") === group ? "true" : "false");
+        });
+      }
+      var rail = row && row.closest ? row.closest(".editor-sidebar, [data-studio-sidebar='right']") : null;
+      if (row && rail) {
+        var rowRect = row.getBoundingClientRect();
+        var railRect = rail.getBoundingClientRect();
+        if (rowRect.top < railRect.top || rowRect.bottom > railRect.bottom) {
+          rail.scrollTop += rowRect.top < railRect.top ? rowRect.top - railRect.top : rowRect.bottom - railRect.bottom;
+        }
+      }
     }
 
     function previewSelectionResult(detail) {
@@ -580,7 +685,7 @@
       var control = fieldControl(source);
       var editable = detail.editable || inferPreviewEditableKind(source, control) || "";
       var actions = applyFieldActionMetadata(source, detail);
-      var selectionKey = detail.blockKey || detail.nodeID || detail.field || "";
+      var selectionKey = detail.field || detail.blockKey || detail.nodeID || detail.pageID || "";
       var kind = detail.field ? "preview-field" : "preview";
       return {
         field: detail.field || "",
@@ -593,7 +698,8 @@
         selectionKey: selectionKey,
         kind: kind,
         blockKey: detail.blockKey || "",
-        nodeID: detail.nodeID || ""
+        nodeID: detail.nodeID || "",
+        pageID: detail.pageID || ""
       };
     }
 
@@ -769,7 +875,7 @@
       var envelope = event.detail || {};
       var detail = envelope.detail || {};
       var options = envelope.options || {};
-      if (!detail.field && !detail.blockKey && !detail.nodeID) return;
+      if (!detail.field && !detail.blockKey && !detail.nodeID && !detail.pageID) return;
       clearPreviewInspectorSelection();
       clearFieldFocus();
       var result = previewSelectionResult(detail);
@@ -787,6 +893,10 @@
       if (result.selectionKey) form.setAttribute("data-studio-selection", result.selectionKey);
       else form.removeAttribute("data-studio-selection");
       form.setAttribute("data-studio-selection-kind", result.kind);
+      syncHomeLayerPicker(result.blockKey || result.nodeID || "");
+      syncPageNavigatorSelection(result.pageID || detail.pageID || "", detail.route || "/");
+      syncInspectorForSelection(result.blockKey || result.nodeID || "");
+      form.setAttribute("data-studio-preview-route-current", normalizeSelectionLocatorRoute(detail.route || "/"));
       setSelectionReadout(result.label || result.field || result.blockKey || "Preview selection");
       setReadout("[data-studio-selection-status]", result.field ? "Preview field" : "Preview selection");
       Array.prototype.forEach.call(form.querySelectorAll("[data-studio-field-selection-label]"), function (readout) {
@@ -795,6 +905,14 @@
       updateFieldActionLabels();
       updateStyleScope();
       writeSharedSignal("$selection.fieldFocus", { field: result.field, editable: result.editable, label: result.label || fieldLabel(result.field) });
+      writeSelectionLocator(form, {
+        route: detail.route || "/",
+        pageID: detail.pageID || "",
+        field: result.field,
+        blockKey: result.blockKey,
+        nodeID: result.nodeID,
+        kind: result.kind
+      });
       envelope.result = result;
       selectionOperationCounter += 1;
       form.dispatchEvent(new CustomEvent("gosxstudio:editor-operation", {
@@ -849,6 +967,7 @@
       updateWorkspaceSelectionLinks("");
       syncHomeLayerPicker("");
       clearFieldFocus();
+      syncInspectorForExactSelection("");
       setSelectionReadout("No selection");
       updateSelectionStatus(null);
       Array.prototype.forEach.call(form.querySelectorAll("[data-studio-field-selection-label]"), function (readout) {
@@ -858,7 +977,31 @@
       updateStyleScope();
       writeSharedSignal("$selection.block", { key: "", label: "" });
       writeSharedSignal("$selection.workspaceTarget", { scope: "", key: "", label: "" });
+      if (!envelope.keepLocator) {
+        clearSelectionLocator(form, form.getAttribute("data-studio-preview-route-current") || "/");
+      }
       envelope.result = { cleared: true };
+    }
+
+    function suspendPreviewSelectionState(event) {
+      var envelope = event.detail || {};
+      var route = normalizeSelectionLocatorRoute(envelope.route || "/");
+      envelope.keepLocator = true;
+      clearPreviewSelectionState({ detail: envelope });
+      var pageID = pageNavigatorIdentityForRoute(route);
+      form.setAttribute("data-studio-preview-route-current", route);
+      syncPageNavigatorSelection(pageID, route);
+      syncInspectorForExactSelection(pageID);
+      envelope.result = { cleared: true, suspended: true, route: route, pageID: pageID };
+    }
+
+    function restorePreviewSelectionLocator(event) {
+      var envelope = event.detail || {};
+      envelope.result = readSelectionLocator(form, envelope.route || "/");
+    }
+
+    function clearStalePreviewSelectionLocator(event) {
+      clearSelectionLocator(form, event && event.detail && event.detail.route || form.getAttribute("data-studio-preview-route-current") || "/");
     }
 
     function emitPreviewFieldNavigation(event) {
@@ -1307,6 +1450,9 @@
     form.addEventListener("gosxstudio:preview-selection-detail-resolve", resolvePreviewSelectionDetail);
     form.addEventListener("gosxstudio:preview-selection-apply", applyPreviewSelectionState);
     form.addEventListener("gosxstudio:preview-selection-clear", clearPreviewSelectionState);
+	form.addEventListener("gosxstudio:preview-selection-suspend", suspendPreviewSelectionState);
+    form.addEventListener("gosxstudio:preview-selection-locator-restore", restorePreviewSelectionLocator);
+    form.addEventListener("gosxstudio:preview-selection-locator-stale", clearStalePreviewSelectionLocator);
     form.addEventListener("gosxstudio:preview-field-target-resolve", resolvePreviewFieldTarget);
     form.addEventListener("gosxstudio:preview-field-reveal", revealPreviewField);
     form.addEventListener("gosxstudio:preview-field-navigation-commit", emitPreviewFieldNavigation);
@@ -1317,6 +1463,10 @@
     bindCommandPaletteCommands();
     if (form.getAttribute("data-studio-mode") === "advanced") ensureWorkspaceSelection();
     else updateSelection("");
+    form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-restore-request", {
+      bubbles: true,
+      detail: { reason: "selection-runtime-bound" }
+    }));
   }
 
   // Publish the island global. The name is the contract referenced by

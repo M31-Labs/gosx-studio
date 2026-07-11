@@ -89,8 +89,16 @@
   function editorPreviewDockForFrame(frame) {
     var shell = editorPreviewShellForFrame(frame);
     if (!shell) return { dock: null, shell: null };
+    var dock = shell.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]");
+    if (!dock) {
+      var form = closestWorkbenchForm(frame);
+      dock = form && form.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]");
+      if (dock && shell.matches && shell.matches("[data-gosx-studio-page-canvas]") && !shell.contains(dock)) {
+        shell.appendChild(dock);
+      }
+    }
     return {
-      dock: shell.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]"),
+      dock: dock,
       shell: shell
     };
   }
@@ -126,7 +134,145 @@
 
   function editorPreviewSelectableNode(target) {
     if (!target || !target.closest) return null;
-    return target.closest("[data-studio-field], [data-editor-preview], [data-studio-field-source], [data-studio-block-key], [data-studio-node-id]");
+    var selectable = target.closest("[data-studio-field], [data-editor-preview], [data-studio-field-source], [data-studio-block-key], [data-studio-node-id]");
+    if (selectable) {
+      var pageOnlyAncestor = selectable !== target && selectable.hasAttribute("data-studio-page-id") && !selectable.hasAttribute("data-studio-field") && !selectable.hasAttribute("data-studio-block-key");
+      if (!pageOnlyAncestor) return selectable;
+    }
+    return target.matches && target.matches("[data-studio-page-id]") ? target : null;
+  }
+
+  function normalizedEditorPreviewRoute(value) {
+    value = String(value || "").trim();
+    if (!value) return "/";
+    try {
+      var parsed = new URL(value, window.location.origin);
+      return parsed.pathname || "/";
+    } catch (error) {
+      return (value.split("#")[0].split("?")[0] || "/");
+    }
+  }
+
+  function editorPreviewRouteForFrame(frame) {
+    var frameDoc = editorPreviewFrameDocument(frame);
+    var declared = frameDoc && frameDoc.documentElement && frameDoc.documentElement.getAttribute("data-studio-route");
+    if (!declared && frameDoc && frameDoc.body) declared = frameDoc.body.getAttribute("data-studio-route");
+    if (declared) return normalizedEditorPreviewRoute(declared);
+    try {
+      if (frame && frame.contentWindow && frame.contentWindow.location) return normalizedEditorPreviewRoute(frame.contentWindow.location.pathname);
+    } catch (error) {
+      return normalizedEditorPreviewRoute(editorPreviewURL(frame));
+    }
+    return normalizedEditorPreviewRoute(editorPreviewURL(frame));
+  }
+
+  function editorPreviewIdentityDetail(frame, target, detail) {
+    detail = detail || {};
+    var frameDoc = editorPreviewFrameDocument(frame);
+    var page = target && target.closest ? target.closest("[data-studio-page-id]") : null;
+    if (!page && frameDoc) page = frameDoc.querySelector("[data-studio-page-id]");
+    detail.route = editorPreviewRouteForFrame(frame);
+    detail.pageID = page ? page.getAttribute("data-studio-page-id") || "" : "";
+    detail.kind = detail.field ? "field" : detail.blockKey ? "block" : detail.nodeID ? "node" : detail.pageID ? "page" : "";
+    return detail;
+  }
+
+  function setEditorPreviewDiagnostic(form, code, detail) {
+    detail = detail || {};
+    var route = normalizedEditorPreviewRoute(detail.route || "");
+    var tag = String(detail.tag || "node").toLowerCase();
+    var message = detail.message || "";
+    if (!message && code === "unsupported-node") {
+      message = "Unsupported <" + tag + "> on " + route + ". Add a stable Studio field, block, node, or page identity.";
+    } else if (!message && code === "same-origin-unavailable") {
+      message = "Page canvas unavailable: the preview must be same-origin and permitted by the frame policy.";
+    } else if (!message && code === "stale-selection") {
+      message = "The previous selection no longer exists on " + route + ". Select another page object.";
+    }
+    editorPreviewShells(form).forEach(function (shell) {
+      shell.setAttribute("data-studio-preview-diagnostic-code", code || "");
+    });
+    queryAll(form, "[data-studio-preview-diagnostic]").forEach(function (node) {
+      node.setAttribute("data-studio-preview-diagnostic-code", code || "");
+      node.setAttribute("data-studio-preview-diagnostic-route", route);
+      node.setAttribute("data-studio-preview-diagnostic-tag", tag);
+      node.textContent = message;
+    });
+    form.dispatchEvent(new CustomEvent("gosxstudio:preview-diagnostic", {
+      bubbles: true,
+      detail: { code: code || "", route: route, tag: tag, nearest: detail.nearest || "", message: message }
+    }));
+    return { handled: true, code: code || "", message: message };
+  }
+
+  function clearEditorPreviewDiagnostic(form) {
+    editorPreviewShells(form).forEach(function (shell) {
+      shell.removeAttribute("data-studio-preview-diagnostic-code");
+    });
+    queryAll(form, "[data-studio-preview-diagnostic]").forEach(function (node) {
+      node.removeAttribute("data-studio-preview-diagnostic-code");
+      node.removeAttribute("data-studio-preview-diagnostic-route");
+      node.removeAttribute("data-studio-preview-diagnostic-tag");
+      node.textContent = "";
+    });
+  }
+
+  function diagnoseUnsupportedEditorPreviewNode(form, frame, target) {
+    var nearest = target && target.closest ? target.closest("[data-studio-page-id], [data-studio-route]") : null;
+    return setEditorPreviewDiagnostic(form, "unsupported-node", {
+      route: editorPreviewRouteForFrame(frame),
+      tag: target && target.tagName ? target.tagName : "node",
+      nearest: nearest ? nearest.getAttribute("data-studio-page-id") || nearest.getAttribute("data-studio-route") || "" : ""
+    });
+  }
+
+  function stopEditorPreviewActivation(event) {
+    if (!event) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function makeEditorPreviewIdentityFocusable(frameDoc) {
+    if (!frameDoc) return 0;
+    var count = 0;
+    queryAll(frameDoc, "[data-studio-field], [data-editor-preview], [data-studio-field-source], [data-studio-block-key], [data-studio-node-id], [data-studio-page-id]").forEach(function (node) {
+      if (node.matches && node.matches("a[href], button, input, select, textarea, [tabindex]")) return;
+      var ownsLeaf = node.matches && node.matches("[data-studio-field], [data-editor-preview], [data-studio-field-source]");
+      var nestedLeaf = node.querySelector && node.querySelector("[data-studio-field], [data-editor-preview], [data-studio-field-source]");
+      if (!ownsLeaf && nestedLeaf) return;
+      node.setAttribute("tabindex", "0");
+      node.setAttribute("data-gosx-studio-preview-tab-stop", "true");
+      count += 1;
+    });
+    return count;
+  }
+
+  function editorPreviewTargetForLocator(frame, locator) {
+    var frameDoc = editorPreviewFrameDocument(frame);
+    if (!frameDoc || !locator) return null;
+    if (locator.field) return frameDoc.querySelector('[data-studio-field="' + attrValue(locator.field) + '"], [data-editor-preview="' + attrValue(locator.field) + '"], [data-studio-field-source="' + attrValue(locator.field) + '"]');
+    if (locator.blockKey) return frameDoc.querySelector('[data-studio-block-key="' + attrValue(locator.blockKey) + '"]');
+    if (locator.nodeID) return frameDoc.querySelector('[data-studio-node-id="' + attrValue(locator.nodeID) + '"]');
+    if (locator.pageID) return frameDoc.querySelector('[data-studio-page-id="' + attrValue(locator.pageID) + '"]');
+    return null;
+  }
+
+  function restoreEditorPreviewSelection(form, frame, host) {
+    var route = editorPreviewRouteForFrame(frame);
+    var envelope = { route: route, result: null };
+    form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-locator-restore", { bubbles: true, detail: envelope }));
+    var locator = envelope.result;
+    if (!locator) return { handled: false, restored: false };
+    var target = editorPreviewTargetForLocator(frame, locator);
+    if (!target) {
+      setEditorPreviewDiagnostic(form, "stale-selection", { route: route });
+      form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-locator-stale", { bubbles: true, detail: { route: route } }));
+      return { handled: true, restored: false, stale: true };
+    }
+    var detail = editorPreviewIdentityDetail(frame, target, editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {});
+    var restored = editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: false, reason: "restore" });
+    if (restored) clearEditorPreviewDiagnostic(form);
+    return { handled: true, restored: !!restored, detail: detail };
   }
 
   function editorPreviewFieldKeyForTarget(target) {
@@ -336,7 +482,7 @@
     var selection = detail.selection || detail.detail || {};
     var options = detail.options || {};
     var host = detail.host || {};
-    if (!selection.field && !selection.blockKey && !selection.nodeID) {
+    if (!selection.field && !selection.blockKey && !selection.nodeID && !selection.pageID) {
       return { handled: false, applied: null, targets: [] };
     }
     var cleared = clearEditorPreviewSelections(form, host);
@@ -347,7 +493,7 @@
     if (!applied) {
       return { handled: false, applied: null, targets: selectedTargets, marker: marker, cleared: cleared };
     }
-    var chrome = applyEditorPreviewSelectionChrome(form, frame, selection.field || selection.blockKey || selection.nodeID || "");
+    var chrome = applyEditorPreviewSelectionChrome(form, frame, selection.field || selection.blockKey || selection.nodeID || selection.pageID || "");
     var dockSelection = editorPreviewDockSelection(selection, applied);
     var dock = syncEditorPreviewDockSelection(form, frame, selectedTargets[0] || target, dockSelection, host);
     return { handled: true, applied: applied, targets: selectedTargets, marker: marker, chrome: chrome, dock: dock, cleared: cleared };
@@ -762,6 +908,22 @@
     return true;
   }
 
+  function editorPreviewActionControl(target) {
+    return target && target.closest ? target.closest("a[href], button, input, select, textarea, form") : null;
+  }
+
+  function blockEditorPreviewActionControl(form, frame, event, actionControl) {
+    actionControl = actionControl || editorPreviewActionControl(event && event.target);
+    if (!actionControl) return false;
+    setEditorPreviewDiagnostic(form, "preview-action-blocked", {
+      route: editorPreviewRouteForFrame(frame),
+      tag: actionControl.tagName || "control",
+      message: "Form submission and navigation are disabled inside the authoring canvas. Open the public preview to test this action."
+    });
+    stopEditorPreviewActivation(event);
+    return true;
+  }
+
   function editorPreviewKeyboardIntent(event) {
     if (!event || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return null;
     var focusedControl = event.target && event.target.closest ? event.target.closest("input, textarea, select, button, a[href], [contenteditable='true'], [contenteditable='plaintext-only']") : null;
@@ -788,29 +950,61 @@
 
   function bindEditorPreviewDocument(form, frame, host) {
     var frameDoc = editorPreviewFrameDocument(frame);
-    if (!frame || !frameDoc || editorPreviewBoundDocument(frame) === frameDoc) return { handled: false, bound: false };
+    if (!frame || !frameDoc) {
+      if (frame) setEditorPreviewDiagnostic(form, "same-origin-unavailable", { route: editorPreviewURL(frame) });
+      return { handled: false, bound: false };
+    }
+    if (editorPreviewBoundDocument(frame) === frameDoc) return { handled: false, bound: false };
     setEditorPreviewBoundDocument(frame, frameDoc);
     if (frameDoc.documentElement) frameDoc.documentElement.setAttribute("data-gosx-studio-preview-selectable", "true");
+    makeEditorPreviewIdentityFocusable(frameDoc);
+    clearEditorPreviewDiagnostic(form);
     var repositionDock = editorPreviewFrameTask(function () {
       syncEditorPreviewDockPositionForFrame(frame);
     });
     frameDoc.addEventListener("click", function (event) {
-      if (editorPreviewInlineEditContains(frame, event.target)) return;
-      if (!editorPreviewPointerEventEligible(event)) return;
+      var actionControl = editorPreviewActionControl(event.target);
+      if (editorPreviewInlineEditContains(frame, event.target)) {
+        if (actionControl) event.preventDefault();
+        return;
+      }
+      if (!editorPreviewPointerEventEligible(event)) {
+        blockEditorPreviewActionControl(form, frame, event, actionControl);
+        return;
+      }
       var target = editorPreviewSelectableNode(event.target);
-      if (!target) return;
-      var detail = editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {};
-      if (editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: true, reason: "click" })) {
+      if (!target) {
+        if (actionControl) {
+          blockEditorPreviewActionControl(form, frame, event, actionControl);
+        } else {
+          diagnoseUnsupportedEditorPreviewNode(form, frame, event.target);
+        }
+        return;
+      }
+      var detail = editorPreviewIdentityDetail(frame, target, editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {});
+      var selectionApplied = editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: true, reason: "click" });
+      if (selectionApplied) {
+        clearEditorPreviewDiagnostic(form);
+      }
+      if (selectionApplied || actionControl) {
         event.preventDefault();
         event.stopPropagation();
       }
+    }, true);
+    frameDoc.addEventListener("auxclick", function (event) {
+      var actionControl = editorPreviewActionControl(event.target);
+      if (actionControl) {
+        blockEditorPreviewActionControl(form, frame, event, actionControl);
+        return;
+      }
+      if (editorPreviewInlineEditContains(frame, event.target)) return;
     }, true);
     frameDoc.addEventListener("dblclick", function (event) {
       if (editorPreviewInlineEditContains(frame, event.target)) return;
       if (!editorPreviewPointerEventEligible(event)) return;
       var target = editorPreviewSelectableNode(event.target);
       if (!target) return;
-      var detail = editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {};
+      var detail = editorPreviewIdentityDetail(frame, target, editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {});
       if (detail.editable !== "text") return;
       if (editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: true, reason: "double-click" }) && editorPreviewHostCall(host, "startInlineTextFromDetail", false, frame, detail, "double-click")) {
         event.preventDefault();
@@ -821,18 +1015,38 @@
       if (editorPreviewInlineEditContains(frame, event.target)) return;
       var target = editorPreviewSelectableNode(event.target);
       if (target) {
-        var detail = editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {};
+        var detail = editorPreviewIdentityDetail(frame, target, editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {});
         editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: false, reason: "focus" });
       }
     }, true);
     frameDoc.addEventListener("input", function (event) {
       editorPreviewHostCall(host, "handleInlineTextInput", false, frame, event);
     });
+    frameDoc.addEventListener("submit", function (event) {
+      stopEditorPreviewActivation(event);
+      setEditorPreviewDiagnostic(form, "preview-action-blocked", {
+        route: editorPreviewRouteForFrame(frame),
+        tag: "form",
+        message: "Form submission is disabled inside the authoring canvas. Open the public preview to test this action."
+      });
+    }, true);
     frameDoc.addEventListener("keydown", function (event) {
       editorPreviewHostCall(host, "handleInlineTextKeyEvent", false, frame, event);
     });
     frameDoc.addEventListener("keydown", function (event) {
       if (frame.__gosxStudioInlineEdit) return;
+      if ((event.key === "Enter" || event.key === " ") && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) {
+        var selectionTarget = editorPreviewSelectableNode(event.target);
+        if (selectionTarget) {
+          var selectionDetail = editorPreviewIdentityDetail(frame, selectionTarget, editorPreviewHostCall(host, "previewSelectionDetail", {}, selectionTarget) || {});
+          if (editorPreviewHostCall(host, "applyPreviewSelection", false, frame, selectionTarget, selectionDetail, { reveal: true, reason: "keyboard-select" })) {
+            clearEditorPreviewDiagnostic(form);
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+        }
+      }
       var intent = editorPreviewKeyboardIntent(event);
       if (!intent) return;
       if (intent.action === "prev-field" || intent.action === "next-field") {
@@ -876,8 +1090,23 @@
     return bindEditorPreviewDocument(form, frame, host);
   }
 
+  function bindEditorPreviewSelectionRestoreHandshake(form, host) {
+    if (!form || !form.addEventListener) return false;
+    form.__gosxStudioPreviewSelectionRestoreHost = host;
+    if (form.__gosxStudioPreviewSelectionRestoreHandshake) return false;
+    form.__gosxStudioPreviewSelectionRestoreHandshake = true;
+    form.addEventListener("gosxstudio:preview-selection-restore-request", function () {
+      var restoreHost = form.__gosxStudioPreviewSelectionRestoreHost || host;
+      editorPreviewFrames(form).forEach(function (frame) {
+        restoreEditorPreviewSelection(form, frame, restoreHost);
+      });
+    });
+    return true;
+  }
+
   function bindEditorPreviewFrames(form, host) {
     if (!form) return { handled: false, frames: 0, bound: 0 };
+    bindEditorPreviewSelectionRestoreHandshake(form, host);
     var frames = editorPreviewFrames(form);
     var bound = 0;
     frames.forEach(function (frame) {
@@ -891,6 +1120,7 @@
         setEditorPreviewStatus(form, "ready", "Ready", "load");
         syncEditorPreviewFrame(form, frame, "load", typeof host.shouldTransportPreviewPatch === "function" ? host.shouldTransportPreviewPatch : null);
         bindEditorPreviewFrameDocument(form, frame, host);
+        restoreEditorPreviewSelection(form, frame, host);
         var route = editorPreviewURL(frame) || frame.getAttribute("src") || "";
         postEditorPreviewPatch(form, "load-sync", editorPreviewPatchEnvelope("load-sync", { route: route }, null));
       });
@@ -898,9 +1128,32 @@
         setEditorPreviewStatus(form, "error", "Preview failed", "error");
       });
       bindEditorPreviewFrameDocument(form, frame, host);
+      restoreEditorPreviewSelection(form, frame, host);
       bound += 1;
     });
+    bindEditorPreviewRouteControls(form);
     return { handled: true, frames: frames.length, bound: bound };
+  }
+
+  function bindEditorPreviewRouteControls(form) {
+    queryAll(form, "button[data-studio-preview-route]").forEach(function (button) {
+      if (button.dataset && button.dataset.gosxStudioPreviewRouteBound === "true") return;
+      if (button.dataset) button.dataset.gosxStudioPreviewRouteBound = "true";
+      button.addEventListener("click", function (event) {
+        event.preventDefault();
+        var route = button.getAttribute("data-studio-preview-route") || "";
+        if (!route) return;
+        queryAll(form, "button[data-studio-preview-route]").forEach(function (candidate) {
+          candidate.setAttribute("aria-pressed", candidate === button ? "true" : "false");
+        });
+        form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-suspend", {
+          bubbles: true,
+          detail: { route: normalizedEditorPreviewRoute(route), reason: "route-switch" }
+        }));
+        clearEditorPreviewDiagnostic(form);
+        refreshEditorPreviewNow(form, "route", route);
+      });
+    });
   }
 
   function setEditorPreviewStatus(form, state, label, reason) {
@@ -921,11 +1174,16 @@
   function syncEditorPreviewRoute(form, route, reason) {
     route = route || "";
     if (!form || !route) return { handled: false };
+    form.setAttribute("data-studio-preview-route-current", normalizedEditorPreviewRoute(route));
     editorPreviewShells(form).forEach(function (shell) {
       shell.setAttribute("data-gosx-studio-preview-url", route);
     });
     editorPreviewFrames(form).forEach(function (frame) {
       frame.setAttribute("data-studio-preview-src", route);
+      frame.setAttribute("data-studio-preview-route", normalizedEditorPreviewRoute(route));
+    });
+    queryAll(form, "button[data-studio-preview-route]").forEach(function (button) {
+      button.setAttribute("aria-pressed", normalizedEditorPreviewRoute(button.getAttribute("data-studio-preview-route")) === normalizedEditorPreviewRoute(route) ? "true" : "false");
     });
     queryAll(form, "[data-studio-open-preview]").forEach(function (link) {
       if (link.getAttribute("aria-disabled") === "true") return;
