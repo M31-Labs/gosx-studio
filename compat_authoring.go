@@ -22,8 +22,53 @@ import (
 
 	"m31labs.dev/gosx-studio/authoring"
 	"m31labs.dev/gosx-studio/cms/media"
+	"m31labs.dev/gosx-studio/core"
 	"m31labs.dev/gosx/action"
 )
+
+type InteractionOperationKind = authoring.InteractionOperationKind
+type InteractionEvent = core.InteractionEvent
+type InteractionActionKind = core.InteractionActionKind
+type InteractionConditionKind = core.InteractionConditionKind
+type InteractionTarget = core.InteractionTarget
+type InteractionCondition = core.InteractionCondition
+type InteractionAction = core.InteractionAction
+type InteractionGraph = core.InteractionGraph
+type InteractionState = authoring.InteractionState
+type InteractionOperation = authoring.InteractionOperation
+type InteractionOperationRecord = authoring.InteractionOperationRecord
+type InteractionApplyOptions = authoring.InteractionApplyOptions
+type InteractionResult = authoring.InteractionResult
+type InteractionStateStore = authoring.InteractionStateStore
+type FileInteractionStateStore = authoring.FileInteractionStateStore
+
+const (
+	InteractionUpsert = authoring.InteractionUpsert
+	InteractionDelete = authoring.InteractionDelete
+	InteractionUndo   = authoring.InteractionUndo
+	InteractionRedo   = authoring.InteractionRedo
+)
+
+var (
+	ErrInteractionUnauthorized = authoring.ErrInteractionUnauthorized
+	ErrInteractionConflict     = authoring.ErrInteractionConflict
+	ErrInteractionIdempotency  = authoring.ErrInteractionIdempotency
+	ErrInteractionNotFound     = authoring.ErrInteractionNotFound
+	ErrInteractionReferenced   = authoring.ErrInteractionReferenced
+)
+
+func ApplyInteractionOperation(state InteractionState, operation InteractionOperation, options InteractionApplyOptions) (InteractionResult, error) {
+	return authoring.ApplyInteractionOperation(state, operation, options)
+}
+func CommitInteractionOperation(ctx context.Context, store InteractionStateStore, operation InteractionOperation, options InteractionApplyOptions) (InteractionResult, error) {
+	return authoring.CommitInteractionOperation(ctx, store, operation, options)
+}
+func ValidateInteractionReferenceDeletion(state InteractionState, kind, id string) error {
+	return authoring.ValidateInteractionReferenceDeletion(state, kind, id)
+}
+func SerializeInteractionGraphs(graphs []core.InteractionGraph) (string, error) {
+	return core.SerializeInteractionGraphs(graphs)
+}
 
 type AssetOperationKind = authoring.AssetOperationKind
 type AssetBindingTarget = authoring.AssetBindingTarget

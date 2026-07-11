@@ -28,6 +28,7 @@ import (
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/inlineeditruntime"
 	"m31labs.dev/gosx-studio/inspectorruntime"
+	"m31labs.dev/gosx-studio/interactionruntime"
 	"m31labs.dev/gosx-studio/operationruntime"
 	"m31labs.dev/gosx-studio/previewruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
@@ -74,6 +75,7 @@ func builtinRuntimeSlices() [][]byte {
 		sitemapruntime.Bundle(),
 		inspectorruntime.Bundle(),
 		inlineeditruntime.Bundle(),
+		interactionruntime.Bundle(),
 		operationruntime.Script(),
 	}
 }

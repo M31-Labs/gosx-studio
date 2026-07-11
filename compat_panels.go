@@ -68,6 +68,12 @@ type ReusableComponentPanelOptions = panels.ReusableComponentPanelOptions
 
 type AssetLibraryPanelOptions = panels.AssetLibraryPanelOptions
 
+type InteractionPanelOptions = panels.InteractionPanelOptions
+
+func RenderInteractionPanel(options InteractionPanelOptions) gosx.Node {
+	return panels.RenderInteractionPanel(options)
+}
+
 func RenderAssetLibraryPanel(options AssetLibraryPanelOptions) gosx.Node {
 	return panels.RenderAssetLibraryPanel(options)
 }

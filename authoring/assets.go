@@ -108,6 +108,7 @@ type AssetApplyOptions struct {
 	ActorID, ActorLabel            string
 	CanManageAssets, CanBindAssets bool
 	Reusable                       ReusableState
+	Interactions                   InteractionState
 }
 type AssetOperationResult struct {
 	State   AssetState
@@ -295,6 +296,9 @@ func applyAssetMutation(state *AssetState, op AssetOperation, options AssetApply
 			if binding.AssetID == op.AssetID {
 				return ErrAssetReferenced
 			}
+		}
+		if err := ValidateInteractionReferenceDeletion(options.Interactions, "asset", op.AssetID); err != nil {
+			return err
 		}
 		delete(state.Assets, op.AssetID)
 	case AssetBind:
