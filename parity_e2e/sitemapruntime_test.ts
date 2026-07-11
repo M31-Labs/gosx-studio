@@ -7,6 +7,18 @@ const runtimeJS = readFileSync(
   "utf8",
 );
 
+declare global {
+  interface Window {
+    GoSXStudioSiteMapRuntime: {
+      setState(board: Element | null, state: Record<string, unknown>): void;
+    };
+    __activatedKey: unknown;
+    __activated: boolean;
+    __moved: { key: unknown; x: unknown; y: unknown } | null;
+    __moveCount: number;
+  }
+}
+
 test.describe("@smoke GoSXStudioSiteMapRuntime interactions", () => {
   test("drives board tabs, filters, palette state, and node selection", async ({ page }) => {
     await page.setContent(`
@@ -247,6 +259,7 @@ test.describe("@smoke GoSXStudioSiteMapRuntime infinite-canvas pan and zoom", ()
 
     const canvas = page.locator("[data-studio-site-map-canvas='true']");
     const box = await canvas.boundingBox();
+    if (!box) throw new Error("canvas has no bounding box");
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.wheel(0, -100);
 
@@ -274,6 +287,7 @@ test.describe("@smoke GoSXStudioSiteMapRuntime infinite-canvas pan and zoom", ()
 
     const canvas = page.locator("[data-studio-site-map-canvas='true']");
     const box = await canvas.boundingBox();
+    if (!box) throw new Error("canvas has no bounding box");
     // Start in the empty bottom-right of the canvas, away from the node.
     const startX = box.x + box.width - 24;
     const startY = box.y + box.height - 24;
@@ -319,6 +333,7 @@ test.describe("@smoke GoSXStudioSiteMapRuntime infinite-canvas marquee and multi
 
     const canvas = page.locator("[data-studio-site-map-canvas='true']");
     const box = await canvas.boundingBox();
+    if (!box) throw new Error("canvas has no bounding box");
     await page.keyboard.down("Shift");
     await page.mouse.move(box.x + 16, box.y + 16);
     await page.mouse.down();
@@ -481,11 +496,12 @@ test.describe("@smoke GoSXStudioSiteMapRuntime infinite-canvas keyboard navigati
     const board = page.locator("[data-studio-site-map-board='true']");
     await page.evaluate(() => {
       const root = document.querySelector("[data-studio-site-map-board='true']");
+      if (!root) throw new Error("site map board missing");
       window.GoSXStudioSiteMapRuntime.setState(root, { selectedNode: "left" });
       // Hide `center` directly; arrow nav must skip invisible nodes.
-      root
-        .querySelector("[data-studio-site-map-workspace-node='center']")
-        .setAttribute("data-studio-site-map-visible", "false");
+      const center = root.querySelector("[data-studio-site-map-workspace-node='center']");
+      if (!center) throw new Error("center node missing");
+      center.setAttribute("data-studio-site-map-visible", "false");
     });
 
     await board.focus();
@@ -501,9 +517,11 @@ test.describe("@smoke GoSXStudioSiteMapRuntime infinite-canvas keyboard navigati
     const board = page.locator("[data-studio-site-map-board='true']");
     await page.evaluate(() => {
       const root = document.querySelector("[data-studio-site-map-board='true']");
+      if (!root) throw new Error("site map board missing");
       window.__activatedKey = null;
       root.addEventListener("gosxstudio:site-map-activate", (event) => {
-        window.__activatedKey = event.detail && event.detail.key;
+        const detail = (event as CustomEvent<{ key?: string }>).detail;
+        window.__activatedKey = detail && detail.key;
       });
       window.GoSXStudioSiteMapRuntime.setState(root, { selectedNode: "right" });
     });
@@ -521,9 +539,11 @@ test.describe("@smoke GoSXStudioSiteMapRuntime infinite-canvas keyboard navigati
     const board = page.locator("[data-studio-site-map-board='true']");
     await page.evaluate(() => {
       const root = document.querySelector("[data-studio-site-map-board='true']");
+      if (!root) throw new Error("site map board missing");
       window.__activatedKey = null;
       root.addEventListener("gosxstudio:site-map-activate", (event) => {
-        window.__activatedKey = event.detail && event.detail.key;
+        const detail = (event as CustomEvent<{ key?: string }>).detail;
+        window.__activatedKey = detail && detail.key;
       });
       window.GoSXStudioSiteMapRuntime.setState(root, { selectedNode: "down" });
     });

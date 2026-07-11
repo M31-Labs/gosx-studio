@@ -247,7 +247,7 @@ async function scrollSelectorIntoView(page: Page, selector: string) {
       while (current && current !== ancestor && ancestor.contains(current)) {
         top += current.offsetTop;
         left += current.offsetLeft;
-        const next = current.offsetParent instanceof HTMLElement ? current.offsetParent : current.parentElement;
+        const next: HTMLElement | null = current.offsetParent instanceof HTMLElement ? current.offsetParent : current.parentElement;
         current = next;
       }
       return { top, left };
