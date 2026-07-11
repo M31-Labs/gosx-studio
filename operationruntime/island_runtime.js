@@ -80,6 +80,43 @@
         form.__gosxOperationRuntime.commit(kind, value, { componentKey: button.getAttribute("data-gosx-studio-component"), property: button.getAttribute("data-gosx-studio-style-property"), breakpoint: button.getAttribute("data-gosx-studio-breakpoint"), state: button.getAttribute("data-gosx-studio-state"), historyOperationId: button.getAttribute("data-gosx-studio-history-operation-id") });
       });
     });
+    if (!document.__gosxStudioOperationSelectionBridge) {
+      document.__gosxStudioOperationSelectionBridge = true;
+      document.addEventListener("gosxstudio:preview-select", function (event) { bridgeSelection(event.detail || {}); });
+      document.addEventListener("gosxstudio:editor-operation", function (event) {
+        var detail = event.detail || {};
+        if (detail.mutation === false && detail.target) bridgeSelection(detail.target);
+      });
+    }
+  }
+  function bridgeSelection(detail) {
+    detail = detail || {};
+    var field = detail.field || "";
+    var routeNode = document.querySelector("[data-studio-preview-route-current]");
+    var route = detail.route || detail.targetRoute || (routeNode && routeNode.getAttribute("data-studio-preview-route-current")) || "/";
+    var pageId = detail.pageID || detail.pageId || (route === "/about" ? "page:about" : "page:home");
+    var component = detail.componentKey || detail.blockKey || "";
+    if (component && component.indexOf(":") < 0) component = (route === "/about" ? "about:" : "home:") + component;
+    if (!component && field === "pages.about.title") component = "about:content";
+    var forms = document.querySelectorAll("form[data-gosx-studio-durable-history='true']");
+    Array.prototype.forEach.call(forms, function (form) {
+      var formRoute = form.getAttribute("data-studio-target-route") || "/";
+      var formField = form.getAttribute("data-studio-target-field") || "";
+      if (field && formField !== field) return;
+      if (route && formRoute !== route) return;
+      form.setAttribute("data-studio-target-route", route);
+      form.setAttribute("data-studio-target-page-id", pageId);
+      form.setAttribute("data-studio-target-component", component);
+      ["gosx_studio_page_route", "gosx_studio_page_key", "gosx_studio_component_key", "gosx_studio_binding"].forEach(function (name, index) {
+        var value = [route, pageId, component, field][index];
+        form.querySelectorAll("[name='" + name + "']").forEach(function (node) { node.value = value; });
+      });
+      if (detail.value !== undefined || detail.text !== undefined) {
+        var valueNode = form.querySelector("[data-studio-operation-value]");
+        if (valueNode) valueNode.value = String(detail.value !== undefined ? detail.value : detail.text);
+      }
+      if (form.__gosxOperationRuntime) form.__gosxOperationRuntime.select({ route: route, pageId: pageId, field: field, componentKey: component });
+    });
   }
   window.GoSXStudioOperationRuntime = { bind: bind, create: runtime };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { bind(document); }, { once: true }); else bind(document);
