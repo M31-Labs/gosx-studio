@@ -17,6 +17,24 @@ package studio
 
 import "m31labs.dev/gosx-studio/core"
 
+// Reusable component definition/instance protocol aliases.
+type ExplicitOverride = core.ExplicitOverride
+type DefinitionStyles = core.DefinitionStyles
+type DefinitionLayout = core.DefinitionLayout
+type ComponentDefinition = core.ComponentDefinition
+type ComponentInstance = core.ComponentInstance
+
+var (
+	ErrReusableInvalid          = core.ErrReusableInvalid
+	ErrReusableDefinitionAbsent = core.ErrReusableDefinitionAbsent
+)
+
+func ResolveComponentInstance(instance ComponentInstance, definitions map[string]ComponentDefinition) (ComponentDefinition, error) {
+	return core.ResolveComponentInstance(instance, definitions)
+}
+
+func ValidInstanceOverrideKey(key string) bool { return core.ValidInstanceOverrideKey(key) }
+
 // --- Kind/enum types (core/kinds.go) ---
 
 // Deprecated: use core.SurfaceKind.

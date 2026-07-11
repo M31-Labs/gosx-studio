@@ -10,7 +10,8 @@ import (
 )
 
 type BlockLibraryPanelOptions struct {
-	RootAttrs map[string]any
+	RootAttrs    map[string]any
+	ReusableNode *gosx.Node
 }
 
 func RenderBlockLibraryPanel(view map[string]any, options BlockLibraryPanelOptions) gosx.Node {
@@ -32,6 +33,9 @@ func RenderBlockLibraryPanel(view map[string]any, options BlockLibraryPanelOptio
 	}
 	if len(items) > 0 || core.WorkbenchViewBool(view, "hasItems") {
 		children = append(children, gosx.El("div", gosx.Attrs(gosx.Attr("class", core.WorkbenchViewString(view, "listClass"))), gosx.Fragment(renderBlockLibraryPanelItems(items)...)))
+	}
+	if options.ReusableNode != nil {
+		children = append(children, gosx.El("div", gosx.Attrs(gosx.Attr("data-studio-block-library-reusable-slot", "true")), *options.ReusableNode))
 	}
 	return gosx.El("section", gosx.Attrs(attrs...), gosx.Fragment(children...))
 }

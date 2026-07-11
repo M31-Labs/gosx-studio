@@ -74,3 +74,11 @@ func TestRenderBlockLibraryPanelEmpty(t *testing.T) {
 		t.Fatalf("empty block library panel should not render list:\n%s", html)
 	}
 }
+
+func TestRenderBlockLibraryPanelMountsReusableStateProjection(t *testing.T) {
+	reusable := gosx.El("section", gosx.Attrs(gosx.Attr("data-studio-reusable-component-panel", "true")), gosx.Text("Reusable state"))
+	html := gosx.RenderHTML(RenderBlockLibraryPanel(map[string]any{"title": "Sections"}, BlockLibraryPanelOptions{ReusableNode: &reusable}))
+	if !strings.Contains(html, `data-studio-block-library-reusable-slot="true"`) || !strings.Contains(html, `data-studio-reusable-component-panel="true"`) {
+		t.Fatalf("block library must mount the host-backed reusable projection:\n%s", html)
+	}
+}

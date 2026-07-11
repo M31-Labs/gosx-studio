@@ -64,6 +64,16 @@ func RenderResponsiveLayoutInspector(options ResponsiveLayoutInspectorOptions) g
 	return panels.RenderResponsiveLayoutInspector(options)
 }
 
+type ReusableComponentPanelOptions = panels.ReusableComponentPanelOptions
+
+func RenderReusableComponentPanel(options ReusableComponentPanelOptions) gosx.Node {
+	return panels.RenderReusableComponentPanel(options)
+}
+
+func ReusablePanelOperationKey(kind ReusableOperationKind, instanceID, discriminator string) string {
+	return panels.ReusablePanelOperationKey(kind, instanceID, discriminator)
+}
+
 // --- Activity panel (panels/activity_panel.go) ---
 
 // Deprecated: use panels.ActivityPanelOptions.

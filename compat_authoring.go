@@ -18,9 +18,71 @@ package studio
 // will be removed after the v0.6.x compatibility window (see spec §9).
 
 import (
+	"context"
+
 	"m31labs.dev/gosx-studio/authoring"
 	"m31labs.dev/gosx/action"
 )
+
+type ReusableOperationKind = authoring.ReusableOperationKind
+type ReusableState = authoring.ReusableState
+type ReusableOperation = authoring.ReusableOperation
+type ReusableTargetSnapshot = authoring.ReusableTargetSnapshot
+type ReusableOperationRecord = authoring.ReusableOperationRecord
+type ReusableApplyOptions = authoring.ReusableApplyOptions
+type ReusableOperationResult = authoring.ReusableOperationResult
+type ReusableStateStore = authoring.ReusableStateStore
+
+const (
+	ReusableCreateDefinition    = authoring.ReusableCreateDefinition
+	ReusableCreateInstance      = authoring.ReusableCreateInstance
+	ReusableUpdateDefinition    = authoring.ReusableUpdateDefinition
+	ReusableSetInstanceOverride = authoring.ReusableSetInstanceOverride
+	ReusableClearOverride       = authoring.ReusableClearOverride
+	ReusableDetachInstance      = authoring.ReusableDetachInstance
+	ReusableRestoreInstance     = authoring.ReusableRestoreInstance
+	ReusableRevertOperation     = authoring.ReusableRevertOperation
+)
+
+const (
+	ReusableFieldOperation     = authoring.ReusableFieldOperation
+	ReusableFieldOperationID   = authoring.ReusableFieldOperationID
+	ReusableFieldDefinitionID  = authoring.ReusableFieldDefinitionID
+	ReusableFieldInstanceID    = authoring.ReusableFieldInstanceID
+	ReusableFieldPageKey       = authoring.ReusableFieldPageKey
+	ReusableFieldRegion        = authoring.ReusableFieldRegion
+	ReusableFieldPosition      = authoring.ReusableFieldPosition
+	ReusableFieldOverrideKey   = authoring.ReusableFieldOverrideKey
+	ReusableFieldOverrideValue = authoring.ReusableFieldOverrideValue
+	ReusableFieldExpectedHead  = authoring.ReusableFieldExpectedHead
+)
+
+var (
+	ErrReusableConflict     = authoring.ErrReusableConflict
+	ErrReusableUnauthorized = authoring.ErrReusableUnauthorized
+	ErrReusableIdempotency  = authoring.ErrReusableIdempotency
+	ErrReusableNotFound     = authoring.ErrReusableNotFound
+)
+
+func ApplyReusableOperation(state ReusableState, operation ReusableOperation, options ReusableApplyOptions) (ReusableOperationResult, error) {
+	return authoring.ApplyReusableOperation(state, operation, options)
+}
+
+func ApplyReusableInverse(state ReusableState, historyID, operationID, expectedHead string, options ReusableApplyOptions) (ReusableOperationResult, error) {
+	return authoring.ApplyReusableInverse(state, historyID, operationID, expectedHead, options)
+}
+
+func ReusableOperationFromForm(form map[string]string) (ReusableOperation, error) {
+	return authoring.ReusableOperationFromForm(form)
+}
+
+func CommitReusableOperation(ctx context.Context, store ReusableStateStore, operation ReusableOperation, options ReusableApplyOptions) (ReusableOperationResult, error) {
+	return authoring.CommitReusableOperation(ctx, store, operation, options)
+}
+
+func CommitReusableInverse(ctx context.Context, store ReusableStateStore, historyID, operationID, expectedHead string, options ReusableApplyOptions) (ReusableOperationResult, error) {
+	return authoring.CommitReusableInverse(ctx, store, historyID, operationID, expectedHead, options)
+}
 
 // --- Mutation-boundary types (authoring/mutations.go) ---
 
