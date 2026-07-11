@@ -92,10 +92,19 @@ type RestoreResult struct {
 }
 
 // DraftPreview is the exact-draft-diff surface for a target: the structural
-// diff between live and draft. The operation-log change-set classification
-// (studio.DraftChange, grouped by scope) lands in a later slice (spec §3 /
-// S3); this type keeps room for it without requiring cms/studio here.
+// diff between live and draft (Diff/HasDiff, from Host.DraftDiff) plus the
+// domain-classified, actor-attributed operation-log change set (Changes,
+// spec §3 / slice S3) derived from Host.OperationLog since the target's last
+// publish. Changes is what Publish is about to promote to live, itemized;
+// Diff is the same promotion summarized as net before/after state.
+//
+// HasChanges is presentation-only: an empty change set does not block
+// Engine.Publish (see change_set.go doc comment "Empty-diff publish
+// behavior"); it lets a host render "nothing to publish" without adding a
+// new server-side gate this slice was not asked to add.
 type DraftPreview struct {
-	Diff    lifecycle.RevisionDiff
-	HasDiff bool
+	Diff       lifecycle.RevisionDiff
+	HasDiff    bool
+	Changes    []DraftChange
+	HasChanges bool
 }

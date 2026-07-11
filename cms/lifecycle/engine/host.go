@@ -44,6 +44,16 @@ type HostLifecycle interface {
 	// OperationLog is read-only. It returns the operation-log tail for the
 	// draft change set (see spec §3 / slice S3).
 	OperationLog(ctx context.Context, ref TargetRef, sinceRevision uint64) ([]authoring.OperationRecord, error)
+	// PublishedOperationRevision is read-only. It reports the durable
+	// operation log's DocumentRevision high-water mark as of ref's current
+	// live (published) state, so Engine.PendingDiff can ask OperationLog for
+	// exactly the tail applied since the last publish (spec §3 / slice S3).
+	// Only the host can answer this: it is the one place a target's content
+	// revision and its durable operation-log sequence are correlated. A host
+	// that has not wired that correlation yet may safely return 0 -- every
+	// operation in the log then shows as still-pending, which is the
+	// conservative/safe default (never hides a real pending change).
+	PublishedOperationRevision(ctx context.Context, ref TargetRef) (uint64, error)
 }
 
 // PublishOutcome is what a host reports after ApplyPublish promotes a draft

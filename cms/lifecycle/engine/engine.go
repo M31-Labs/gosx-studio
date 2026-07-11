@@ -107,9 +107,11 @@ func (e *Engine) Readiness(ctx context.Context, ref TargetRef) (Gate, error) {
 	return Gate{Blockers: blockers}, nil
 }
 
-// PendingDiff returns the structural draft-diff surface for ref. The
-// operation-log change-set classification (studio.DraftChange) lands in a
-// later slice (spec §3 / S3).
+// PendingDiff returns the exact-draft-diff surface for ref: the structural
+// diff (Host.DraftDiff) plus the operation-log change set (spec §3 / S3),
+// classified by domain and collapsed per OperationChangeSet's exact-inverse
+// semantics (change_set.go). This is what the publish panel renders as
+// "what will publish" -- precisely, not a summary.
 func (e *Engine) PendingDiff(ctx context.Context, ref TargetRef) (DraftPreview, error) {
 	if e.Host == nil {
 		return DraftPreview{}, nil
@@ -118,7 +120,19 @@ func (e *Engine) PendingDiff(ctx context.Context, ref TargetRef) (DraftPreview, 
 	if err != nil {
 		return DraftPreview{}, err
 	}
-	return DraftPreview{Diff: diff, HasDiff: hasDraft}, nil
+	preview := DraftPreview{Diff: diff, HasDiff: hasDraft}
+
+	since, err := e.Host.PublishedOperationRevision(ctx, ref)
+	if err != nil {
+		return DraftPreview{}, err
+	}
+	ops, err := e.Host.OperationLog(ctx, ref, since)
+	if err != nil {
+		return DraftPreview{}, err
+	}
+	preview.Changes = OperationChangeSet(ops, since)
+	preview.HasChanges = len(preview.Changes) > 0
+	return preview, nil
 }
 
 // Review opens a review by recording a Pending PublishDecision.

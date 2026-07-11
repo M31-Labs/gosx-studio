@@ -28,6 +28,15 @@ type fakeHost struct {
 	blockers map[TargetRef][]Blocker
 	ops      map[TargetRef][]authoring.OperationRecord
 
+	// publishedOpRevision is the fake host's answer to
+	// PublishedOperationRevision: the durable operation-log DocumentRevision
+	// high-water mark as of the target's last publish. ApplyPublish advances
+	// it automatically to the highest DocumentRevision among the ops seeded
+	// for that target so far (mirroring how a real host would correlate its
+	// content revision with the durable log at publish time); tests may also
+	// set it directly for scenarios that do not go through a full Publish.
+	publishedOpRevision map[TargetRef]uint64
+
 	// applied gives the fake host its own defense-in-depth idempotency by
 	// operation id, mirroring the "MUST be idempotent on cmd.OperationID"
 	// requirement on HostLifecycle.ApplyPublish.
@@ -42,13 +51,24 @@ type fakeHost struct {
 
 func newFakeHost(revisions cmsstore.RevisionStore) *fakeHost {
 	return &fakeHost{
-		revisions: revisions,
-		live:      map[TargetRef]map[string]string{},
-		draft:     map[TargetRef]map[string]string{},
-		blockers:  map[TargetRef][]Blocker{},
-		ops:       map[TargetRef][]authoring.OperationRecord{},
-		applied:   map[string]PublishOutcome{},
+		revisions:           revisions,
+		live:                map[TargetRef]map[string]string{},
+		draft:               map[TargetRef]map[string]string{},
+		blockers:            map[TargetRef][]Blocker{},
+		ops:                 map[TargetRef][]authoring.OperationRecord{},
+		applied:             map[string]PublishOutcome{},
+		publishedOpRevision: map[TargetRef]uint64{},
 	}
+}
+
+// addOp appends one durable operation-log record for ref, as a real host's
+// collab-backed OperationLog would report it. Tests use this to seed a mixed
+// operation sequence for the change-set surface (spec §3 / S3) without
+// depending on the actual cms/studio/collab persistence layer.
+func (h *fakeHost) addOp(ref TargetRef, op authoring.OperationRecord) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.ops[ref] = append(h.ops[ref], op.Normalize())
 }
 
 func (h *fakeHost) setLive(ref TargetRef, attrs map[string]string) {
@@ -132,6 +152,7 @@ func (h *fakeHost) ApplyPublish(ctx context.Context, cmd PublishCommand) (Publis
 	if cmd.OperationID != "" {
 		h.applied[cmd.OperationID] = outcome
 	}
+	h.advancePublishedOpRevisionLocked(cmd.Target)
 	return outcome, nil
 }
 
@@ -179,6 +200,29 @@ func (h *fakeHost) OperationLog(ctx context.Context, ref TargetRef, sinceRevisio
 		}
 	}
 	return out, nil
+}
+
+func (h *fakeHost) PublishedOperationRevision(ctx context.Context, ref TargetRef) (uint64, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.publishedOpRevision[ref], nil
+}
+
+// advancePublishedOpRevisionLocked mirrors what a real host would do at
+// publish time: correlate the content revision it just promoted with the
+// durable operation log's current high-water mark for ref, so a later
+// PendingDiff only reports ops applied after this publish. Callers must hold
+// h.mu.
+func (h *fakeHost) advancePublishedOpRevisionLocked(ref TargetRef) {
+	var max uint64
+	for _, op := range h.ops[ref] {
+		if op.DocumentRevision > max {
+			max = op.DocumentRevision
+		}
+	}
+	if max > h.publishedOpRevision[ref] {
+		h.publishedOpRevision[ref] = max
+	}
 }
 
 func cloneAttrs(attrs map[string]string) map[string]string {
