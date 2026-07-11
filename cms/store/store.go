@@ -22,6 +22,17 @@ const (
 	ActionSettingsPreviewSaved = "settings.preview_saved"
 	ActionSettingsPublished    = "settings.published"
 	ActionSettingsRestored     = "settings.restored"
+
+	// ActionRestorePoint marks a Revision as an automatic pre-transition live
+	// snapshot minted by cms/lifecycle/engine before every publish/restore
+	// (see engine.Engine.Publish/Restore). ActionRestorePrePub is an alias
+	// kept for the pre-publish case named in the lifecycle spec.
+	// ActionRestoreApplied marks the new live Revision a host mints when it
+	// applies a restore. Both are additive Revision.Action values; existing
+	// rows and the RevisionStore interface are unaffected.
+	ActionRestorePoint   = "lifecycle.restore_point"
+	ActionRestorePrePub  = ActionRestorePoint
+	ActionRestoreApplied = "lifecycle.restore_applied"
 )
 
 type DraftState = lifecycle.DraftState
