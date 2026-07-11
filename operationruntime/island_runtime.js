@@ -29,6 +29,21 @@
       form.querySelectorAll("[name='gosx_studio_expected_target_head']").forEach(function (node) { node.value = head; });
     }
   }
+  function updateHistoryButtons(form, kind, payload) {
+    var data = resultData(payload);
+    var operationID = data.operationID || "";
+    var undo = form.querySelector("[data-gosx-studio-operation-kind='undo']");
+    var redo = form.querySelector("[data-gosx-studio-operation-kind='redo']");
+    if (kind === "undo" && undo && redo) {
+      undo.setAttribute("disabled", "disabled");
+      redo.removeAttribute("disabled");
+      redo.setAttribute("data-gosx-studio-history-operation-id", operationID);
+    } else if (kind === "redo" && undo && redo) {
+      redo.setAttribute("disabled", "disabled");
+      undo.removeAttribute("disabled");
+      undo.setAttribute("data-gosx-studio-history-operation-id", operationID);
+    }
+  }
   function runtime(form) {
     var selected = { route: form.getAttribute("data-studio-target-route") || "/", pageId: form.getAttribute("data-studio-target-page-id") || "", field: form.getAttribute("data-studio-target-field") || "", componentKey: form.getAttribute("data-studio-target-component") || "" };
     var targetHeads = {};
@@ -54,6 +69,7 @@
           updateCursors(form, body);
           var bodyData = resultData(body);
           if (bodyData.targetHead !== undefined) targetHeads[effectiveKey] = String(bodyData.targetHead || "");
+          updateHistoryButtons(form, kind, body);
           form.dispatchEvent(new CustomEvent("gosxstudio:operation-committed", { bubbles: true, detail: { kind: kind, response: response, body: body } }));
           return response;
         });
