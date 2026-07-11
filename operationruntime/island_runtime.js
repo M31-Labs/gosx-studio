@@ -31,15 +31,26 @@
   }
   function runtime(form) {
     var selected = { route: form.getAttribute("data-studio-target-route") || "/", pageId: form.getAttribute("data-studio-target-page-id") || "", field: form.getAttribute("data-studio-target-field") || "", componentKey: form.getAttribute("data-studio-target-component") || "" };
+    var targetHeads = {};
+    function targetKey(target, extra) {
+      extra = extra || {};
+      return [target.route || "/", target.pageId || "", target.field || "", extra.componentKey || target.componentKey || "", extra.property || target.property || "", extra.breakpoint || target.breakpoint || "base", extra.state || target.state || "default"].join("|");
+    }
     function setSelection(detail) { selected = detail || null; form.dispatchEvent(new CustomEvent("gosxstudio:operation-selection", { bubbles: true, detail: selected })); }
     function request(kind, value, extra) {
       extra = extra || {};
       var target = selected || {};
-      var payload = { gosx_studio_operation: kind, gosx_studio_operation_id: extra.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()), gosx_studio_page_route: extra.route || target.route || "/", gosx_studio_page_key: extra.pageId || target.pageId || target.page || "", gosx_studio_component_key: extra.componentKey || target.componentKey || target.blockKey || "", gosx_studio_binding: extra.field || target.field || "", gosx_studio_value: value || "", gosx_studio_style_property: extra.property || target.property || "", gosx_studio_style_value: value || "", gosx_studio_breakpoint: extra.breakpoint || target.breakpoint || "base", gosx_studio_state: extra.state || target.state || "default", gosx_studio_expected_revision: extra.revision || form.getAttribute("data-studio-document-revision") || "0", gosx_studio_expected_target_head: extra.head || target.targetHead || "", gosx_studio_history_operation_id: extra.historyOperationId || "" };
+      var effectiveKey = targetKey(target, extra);
+      var expectedHead = extra.head;
+      if (expectedHead === undefined) expectedHead = targetHeads[effectiveKey] || "";
+      if (expectedHead === "" && effectiveKey === targetKey(target, {})) expectedHead = form.getAttribute("data-studio-target-head") || "";
+      var payload = { gosx_studio_operation: kind, gosx_studio_operation_id: extra.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()), gosx_studio_page_route: extra.route || target.route || "/", gosx_studio_page_key: extra.pageId || target.pageId || target.page || "", gosx_studio_component_key: extra.componentKey || target.componentKey || target.blockKey || "", gosx_studio_binding: extra.field || target.field || "", gosx_studio_value: value || "", gosx_studio_style_property: extra.property || target.property || "", gosx_studio_style_value: value || "", gosx_studio_breakpoint: extra.breakpoint || target.breakpoint || "base", gosx_studio_state: extra.state || target.state || "default", gosx_studio_expected_revision: extra.revision || form.getAttribute("data-studio-document-revision") || "0", gosx_studio_expected_target_head: expectedHead, gosx_studio_history_operation_id: extra.historyOperationId || "" };
       return post(form, payload).then(function (response) {
         if (!response.ok) throw new Error("Operation failed (" + response.status + ")");
         return response.clone().json().catch(function () { return {}; }).then(function (body) {
           updateCursors(form, body);
+          var bodyData = resultData(body);
+          if (bodyData.targetHead !== undefined) targetHeads[effectiveKey] = String(bodyData.targetHead || "");
           form.dispatchEvent(new CustomEvent("gosxstudio:operation-committed", { bubbles: true, detail: { kind: kind, response: response, body: body } }));
           return response;
         });
