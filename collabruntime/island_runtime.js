@@ -38,9 +38,13 @@
     var live = qs(panel, "[data-studio-collab-live]");
     var facepile = qs(panel, "[data-studio-collab-facepile]");
     var conflict = qs(panel, "[data-studio-collab-conflict]");
-    var socket = null, connectionID = "", retry = 0, reconnectTimer = 0, stopped = false, lastCursor = 0, pending = {};
+    var socket = null, connectionID = "", retry = 0, reconnectTimer = 0, stopped = false, lastCursor = 0, pending = {}, synced = false, serverPermissions = {};
     var sequenceKey = "gosxstudio:collab-sequence:" + resource;
+    var headsKey = "gosxstudio:collab-heads:" + resource;
     var acceptedSequence = Number(storageGet(sequenceKey) || "0") || 0;
+    var heads = {}; try { heads = JSON.parse(storageGet(headsKey) || "{}") || {}; } catch (_) { heads = {}; }
+    function targetKey(target) { target = target || {}; return [target.route || "/", target.pageId || "", target.field || "", target.componentKey || target.blockKey || "", target.nodeId || "", target.property || "", target.breakpoint || "base", target.state || "default"].join("|"); }
+    function storeHeads() { storageSet(headsKey, JSON.stringify(heads)); }
     function setStatus(value, message) {
       panel.setAttribute("data-studio-collab-state", value);
       if (status) status.textContent = message;
@@ -120,6 +124,7 @@
       if (sequence > acceptedSequence) { acceptedSequence = sequence; storageSet(sequenceKey, String(sequence)); }
       document.dispatchEvent(new CustomEvent("gosxstudio:collaboration-operation-accepted", { detail: ack || {} }));
       var operationID = ack && ack.record && ack.record.id;
+      if (ack && ack.record && ack.record.target) { heads[targetKey(ack.record.target)] = ack.record.targetHead || ""; storeHeads(); }
       if (operationID && pending[operationID]) { pending[operationID].resolve(ack); clearTimeout(pending[operationID].timer); delete pending[operationID]; }
     }
     function rejected(error) {
@@ -127,19 +132,19 @@
       announce((error && error.message) || "The shared edit was rejected.");
       document.dispatchEvent(new CustomEvent("gosxstudio:collaboration-operation-rejected", { detail: error || {} }));
       var operationID = error && error.operationId;
-      if (operationID && pending[operationID]) { var failure = new Error(error.message || "Shared edit rejected"); failure.collaborationError = error; pending[operationID].reject(failure); clearTimeout(pending[operationID].timer); delete pending[operationID]; }
+      if (operationID && pending[operationID]) { if (error.currentHead !== undefined && pending[operationID].request) { heads[targetKey(pending[operationID].request.target)] = error.currentHead || ""; storeHeads(); } var failure = new Error(error.message || "Shared edit rejected"); failure.collaborationError = error; pending[operationID].reject(failure); clearTimeout(pending[operationID].timer); delete pending[operationID]; }
     }
     function rejectPending(message) { Object.keys(pending).forEach(function (id) { clearTimeout(pending[id].timer); pending[id].reject(new Error(message)); delete pending[id]; }); }
     function message(event) {
       var envelope; try { envelope = JSON.parse(event.data); } catch (_) { return; }
       var data = envelope.data || {};
-      if (envelope.event === "studio.hello") { connectionID = data.connectionId || ""; permissions(data.permissions); retry = 0; setStatus("connected", "Live"); send("studio.sync.resume", { afterSequence: acceptedSequence }); }
+      if (envelope.event === "studio.hello") { connectionID = data.connectionId || ""; synced = false; serverPermissions = data.permissions || {}; permissions({}); retry = 0; setStatus("syncing", "Syncing…"); send("studio.sync.resume", { afterSequence: acceptedSequence }); }
       else if (envelope.event === "studio.presence") renderPresence(data);
       else if (envelope.event === "studio.cursors") renderCursor(data);
       else if (envelope.event === "studio.selection") renderSelection(data);
       else if (envelope.event === "studio.operation.accepted") accepted(data);
       else if (envelope.event === "studio.operation.rejected") rejected(data);
-      else if (envelope.event === "studio.sync.tail") { (data.operations || []).forEach(accepted); if (data.hasMore) send("studio.sync.resume", { afterSequence: acceptedSequence }); }
+      else if (envelope.event === "studio.sync.tail") { (data.operations || []).forEach(accepted); if (data.hasMore) send("studio.sync.resume", { afterSequence: acceptedSequence }); else { synced = true; permissions(serverPermissions); setStatus("connected", "Live"); } }
       else if (envelope.event === "__crdt_error") rejected({ message: "Binary collaboration is not supported." });
     }
     function connect() {
@@ -147,7 +152,7 @@
       clearTimeout(reconnectTimer); setStatus("connecting", "Connecting…");
       socket = new WebSocket(socketURL(endpoint));
       socket.addEventListener("message", message);
-      socket.addEventListener("close", function () { connectionID = ""; permissions({}); rejectPending("Collaboration connection closed"); setStatus("reconnecting", "Reconnecting…"); if (!stopped) reconnectTimer = setTimeout(connect, Math.min(5000, 500 * Math.pow(2, retry++))); });
+      socket.addEventListener("close", function () { connectionID = ""; synced = false; permissions({}); rejectPending("Collaboration connection closed"); setStatus("reconnecting", "Reconnecting…"); if (!stopped) reconnectTimer = setTimeout(connect, Math.min(5000, 500 * Math.pow(2, retry++))); });
       socket.addEventListener("error", function () { setStatus("error", "Connection interrupted"); });
     }
     function selectionEvent(event) { var selection = stableSelection(event.detail); if (selection) send("studio.selection.submit", selection); }
@@ -166,15 +171,15 @@
       return new Promise(function (resolve, reject) {
         var id = request && request.id; if (!id || !send("studio.operation.submit", { request: request })) { reject(new Error("Collaboration is not connected")); return; }
         var timer = setTimeout(function () { if (pending[id]) { pending[id].reject(new Error("Shared edit timed out")); delete pending[id]; } }, 15000);
-        pending[id] = { resolve: resolve, reject: reject, timer: timer };
+        pending[id] = { resolve: resolve, reject: reject, timer: timer, request: request };
       });
     }
     permissions({}); connect();
-    return { submit: submit, available: function () { return !!connectionID && !!socket && socket.readyState === WebSocket.OPEN; }, resume: function () { return send("studio.sync.resume", { afterSequence: acceptedSequence }); }, close: function () { stopped = true; clearTimeout(reconnectTimer); rejectPending("Collaboration closed"); if (socket) socket.close(1000, "closed"); }, sequence: function () { return acceptedSequence; } };
+    return { submit: submit, expectedHead: function (request) { var key = targetKey(request && request.target); if (!Object.prototype.hasOwnProperty.call(heads, key)) { heads[key] = ""; storeHeads(); } return heads[key]; }, available: function () { return synced && !!connectionID && !!socket && socket.readyState === WebSocket.OPEN; }, resume: function () { synced = false; permissions({}); return send("studio.sync.resume", { afterSequence: acceptedSequence }); }, close: function () { stopped = true; synced = false; clearTimeout(reconnectTimer); rejectPending("Collaboration closed"); if (socket) socket.close(1000, "closed"); }, sequence: function () { return acceptedSequence; } };
   }
   function bind(root) {
     qsa(root || document, "[data-gosx-studio-collaboration='true']").forEach(function (panel) { if (panel.__gosxCollaborationRuntime) return; panel.__gosxCollaborationRuntime = create(panel); runtimes.push(panel.__gosxCollaborationRuntime); });
   }
-  window.GoSXStudioCollaborationRuntime = { bind: bind, create: create, available: function () { return !!(runtimes.length && runtimes[0].available()); }, submit: function (request) { return runtimes.length ? runtimes[0].submit(request) : Promise.reject(new Error("Collaboration is not mounted")); } };
+  window.GoSXStudioCollaborationRuntime = { bind: bind, create: create, available: function () { return !!(runtimes.length && runtimes[0].available()); }, expectedHead: function (request) { return runtimes.length ? runtimes[0].expectedHead(request) : ""; }, submit: function (request) { return runtimes.length ? runtimes[0].submit(request) : Promise.reject(new Error("Collaboration is not mounted")); } };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { bind(document); }, { once: true }); else bind(document);
 })();

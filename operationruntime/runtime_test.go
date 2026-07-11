@@ -32,8 +32,9 @@ func TestRuntimePrefersAuthenticatedCollaborationTransport(t *testing.T) {
 	for _, want := range []string{
 		`function collaborationRequest(payload, target, extra)`,
 		`typeof collaboration.available === "function"`,
-		`collaboration.submit(collaborationRequest(payload, target, extra)).then(collaborationResponse)`,
+		`collaboration.submit(request).then(collaborationResponse)`,
 		`return submit(form, payload, target, extra).then(function (response)`,
+		`request.expectedTargetHead = collaboration.expectedHead(request)`,
 	} {
 		if !strings.Contains(script, want) {
 			t.Fatalf("runtime missing collaboration bridge %q", want)

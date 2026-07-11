@@ -39,7 +39,9 @@
   function submit(form, payload, target, extra) {
     var collaboration = window.GoSXStudioCollaborationRuntime;
     if (collaboration && typeof collaboration.available === "function" && collaboration.available() && typeof collaboration.submit === "function") {
-      return collaboration.submit(collaborationRequest(payload, target, extra)).then(collaborationResponse);
+      var request = collaborationRequest(payload, target, extra);
+      if (typeof collaboration.expectedHead === "function") request.expectedTargetHead = collaboration.expectedHead(request);
+      return collaboration.submit(request).then(collaborationResponse);
     }
     return post(form, payload);
   }

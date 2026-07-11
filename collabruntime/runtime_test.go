@@ -26,6 +26,13 @@ func TestRuntimeOwnsTrustedRealtimeContracts(t *testing.T) {
 		`pending[operationID].resolve(ack)`,
 		`available: function ()`,
 		`permissions({}); connect();`,
+		`gosxstudio:collab-heads:`,
+		`expectedHead: function (request)`,
+		`heads[targetKey(ack.record.target)]`,
+		`setStatus("syncing", "Syncing…")`,
+		`else { synced = true; permissions(serverPermissions); setStatus("connected", "Live"); }`,
+		`return synced && !!connectionID`,
+		`Object.prototype.hasOwnProperty.call(heads, key)`,
 	} {
 		if !strings.Contains(script, want) {
 			t.Fatalf("runtime missing %q", want)
