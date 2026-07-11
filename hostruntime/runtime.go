@@ -26,6 +26,7 @@ import (
 	"m31labs.dev/gosx-studio/canvasselectionbridgeruntime"
 	"m31labs.dev/gosx-studio/canvaswasmfreeruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
+	"m31labs.dev/gosx-studio/flowruntime"
 	"m31labs.dev/gosx-studio/inlineeditruntime"
 	"m31labs.dev/gosx-studio/inspectorruntime"
 	"m31labs.dev/gosx-studio/interactionruntime"
@@ -76,6 +77,7 @@ func builtinRuntimeSlices() [][]byte {
 		inspectorruntime.Bundle(),
 		inlineeditruntime.Bundle(),
 		interactionruntime.Bundle(),
+		flowruntime.Bundle(),
 		operationruntime.Script(),
 	}
 }

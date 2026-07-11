@@ -21,10 +21,46 @@ import (
 	"context"
 
 	"m31labs.dev/gosx-studio/authoring"
+	"m31labs.dev/gosx-studio/cms/flows"
 	"m31labs.dev/gosx-studio/cms/media"
 	"m31labs.dev/gosx-studio/core"
 	"m31labs.dev/gosx/action"
 )
+
+type FlowOperationKind = authoring.FlowOperationKind
+type FlowState = authoring.FlowState
+type FlowOperation = authoring.FlowOperation
+type FlowOperationRecord = authoring.FlowOperationRecord
+type FlowApplyOptions = authoring.FlowApplyOptions
+type FlowResult = authoring.FlowResult
+type FlowStateStore = authoring.FlowStateStore
+type FileFlowStateStore = authoring.FileFlowStateStore
+type FlowGraph = flows.Graph
+
+const (
+	FlowUpsert = authoring.FlowUpsert
+	FlowDelete = authoring.FlowDelete
+	FlowUndo   = authoring.FlowUndo
+	FlowRedo   = authoring.FlowRedo
+)
+
+var (
+	ErrFlowUnauthorized = authoring.ErrFlowUnauthorized
+	ErrFlowConflict     = authoring.ErrFlowConflict
+	ErrFlowIdempotency  = authoring.ErrFlowIdempotency
+	ErrFlowNotFound     = authoring.ErrFlowNotFound
+	ErrFlowReferenced   = authoring.ErrFlowReferenced
+)
+
+func ApplyFlowOperation(state FlowState, operation FlowOperation, options FlowApplyOptions) (FlowResult, error) {
+	return authoring.ApplyFlowOperation(state, operation, options)
+}
+func CommitFlowOperation(ctx context.Context, store FlowStateStore, operation FlowOperation, options FlowApplyOptions) (FlowResult, error) {
+	return authoring.CommitFlowOperation(ctx, store, operation, options)
+}
+func ValidateFlowReferenceDeletion(state FlowState, kind, id string) error {
+	return authoring.ValidateFlowReferenceDeletion(state, kind, id)
+}
 
 type InteractionOperationKind = authoring.InteractionOperationKind
 type InteractionEvent = core.InteractionEvent

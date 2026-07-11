@@ -109,6 +109,7 @@ type AssetApplyOptions struct {
 	CanManageAssets, CanBindAssets bool
 	Reusable                       ReusableState
 	Interactions                   InteractionState
+	Flows                          FlowState
 }
 type AssetOperationResult struct {
 	State   AssetState
@@ -298,6 +299,9 @@ func applyAssetMutation(state *AssetState, op AssetOperation, options AssetApply
 			}
 		}
 		if err := ValidateInteractionReferenceDeletion(options.Interactions, "asset", op.AssetID); err != nil {
+			return err
+		}
+		if err := ValidateFlowReferenceDeletion(options.Flows, "asset", op.AssetID); err != nil {
 			return err
 		}
 		delete(state.Assets, op.AssetID)

@@ -70,6 +70,12 @@ type AssetLibraryPanelOptions = panels.AssetLibraryPanelOptions
 
 type InteractionPanelOptions = panels.InteractionPanelOptions
 
+type FlowGraphPanelOptions = panels.FlowGraphPanelOptions
+
+func RenderFlowGraphPanel(options FlowGraphPanelOptions) gosx.Node {
+	return panels.RenderFlowGraphPanel(options)
+}
+
 func RenderInteractionPanel(options InteractionPanelOptions) gosx.Node {
 	return panels.RenderInteractionPanel(options)
 }
