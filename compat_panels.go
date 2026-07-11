@@ -66,6 +66,12 @@ func RenderResponsiveLayoutInspector(options ResponsiveLayoutInspectorOptions) g
 
 type ReusableComponentPanelOptions = panels.ReusableComponentPanelOptions
 
+type AssetLibraryPanelOptions = panels.AssetLibraryPanelOptions
+
+func RenderAssetLibraryPanel(options AssetLibraryPanelOptions) gosx.Node {
+	return panels.RenderAssetLibraryPanel(options)
+}
+
 func RenderReusableComponentPanel(options ReusableComponentPanelOptions) gosx.Node {
 	return panels.RenderReusableComponentPanel(options)
 }

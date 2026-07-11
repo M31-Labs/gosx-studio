@@ -21,8 +21,53 @@ import (
 	"context"
 
 	"m31labs.dev/gosx-studio/authoring"
+	"m31labs.dev/gosx-studio/cms/media"
 	"m31labs.dev/gosx/action"
 )
+
+type AssetOperationKind = authoring.AssetOperationKind
+type AssetBindingTarget = authoring.AssetBindingTarget
+type AssetBinding = authoring.AssetBinding
+type AssetState = authoring.AssetState
+type AssetOperation = authoring.AssetOperation
+type AssetOperationRecord = authoring.AssetOperationRecord
+type AssetApplyOptions = authoring.AssetApplyOptions
+type AssetOperationResult = authoring.AssetOperationResult
+type AssetStateStore = authoring.AssetStateStore
+type FileAssetStateStore = authoring.FileAssetStateStore
+type AssetService = authoring.AssetService
+
+const (
+	AssetImport         = authoring.AssetImport
+	AssetUpdateMetadata = authoring.AssetUpdateMetadata
+	AssetReplace        = authoring.AssetReplace
+	AssetDelete         = authoring.AssetDelete
+	AssetBind           = authoring.AssetBind
+	AssetUnbind         = authoring.AssetUnbind
+	AssetUndo           = authoring.AssetUndo
+	AssetRedo           = authoring.AssetRedo
+)
+
+var (
+	ErrAssetInvalid      = authoring.ErrAssetInvalid
+	ErrAssetUnauthorized = authoring.ErrAssetUnauthorized
+	ErrAssetConflict     = authoring.ErrAssetConflict
+	ErrAssetIdempotency  = authoring.ErrAssetIdempotency
+	ErrAssetNotFound     = authoring.ErrAssetNotFound
+	ErrAssetReferenced   = authoring.ErrAssetReferenced
+)
+
+func ApplyAssetOperation(state AssetState, operation AssetOperation, options AssetApplyOptions) (AssetOperationResult, error) {
+	return authoring.ApplyAssetOperation(state, operation, options)
+}
+
+func CommitAssetOperation(ctx context.Context, store AssetStateStore, operation AssetOperation, options AssetApplyOptions) (AssetOperationResult, error) {
+	return authoring.CommitAssetOperation(ctx, store, operation, options)
+}
+
+func ResolveAssetBinding(state AssetState, reusable ReusableState, instanceID, definitionID, componentKey, property string) (AssetBinding, media.Asset, bool) {
+	return authoring.ResolveAssetBinding(state, reusable, instanceID, definitionID, componentKey, property)
+}
 
 type ReusableOperationKind = authoring.ReusableOperationKind
 type ReusableState = authoring.ReusableState

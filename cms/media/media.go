@@ -15,19 +15,51 @@ type Item struct {
 }
 
 type Asset struct {
-	ID          string     `json:"id"`
-	URL         string     `json:"url"`
-	Alt         string     `json:"alt"`
-	Filename    string     `json:"filename"`
-	ContentType string     `json:"contentType"`
-	Size        int64      `json:"size"`
-	Variants    Variants   `json:"variants,omitempty"`
-	FocalX      float64    `json:"focalX,omitempty"`
-	FocalY      float64    `json:"focalY,omitempty"`
-	ArchivedAt  *time.Time `json:"archivedAt,omitempty"`
-	Created     time.Time  `json:"created"`
-	Updated     time.Time  `json:"updated"`
+	ID          string             `json:"id"`
+	Kind        AssetKind          `json:"kind,omitempty"`
+	URL         string             `json:"url"`
+	Alt         string             `json:"alt"`
+	Filename    string             `json:"filename"`
+	ContentType string             `json:"contentType"`
+	Size        int64              `json:"size"`
+	ContentHash string             `json:"contentHash,omitempty"`
+	Caption     string             `json:"caption,omitempty"`
+	License     string             `json:"license,omitempty"`
+	Version     uint64             `json:"version,omitempty"`
+	Revision    uint64             `json:"revision,omitempty"`
+	Responsive  ResponsiveMetadata `json:"responsive,omitempty"`
+	Variants    Variants           `json:"variants,omitempty"`
+	FocalX      float64            `json:"focalX,omitempty"`
+	FocalY      float64            `json:"focalY,omitempty"`
+	ArchivedAt  *time.Time         `json:"archivedAt,omitempty"`
+	Created     time.Time          `json:"created"`
+	Updated     time.Time          `json:"updated"`
 }
+
+type AssetKind string
+
+const (
+	AssetKindImage    AssetKind = "image"
+	AssetKindMedia    AssetKind = "media"
+	AssetKindDocument AssetKind = "document"
+)
+
+type CropMode string
+
+const (
+	CropCover   CropMode = "cover"
+	CropContain CropMode = "contain"
+	CropNone    CropMode = "none"
+)
+
+type ResponsiveAssetMetadata struct {
+	Alt    string   `json:"alt,omitempty"`
+	Crop   CropMode `json:"crop,omitempty"`
+	FocalX float64  `json:"focalX,omitempty"`
+	FocalY float64  `json:"focalY,omitempty"`
+}
+
+type ResponsiveMetadata map[string]ResponsiveAssetMetadata
 
 type Variants map[string]Variant
 
@@ -60,6 +92,11 @@ type Input struct {
 	Variants    Variants
 	FocalX      float64
 	FocalY      float64
+	Kind        AssetKind
+	ContentHash string
+	Caption     string
+	License     string
+	Responsive  ResponsiveMetadata
 }
 
 type Filter struct {
@@ -87,6 +124,7 @@ type StoredObject struct {
 	Filename    string
 	ContentType string
 	Size        int64
+	ContentHash string
 }
 
 type UploadPolicy struct {
@@ -134,10 +172,14 @@ func DefaultUploadPolicy() UploadPolicy {
 	return UploadPolicy{
 		MaxBytes: 12 << 20,
 		ContentTypes: map[string]string{
-			"image/gif":  ".gif",
-			"image/jpeg": ".jpg",
-			"image/png":  ".png",
-			"image/webp": ".webp",
+			"application/pdf": ".pdf",
+			"audio/mpeg":      ".mp3",
+			"image/gif":       ".gif",
+			"image/jpeg":      ".jpg",
+			"image/png":       ".png",
+			"image/webp":      ".webp",
+			"video/mp4":       ".mp4",
+			"video/webm":      ".webm",
 		},
 		ExtensionTypes: map[string]string{
 			".ico":   "image/x-icon",
@@ -180,6 +222,7 @@ func InputFromStoredObject(object StoredObject, alt string, variants Variants) I
 		Filename:    strings.TrimSpace(object.Filename),
 		ContentType: strings.TrimSpace(object.ContentType),
 		Size:        object.Size,
+		ContentHash: strings.TrimSpace(object.ContentHash),
 		Variants:    NormalizeVariants(variants),
 	}
 }
@@ -218,6 +261,11 @@ func NormalizeAsset(input Input, asset Asset) Asset {
 	asset.Filename = strings.TrimSpace(input.Filename)
 	asset.FocalX = input.FocalX
 	asset.FocalY = input.FocalY
+	asset.Kind = NormalizeAssetKind(input.Kind, input.ContentType, input.Filename)
+	asset.ContentHash = strings.ToLower(strings.TrimSpace(input.ContentHash))
+	asset.Caption = strings.TrimSpace(input.Caption)
+	asset.License = strings.TrimSpace(input.License)
+	asset.Responsive = NormalizeResponsiveMetadata(input.Responsive)
 	if strings.TrimSpace(input.ContentType) != "" {
 		asset.ContentType = strings.TrimSpace(input.ContentType)
 	}
@@ -231,6 +279,40 @@ func NormalizeAsset(input Input, asset Asset) Asset {
 		asset.Filename = filepath.Base(strings.TrimSpace(input.URL))
 	}
 	return asset
+}
+
+func NormalizeAssetKind(kind AssetKind, contentType, filename string) AssetKind {
+	kind = AssetKind(strings.ToLower(strings.TrimSpace(string(kind))))
+	switch kind {
+	case AssetKindImage, AssetKindMedia, AssetKindDocument:
+		return kind
+	}
+	contentType = strings.ToLower(strings.TrimSpace(contentType))
+	if strings.HasPrefix(contentType, "image/") {
+		return AssetKindImage
+	}
+	if strings.HasPrefix(contentType, "audio/") || strings.HasPrefix(contentType, "video/") {
+		return AssetKindMedia
+	}
+	_ = filename
+	return AssetKindDocument
+}
+
+func NormalizeResponsiveMetadata(values ResponsiveMetadata) ResponsiveMetadata {
+	if len(values) == 0 {
+		return nil
+	}
+	out := ResponsiveMetadata{}
+	for breakpoint, value := range values {
+		breakpoint = strings.ToLower(strings.TrimSpace(breakpoint))
+		value.Alt = strings.TrimSpace(value.Alt)
+		value.Crop = CropMode(strings.ToLower(strings.TrimSpace(string(value.Crop))))
+		out[breakpoint] = value
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func NormalizeVariants(variants Variants) Variants {
