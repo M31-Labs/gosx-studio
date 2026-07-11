@@ -34,7 +34,7 @@
     var operationID = data.operationID || "";
     var undo = form.querySelector("[data-gosx-studio-operation-kind='undo']");
     var redo = form.querySelector("[data-gosx-studio-operation-kind='redo']");
-    if ((kind === "set-field" || kind === "set-style" || kind === "reset-style") && undo && redo) {
+    if (kind === "set-field" && undo && redo) {
       undo.removeAttribute("disabled");
       undo.setAttribute("data-gosx-studio-history-operation-id", operationID);
       redo.setAttribute("disabled", "disabled");
@@ -50,7 +50,10 @@
       undo.removeAttribute("disabled");
       undo.setAttribute("data-gosx-studio-history-operation-id", operationID);
     }
-    if (data.value !== undefined && data.value !== null) {
+    // These controls represent content history. Style targets have their own
+    // target heads and must never replace the selected content value or claim
+    // its Undo button.
+    if ((kind === "set-field" || kind === "undo" || kind === "redo") && data.value !== undefined && data.value !== null) {
       var valueNode = form.querySelector("[data-studio-operation-value]");
       if (valueNode) valueNode.value = String(data.value);
     }
