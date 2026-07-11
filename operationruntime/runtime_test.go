@@ -46,3 +46,33 @@ func TestRuntimePrefersAuthenticatedCollaborationTransport(t *testing.T) {
 		}
 	}
 }
+
+// TestRuntimeDispatchesInstanceInteractionAndFlowDurableFamilies locks the
+// client dispatch contract for the six instance/interaction/flow durable
+// operation kinds (authoring/operations.go) to the exact literal Field
+// values and JSON settings keys those Go types expect -- see
+// authoring.FieldInstancesSharedField etc. and
+// authoring.InteractionSettings/FlowFieldSettings/FlowActionSettings' json
+// tags. A drift here would silently desync the browser-built
+// OperationRequest from what OperationRequest.Validate accepts.
+func TestRuntimeDispatchesInstanceInteractionAndFlowDurableFamilies(t *testing.T) {
+	script := string(Script())
+	for _, want := range []string{
+		`"set-shared-field": "instances.shared-field"`,
+		`"override-instance": "instances.override"`,
+		`"detach-instance": "instances.attachment"`,
+		`"restore-instance": "instances.attachment"`,
+		`"set-interaction": "interactions.entry"`,
+		`"remove-interaction": "interactions.entry"`,
+		`"set-flow-field": "flows.field"`,
+		`"remove-flow-field": "flows.field"`,
+		`"set-flow-action": "flows.action"`,
+		`function durableValue(kind, payload)`,
+		`function durableControlKey(kind, payload)`,
+		`gosx_studio_control_key: extra.controlKey || ""`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("runtime missing durable family dispatch %q", want)
+		}
+	}
+}

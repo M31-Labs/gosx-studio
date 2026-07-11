@@ -93,6 +93,12 @@ func (*captureOperationStore) PendingOutbox(context.Context, ResourceKey, int) (
 func (*captureOperationStore) MarkProjected(context.Context, ResourceKey, int64, time.Time) error {
 	return nil
 }
+func (*captureOperationStore) RepairFieldHead(context.Context, RepairFieldHeadCommand) (RepairFieldHeadResult, *ProtocolError) {
+	return RepairFieldHeadResult{}, nil
+}
+func (*captureOperationStore) RepairHistory(context.Context, ResourceKey, int) ([]RepairRecord, error) {
+	return nil, nil
+}
 func (*captureOperationStore) Close() error { return nil }
 
 func TestOperationWireHasNoPrincipalFields(t *testing.T) {

@@ -15,6 +15,15 @@ const (
 	CapabilityAuthor  Capability = "author"
 	CapabilityDesign  Capability = "design"
 	CapabilityPublish Capability = "publish"
+	// CapabilityRepair gates OperationStore.RepairFieldHead: a host-only,
+	// bypass-the-optimistic-concurrency-envelope primitive for un-sticking a
+	// target whose ledger field head was quarantined out of sync with the
+	// host's real draft (see store.go's RepairFieldHeadCommand doc comment).
+	// It is deliberately never granted alongside View/Author/Design/Publish
+	// through the ordinary collaboration transport metadata -- a host grants
+	// it only to its own privileged admin/recovery code path, never to a
+	// browser-facing collaboration principal.
+	CapabilityRepair Capability = "repair"
 )
 
 // Principal is supplied by the host after authentication. It is deliberately

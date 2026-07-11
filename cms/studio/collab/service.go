@@ -40,3 +40,22 @@ func (s *Service) Resume(ctx context.Context, after uint64, limit int) ([]Operat
 	return s.store.Tail(ctx, s.resource, after, limit)
 }
 func (s *Service) Presence() *PresenceRegistry { return s.presence }
+
+// RepairFieldHead is the host-callable passthrough to the underlying store's
+// recovery primitive (see RepairFieldHeadCommand). It is intentionally not
+// reachable from the browser-facing Transport/hub -- hosts call it directly
+// from their own privileged admin/recovery code path with a principal that
+// carries CapabilityRepair.
+func (s *Service) RepairFieldHead(ctx context.Context, cmd RepairFieldHeadCommand) (RepairFieldHeadResult, *ProtocolError) {
+	cmd.Resource = s.resource
+	if cmd.Now.IsZero() {
+		cmd.Now = s.clock()
+	}
+	return s.store.RepairFieldHead(ctx, cmd)
+}
+
+// RepairHistory returns this service's resource's durable repair audit
+// trail.
+func (s *Service) RepairHistory(ctx context.Context, limit int) ([]RepairRecord, error) {
+	return s.store.RepairHistory(ctx, s.resource, limit)
+}

@@ -201,30 +201,16 @@ func draftChangeFromOperation(op authoring.OperationRecord) DraftChange {
 // cms/studio/collab/sqlstore/store.go's resolveHistory -- so IsStyle() still
 // reports correctly for those).
 //
-// Instances/assets/interactions/flows are NOT reachable from a real
-// authoring.OperationRecord today (documented honestly in the S3 report, not
-// hidden): authoring/operations.go's OperationKind enum only ever persists
-// SetField/SetStyle/ResetStyle/Undo/Redo, and OperationTarget.Field for a
-// genuine content edit is a plain dotted field path (e.g. "hero.headline",
-// see authoring/operations_test.go), not a domain-tagged string. The four
-// newer authoring domains (core/instances.go, core/interactions.go,
-// core/flows.go, via authoring/instance_handlers.go /interaction_handlers.go
-// /flow_handlers.go) report their own change summary through the SEPARATE,
-// ephemeral authoring.AuthoringMutationResult.Changes
-// ([]authoring.AuthoringChange) -- not through this durable, revision-
-// addressed log -- so nothing currently produces an OperationRecord this
-// classifier could recognize as one of those four domains.
-//
-// scopeForField below still recognizes a forward-compatible, dot-namespaced
-// Field-prefix convention for these four domains (chosen to match the real
-// dotted-path style of genuine Field values, not the colon-prefixed
-// AuthoringChange.Key convention those handlers use for their own ephemeral
-// summaries, which is a different string with a different purpose). It is
-// inert against every record produced by the codebase today -- exercised
-// only by this package's own synthetic test records -- so it carries zero
-// misclassification risk; it exists so a later slice that wires these
-// domains into the durable log (an authoring/ change, out of this slice's
-// HARD BOUNDARIES) has a scope to land in without another engine change.
+// Instances/assets/interactions/flows classify via the dot-namespaced
+// Field-prefix convention below (chosen to match the real dotted-path style
+// of genuine Field values, not the colon-prefixed AuthoringChange.Key
+// convention the mutation handlers use for their own ephemeral summaries,
+// which is a different string with a different purpose). The durable-ops
+// consolidation made these four domains first-class durable OperationKinds
+// carrying exactly this convention -- see authoring/operations.go's Field*
+// constants, and cms/studio/collab/sqlstore/lifecycle_classification_test.go
+// which proves a real persisted record of each family classifies into the
+// right scope here.
 func classifyOperationScope(target authoring.OperationTarget) DraftChangeScope {
 	target = target.Normalize()
 	if target.IsStyle() {

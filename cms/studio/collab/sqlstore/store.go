@@ -127,6 +127,13 @@ func (s *Store) migrate(ctx context.Context) error {
 			created_at TEXT NOT NULL, projected_at TEXT,
 			UNIQUE(resource_key,accepted_sequence),
 			FOREIGN KEY(resource_key) REFERENCES studio_resources(resource_key) ON DELETE CASCADE)`,
+		`CREATE TABLE IF NOT EXISTS studio_field_head_repairs (
+			repair_id INTEGER PRIMARY KEY AUTOINCREMENT, resource_key TEXT NOT NULL,
+			target_key TEXT NOT NULL, target_json BLOB NOT NULL, actor_id TEXT NOT NULL,
+			reason TEXT NOT NULL, old_head TEXT NOT NULL, old_value_present INTEGER NOT NULL,
+			old_value TEXT NOT NULL, new_head TEXT NOT NULL, new_value_present INTEGER NOT NULL,
+			new_value TEXT NOT NULL, created_at TEXT NOT NULL,
+			FOREIGN KEY(resource_key) REFERENCES studio_resources(resource_key) ON DELETE CASCADE)`,
 	}
 	for _, statement := range statements {
 		if _, err := s.db.ExecContext(ctx, statement); err != nil {
@@ -201,7 +208,14 @@ func (s *Store) Apply(ctx context.Context, command collab.ApplyCommand) (collab.
 		return collab.OperationAck{}, protocolErr
 	}
 	requiredCapability := collab.CapabilityAuthor
-	if effective.Kind == authoring.OperationSetStyle || effective.Kind == authoring.OperationResetStyle {
+	switch effective.Kind {
+	case authoring.OperationSetStyle, authoring.OperationResetStyle, authoring.OperationSetInteraction, authoring.OperationRemoveInteraction:
+		// Style and interaction operations are both visual/behavioral
+		// treatment, not content or structural configuration -- they share
+		// style's CapabilityDesign gate. Instance ops (shared field,
+		// override, detach/restore) and flow ops (field, action) stay
+		// CapabilityAuthor, the same gate SetField already uses, because
+		// they edit content/structure, not visual treatment.
 		requiredCapability = collab.CapabilityDesign
 	}
 	if !principal.Can(requiredCapability) {
@@ -226,7 +240,7 @@ func (s *Store) Apply(ctx context.Context, command collab.ApplyCommand) (collab.
 		valueCopy := currentValue
 		protocolErr.CurrentValue = &valueCopy
 		submitted := authoring.PresentValue(effective.Value)
-		if effective.Kind == authoring.OperationResetStyle {
+		if authoring.ClearsTarget(effective.Kind) {
 			submitted = authoring.OperationValue{}
 		}
 		if desiredHistoryValue != nil {
@@ -248,7 +262,7 @@ func (s *Store) Apply(ctx context.Context, command collab.ApplyCommand) (collab.
 	}
 	sequence++
 	after := authoring.PresentValue(effective.Value)
-	if effective.Kind == authoring.OperationResetStyle {
+	if authoring.ClearsTarget(effective.Kind) {
 		after = authoring.OperationValue{}
 	}
 	if desiredHistoryValue != nil {
@@ -362,14 +376,12 @@ func resolveHistory(ctx context.Context, tx *sql.Tx, key string, principal colla
 		value = history.After
 	}
 	effective.Value = value.Value
-	if history.Target.Property != "" {
-		effective.Kind = authoring.OperationSetStyle
-		if !value.Present {
-			effective.Kind = authoring.OperationResetStyle
-		}
-	} else {
-		effective.Kind = authoring.OperationSetField
-	}
+	// history.Target's own shape (not history.Kind, which is "undo" for a
+	// redo's history record) identifies which durable family this replay
+	// belongs to -- the same classification InverseRequest/CanonicalRequest
+	// use, so a target can never be replayed as a different family than the
+	// one that originally wrote it.
+	effective.Kind = authoring.SetKindForTarget(history.Target, value.Present)
 	return effective, history, &value, nil
 }
 
@@ -475,6 +487,115 @@ func (s *Store) MarkProjected(ctx context.Context, resource collab.ResourceKey, 
 		return fmt.Errorf("projection outbox entry not pending")
 	}
 	return nil
+}
+
+// RepairFieldHead force-overwrites one target's studio_field_heads row to
+// cmd.NewHead/cmd.NewValue, bypassing every Apply invariant (expected-head
+// match, actor ownership, operation-id idempotency) on purpose -- see
+// collab.RepairFieldHeadCommand's doc comment for why. It never touches
+// studio_operation_attempts, studio_projection_outbox, or
+// studio_resources.accepted_sequence: a repair is explicitly outside the
+// accepted-operation ledger, not a new operation in it. Every call (success
+// or a no-op repairing an already-healthy head) writes exactly one
+// studio_field_head_repairs audit row.
+func (s *Store) RepairFieldHead(ctx context.Context, cmd collab.RepairFieldHeadCommand) (collab.RepairFieldHeadResult, *collab.ProtocolError) {
+	resource := cmd.Resource.Normalize()
+	principal := cmd.Principal.Clone()
+	target := cmd.Target.Normalize()
+	reason := strings.TrimSpace(cmd.Reason)
+	newHead := strings.TrimSpace(cmd.NewHead)
+	newValue := cmd.NewValue
+	now := cmd.Now.UTC()
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	if err := resource.Validate(); err != nil {
+		return collab.RepairFieldHeadResult{}, collab.NewProtocolError(collab.ErrorInvalidRequest, err.Error())
+	}
+	if err := principal.Validate(); err != nil {
+		return collab.RepairFieldHeadResult{}, collab.NewProtocolError(collab.ErrorForbidden, err.Error())
+	}
+	if reason == "" {
+		return collab.RepairFieldHeadResult{}, collab.NewProtocolError(collab.ErrorInvalidRequest, "a repair reason is required")
+	}
+	// Key's kind parameter is unused (target key hashing depends only on the
+	// normalized target's own fields) -- see authoring.OperationTarget.Key.
+	targetKey := target.Key("")
+	if !principal.Can(collab.CapabilityRepair) {
+		protocolErr := collab.NewProtocolError(collab.ErrorForbidden, "principal lacks the field-head repair capability")
+		return collab.RepairFieldHeadResult{}, protocolErr
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return collab.RepairFieldHeadResult{}, storeError(err)
+	}
+	defer tx.Rollback()
+	key := resource.StableKey()
+	if _, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO studio_resources(resource_key,tenant_id,project_id,resource_kind,resource_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`, key, resource.TenantID, resource.ProjectID, resource.Kind, resource.ID, timestamp(now), timestamp(now)); err != nil {
+		return collab.RepairFieldHeadResult{}, storeError(err)
+	}
+
+	var oldHead, oldValue string
+	var oldPresentInt, sequence int
+	scanErr := tx.QueryRowContext(ctx, `SELECT head_operation_id,value_present,value,sequence FROM studio_field_heads WHERE resource_key=? AND target_key=?`, key, targetKey).Scan(&oldHead, &oldPresentInt, &oldValue, &sequence)
+	if scanErr != nil {
+		if !errors.Is(scanErr, sql.ErrNoRows) {
+			return collab.RepairFieldHeadResult{}, storeError(scanErr)
+		}
+		oldHead, oldPresentInt, oldValue, sequence = "", 0, "", 0
+	}
+	oldValuePresent := oldPresentInt != 0
+
+	if _, err := tx.ExecContext(ctx, `INSERT INTO studio_field_heads(resource_key,target_key,head_operation_id,sequence,value_present,value,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(resource_key,target_key) DO UPDATE SET head_operation_id=excluded.head_operation_id,value_present=excluded.value_present,value=excluded.value,updated_at=excluded.updated_at`, key, targetKey, newHead, sequence, boolInt(newValue.Present), newValue.Value, timestamp(now)); err != nil {
+		return collab.RepairFieldHeadResult{}, storeError(err)
+	}
+
+	targetJSON, _ := json.Marshal(target)
+	if _, err := tx.ExecContext(ctx, `INSERT INTO studio_field_head_repairs(resource_key,target_key,target_json,actor_id,reason,old_head,old_value_present,old_value,new_head,new_value_present,new_value,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
+		key, targetKey, targetJSON, principal.ActorID, reason, oldHead, boolInt(oldValuePresent), oldValue, newHead, boolInt(newValue.Present), newValue.Value, timestamp(now)); err != nil {
+		return collab.RepairFieldHeadResult{}, storeError(err)
+	}
+	if err := tx.Commit(); err != nil {
+		return collab.RepairFieldHeadResult{}, storeError(err)
+	}
+	return collab.RepairFieldHeadResult{
+		Resource: resource, TargetKey: targetKey, Target: target,
+		ActorID: principal.ActorID, Reason: reason,
+		OldHead: oldHead, OldValue: authoring.OperationValue{Present: oldValuePresent, Value: oldValue},
+		NewHead: newHead, NewValue: newValue, Created: now,
+	}, nil
+}
+
+// RepairHistory returns resource's durable RepairFieldHead audit trail,
+// oldest first.
+func (s *Store) RepairHistory(ctx context.Context, resource collab.ResourceKey, limit int) ([]collab.RepairRecord, error) {
+	if limit <= 0 || limit > 1000 {
+		limit = 100
+	}
+	resource = resource.Normalize()
+	rows, err := s.db.QueryContext(ctx, `SELECT repair_id,target_key,target_json,actor_id,reason,old_head,old_value_present,old_value,new_head,new_value_present,new_value,created_at FROM studio_field_head_repairs WHERE resource_key=? ORDER BY repair_id LIMIT ?`, resource.StableKey(), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []collab.RepairRecord
+	for rows.Next() {
+		var r collab.RepairRecord
+		var targetJSON []byte
+		var oldPresent, newPresent int
+		var created string
+		if err := rows.Scan(&r.ID, &r.TargetKey, &targetJSON, &r.ActorID, &r.Reason, &r.OldHead, &oldPresent, &r.OldValue.Value, &r.NewHead, &newPresent, &r.NewValue.Value, &created); err != nil {
+			return nil, err
+		}
+		r.Resource = resource
+		r.OldValue.Present = oldPresent != 0
+		r.NewValue.Present = newPresent != 0
+		_ = json.Unmarshal(targetJSON, &r.Target)
+		r.Created, _ = time.Parse(time.RFC3339Nano, created)
+		result = append(result, r)
+	}
+	return result, rows.Err()
 }
 
 func storeError(err error) *collab.ProtocolError {

@@ -55,7 +55,93 @@ type OperationStore interface {
 	Attempts(context.Context, ResourceKey) ([]Attempt, error)
 	PendingOutbox(context.Context, ResourceKey, int) ([]OutboxEntry, error)
 	MarkProjected(context.Context, ResourceKey, int64, time.Time) error
+	// RepairFieldHead force-overwrites one target's field head to a
+	// caller-supplied known-good revision, bypassing Apply's optimistic
+	// concurrency envelope entirely. See RepairFieldHeadCommand.
+	RepairFieldHead(context.Context, RepairFieldHeadCommand) (RepairFieldHeadResult, *ProtocolError)
+	// RepairHistory returns the durable audit trail RepairFieldHead writes,
+	// oldest first, for one resource.
+	RepairHistory(context.Context, ResourceKey, int) ([]RepairRecord, error)
 	Close() error
+}
+
+// RepairFieldHeadCommand force-overwrites one target's field-head slot
+// (studio_field_heads) to a caller-supplied known-good revision, bypassing
+// Apply's optimistic-concurrency envelope (expected-head match, actor-scoped
+// Undo/Redo) entirely.
+//
+// It exists for exactly one recovery situation: a host quarantined an
+// operation its projection could not apply (see the poison-outbox handoff
+// report), leaving that target's ledger field head advanced past a value the
+// host's real draft store never actually received. Apply's normal machinery
+// cannot recover that target -- there is no legitimate operation to Undo,
+// because it is the PROJECTION that diverged from the ledger, not a
+// legitimately-reversible edit. Every future Submit for that target keeps
+// failing ErrorStaleField against a head the host's draft can never present,
+// until something resets the ledger's belief about the field back to what
+// the host's draft actually holds.
+//
+// RepairFieldHead is the host-callable primitive that performs that reset.
+// It is deliberately NOT part of the ordinary Apply path: it requires
+// CapabilityRepair (never granted to a browser-facing collaboration
+// principal -- see CapabilityRepair's doc comment), and every call -- success
+// or no-op -- writes a durable RepairRecord (RepairHistory) so a repair is
+// always attributable to an actor and a reason, never silent.
+type RepairFieldHeadCommand struct {
+	Resource  ResourceKey
+	Principal Principal
+	Target    authoring.OperationTarget
+	// NewHead is the operation id RepairFieldHead sets as this target's
+	// field head. It does not need to reference a real accepted operation
+	// (the whole point is recovering a target the ledger's own history
+	// cannot explain) -- hosts typically pass the id of the last operation
+	// whose projection is known-good, or a synthetic marker of their own.
+	NewHead string
+	// NewValue is the known-good current value RepairFieldHead writes
+	// alongside NewHead -- typically read back from the host's own draft
+	// store after manual recovery.
+	NewValue authoring.OperationValue
+	// Reason is required: a short operator-facing note (e.g. "poison outbox
+	// recovery, ticket #123") persisted verbatim in the audit record.
+	Reason string
+	Now    time.Time
+}
+
+// RepairFieldHeadResult reports one RepairFieldHead call's before/after
+// state. It mirrors OperationAck's shape (what changed, at what target) but
+// carries no DocumentRevision/Sequence -- a repair is explicitly outside the
+// accepted-operation sequence hosts replay through Tail/PendingOutbox.
+type RepairFieldHeadResult struct {
+	Resource  ResourceKey
+	TargetKey string
+	Target    authoring.OperationTarget
+	ActorID   string
+	Reason    string
+	OldHead   string
+	OldValue  authoring.OperationValue
+	NewHead   string
+	NewValue  authoring.OperationValue
+	Created   time.Time
+}
+
+// RepairRecord is one durable, queryable audit entry a RepairFieldHead call
+// wrote: Old/NewHead+Value are exactly what changed, ActorID+Reason are who
+// did it and why. Every RepairFieldHead call writes exactly one of these,
+// including a call that repairs an already-healthy head to its own current
+// value -- a safe, idempotent no-op on studio_field_heads that still leaves
+// an audit trail of the attempt.
+type RepairRecord struct {
+	ID        int64
+	Resource  ResourceKey
+	TargetKey string
+	Target    authoring.OperationTarget
+	ActorID   string
+	Reason    string
+	OldHead   string
+	OldValue  authoring.OperationValue
+	NewHead   string
+	NewValue  authoring.OperationValue
+	Created   time.Time
 }
 
 // PresenceRegistry is intentionally process-local and connection-keyed. A
