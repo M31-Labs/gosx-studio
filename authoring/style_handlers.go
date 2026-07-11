@@ -7,6 +7,10 @@ import "strings"
 // breakpoint, state) through its own draft -> publish pipeline.
 type StyleDraftWriter func(componentKey, property, value, breakpoint, state string) error
 
+// StyleDraftResetter removes one explicit override. The host should preserve
+// inherited values and only delete the breakpoint/state/property entry.
+type StyleDraftResetter func(componentKey, property, breakpoint, state string) error
+
 // AppearanceWriter receives the filtered, allowedKeys-gated form map from
 // ApplySaveAppearance and persists it to the host draft store. It returns
 // host-level field errors (nil map == success) and any fatal error.
@@ -57,6 +61,18 @@ func ApplySetStyle(m AuthoringMutation, write StyleDraftWriter) (AuthoringMutati
 			Component: m.ComponentKey,
 		}},
 	}, nil
+}
+
+// ApplyResetStyle is the host-agnostic reset path. It never serializes the
+// inherited value as a new override.
+func ApplyResetStyle(m AuthoringMutation, reset StyleDraftResetter) (AuthoringMutationResult, error) {
+	if strings.TrimSpace(m.ComponentKey) == "" || !IsSupportedStyleProperty(m.StyleProperty) {
+		return AuthoringMutationResult{Message: "Choose a supported element style.", FieldErrors: map[string]string{AuthoringFieldStyleProperty: "This style property is not supported."}, Values: m.FormValues()}, nil
+	}
+	if err := reset(m.ComponentKey, m.StyleProperty, normalizeStyleBreakpoint(m.Breakpoint), normalizeStyleState(m.State)); err != nil {
+		return AuthoringMutationResult{}, err
+	}
+	return AuthoringMutationResult{Message: "Style reset.", PreviewURL: "/", RefreshPreview: true, Values: m.FormValues(), Changes: []AuthoringChange{{Key: "style:" + m.ComponentKey + ":" + m.StyleProperty, Label: m.StyleProperty, Summary: "Reset " + m.StyleProperty, Kind: "style", Component: m.ComponentKey}}}, nil
 }
 
 // ApplySaveAppearance is the host-agnostic body for the save-appearance

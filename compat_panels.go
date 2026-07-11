@@ -51,6 +51,12 @@ import (
 	"m31labs.dev/gosx-studio/panels"
 )
 
+type DirectEditPanelOptions = panels.DirectEditPanelOptions
+
+func RenderDirectEditPanel(options DirectEditPanelOptions) gosx.Node {
+	return panels.RenderDirectEditPanel(options)
+}
+
 // --- Activity panel (panels/activity_panel.go) ---
 
 // Deprecated: use panels.ActivityPanelOptions.

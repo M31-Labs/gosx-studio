@@ -28,6 +28,7 @@ import (
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/inlineeditruntime"
 	"m31labs.dev/gosx-studio/inspectorruntime"
+	"m31labs.dev/gosx-studio/operationruntime"
 	"m31labs.dev/gosx-studio/previewruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
 	"m31labs.dev/gosx-studio/sitemapruntime"
@@ -73,8 +74,15 @@ func builtinRuntimeSlices() [][]byte {
 		sitemapruntime.Bundle(),
 		inspectorruntime.Bundle(),
 		inlineeditruntime.Bundle(),
+		operationruntime.Script(),
 	}
 }
+
+// OperationRuntimeScript returns the durable operation bridge used by hosts
+// that opt into data-gosx-studio-durable-history.
+func OperationRuntimeScript() []byte { return operationruntime.Script() }
+
+func OperationRuntimeHandler() http.Handler { return operationruntime.Handler() }
 
 // concatRuntimeSlices joins non-empty island bundles, each terminated by a
 // newline (the historical engine-bundle framing).

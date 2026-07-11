@@ -171,7 +171,7 @@ func styleValueRejection(value string) string {
 // validateStyleMutation enforces the set-style contract: a real page+component
 // target, a supported property, a safe value, and supported breakpoint/state.
 func validateStyleMutation(validation *AuthoringValidation, mutation AuthoringMutation) {
-	requirePageComponent(validation, mutation)
+	validateStyleTarget(validation, mutation)
 	if mutation.StyleProperty == "" {
 		validation.AddFieldError(AuthoringFieldStyleProperty, "Choose a style property.")
 	} else if !IsSupportedStyleProperty(mutation.StyleProperty) {
@@ -179,6 +179,24 @@ func validateStyleMutation(validation *AuthoringValidation, mutation AuthoringMu
 	}
 	if reason := styleValueRejection(mutation.StyleValue); reason != "" {
 		validation.AddFieldError(AuthoringFieldStyleValue, reason)
+	}
+	if !isSupportedStyleBreakpoint(normalizeStyleBreakpoint(mutation.Breakpoint)) {
+		validation.AddFieldError(AuthoringFieldBreakpoint, "Choose a supported breakpoint.")
+	}
+	if !isSupportedStyleState(normalizeStyleState(mutation.State)) {
+		validation.AddFieldError(AuthoringFieldState, "Choose a supported state.")
+	}
+}
+
+// validateStyleTarget validates the address shared by set/reset style. Reset
+// intentionally does not validate a value because its meaning is to remove an
+// explicit override and reveal the inherited cascade value.
+func validateStyleTarget(validation *AuthoringValidation, mutation AuthoringMutation) {
+	requirePageComponent(validation, mutation)
+	if mutation.StyleProperty == "" {
+		validation.AddFieldError(AuthoringFieldStyleProperty, "Choose a style property.")
+	} else if !IsSupportedStyleProperty(mutation.StyleProperty) {
+		validation.AddFieldError(AuthoringFieldStyleProperty, "This style property is not supported.")
 	}
 	if !isSupportedStyleBreakpoint(normalizeStyleBreakpoint(mutation.Breakpoint)) {
 		validation.AddFieldError(AuthoringFieldBreakpoint, "Choose a supported breakpoint.")

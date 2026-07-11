@@ -63,7 +63,28 @@ const (
 	// Deprecated: use authoring.AuthoringOperationSaveAppearance.
 	AuthoringOperationSaveAppearance = authoring.AuthoringOperationSaveAppearance
 	// Deprecated: use authoring.AuthoringOperationSetStyle.
-	AuthoringOperationSetStyle = authoring.AuthoringOperationSetStyle
+	AuthoringOperationSetStyle   = authoring.AuthoringOperationSetStyle
+	AuthoringOperationSetField   = authoring.AuthoringOperationSetField
+	AuthoringOperationResetStyle = authoring.AuthoringOperationResetStyle
+	AuthoringOperationUndo       = authoring.AuthoringOperationUndo
+	AuthoringOperationRedo       = authoring.AuthoringOperationRedo
+)
+
+// Durable operation protocol aliases for hosts that still import the Studio
+// root facade.
+type OperationKind = authoring.OperationKind
+type OperationTarget = authoring.OperationTarget
+type OperationValue = authoring.OperationValue
+type OperationRequest = authoring.OperationRequest
+type OperationRecord = authoring.OperationRecord
+
+const OperationSchemaVersion = authoring.OperationSchemaVersion
+const (
+	OperationSetField   = authoring.OperationSetField
+	OperationSetStyle   = authoring.OperationSetStyle
+	OperationResetStyle = authoring.OperationResetStyle
+	OperationUndo       = authoring.OperationUndo
+	OperationRedo       = authoring.OperationRedo
 )
 
 const (
@@ -108,7 +129,11 @@ const (
 	// Deprecated: use authoring.AuthoringFieldPosition.
 	AuthoringFieldPosition = authoring.AuthoringFieldPosition
 	// Deprecated: use authoring.AuthoringFieldVisible.
-	AuthoringFieldVisible = authoring.AuthoringFieldVisible
+	AuthoringFieldVisible            = authoring.AuthoringFieldVisible
+	AuthoringFieldOperationID        = authoring.AuthoringFieldOperationID
+	AuthoringFieldExpectedRevision   = authoring.AuthoringFieldExpectedRevision
+	AuthoringFieldExpectedTargetHead = authoring.AuthoringFieldExpectedTargetHead
+	AuthoringFieldHistoryOperationID = authoring.AuthoringFieldHistoryOperationID
 )
 
 // Deprecated: use authoring.AuthoringActionHandler.

@@ -35,7 +35,11 @@ const (
 	// validated against a curated allow-list and the value is sanitized
 	// server-side (see style_mutations.go), so the browser can never push an
 	// illegal or injecting declaration into a page.
-	AuthoringOperationSetStyle AuthoringOperationKind = "set-style"
+	AuthoringOperationSetStyle   AuthoringOperationKind = "set-style"
+	AuthoringOperationSetField   AuthoringOperationKind = "set-field"
+	AuthoringOperationResetStyle AuthoringOperationKind = "reset-style"
+	AuthoringOperationUndo       AuthoringOperationKind = "undo"
+	AuthoringOperationRedo       AuthoringOperationKind = "redo"
 )
 
 const (
@@ -60,6 +64,10 @@ const (
 	AuthoringFieldState                = "gosx_studio_state"
 	AuthoringFieldPosition             = "gosx_studio_position"
 	AuthoringFieldVisible              = "gosx_studio_visible"
+	AuthoringFieldOperationID          = "gosx_studio_operation_id"
+	AuthoringFieldExpectedRevision     = "gosx_studio_expected_revision"
+	AuthoringFieldExpectedTargetHead   = "gosx_studio_expected_target_head"
+	AuthoringFieldHistoryOperationID   = "gosx_studio_history_operation_id"
 )
 
 // AuthoringAdapter is the host-owned mutation boundary for no-code editing.
@@ -100,6 +108,12 @@ type AuthoringMutation struct {
 	// directly from RawForm (e.g. mutation.RawForm["colorAccent"]).
 	// For all other operations RawForm is nil.
 	RawForm map[string]string
+	// Durable operation metadata. Actor/capabilities are intentionally absent:
+	// hosts derive them from the authenticated request context.
+	OperationID        string
+	ExpectedRevision   uint64
+	ExpectedTargetHead string
+	HistoryOperationID string
 }
 
 type AuthoringValidation struct {
@@ -278,6 +292,7 @@ func AuthoringMutationForComponentDuplicate(page core.Page, component core.Compo
 }
 
 func AuthoringMutationFromForm(form map[string]string) (AuthoringMutation, AuthoringValidation) {
+	validation := AuthoringValidation{Values: cloneStringMap(form)}
 	mutation := AuthoringMutation{
 		Kind:                 AuthoringOperationKind(formValue(form, AuthoringFieldOperation)),
 		IntentKey:            formValue(form, AuthoringFieldIntentKey),
@@ -298,8 +313,17 @@ func AuthoringMutationFromForm(form map[string]string) (AuthoringMutation, Autho
 		StyleValue:           formValue(form, AuthoringFieldStyleValue),
 		Breakpoint:           formValue(form, AuthoringFieldBreakpoint),
 		State:                formValue(form, AuthoringFieldState),
+		OperationID:          formValue(form, AuthoringFieldOperationID),
+		ExpectedTargetHead:   formValue(form, AuthoringFieldExpectedTargetHead),
+		HistoryOperationID:   formValue(form, AuthoringFieldHistoryOperationID),
 	}
-	validation := AuthoringValidation{Values: cloneStringMap(form)}
+	if revision, ok, valid := parseAuthoringInt(formValue(form, AuthoringFieldExpectedRevision)); ok {
+		if valid && revision >= 0 {
+			mutation.ExpectedRevision = uint64(revision)
+		} else {
+			validation.AddFieldError(AuthoringFieldExpectedRevision, "Enter a valid document revision.")
+		}
+	}
 	if position, ok, valid := parseAuthoringInt(formValue(form, AuthoringFieldPosition)); ok {
 		if valid {
 			mutation.Position = position
@@ -355,6 +379,9 @@ func (mutation AuthoringMutation) Normalize() AuthoringMutation {
 	mutation.StyleValue = strings.TrimSpace(mutation.StyleValue)
 	mutation.Breakpoint = strings.TrimSpace(mutation.Breakpoint)
 	mutation.State = strings.TrimSpace(mutation.State)
+	mutation.OperationID = strings.TrimSpace(mutation.OperationID)
+	mutation.ExpectedTargetHead = strings.TrimSpace(mutation.ExpectedTargetHead)
+	mutation.HistoryOperationID = strings.TrimSpace(mutation.HistoryOperationID)
 	if mutation.Kind == AuthoringOperationSetStyle {
 		mutation.Breakpoint = normalizeStyleBreakpoint(mutation.Breakpoint)
 		mutation.State = normalizeStyleState(mutation.State)
@@ -416,6 +443,17 @@ func (mutation AuthoringMutation) Validate() AuthoringValidation {
 		// The host adapter reads values from mutation.RawForm.
 	case AuthoringOperationSetStyle:
 		validateStyleMutation(&validation, mutation)
+	case AuthoringOperationSetField:
+		requirePageComponent(&validation, mutation)
+		if mutation.Binding == "" && mutation.ControlKey == "" {
+			validation.AddFieldError(AuthoringFieldBinding, "Choose a field target.")
+		}
+	case AuthoringOperationResetStyle:
+		validateStyleTarget(&validation, mutation)
+	case AuthoringOperationUndo, AuthoringOperationRedo:
+		if mutation.HistoryOperationID == "" {
+			validation.AddFieldError(AuthoringFieldHistoryOperationID, "Choose a history operation.")
+		}
 	case AuthoringOperationUpdatePage:
 		if mutation.PageKey == "" {
 			validation.AddFieldError(AuthoringFieldPageKey, "Choose a page.")
@@ -449,6 +487,12 @@ func (mutation AuthoringMutation) FormValues() map[string]string {
 	setFormValue(values, AuthoringFieldStyleValue, mutation.StyleValue)
 	setFormValue(values, AuthoringFieldBreakpoint, mutation.Breakpoint)
 	setFormValue(values, AuthoringFieldState, mutation.State)
+	setFormValue(values, AuthoringFieldOperationID, mutation.OperationID)
+	if mutation.ExpectedRevision > 0 {
+		values[AuthoringFieldExpectedRevision] = strconv.FormatUint(mutation.ExpectedRevision, 10)
+	}
+	setFormValue(values, AuthoringFieldExpectedTargetHead, mutation.ExpectedTargetHead)
+	setFormValue(values, AuthoringFieldHistoryOperationID, mutation.HistoryOperationID)
 	if mutation.HasPosition {
 		values[AuthoringFieldPosition] = strconv.Itoa(mutation.Position)
 	}
@@ -482,6 +526,10 @@ func AuthoringMutationFormInputViews(mutation AuthoringMutation) []map[string]st
 		AuthoringFieldState,
 		AuthoringFieldPosition,
 		AuthoringFieldVisible,
+		AuthoringFieldOperationID,
+		AuthoringFieldExpectedRevision,
+		AuthoringFieldExpectedTargetHead,
+		AuthoringFieldHistoryOperationID,
 	}
 	out := make([]map[string]string, 0, len(values))
 	for _, field := range fields {
@@ -523,6 +571,10 @@ func AuthoringMutationView(mutation AuthoringMutation) map[string]any {
 		"hasPosition":          mutation.HasPosition,
 		"visible":              mutation.Visible,
 		"hasVisible":           mutation.HasVisible,
+		"operationID":          mutation.OperationID,
+		"expectedRevision":     mutation.ExpectedRevision,
+		"expectedTargetHead":   mutation.ExpectedTargetHead,
+		"historyOperationID":   mutation.HistoryOperationID,
 		"formValues":           mutation.FormValues(),
 		"formInputs":           AuthoringMutationFormInputViews(mutation),
 	}
@@ -551,6 +603,10 @@ func AuthoringFieldNamesView() map[string]string {
 		"state":                AuthoringFieldState,
 		"position":             AuthoringFieldPosition,
 		"visible":              AuthoringFieldVisible,
+		"operationID":          AuthoringFieldOperationID,
+		"expectedRevision":     AuthoringFieldExpectedRevision,
+		"expectedTargetHead":   AuthoringFieldExpectedTargetHead,
+		"historyOperationID":   AuthoringFieldHistoryOperationID,
 	}
 }
 
@@ -690,6 +746,14 @@ func normalizeAuthoringOperationKind(kind AuthoringOperationKind) AuthoringOpera
 		return AuthoringOperationSaveAppearance
 	case AuthoringOperationSetStyle:
 		return AuthoringOperationSetStyle
+	case AuthoringOperationSetField:
+		return AuthoringOperationSetField
+	case AuthoringOperationResetStyle:
+		return AuthoringOperationResetStyle
+	case AuthoringOperationUndo:
+		return AuthoringOperationUndo
+	case AuthoringOperationRedo:
+		return AuthoringOperationRedo
 	default:
 		return ""
 	}
