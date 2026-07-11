@@ -8,9 +8,21 @@
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     return url.toString();
   }
+  function canonicalRoute(value) {
+    try { return new URL(value || "/", window.location.origin).pathname || "/"; } catch (_) { return String(value || "/").split(/[?#]/)[0] || "/"; }
+  }
+  function activeRouteNode() {
+    return qs(document, "[data-studio-preview-route-current], [data-studio-preview-route][aria-pressed='true'], [data-studio-preview-frame]");
+  }
   function currentRoute() {
-    var node = qs(document, "[data-studio-preview-route-current]");
-    return (node && node.getAttribute("data-studio-preview-route-current")) || window.location.pathname || "/";
+    var node = activeRouteNode();
+    var value = node && (node.getAttribute("data-studio-preview-route-current") || node.getAttribute("data-studio-preview-route"));
+    return canonicalRoute(value || window.location.pathname || "/");
+  }
+  function currentPageID() {
+    var node = qs(document, "[data-studio-preview-route][aria-pressed='true']");
+    var key = node && node.getAttribute("data-studio-preview-route-key");
+    return key ? (key.indexOf("page:") === 0 ? key : "page:" + key) : "";
   }
   function currentViewport() {
     var node = qs(document, "[data-studio-preview-viewport][aria-pressed='true'], [data-studio-viewport][aria-pressed='true']");
@@ -19,8 +31,8 @@
   function stableSelection(detail) {
     detail = detail || {};
     var selection = {
-      route: detail.route || detail.targetRoute || currentRoute(),
-      pageId: detail.pageId || detail.pageID || "",
+      route: canonicalRoute(detail.route || detail.targetRoute || currentRoute()),
+      pageId: detail.pageId || detail.pageID || currentPageID(),
       field: detail.field || "",
       blockKey: detail.blockKey || detail.componentKey || "",
       nodeId: detail.nodeId || detail.nodeID || "",
