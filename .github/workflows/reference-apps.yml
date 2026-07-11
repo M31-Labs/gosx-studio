@@ -26,6 +26,12 @@ jobs:
         with:
           path: gosx-studio
 
+      - name: Resolve reference app refs
+        id: refs
+        run: |
+          echo "muddy=$(jq -r '.muddy' gosx-studio/.github/reference-app-refs.json)" >> "$GITHUB_OUTPUT"
+          echo "pajaritos=$(jq -r '.pajaritos' gosx-studio/.github/reference-app-refs.json)" >> "$GITHUB_OUTPUT"
+
       - name: Checkout gosx
         uses: actions/checkout@v4
         with:
@@ -45,6 +51,7 @@ jobs:
         with:
           repository: odvcencio/muddy-noni-commerce
           token: ${{ secrets.CI_GITHUB_TOKEN || github.token }}
+          ref: ${{ steps.refs.outputs.muddy }}
           path: muddy-noni-commerce
 
       - name: Checkout Pajaritos
@@ -52,6 +59,7 @@ jobs:
         with:
           repository: odvcencio/pajaritos-forest-school
           token: ${{ secrets.CI_GITHUB_TOKEN || github.token }}
+          ref: ${{ steps.refs.outputs.pajaritos }}
           path: pajaritos-forest-school
 
       - name: Setup Go
