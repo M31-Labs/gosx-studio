@@ -40,6 +40,30 @@ const (
 	AuthoringOperationResetStyle AuthoringOperationKind = "reset-style"
 	AuthoringOperationUndo       AuthoringOperationKind = "undo"
 	AuthoringOperationRedo       AuthoringOperationKind = "redo"
+	// The four operations below implement the reusable component/instance
+	// model (see core/instances.go): a shared ComponentDefinition's Controls
+	// fan out to every attached Component instance, and one instance can
+	// diverge one field at a time (override) or completely (detach/restore).
+	//
+	// AuthoringOperationSetSharedField edits one control on the shared
+	// definition itself, identified by ComponentTemplateKey (the definition
+	// key) and ControlKey. It fans out to every attached instance because
+	// attached instances always resolve through core.EffectiveComponentControls
+	// — no per-instance write follows a shared edit.
+	AuthoringOperationSetSharedField AuthoringOperationKind = "set-shared-field"
+	// AuthoringOperationOverrideInstance sets one instance-local control
+	// override, identified by PageKey+ComponentKey (the placed instance) and
+	// ControlKey. Only that control diverges; the rest of the instance keeps
+	// following the shared definition.
+	AuthoringOperationOverrideInstance AuthoringOperationKind = "override-instance"
+	// AuthoringOperationDetachInstance freezes one instance's currently
+	// effective values as its own independent copy and stops it from
+	// following further shared edits.
+	AuthoringOperationDetachInstance AuthoringOperationKind = "detach-instance"
+	// AuthoringOperationRestoreInstance re-attaches a detached (or
+	// override-diverged) instance to its shared definition, dropping any
+	// instance-local state.
+	AuthoringOperationRestoreInstance AuthoringOperationKind = "restore-instance"
 )
 
 const (
@@ -301,6 +325,72 @@ func AuthoringMutationForComponentDuplicate(page core.Page, component core.Compo
 	}.Normalize()
 }
 
+// AuthoringMutationForSharedField edits one control on a shared component
+// definition. definitionKey identifies the core.ComponentDefinition (carried
+// in ComponentTemplateKey, the same field a duplicate-from-template mutation
+// uses to name its source template); control.Key/control.Value name the field
+// and its new value.
+func AuthoringMutationForSharedField(definitionKey string, control core.Control) AuthoringMutation {
+	control = control.Normalize()
+	return AuthoringMutation{
+		Kind:                 AuthoringOperationSetSharedField,
+		ComponentTemplateKey: strings.TrimSpace(definitionKey),
+		ControlKey:           control.Key,
+		ControlKind:          control.Kind,
+		Value:                control.Value,
+	}.Normalize()
+}
+
+// AuthoringMutationForInstanceOverride sets one instance-local control
+// override on a placed shared-component instance, leaving every other
+// control on the instance following the shared definition.
+func AuthoringMutationForInstanceOverride(page core.Page, component core.Component, control core.Control) AuthoringMutation {
+	page = page.Normalize()
+	component = component.Normalize()
+	control = control.Normalize()
+	return AuthoringMutation{
+		Kind:           AuthoringOperationOverrideInstance,
+		PageKey:        page.Key,
+		PageLabel:      page.Label,
+		PageRoute:      page.Route,
+		ComponentKey:   component.Key,
+		ComponentLabel: component.Label,
+		ControlKey:     control.Key,
+		ControlKind:    control.Kind,
+		Value:          control.Value,
+	}.Normalize()
+}
+
+// AuthoringMutationForInstanceDetach severs a placed shared-component instance
+// from its definition, freezing its currently-effective values as its own.
+func AuthoringMutationForInstanceDetach(page core.Page, component core.Component) AuthoringMutation {
+	page = page.Normalize()
+	component = component.Normalize()
+	return AuthoringMutation{
+		Kind:           AuthoringOperationDetachInstance,
+		PageKey:        page.Key,
+		PageLabel:      page.Label,
+		PageRoute:      page.Route,
+		ComponentKey:   component.Key,
+		ComponentLabel: component.Label,
+	}.Normalize()
+}
+
+// AuthoringMutationForInstanceRestore re-attaches a detached (or
+// override-diverged) instance to its shared definition.
+func AuthoringMutationForInstanceRestore(page core.Page, component core.Component) AuthoringMutation {
+	page = page.Normalize()
+	component = component.Normalize()
+	return AuthoringMutation{
+		Kind:           AuthoringOperationRestoreInstance,
+		PageKey:        page.Key,
+		PageLabel:      page.Label,
+		PageRoute:      page.Route,
+		ComponentKey:   component.Key,
+		ComponentLabel: component.Label,
+	}.Normalize()
+}
+
 func AuthoringMutationFromForm(form map[string]string) (AuthoringMutation, AuthoringValidation) {
 	validation := AuthoringValidation{Values: cloneStringMap(form)}
 	mutation := AuthoringMutation{
@@ -471,6 +561,20 @@ func (mutation AuthoringMutation) Validate() AuthoringValidation {
 		if mutation.PageLabel == "" && mutation.PageRoute == "" {
 			validation.AddFieldError(AuthoringFieldPageLabel, "Enter a page label or route.")
 		}
+	case AuthoringOperationSetSharedField:
+		if mutation.ComponentTemplateKey == "" {
+			validation.AddFieldError(AuthoringFieldComponentTemplateKey, "Choose a shared component.")
+		}
+		if mutation.ControlKey == "" {
+			validation.AddFieldError(AuthoringFieldControlKey, "Choose a control.")
+		}
+	case AuthoringOperationOverrideInstance:
+		requirePageComponent(&validation, mutation)
+		if mutation.ControlKey == "" {
+			validation.AddFieldError(AuthoringFieldControlKey, "Choose a control.")
+		}
+	case AuthoringOperationDetachInstance, AuthoringOperationRestoreInstance:
+		requirePageComponent(&validation, mutation)
 	}
 	return validation.withDefaultMessage()
 }
@@ -770,6 +874,14 @@ func normalizeAuthoringOperationKind(kind AuthoringOperationKind) AuthoringOpera
 		return AuthoringOperationUndo
 	case AuthoringOperationRedo:
 		return AuthoringOperationRedo
+	case AuthoringOperationSetSharedField:
+		return AuthoringOperationSetSharedField
+	case AuthoringOperationOverrideInstance:
+		return AuthoringOperationOverrideInstance
+	case AuthoringOperationDetachInstance:
+		return AuthoringOperationDetachInstance
+	case AuthoringOperationRestoreInstance:
+		return AuthoringOperationRestoreInstance
 	default:
 		return ""
 	}

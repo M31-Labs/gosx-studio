@@ -3,10 +3,13 @@ package media
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"m31labs.dev/gosx-studio/core"
 )
 
 type Item struct {
@@ -18,6 +21,7 @@ type Asset struct {
 	ID          string     `json:"id"`
 	URL         string     `json:"url"`
 	Alt         string     `json:"alt"`
+	Caption     string     `json:"caption,omitempty"`
 	Filename    string     `json:"filename"`
 	ContentType string     `json:"contentType"`
 	Size        int64      `json:"size"`
@@ -54,6 +58,7 @@ type Usage struct {
 type Input struct {
 	URL         string
 	Alt         string
+	Caption     string
 	Filename    string
 	ContentType string
 	Size        int64
@@ -215,6 +220,7 @@ func NormalizeList(items []Item, fallbackTitle string, placeholder bool) []Item 
 func NormalizeAsset(input Input, asset Asset) Asset {
 	asset.URL = strings.TrimSpace(input.URL)
 	asset.Alt = strings.TrimSpace(input.Alt)
+	asset.Caption = strings.TrimSpace(input.Caption)
 	asset.Filename = strings.TrimSpace(input.Filename)
 	asset.FocalX = input.FocalX
 	asset.FocalY = input.FocalY
@@ -317,4 +323,98 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// ErrAssetReferenced signals that a caller attempted to permanently delete an
+// asset that MediaUsage still reports as referenced by draft or published
+// content. Hosts should surface the returned Usage list ("still used by
+// <Product>, <Page>...") instead of deleting, matching Webflow-class editors'
+// referenced-asset protection.
+var ErrAssetReferenced = errors.New("asset is still referenced by draft or published content")
+
+// UsageLookup is the narrow read capability GuardDeleteMediaAsset needs from a
+// host's media store.
+type UsageLookup interface {
+	MediaUsage(id string) []Usage
+}
+
+// AssetDeleter is the narrow write capability GuardDeleteMediaAsset needs from
+// a host's media store: a PERMANENT delete (distinct from archive/restore,
+// which are reversible and already usage-agnostic).
+type AssetDeleter interface {
+	DeleteMediaAsset(id string) error
+}
+
+// GuardDeleteMediaAsset refuses to delete an asset that lookup.MediaUsage
+// still reports as referenced, returning that usage list so the caller can
+// render "still used by X, Y" instead of silently deleting a referenced asset
+// or leaving a dangling reference behind. Studio owns this guard so every
+// host enforces the same referenced-asset protection rather than
+// reimplementing (and potentially forgetting) the usage check.
+func GuardDeleteMediaAsset(lookup UsageLookup, deleter AssetDeleter, id string) ([]Usage, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, errors.New("asset id is required")
+	}
+	if lookup != nil {
+		if usage := lookup.MediaUsage(id); len(usage) > 0 {
+			return usage, ErrAssetReferenced
+		}
+	}
+	if deleter == nil {
+		return nil, errors.New("no asset deleter is configured")
+	}
+	return nil, deleter.DeleteMediaAsset(id)
+}
+
+// AssetReadinessCheck reports one publish-readiness concern for a media
+// asset, mirroring core.FlowReadinessCheck's shape so hosts can fold media
+// diagnostics into the same readiness/publish-review surface.
+type AssetReadinessCheck struct {
+	Key     string
+	Label   string
+	Summary string
+	Status  core.ReadinessStatus
+}
+
+// AssetReadiness computes the accessibility/publish-readiness checks for one
+// asset given its current usage. Alt text is only REQUIRED once an asset is
+// actually bound to visible content ("alt text required where semantically
+// needed" — an unused library upload is Watch, not Blocked, so operators can
+// stage assets before wiring them up).
+func AssetReadiness(asset Asset, usage []Usage) []AssetReadinessCheck {
+	checks := []AssetReadinessCheck{}
+	referenced := len(usage) > 0
+	hasAlt := strings.TrimSpace(asset.Alt) != ""
+	switch {
+	case hasAlt:
+		checks = append(checks, AssetReadinessCheck{
+			Key: "alt-text", Label: "Alt text", Summary: "Alt text is set.", Status: core.ReadinessReady,
+		})
+	case referenced:
+		checks = append(checks, AssetReadinessCheck{
+			Key: "alt-text", Label: "Alt text", Summary: "This asset is used on the live site and has no alt text.", Status: core.ReadinessBlocked,
+		})
+	default:
+		checks = append(checks, AssetReadinessCheck{
+			Key: "alt-text", Label: "Alt text", Summary: "Add alt text before using this asset on a page.", Status: core.ReadinessWatch,
+		})
+	}
+	return checks
+}
+
+// AssetReadinessStatus rolls AssetReadiness up to a single status the way
+// core.Flow.ReadinessStatus rolls up flow checks: any Blocked check blocks,
+// any Watch (with no Blocked) watches, otherwise ready.
+func AssetReadinessStatus(asset Asset, usage []Usage) core.ReadinessStatus {
+	status := core.ReadinessReady
+	for _, check := range AssetReadiness(asset, usage) {
+		switch check.Status {
+		case core.ReadinessBlocked:
+			return core.ReadinessBlocked
+		case core.ReadinessWatch:
+			status = core.ReadinessWatch
+		}
+	}
+	return status
 }
