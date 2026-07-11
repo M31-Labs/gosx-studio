@@ -33,6 +33,10 @@
         event.preventDefault();
         var kind = button.getAttribute("data-gosx-studio-operation-kind");
         var value = button.getAttribute("data-gosx-studio-operation-value") || "";
+        if (!value && kind === "set-field") {
+          var editorValue = form.querySelector("[data-studio-operation-value]");
+          if (editorValue) value = "value" in editorValue ? editorValue.value : (editorValue.textContent || "");
+        }
         form.__gosxOperationRuntime.select({ route: button.getAttribute("data-gosx-studio-route") || form.getAttribute("data-studio-target-route") || "/", pageId: button.getAttribute("data-gosx-studio-page-id") || form.getAttribute("data-studio-target-page-id") || "", field: button.getAttribute("data-gosx-studio-field") || form.getAttribute("data-studio-target-field") || "", componentKey: button.getAttribute("data-gosx-studio-component") || form.getAttribute("data-studio-target-component") || "", property: button.getAttribute("data-gosx-studio-style-property") || "" });
         form.__gosxOperationRuntime.commit(kind, value, { componentKey: button.getAttribute("data-gosx-studio-component"), property: button.getAttribute("data-gosx-studio-style-property"), breakpoint: button.getAttribute("data-gosx-studio-breakpoint"), state: button.getAttribute("data-gosx-studio-state"), historyOperationId: button.getAttribute("data-gosx-studio-history-operation-id") });
       });
