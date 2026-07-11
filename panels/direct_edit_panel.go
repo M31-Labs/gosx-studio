@@ -18,6 +18,8 @@ type DirectEditPanelOptions struct {
 	StyleProperty             string
 	StyleValue                string
 	InheritedFrom             string
+	UndoOperationID           string
+	RedoOperationID           string
 }
 
 // RenderDirectEditPanel renders the compact selected-target editor. It keeps
@@ -49,13 +51,32 @@ func RenderDirectEditPanel(options DirectEditPanelOptions) gosx.Node {
 		styleOperationButtons(target),
 		gosx.El("button", gosx.Attrs(gosx.Attr("type", "submit"), gosx.Attr("data-gosx-studio-operation-kind", string(authoring.AuthoringOperationSetField))), gosx.Text("Save")),
 		gosx.El("button", gosx.Attrs(gosx.Attr("type", "reset"), gosx.Attr("data-gosx-studio-operation-cancel", "true")), gosx.Text("Cancel")),
+		historyControls(options),
 	)
 	return gosx.El("form", gosx.Attrs(attrs...), gosx.Fragment(children...))
 }
 
+func historyControls(options DirectEditPanelOptions) gosx.Node {
+	undoAttrs := []any{gosx.Attr("type", "button"), gosx.Attr("data-gosx-studio-operation-kind", string(authoring.AuthoringOperationUndo)), gosx.Attr("data-gosx-studio-history-operation-id", options.UndoOperationID)}
+	redoAttrs := []any{gosx.Attr("type", "button"), gosx.Attr("data-gosx-studio-operation-kind", string(authoring.AuthoringOperationRedo)), gosx.Attr("data-gosx-studio-history-operation-id", options.RedoOperationID)}
+	if options.UndoOperationID == "" {
+		undoAttrs = append(undoAttrs, gosx.Attr("disabled", "disabled"))
+	}
+	if options.RedoOperationID == "" {
+		redoAttrs = append(redoAttrs, gosx.Attr("disabled", "disabled"))
+	}
+	return gosx.El("div", gosx.Attrs(gosx.Attr("data-studio-durable-history", "true")), gosx.El("output", gosx.Attrs(gosx.Attr("data-studio-durable-history-status", "true")), gosx.Text("Durable history")), gosx.El("button", gosx.Attrs(undoAttrs...), gosx.Text("Undo")), gosx.El("button", gosx.Attrs(redoAttrs...), gosx.Text("Redo")))
+}
+
 func styleOperationButtons(target authoring.OperationTarget) gosx.Node {
 	component := target.ComponentKey
-	if component == "" { if target.Field == "pages.about.title" { component = "about:content" } else { component = "home:hero" } }
+	if component == "" {
+		if target.Field == "pages.about.title" {
+			component = "about:content"
+		} else {
+			component = "home:hero"
+		}
+	}
 	return gosx.El("fieldset", gosx.Attrs(gosx.Attr("data-studio-direct-style-controls", "true")),
 		gosx.El("legend", nil, gosx.Text("Responsive style")),
 		styleButton(component, "background-color", "var(--color-accent)", "base", "Accent · Base"),
@@ -64,8 +85,12 @@ func styleOperationButtons(target authoring.OperationTarget) gosx.Node {
 		styleResetButton(component, "padding-block", "mobile", "Reset mobile padding"),
 	)
 }
-func styleButton(component, property, value, breakpoint, label string) gosx.Node { return gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("data-gosx-studio-operation-kind", string(authoring.AuthoringOperationSetStyle)), gosx.Attr("data-gosx-studio-operation-value", value), gosx.Attr("data-gosx-studio-style-property", property), gosx.Attr("data-gosx-studio-component", component), gosx.Attr("data-gosx-studio-breakpoint", breakpoint)), gosx.Text(label)) }
-func styleResetButton(component, property, breakpoint, label string) gosx.Node { return gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("data-gosx-studio-operation-kind", string(authoring.AuthoringOperationResetStyle)), gosx.Attr("data-gosx-studio-operation-value", ""), gosx.Attr("data-gosx-studio-style-property", property), gosx.Attr("data-gosx-studio-component", component), gosx.Attr("data-gosx-studio-breakpoint", breakpoint)), gosx.Text(label)) }
+func styleButton(component, property, value, breakpoint, label string) gosx.Node {
+	return gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("data-gosx-studio-operation-kind", string(authoring.AuthoringOperationSetStyle)), gosx.Attr("data-gosx-studio-operation-value", value), gosx.Attr("data-gosx-studio-style-property", property), gosx.Attr("data-gosx-studio-component", component), gosx.Attr("data-gosx-studio-breakpoint", breakpoint)), gosx.Text(label))
+}
+func styleResetButton(component, property, breakpoint, label string) gosx.Node {
+	return gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("data-gosx-studio-operation-kind", string(authoring.AuthoringOperationResetStyle)), gosx.Attr("data-gosx-studio-operation-value", ""), gosx.Attr("data-gosx-studio-style-property", property), gosx.Attr("data-gosx-studio-component", component), gosx.Attr("data-gosx-studio-breakpoint", breakpoint)), gosx.Text(label))
+}
 
 func hidden(name, value string) gosx.Node {
 	return gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", name), gosx.Attr("value", value)))
