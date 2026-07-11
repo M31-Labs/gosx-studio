@@ -75,6 +75,28 @@ func (p *PresenceRegistry) Leave(connectionID string) {
 	defer p.mu.Unlock()
 	delete(p.entries, connectionID)
 }
+func (p *PresenceRegistry) SetSelection(connectionID string, selection SelectionState) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	entry, ok := p.entries[connectionID]
+	if !ok {
+		return false
+	}
+	entry.Selection = selection.Normalize()
+	p.entries[connectionID] = entry
+	return true
+}
+func (p *PresenceRegistry) SetCursor(connectionID string, cursor CursorState) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	entry, ok := p.entries[connectionID]
+	if !ok {
+		return false
+	}
+	entry.Cursor = cursor.Normalize()
+	p.entries[connectionID] = entry
+	return true
+}
 func (p *PresenceRegistry) Entries() []PresenceEntry {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

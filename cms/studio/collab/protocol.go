@@ -156,8 +156,39 @@ type ResumeRequest struct {
 }
 
 type SelectionState struct {
-	Identity core.CanvasIdentity `json:"identity"`
-	Viewport string              `json:"viewport,omitempty"`
+	Route    string `json:"route"`
+	PageID   string `json:"pageId,omitempty"`
+	Field    string `json:"field,omitempty"`
+	BlockKey string `json:"blockKey,omitempty"`
+	NodeID   string `json:"nodeId,omitempty"`
+	Kind     string `json:"kind,omitempty"`
+	Viewport string `json:"viewport,omitempty"`
+}
+
+func SelectionFromIdentity(identity core.CanvasIdentity, viewport string) SelectionState {
+	identity = identity.Normalize()
+	return SelectionState{Route: identity.Route, PageID: identity.PageID, Field: identity.Field, BlockKey: identity.BlockKey, NodeID: identity.NodeID, Kind: identity.Kind, Viewport: strings.TrimSpace(viewport)}
+}
+
+func (s SelectionState) Identity() core.CanvasIdentity {
+	return core.CanvasIdentity{Route: s.Route, PageID: s.PageID, Field: s.Field, BlockKey: s.BlockKey, NodeID: s.NodeID, Kind: s.Kind}.Normalize()
+}
+
+func (s SelectionState) Normalize() SelectionState {
+	return SelectionFromIdentity(s.Identity(), s.Viewport)
+}
+
+func (s SelectionState) Validate() *ProtocolError {
+	if !s.Identity().Stable() {
+		return NewProtocolError(ErrorInvalidRequest, "stable shared selection identity is required")
+	}
+	if len(s.Route) > 2048 || len(s.PageID) > 512 || len(s.Field) > 512 || len(s.BlockKey) > 512 || len(s.NodeID) > 512 {
+		return NewProtocolError(ErrorInvalidRequest, "shared selection identity is too long")
+	}
+	if len(s.Viewport) > 64 {
+		return NewProtocolError(ErrorInvalidRequest, "selection viewport is too long")
+	}
+	return nil
 }
 
 type CursorState struct {
@@ -183,4 +214,12 @@ func (c CursorState) Normalize() CursorState {
 		c.Y = 1
 	}
 	return c
+}
+
+func (c CursorState) Validate() *ProtocolError {
+	c = c.Normalize()
+	if len(c.Route) > 2048 || len(c.Viewport) > 64 {
+		return NewProtocolError(ErrorInvalidRequest, "cursor scope is too long")
+	}
+	return nil
 }

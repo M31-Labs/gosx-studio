@@ -7,6 +7,42 @@
     var action = form.getAttribute("data-gosx-studio-operation-action") || form.action || window.location.href;
     return fetch(action, { method: "POST", body: body, credentials: "same-origin", headers: { "X-Requested-With": "XMLHttpRequest" } });
   }
+  function collaborationRequest(payload, target, extra) {
+    extra = extra || {};
+    var revision = Number(payload.gosx_studio_expected_revision || "0");
+    if (!Number.isFinite(revision) || revision < 0) revision = 0;
+    return {
+      schemaVersion: 1,
+      id: payload.gosx_studio_operation_id,
+      kind: payload.gosx_studio_operation,
+      target: {
+        route: payload.gosx_studio_page_route || "/",
+        pageId: payload.gosx_studio_page_key || "",
+        field: payload.gosx_studio_binding || "",
+        componentKey: payload.gosx_studio_component_key || "",
+        nodeId: extra.nodeId || target.nodeId || "",
+        property: payload.gosx_studio_style_property || "",
+        breakpoint: payload.gosx_studio_breakpoint || "base",
+        state: payload.gosx_studio_state || "default"
+      },
+      value: payload.gosx_studio_operation === "set-style" ? payload.gosx_studio_style_value : payload.gosx_studio_value,
+      expectedDocumentRevision: revision,
+      expectedTargetHead: payload.gosx_studio_expected_target_head || "",
+      historyOperationId: payload.gosx_studio_history_operation_id || ""
+    };
+  }
+  function collaborationResponse(ack) {
+    var record = (ack && ack.record) || {}, after = record.after || {};
+    var body = { data: { documentRevision: record.documentRevision || ack.sequence || 0, targetHead: record.targetHead || "", operationID: record.id || "", value: after.present ? (after.value || "") : "" } };
+    return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+  function submit(form, payload, target, extra) {
+    var collaboration = window.GoSXStudioCollaborationRuntime;
+    if (collaboration && typeof collaboration.available === "function" && collaboration.available() && typeof collaboration.submit === "function") {
+      return collaboration.submit(collaborationRequest(payload, target, extra)).then(collaborationResponse);
+    }
+    return post(form, payload);
+  }
   function resultData(payload) {
     var data = payload || {};
     if (data.data && typeof data.data === "object") data = data.data;
@@ -91,7 +127,7 @@
       if (expectedHead === "" && kind === "set-field" && effectiveKey === targetKey(target, {})) expectedHead = form.getAttribute("data-studio-target-head") || "";
       if (expectedHead === "" && form.hasAttribute("data-studio-layout-control")) expectedHead = form.getAttribute("data-studio-target-head") || "";
       var payload = { gosx_studio_operation: kind, gosx_studio_operation_id: extra.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()), gosx_studio_page_route: extra.route || target.route || "/", gosx_studio_page_key: extra.pageId || target.pageId || target.page || "", gosx_studio_component_key: extra.componentKey || target.componentKey || target.blockKey || "", gosx_studio_binding: extra.field || target.field || "", gosx_studio_value: value || "", gosx_studio_style_property: extra.property || target.property || "", gosx_studio_style_value: value || "", gosx_studio_breakpoint: extra.breakpoint || target.breakpoint || "base", gosx_studio_state: extra.state || target.state || "default", gosx_studio_expected_revision: extra.revision || form.getAttribute("data-studio-document-revision") || "0", gosx_studio_expected_target_head: expectedHead, gosx_studio_history_operation_id: extra.historyOperationId || "" };
-      return post(form, payload).then(function (response) {
+      return submit(form, payload, target, extra).then(function (response) {
         if (!response.ok) throw new Error("Operation failed (" + response.status + ")");
         return response.clone().json().catch(function () { return {}; }).then(function (body) {
           updateCursors(form, body);
