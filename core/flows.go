@@ -326,6 +326,53 @@ func flowFieldsReadinessStatus(flow Flow) ReadinessStatus {
 	return ReadinessWatch
 }
 
+// BindingResolved reports whether this flow currently resolves as a
+// component's resource Binding target (e.g. Component.Binding ==
+// "flow."+flow.Key). It composes with BindingDiagnostic/BindingResolver: a
+// host's ResourceBindingAdapter for core.ResourceFlows typically wraps this
+// method directly, so a flow with no handler or that cannot yet execute
+// blocks readiness/publish the same way an unresolved CMS or media binding
+// does, with an actionable reason instead of a silent false.
+func (flow Flow) BindingResolved() (bool, string) {
+	flow = flow.Normalize()
+	if flow.HandlerRef == "" {
+		return false, "Connect a handler before this flow can accept submissions."
+	}
+	if !flow.CanExecute {
+		return false, "This flow cannot execute yet; review its steps and actions."
+	}
+	return true, ""
+}
+
+// ValidatePayload runs the same required/format checks a real submission
+// would (see cms/flows.ValidateActionPayload) but stays pure/core-level so the
+// flow designer's isolated test-execution path (authoring.ApplyTestFlowAction)
+// can validate test values before ever calling a host handler.
+func (action FlowAction) ValidatePayload(values map[string]string) map[string]string {
+	actions := normalizeFlowActions([]FlowAction{action})
+	errs := map[string]string{}
+	if len(actions) == 0 {
+		return errs
+	}
+	action = actions[0]
+	for _, field := range action.Fields {
+		value := strings.TrimSpace(values[field.Name])
+		if field.Required && value == "" {
+			errs[field.Name] = "This field is required."
+			continue
+		}
+		if value != "" && looksLikeEmailFieldName(field.Name) && !strings.Contains(value, "@") {
+			errs[field.Name] = "Enter a valid email address."
+		}
+	}
+	return errs
+}
+
+func looksLikeEmailFieldName(name string) bool {
+	name = strings.ToLower(strings.TrimSpace(name))
+	return name == "email" || strings.HasSuffix(name, "email")
+}
+
 func flowFieldsReadinessSummary(flow Flow) string {
 	if flow.FieldCount == 0 {
 		return "No fields are exposed to site operators."

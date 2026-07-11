@@ -2420,3 +2420,84 @@ html[data-gosx-studio-preview-selectable] [data-gosx-studio-preview-tab-stop]:fo
 .studio-collaboration-panel [data-studio-collab-reconnect]:focus-visible { outline: 2px solid var(--color-accent, #6d5efc); outline-offset: 2px; }
 .studio-visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 @media (prefers-reduced-motion: reduce) { .studio-remote-cursor { transition: none; } }
+
+/* No-code interactions (reveal-on-scroll, hover-focus-state). These rules
+   render on the published/preview page, driven only by the fixed
+   data-gosx-interaction* attribute contract core.Interaction.RenderAttrs
+   produces (interactionruntime toggles data-gosx-interaction-revealed for
+   reveal-on-scroll; hover-focus-state needs no script at all). Every rule
+   below animates opacity/transform only — never display or visibility — so a
+   focusable descendant is never removed from the tab order by an
+   interaction state, and prefers-reduced-motion always collapses every
+   interaction to "content is immediately visible, no animation plays". */
+[data-gosx-interaction="reveal-on-scroll"] {
+  opacity: 0;
+  transform: translateY(0);
+  transition: opacity var(--gosx-interaction-duration, 250ms) ease, transform var(--gosx-interaction-duration, 250ms) ease;
+  transition-delay: var(--gosx-interaction-delay, 0ms);
+}
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-effect="fade-up"] { transform: translateY(1rem); }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-effect="fade-left"] { transform: translateX(1rem); }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-effect="fade-right"] { transform: translateX(-1rem); }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-duration-ms="150"] { --gosx-interaction-duration: 150ms; }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-duration-ms="400"] { --gosx-interaction-duration: 400ms; }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-duration-ms="600"] { --gosx-interaction-duration: 600ms; }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-delay-ms="100"] { --gosx-interaction-delay: 100ms; }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-delay-ms="200"] { --gosx-interaction-delay: 200ms; }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-delay-ms="300"] { --gosx-interaction-delay: 300ms; }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-revealed="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* hover-focus-state is pure CSS: :hover and :focus-visible always share one
+   rule per effect, so a keyboard user reaches the exact same treatment a
+   mouse user does — no interaction state may exist for :hover alone. */
+[data-gosx-interaction="hover-focus-state"] {
+  transition: transform var(--gosx-interaction-duration, 250ms) ease, box-shadow var(--gosx-interaction-duration, 250ms) ease, text-decoration-color var(--gosx-interaction-duration, 250ms) ease, filter var(--gosx-interaction-duration, 250ms) ease;
+}
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-duration-ms="150"] { --gosx-interaction-duration: 150ms; }
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-duration-ms="400"] { --gosx-interaction-duration: 400ms; }
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-duration-ms="600"] { --gosx-interaction-duration: 600ms; }
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="lift"]:hover,
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="lift"]:focus-visible {
+  transform: translateY(-0.25rem);
+}
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="glow"]:hover,
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="glow"]:focus-visible {
+  box-shadow: 0 0 0 4px var(--gosx-studio-accent-soft, rgba(109, 94, 252, 0.35));
+}
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="underline"]:hover,
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="underline"]:focus-visible {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.2em;
+}
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="scale"]:hover,
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="scale"]:focus-visible {
+  transform: scale(1.03);
+}
+[data-gosx-interaction="hover-focus-state"]:focus-visible {
+  outline: 2px solid var(--gosx-studio-accent, Highlight);
+  outline-offset: 2px;
+}
+
+/* Platform guarantee, not an authored choice: under prefers-reduced-motion,
+   every interaction collapses to "immediately visible/reachable, no
+   animation plays", regardless of Kind/Effect/duration/delay. */
+@media (prefers-reduced-motion: reduce) {
+  [data-gosx-interaction="reveal-on-scroll"] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  [data-gosx-interaction="hover-focus-state"] {
+    transition: none;
+  }
+  [data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="lift"]:hover,
+  [data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="lift"]:focus-visible,
+  [data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="scale"]:hover,
+  [data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="scale"]:focus-visible {
+    transform: none;
+  }
+}
