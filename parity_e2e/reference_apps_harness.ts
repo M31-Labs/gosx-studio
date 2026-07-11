@@ -20,6 +20,7 @@ export type ClickAuthoringOptions = {
 
 export type ServerHandle = {
   baseURL: string;
+  dataDir?: string;
   stop: () => Promise<void>;
 };
 
@@ -495,6 +496,33 @@ export async function startMuddy(request: APIRequestContext, extraEnv?: Record<s
   });
 }
 
+export async function startMuddyCollaboration(request: APIRequestContext): Promise<ServerHandle> {
+  await ensureMuddyDist();
+  const port = await freePort();
+  const tempDir = mkdtempSync(path.join(tmpdir(), "gosx-studio-muddy-collab-e2e-"));
+  mkdirSync(path.join(tempDir, "media"), { recursive: true });
+  return startGoServer(request, {
+    cwd: muddyRepo,
+    command: "./cmd/muddy-noni",
+    baseURL: `http://127.0.0.1:${port}`,
+    env: {
+      PORT: String(port),
+      PUBLIC_SITE_URL: `http://127.0.0.1:${port}`,
+      SESSION_SECRET: "noni-collaboration-playwright-signed-session-secret",
+      MUDDY_ENVIRONMENT: "test",
+      MUDDY_COLLAB_TEST_AUTH: "1",
+      MUDDY_DATA_PATH: path.join(tempDir, "cms.json"),
+      MUDDY_FLOW_DATA_PATH: path.join(tempDir, "flows.json"),
+      MUDDY_LIFECYCLE_DB_PATH: path.join(tempDir, "lifecycle.db"),
+      MUDDY_STUDIO_DB_PATH: path.join(tempDir, "studio.db"),
+      MUDDY_MEDIA_PATH: path.join(tempDir, "media"),
+      MUDDY_LIFECYCLE_WORKER: "0",
+      MUDDY_MOCK_CHECKOUT: "1",
+    },
+    tempDir,
+  });
+}
+
 function ensureMuddyDist(): Promise<void> {
   if (!muddyDistBuildPromise) {
     muddyDistBuildPromise = buildMuddyDist().catch((error) => {
@@ -648,6 +676,7 @@ async function startGoServer(request: APIRequestContext, options: ServerOptions)
 
   return {
     baseURL: options.baseURL,
+    dataDir: options.tempDir,
     stop: async () => {
       await stopProcess(proc);
       cleanupTempDir(options.tempDir);
