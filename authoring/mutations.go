@@ -133,6 +133,12 @@ type AuthoringMutationResult struct {
 	Values         map[string]string
 	Changes        []AuthoringChange
 	Fragments      []AuthoringRefreshFragment
+	// Durable operation cursors returned by a host after commit. They let the
+	// next selected-target edit advance its optimistic expected head without a
+	// whole-page reload.
+	DocumentRevision uint64
+	TargetHead       string
+	OperationID      string
 }
 
 type AuthoringChange struct {
@@ -672,6 +678,8 @@ func (result AuthoringMutationResult) Normalize() AuthoringMutationResult {
 	result.PreviewURL = strings.TrimSpace(result.PreviewURL)
 	result.FragmentURL = strings.TrimSpace(result.FragmentURL)
 	result.DraftID = strings.TrimSpace(result.DraftID)
+	result.TargetHead = strings.TrimSpace(result.TargetHead)
+	result.OperationID = strings.TrimSpace(result.OperationID)
 	result.FieldErrors = cloneStringMap(result.FieldErrors)
 	result.Values = cloneStringMap(result.Values)
 	result.Changes = normalizeAuthoringChanges(result.Changes)
@@ -686,18 +694,21 @@ func (result AuthoringMutationResult) HasErrors() bool {
 func AuthoringMutationResultView(result AuthoringMutationResult) map[string]any {
 	result = result.Normalize()
 	return map[string]any{
-		"message":        result.Message,
-		"redirectURL":    result.RedirectURL,
-		"previewURL":     result.PreviewURL,
-		"fragmentURL":    result.FragmentURL,
-		"draftID":        result.DraftID,
-		"refreshPreview": result.RefreshPreview,
-		"fieldErrors":    cloneStringMap(result.FieldErrors),
-		"values":         cloneStringMap(result.Values),
-		"changes":        authoringChangeViews(result.Changes),
-		"changeCount":    len(result.Changes),
-		"fragments":      authoringRefreshFragmentViews(result.Fragments),
-		"fragmentCount":  len(result.Fragments),
+		"message":          result.Message,
+		"redirectURL":      result.RedirectURL,
+		"previewURL":       result.PreviewURL,
+		"fragmentURL":      result.FragmentURL,
+		"draftID":          result.DraftID,
+		"refreshPreview":   result.RefreshPreview,
+		"fieldErrors":      cloneStringMap(result.FieldErrors),
+		"values":           cloneStringMap(result.Values),
+		"changes":          authoringChangeViews(result.Changes),
+		"changeCount":      len(result.Changes),
+		"fragments":        authoringRefreshFragmentViews(result.Fragments),
+		"fragmentCount":    len(result.Fragments),
+		"documentRevision": result.DocumentRevision,
+		"targetHead":       result.TargetHead,
+		"operationID":      result.OperationID,
 	}
 }
 
