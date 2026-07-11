@@ -33,3 +33,10 @@ func TestOperationRequestsEqualPreservesContentWhitespace(t *testing.T) {
 		t.Fatal("content whitespace must not be discarded")
 	}
 }
+
+func TestOperationTargetRootRouteNormalizationIsIdempotent(t *testing.T) {
+	target := OperationTarget{Route: "/", Field: "title"}.Normalize()
+	if target.Route != "/" || target.Normalize() != target {
+		t.Fatalf("root normalization must be stable: %#v -> %#v", target, target.Normalize())
+	}
+}

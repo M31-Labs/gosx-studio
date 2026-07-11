@@ -221,5 +221,9 @@ func normalizeRoute(route string) string {
 	if !strings.HasPrefix(route, "/") {
 		route = "/" + route
 	}
-	return strings.TrimRight(route, "/")
+	route = strings.TrimRight(route, "/")
+	if route == "" {
+		return "/"
+	}
+	return route
 }
