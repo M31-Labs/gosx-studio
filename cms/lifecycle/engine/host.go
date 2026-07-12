@@ -39,7 +39,17 @@ type HostLifecycle interface {
 	ApplyPublish(ctx context.Context, cmd PublishCommand) (PublishOutcome, error)
 	// RestoreLive is mutating, a single host transaction. It restores
 	// cmd.RevisionID to live and mints a new live revision. Engine has
-	// already minted the pre-restore restore point before calling this.
+	// already minted the pre-restore restore point before calling this and
+	// passes its id as cmd.RestorePointID -- a host that keys companion
+	// resources to a target's content revision (e.g. an interactions
+	// ContentRevision) should mint its companion keyed by cmd.RestorePointID
+	// in this same transaction so a later restore-of-restore (a restore
+	// whose RevisionID equals this RestorePointID) can find and restore it
+	// too (see RestoreCommand.RestorePointID doc for the full contract).
+	// Like ApplyPublish, Engine's own OperationID-keyed ledger replay
+	// already de-dupes a resubmitted RestoreCommand before RestoreLive is
+	// ever called again, but a host MAY additionally de-dupe on
+	// cmd.OperationID as defense-in-depth.
 	RestoreLive(ctx context.Context, cmd RestoreCommand) (RestoreOutcome, error)
 	// OperationLog is read-only. It returns the operation-log tail for the
 	// draft change set (see spec §3 / slice S3).

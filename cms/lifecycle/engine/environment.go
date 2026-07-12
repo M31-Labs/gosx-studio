@@ -124,6 +124,6 @@ func (p MigrationPlan) Blocking() bool {
 var ErrProductionNotConfigured = errors.New("production environment is not configured")
 
 // ErrDestructiveMigration is the hard STOP Promote returns when the pending
-// migration cannot be classified as safe. Migration classification lands in
-// a later slice (spec §8 / S8); Promote does not yet return this error.
+// migration cannot be classified as safe (spec §8 / S8); see
+// MigrationPlan.Blocking, which Promote consults in engine.go.
 var ErrDestructiveMigration = errors.New("destructive or unknown migration: promotion refused")

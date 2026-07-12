@@ -365,6 +365,189 @@ func TestRestoreUnauthorized(t *testing.T) {
 	}
 }
 
+// TestRestoreOfRestoreRoundTripsHostCompanion is the P2.1 fix proof: a host
+// that keys a companion resource (e.g. an interactions ContentRevision) to
+// RestoreCommand.RestorePointID can mint that companion during a restore,
+// and a *later* restore whose RevisionID targets that same restore-minted
+// point ("restore-of-restore", i.e. undoing an earlier restore) finds and
+// restores the companion too -- exactly the symmetry that was missing
+// before RestorePointID was threaded into RestoreCommand.
+func TestRestoreOfRestoreRoundTripsHostCompanion(t *testing.T) {
+	e, host := newTestEngine(t)
+	ctx := context.Background()
+	ref := testTarget()
+	actor := publisherActor("actor-1")
+
+	// Some prior stored revision the first restore rolls back to; it has no
+	// companion of its own (it predates the companion ever being minted --
+	// e.g. it was created by a host that had not adopted RestorePointID
+	// yet). Its content is irrelevant to the companion proof.
+	priorRevision, err := e.Revisions.SaveRevision(revisionInputFor(ref, "v0"))
+	if err != nil {
+		t.Fatalf("seed prior revision: %v", err)
+	}
+
+	host.setLive(ref, map[string]string{"title": "Draft V2 Live"})
+	host.setLiveCompanion(ref, "interactions-v2")
+
+	// Restore 1: roll back to the prior revision. Engine mints a fresh
+	// pre-restore restore point (call it RP1) capturing "Draft V2 Live" +
+	// threads RP1's id into cmd.RestorePointID; the fake host mints its
+	// companion snapshot keyed by RP1 from the live companion value
+	// ("interactions-v2") before overwriting anything.
+	restore1, err := e.Restore(ctx, RestoreCommand{
+		Target:      ref,
+		Actor:       actor,
+		RevisionID:  priorRevision.ID,
+		OperationID: "restore-1",
+	})
+	if err != nil {
+		t.Fatalf("first Restore: %v", err)
+	}
+	if restore1.RestorePointID == "" {
+		t.Fatal("expected the first restore to mint a pre-restore restore point")
+	}
+	if got := host.currentLive(ref)["title"]; got != "v0" {
+		t.Fatalf("expected live content to roll back to the prior revision, got %#v", got)
+	}
+	if got := host.currentLiveCompanion(ref); got != "interactions-v2" {
+		t.Fatalf("restoring to a revision with no companion should leave the companion untouched, got %q", got)
+	}
+	if companion, ok := host.companionSnapshotFor(ref, restore1.RestorePointID); !ok || companion != "interactions-v2" {
+		t.Fatalf("expected RP1 (%q) to capture the pre-restore-1 companion %q, got %q (found=%v)", restore1.RestorePointID, "interactions-v2", companion, ok)
+	}
+
+	// Something else changes the companion while "v0" is live, independent
+	// of any content revision -- e.g. someone keeps collaborating.
+	host.setLiveCompanion(ref, "interactions-post-restore1")
+
+	// Restore 2 is the restore-of-restore: restore TO restore1.RestorePointID
+	// (RP1), i.e. undo restore 1. Content symmetry (restoring RP1's snapshot,
+	// "Draft V2 Live") is already covered by TestRestoreRoundTripToRestorePoint;
+	// the new assertion here is the companion.
+	restore2, err := e.Restore(ctx, RestoreCommand{
+		Target:      ref,
+		Actor:       actor,
+		RevisionID:  restore1.RestorePointID,
+		OperationID: "restore-2",
+	})
+	if err != nil {
+		t.Fatalf("second (restore-of-restore) Restore: %v", err)
+	}
+	if restore2.RestorePointID == "" || restore2.RestorePointID == restore1.RestorePointID {
+		t.Fatalf("expected a fresh pre-restore restore point for restore 2, got %q (restore 1's was %q)", restore2.RestorePointID, restore1.RestorePointID)
+	}
+	if got := host.currentLive(ref)["title"]; got != "Draft V2 Live" {
+		t.Fatalf("expected the restore-of-restore to bring content back to what RP1 captured, got %#v", got)
+	}
+	if got := host.currentLiveCompanion(ref); got != "interactions-v2" {
+		t.Fatalf("expected the restore-of-restore to bring the companion back to what RP1 captured (%q), got %q -- this is exactly the gap RestoreCommand.RestorePointID closes", "interactions-v2", got)
+	}
+}
+
+// TestRestoreIsIdempotentOnOperationID mirrors
+// TestPublishIsIdempotentOnOperationID: resubmitting the same OperationID
+// must replay the recorded RestoreResult from the ledger rather than
+// minting a second restore point or calling Host.RestoreLive again.
+func TestRestoreIsIdempotentOnOperationID(t *testing.T) {
+	e, host := newTestEngine(t)
+	ctx := context.Background()
+	ref := testTarget()
+	actor := publisherActor("actor-1")
+
+	host.setLive(ref, map[string]string{"title": "Original"})
+	target, err := e.Revisions.SaveRevision(revisionInputFor(ref, "v0"))
+	if err != nil {
+		t.Fatalf("seed target revision: %v", err)
+	}
+
+	cmd := RestoreCommand{Target: ref, Actor: actor, RevisionID: target.ID, OperationID: "restore-dup"}
+
+	first, err := e.Restore(ctx, cmd)
+	if err != nil {
+		t.Fatalf("first Restore: %v", err)
+	}
+	if first.Idempotent {
+		t.Fatal("expected first restore to not be idempotent")
+	}
+
+	second, err := e.Restore(ctx, cmd)
+	if err != nil {
+		t.Fatalf("second Restore: %v", err)
+	}
+	if !second.Idempotent {
+		t.Fatal("expected second restore with the same operation id to be idempotent")
+	}
+	if second.RevisionID != first.RevisionID {
+		t.Fatalf("expected the same revision id on replay, got %q vs %q", second.RevisionID, first.RevisionID)
+	}
+	if second.RestorePointID != first.RestorePointID {
+		t.Fatalf("expected the same restore point id on replay, got %q vs %q", second.RestorePointID, first.RestorePointID)
+	}
+
+	if host.restoreLiveCalls != 1 {
+		t.Fatalf("expected zero additional host writes on replay, RestoreLive called %d times", host.restoreLiveCalls)
+	}
+}
+
+// TestScheduledRestoreByBackgroundActorIsIdempotentAndMintsRestorePoint is
+// the descriptor-07 review's fix-4 verification: the engine surface a
+// scheduled-publish worker would drive (Restore to a stored revision id,
+// with an OperationID for at-least-once-delivery safety, and an Actor that
+// is not tied to any interactive session) already works end to end. Actor
+// is a plain capability-bearing value -- there is no session coupling to
+// route around -- and Restore mints a restore point and is idempotent on
+// OperationID exactly like Publish.
+func TestScheduledRestoreByBackgroundActorIsIdempotentAndMintsRestorePoint(t *testing.T) {
+	e, host := newTestEngine(t)
+	ctx := context.Background()
+	ref := testTarget()
+
+	// A background actor: no session, label makes the non-interactive
+	// origin explicit, caps are whatever the scheduler's own auth grants it.
+	scheduler := Actor{ID: "system:scheduled-publish-worker", Label: "Scheduled Publish", Caps: CapabilitySet{CanRestore: true}}
+
+	host.setLive(ref, map[string]string{"title": "Currently Live"})
+	scheduledRevision, err := e.Revisions.SaveRevision(revisionInputFor(ref, "scheduled-content"))
+	if err != nil {
+		t.Fatalf("seed scheduled revision: %v", err)
+	}
+
+	cmd := RestoreCommand{
+		Target:      ref,
+		Actor:       scheduler,
+		RevisionID:  scheduledRevision.ID,
+		OperationID: "scheduled-publish-2026-07-11T12:00:00Z",
+	}
+
+	first, err := e.Restore(ctx, cmd)
+	if err != nil {
+		t.Fatalf("scheduled Restore: %v", err)
+	}
+	if first.RestorePointID == "" {
+		t.Fatal("expected the scheduled restore to mint a pre-restore restore point")
+	}
+	if got := host.currentLive(ref)["title"]; got != "scheduled-content" {
+		t.Fatalf("expected the scheduled restore to publish the stored revision live, got %#v", got)
+	}
+
+	// The scheduler retries (crash mid-flight, duplicate trigger, at-least-
+	// once delivery, ...) and resubmits the identical OperationID.
+	second, err := e.Restore(ctx, cmd)
+	if err != nil {
+		t.Fatalf("resubmitted scheduled Restore: %v", err)
+	}
+	if !second.Idempotent {
+		t.Fatal("expected the resubmitted scheduled restore to replay idempotently")
+	}
+	if second.RestorePointID != first.RestorePointID || second.RevisionID != first.RevisionID {
+		t.Fatalf("expected an identical replayed result, got %+v vs %+v", second, first)
+	}
+	if host.restoreLiveCalls != 1 {
+		t.Fatalf("expected exactly one host restore write across both calls, got %d", host.restoreLiveCalls)
+	}
+}
+
 func TestReviewThenMarkReady(t *testing.T) {
 	e, _ := newTestEngine(t)
 	ctx := context.Background()

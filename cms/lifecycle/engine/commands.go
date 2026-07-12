@@ -79,16 +79,40 @@ type RestoreCommand struct {
 	Actor       Actor
 	RevisionID  string
 	OperationID string
+	// RestorePointID is engine-populated right before Host.RestoreLive with
+	// the id of the fresh pre-restore restore point Engine just minted for
+	// this exact transition (Engine.Restore always mints one, so a bad
+	// restore is itself reversible -- see RestoreResult.RestorePointID,
+	// which carries the same value back out). Callers never set it.
+	//
+	// Host-adoption semantics (restore-of-restore symmetry): a host that
+	// maintains a companion resource keyed by a target's content-revision id
+	// (e.g. an interactions ContentRevision that snapshots collaborative
+	// editor state alongside a page's content) MUST mint that companion
+	// keyed by RestorePointID inside the same RestoreLive transaction that
+	// rewrites live -- exactly mirroring how PublishCommand.RestorePointID
+	// already lets a host key a companion to a *publish*-minted restore
+	// point. Without this, a later restore whose RevisionID equals this
+	// RestorePointID (a "restore-of-restore": undoing an earlier restore)
+	// finds no companion to restore and silently skips it. A host that has
+	// not adopted this yet may leave the field unused; that is the prior
+	// (pre-fix) behavior, not a regression.
+	RestorePointID string
 }
 
 // RestoreResult is the outcome of a restore: RevisionID is the NEW live
 // revision minted by the restore; RestorePointID is the pre-restore
 // snapshot Engine minted before calling the host (a restore always mints
-// one, so a bad restore is itself reversible).
+// one, so a bad restore is itself reversible) -- the same id threaded into
+// RestoreCommand.RestorePointID for the host that performed the restore.
+// Idempotent mirrors PublishResult.Idempotent: true when this result was
+// replayed from a prior ActionRestoreCompleted ledger entry sharing
+// OperationID rather than produced by a fresh Host.RestoreLive call.
 type RestoreResult struct {
 	RevisionID     string
 	RestorePointID string
 	Diff           lifecycle.RevisionDiff
+	Idempotent     bool
 }
 
 // DraftPreview is the exact-draft-diff surface for a target: the structural

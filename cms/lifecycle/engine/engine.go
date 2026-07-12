@@ -223,6 +223,13 @@ func (e *Engine) Publish(ctx context.Context, cmd PublishCommand) (PublishResult
 		return PublishResult{}, ErrReadiness{Gate: gate}
 	}
 
+	// Ordering is deliberate (spec §1.2 steps 2 then 3): the readiness gate
+	// runs before the operation-id replay check, not after. The consequence
+	// is that resubmitting an OperationID that already completed successfully
+	// can still return ErrReadiness instead of the original idempotent
+	// result, if a new blocking draft/blocker has appeared on the target
+	// since that completed publish. Do not reorder this to "fix" that --
+	// it is the spec'd behavior, not a bug.
 	if cmd.OperationID != "" {
 		if result, found, err := e.replayPublish(ctx, cmd); err != nil {
 			return PublishResult{}, err
@@ -298,9 +305,33 @@ func (e *Engine) Publish(ctx context.Context, cmd PublishCommand) (PublishResult
 // restore point or any prior content revision). It always mints a
 // pre-restore restore point of its own before calling the host, so a bad
 // restore is itself reversible (spec §9 TestRestoreMintsRestorePointFirst).
+// Restore is idempotent on cmd.OperationID exactly like Publish (step 3
+// below): this is what lets a background/scheduled caller -- e.g. a
+// scheduled-publish worker driving Restore against a stored revision id
+// with no interactive session actor behind it -- safely resubmit the same
+// OperationID after a crash or duplicate trigger without minting a second
+// restore point or invoking Host.RestoreLive twice.
+//
+//  1. requireCap(actor.Caps.CanRestore) -> else ErrUnauthorized.
+//  2. Idempotency replay: scan ledger audit for
+//     metadata["operationId"]==cmd.OperationID with Action ==
+//     ActionRestoreCompleted; if found, return the recorded RestoreResult
+//     with Idempotent:true and no host write.
+//  3. Mint the pre-restore restore point: SnapshotLive + Revisions.SaveRevision.
+//  4. Host.RestoreLive rewrites live in one host transaction.
+//  5. Record ledger: SaveAuditEvent(ActionRestoreCompleted).
+//  6. Return RestoreResult{..., Idempotent:false}.
 func (e *Engine) Restore(ctx context.Context, cmd RestoreCommand) (RestoreResult, error) {
 	if err := e.requireCap(cmd.Actor.Caps.CanRestore); err != nil {
 		return RestoreResult{}, err
+	}
+
+	if cmd.OperationID != "" {
+		if result, found, err := e.replayRestore(ctx, cmd); err != nil {
+			return RestoreResult{}, err
+		} else if found {
+			return result, nil
+		}
 	}
 
 	summary := fmt.Sprintf("Automatic restore point before restoring to revision %s.", cmd.RevisionID)
@@ -312,11 +343,16 @@ func (e *Engine) Restore(ctx context.Context, cmd RestoreCommand) (RestoreResult
 	if e.Host == nil {
 		return RestoreResult{}, fmt.Errorf("engine: no host configured")
 	}
+	cmd.RestorePointID = restorePointID
 	outcome, err := e.Host.RestoreLive(ctx, cmd)
 	if err != nil {
 		return RestoreResult{}, err
 	}
 
+	diffJSON, err := json.Marshal(outcome.Diff)
+	if err != nil {
+		return RestoreResult{}, err
+	}
 	if _, err := e.Ledger.SaveAuditEvent(ctx, lifecycle.AuditEventInput{
 		ResourceKind: cmd.Target.ResourceKind,
 		ResourceID:   cmd.Target.ResourceID,
@@ -328,6 +364,7 @@ func (e *Engine) Restore(ctx context.Context, cmd RestoreCommand) (RestoreResult
 			"restorePointId":     restorePointID,
 			"restoredRevisionId": cmd.RevisionID,
 			"newRevisionId":      outcome.RevisionID,
+			"diff":               string(diffJSON),
 		},
 		Created: e.now(),
 	}); err != nil {
@@ -348,6 +385,7 @@ func (e *Engine) Restore(ctx context.Context, cmd RestoreCommand) (RestoreResult
 		RevisionID:     outcome.RevisionID,
 		RestorePointID: restorePointID,
 		Diff:           outcome.Diff,
+		Idempotent:     false,
 	}, nil
 }
 
@@ -494,4 +532,35 @@ func (e *Engine) replayPublish(ctx context.Context, cmd PublishCommand) (Publish
 		}, true, nil
 	}
 	return PublishResult{}, false, nil
+}
+
+// replayRestore scans the ledger audit for a prior ActionRestoreCompleted
+// event carrying cmd.OperationID. When found it reconstructs RestoreResult
+// entirely from ledger metadata: no host method is called and no second
+// restore point is minted. This is what makes Restore safe for a
+// background/scheduled caller (e.g. a scheduled-publish worker) to resubmit
+// with the same OperationID.
+func (e *Engine) replayRestore(ctx context.Context, cmd RestoreCommand) (RestoreResult, bool, error) {
+	events, err := e.Ledger.ListAuditEvents(ctx, lifecycle.LedgerFilter{
+		ResourceKind: cmd.Target.ResourceKind,
+		ResourceID:   cmd.Target.ResourceID,
+		Action:       ActionRestoreCompleted,
+	})
+	if err != nil {
+		return RestoreResult{}, false, err
+	}
+	for _, event := range events {
+		if event.Metadata["operationId"] == "" || event.Metadata["operationId"] != cmd.OperationID {
+			continue
+		}
+		var diff lifecycle.RevisionDiff
+		_ = json.Unmarshal([]byte(event.Metadata["diff"]), &diff)
+		return RestoreResult{
+			RevisionID:     event.Metadata["newRevisionId"],
+			RestorePointID: event.Metadata["restorePointId"],
+			Diff:           diff,
+			Idempotent:     true,
+		}, true, nil
+	}
+	return RestoreResult{}, false, nil
 }
