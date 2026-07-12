@@ -207,7 +207,11 @@ async function openEditorNavigationPanel(page: Page, baseURL: string) {
 // waitForNavigationPanel waits for the Navigation panel + at least one editable
 // row to be present (the panel only renders rows when nav items exist).
 async function waitForNavigationPanel(page: Page) {
-  await revealModeIfPresent(page, "navigation");
+  // The Navigation panel moved behind the "Advanced" mode tab in the
+  // studio-pagecanvas-handoff declutter slice (it previously carried no mode
+  // tag at all and was always visible) — reveal Advanced, not a nonexistent
+  // "navigation" mode tab.
+  await revealModeIfPresent(page, "advanced");
   await expect(page.locator(NAV_PANEL).first(), "the editor Navigation panel must render").toBeAttached({ timeout: 30_000 });
   await expect(page.locator(NAV_ROW).first(), "the Navigation panel must render at least one editable nav row").toBeAttached({ timeout: 30_000 });
 }

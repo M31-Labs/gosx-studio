@@ -206,7 +206,11 @@ test.describe("@reference-apps muddy M6 Stripe checkout plugin: surface → conf
 async function openEditorCheckoutPanel(page: Page, baseURL: string) {
   await page.goto(`${baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await expect(page.locator("[data-studio-workbench='true']").first(), "the editor workbench must render").toBeAttached({ timeout: 30_000 });
-  await revealModeIfPresent(page, "checkout");
+  // The Checkout panel moved behind the "Advanced" mode tab in the
+  // studio-pagecanvas-handoff declutter slice (it previously carried no mode
+  // tag at all and was always visible) — reveal Advanced, not a nonexistent
+  // "checkout" mode tab.
+  await revealModeIfPresent(page, "advanced");
   await expect(page.locator(CHECKOUT_PANEL).first(), "the editor Checkout panel must render").toBeAttached({ timeout: 30_000 });
 }
 
