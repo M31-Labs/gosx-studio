@@ -351,11 +351,18 @@ func (e *Engine) Restore(ctx context.Context, cmd RestoreCommand) (RestoreResult
 	}, nil
 }
 
-// Promote records a promotion intent (spec §7). It never touches k8s/shell:
-// it verifies caps + (for production) configuration, verifies the target
-// has a published revision, and records the intent as ledger audit
-// metadata with SeedData permanently false. Migration classification
-// (ErrDestructiveMigration) lands in a later slice (S8).
+// Promote records a promotion intent (spec §7). It never touches k8s/shell
+// -- it never even reads e.Host, the engine's only external mutation seam,
+// so there is no code path from Promote to a shell/exec/kubectl call
+// (TestPromoteNeverInvokesHostOrShellHooks). Normative sequence (spec §7):
+//  1. requireCap(actor.Caps.CanPromote), and for a production-shaped target
+//     Environment.Configured && actor.Caps.CanConfigureProduction, else
+//     ErrProductionNotConfigured.
+//  2. verify the target has a current restore point + published revision.
+//  3. classify the pending migration (spec §8); a Destructive or Unknown
+//     step is a hard STOP -> ErrDestructiveMigration (S8).
+//  4. record the PromotionIntent as ledger audit metadata, SeedData
+//     permanently false.
 func (e *Engine) Promote(ctx context.Context, cmd PromoteCommand) (PromotionIntent, error) {
 	if err := e.requireCap(cmd.Actor.Caps.CanPromote); err != nil {
 		return PromotionIntent{}, err
@@ -372,6 +379,10 @@ func (e *Engine) Promote(ctx context.Context, cmd PromoteCommand) (PromotionInte
 	}
 	if !ok || latest.RevisionID == "" {
 		return PromotionIntent{}, fmt.Errorf("promote: target %s/%s has no published revision", cmd.Target.ResourceKind, cmd.Target.ResourceID)
+	}
+
+	if cmd.Migration.Blocking() {
+		return PromotionIntent{}, ErrDestructiveMigration
 	}
 
 	intent := PromotionIntent{

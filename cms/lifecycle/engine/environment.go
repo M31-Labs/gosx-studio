@@ -48,6 +48,73 @@ type PromoteCommand struct {
 	Environment Environment
 	ToDigest    string
 	OperationID string
+	// Migration is the pending migration plan Promote classifies (spec §8)
+	// before recording an intent. The zero value (no steps) classifies Safe:
+	// most promotions carry no schema migration at all, and that absence is
+	// not itself grounds for a STOP. A caller that DOES know about a pending
+	// migration (e.g. an operator-supplied manifest of schema changes) sets
+	// Steps explicitly; any Destructive or Unknown step hard-stops Promote
+	// with ErrDestructiveMigration.
+	Migration MigrationPlan
+}
+
+// MigrationClass classifies one migration step's data-safety per spec §8's
+// table ("Every schema change introduced here, classified.").
+type MigrationClass string
+
+const (
+	// MigrationSafe is additive/idempotent/reversible -- promotion proceeds.
+	MigrationSafe MigrationClass = "safe"
+	// MigrationDestructive drops or rewrites a persisted field/column, or is
+	// otherwise irreversible. Promote refuses with ErrDestructiveMigration.
+	MigrationDestructive MigrationClass = "destructive"
+	// MigrationUnknown is a step Promote cannot classify as Safe. Spec §8:
+	// "Any future host change that would drop/rewrite persisted fields is
+	// out of scope and a STOP under this descriptor" -- an unclassifiable
+	// step must fail closed exactly like a known-destructive one, never be
+	// treated as safe by default.
+	MigrationUnknown MigrationClass = "unknown"
+)
+
+// MigrationStep is one classified change a pending promotion would apply.
+type MigrationStep struct {
+	Description string
+	Class       MigrationClass
+}
+
+// MigrationPlan is the full set of migration steps a promotion would apply.
+// An empty plan (no steps) classifies Safe: it represents "no migration",
+// the common case, not an unclassified one.
+type MigrationPlan struct {
+	Steps []MigrationStep
+}
+
+// Classify reports the plan's overall class: the most severe classification
+// among its steps (Destructive outranks Unknown outranks Safe), or Safe when
+// there are no steps at all. A step whose Class is anything other than the
+// explicit MigrationSafe value -- including the zero value, i.e. a caller
+// that forgot to classify a step -- is treated as MigrationUnknown, never as
+// safe by default (spec §8: an unclassifiable change is a STOP, not a
+// silent pass).
+func (p MigrationPlan) Classify() MigrationClass {
+	worst := MigrationSafe
+	for _, step := range p.Steps {
+		switch step.Class {
+		case MigrationSafe:
+			continue
+		case MigrationDestructive:
+			return MigrationDestructive
+		default:
+			worst = MigrationUnknown
+		}
+	}
+	return worst
+}
+
+// Blocking reports whether the plan's classification hard-stops Promote.
+func (p MigrationPlan) Blocking() bool {
+	class := p.Classify()
+	return class == MigrationDestructive || class == MigrationUnknown
 }
 
 // ErrProductionNotConfigured is returned by Promote when the target
