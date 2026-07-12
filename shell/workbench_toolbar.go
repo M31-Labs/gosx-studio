@@ -517,7 +517,20 @@ func renderWorkbenchToolbarTitle(className, kicker, title, summary string) gosx.
 	}
 	children = append(children, gosx.El("strong", nil, gosx.Text(title)))
 	if summary != "" {
-		children = append(children, gosx.El("span", nil, gosx.Text(summary)))
+		// This subtitle is fed by selectionLabel (falling back to routeLabel) at
+		// server-render time (see RenderWorkbenchToolbar above), so it MUST carry
+		// the same data-studio-selection-label hook the OTHER selection readouts
+		// use (RenderWorkbenchCanvasBar, RenderWorkbenchCanvasStatus,
+		// shell/workbench_page_canvas.go). Without it, workbench_runtime.js's
+		// setReadout("[data-studio-selection-label]", ...) can never find this
+		// node, so it stays frozen at whatever string was baked in on initial
+		// load (almost always "No selection") no matter how many times the user
+		// clicks the canvas — this is the toolbar-title-never-updates defect
+		// (HANDOFF-19): every OTHER selection surface (the page-canvas readout,
+		// the right-rail inspector) updates correctly on click; only this most
+		// prominent, top-of-page label was silently exempt because it is a bare
+		// <span> with no data attribute at all.
+		children = append(children, gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-selection-label", "true")), gosx.Text(summary)))
 	}
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", className)), gosx.Fragment(children...))
 }

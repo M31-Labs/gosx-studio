@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { revealModeIfPresent, startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
+import { revealModeIfPresent, startMuddy, startMuddyCanvasHTMLSurface } from "./reference_apps_harness";
 
 // Live-proof e2e for the editor's default main surface (defect #8 fix).
 //
@@ -216,6 +216,92 @@ test.describe("@reference-apps PageCanvas is the default Home surface (canvas2d 
     }
   });
 });
+
+// HANDOFF-19 regression: an owner-reported production defect where clicking
+// anywhere in the center canvas appeared to do nothing — the editor's most
+// prominent selection status (next to the "Website editor" title, in the
+// workbench toolbar) read "No selection" no matter how many real clicks
+// landed on the PageCanvas underneath it.
+//
+// Root cause: the toolbar title's selection summary was a bare <span> with NO
+// data-studio-selection-label attribute, so client-side setReadout()
+// (which drives every OTHER selection readout by querying
+// "[data-studio-selection-label]") could never find and update it — it stayed
+// frozen at whatever string page.server.go baked in on the FIRST render.
+//
+// The PRIOR acceptance rehearsal's click coverage (phaseA_step1_step2.mjs)
+// missed this entirely because it drove `locator.click({ force: true })`
+// against a specific `[data-studio-field=...]` CSS target inside the preview
+// iframe — a locator-targeted, actionability-check-skipping click, not a
+// literal center-of-viewport click a real human makes, and it only asserted
+// the WORKBENCH's `data-studio-selection` attribute (which was already
+// working) — it never inspected the toolbar title label a human actually
+// looks at first.
+//
+// This test drives a genuine `page.mouse.click()` at the PageCanvas stage's
+// own bounding-box center (no locator, no force, no data-attribute
+// targeting — the same event path a real trackpad/mouse click takes) and
+// asserts the toolbar title's selection label (a) is never left on the dead
+// "No selection" placeholder once the runtime has booted, and (b) stays in
+// lockstep with the OTHER, independently-verified-working selection readout
+// (the PageCanvas's own toolbar output) both before and after the click.
+test.describe("@reference-apps center-canvas click updates every selection readout (HANDOFF-19)", () => {
+  test.describe.configure({ timeout: 180_000 });
+  test.skip(process.env.GOSX_STUDIO_REFERENCE_APP_E2E !== "1", "set GOSX_STUDIO_REFERENCE_APP_E2E=1 to boot sibling reference apps");
+
+  test("Muddy/Noni editor: a raw center-viewport click on the PageCanvas keeps the toolbar-title selection label in sync (not frozen at 'No selection')", async ({ page, request }) => {
+    // Mirrors the staging config from the owner report: MUDDY_EDITOR_SCENE_DOM=1,
+    // MUDDY_CANVAS_WASM_FREE unset (full-WASM canvas-default resolver path).
+    const server = await startMuddy(request, { MUDDY_EDITOR_SCENE_DOM: "1" });
+    try {
+      await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await page.waitForFunction(() => (window as any).__gosx_studio_authoring_runtime_bound === "true", null, { timeout: 20_000 }).catch(() => null);
+
+      const pageCanvas = page.locator("[data-gosx-studio-page-canvas='true']").first();
+      await expect(pageCanvas).toBeVisible({ timeout: 30_000 });
+
+      const toolbarTitleLabel = page.locator(".gosx-studio-toolbar__title [data-studio-selection-label]").first();
+      const pageCanvasLabel = page.locator(".studio-page-canvas__toolbar [data-studio-selection-label]").first();
+      await expect(toolbarTitleLabel, "the toolbar title must carry a reactive data-studio-selection-label span").toBeAttached({ timeout: 15_000 });
+      await expect(pageCanvasLabel).toBeAttached({ timeout: 15_000 });
+
+      // Give the editor's default-selection-on-load path a moment to run
+      // before reading the "before" snapshot.
+      await page.waitForTimeout(1500);
+
+      const before = await readSelectionLabels(page);
+      expect(before.toolbarTitle, `toolbar title label must not be stuck on the dead placeholder; readouts=${JSON.stringify(before)}`).not.toBe("No selection");
+      expect(before.toolbarTitle, `toolbar title label must match the known-working PageCanvas readout on initial load; readouts=${JSON.stringify(before)}`).toBe(before.pageCanvas);
+
+      // A genuine center-of-viewport click on the PageCanvas stage — computed
+      // purely from the stage's own bounding box, no locator/data-attribute
+      // targeting, no { force: true }.
+      const box = await pageCanvas.boundingBox();
+      if (!box) throw new Error("PageCanvas stage has no bounding box to click");
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.85);
+      await page.waitForTimeout(1000);
+
+      const after = await readSelectionLabels(page);
+      expect(after.toolbarTitle, `toolbar title label must not regress to the dead placeholder after a real click; readouts=${JSON.stringify(after)}`).not.toBe("No selection");
+      expect(after.toolbarTitle, `toolbar title label must stay in sync with the PageCanvas readout after a real center-viewport click; readouts=${JSON.stringify(after)}`).toBe(after.pageCanvas);
+    } finally {
+      await server.stop();
+    }
+  });
+});
+
+async function readSelectionLabels(page: Page): Promise<{ toolbarTitle: string | null; pageCanvas: string | null; workbenchSelection: string | null }> {
+  return page.evaluate(() => {
+    const toolbarTitle = document.querySelector(".gosx-studio-toolbar__title [data-studio-selection-label]");
+    const pageCanvas = document.querySelector(".studio-page-canvas__toolbar [data-studio-selection-label]");
+    const workbench = document.querySelector("[data-studio-workbench]");
+    return {
+      toolbarTitle: toolbarTitle ? toolbarTitle.textContent : null,
+      pageCanvas: pageCanvas ? pageCanvas.textContent : null,
+      workbenchSelection: workbench ? workbench.getAttribute("data-studio-selection") : null,
+    };
+  });
+}
 
 // hydrateDeferredPreviewFrame sets the iframe's src from its
 // data-studio-preview-src/host data-gosx-studio-preview-url fallback if the

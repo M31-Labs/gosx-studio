@@ -85,6 +85,53 @@ func TestRenderWorkbenchToolbarUsesShellView(t *testing.T) {
 	}
 }
 
+// TestRenderWorkbenchToolbarTitleSummaryIsReactiveSelectionReadout is the
+// regression test for HANDOFF-19 (owner report: clicking anywhere in the
+// center canvas never visibly selects anything — the editor's most prominent
+// selection status, next to the "Website editor" title, read "No selection"
+// the whole time).
+//
+// Root cause: the toolbar title's summary node (fed by selectionLabel,
+// falling back to routeLabel — see RenderWorkbenchToolbar above) was rendered
+// as a completely bare <span> with no attributes at all. Every OTHER
+// selection-label readout in this file (RenderWorkbenchCanvasBar,
+// RenderWorkbenchCanvasStatus) and in shell/workbench_page_canvas.go carries
+// data-studio-selection-label="true", which
+// hostruntime/assets/workbench_runtime.js's setReadout() targets via
+// queryAll(form, "[data-studio-selection-label]") on every real selection
+// change. Lacking that attribute, the toolbar title span was invisible to
+// that update path and stayed frozen at whatever string the server baked in
+// on the FIRST render (in muddy-noni-commerce, literally the hardcoded
+// string "No selection" — see app/admin/editor/page.server.go's
+// editorStudioShell) no matter how many real, successful clicks the user
+// made on the canvas underneath it.
+//
+// This test asserts the summary span now carries that attribute, so a
+// regression here (dropping the attribute again) fails loudly at the render
+// layer without needing a live browser.
+func TestRenderWorkbenchToolbarTitleSummaryIsReactiveSelectionReadout(t *testing.T) {
+	shell := New(Options{
+		Title:      "Pajaritos Website",
+		PreviewURL: "/",
+		SaveAction: "/admin/editor/__actions/save",
+		Canvas: CanvasSurface{
+			RouteLabel:     "Home",
+			SelectionLabel: "Hero",
+		},
+	})
+	view := WorkbenchShellViewForShell(shell, WorkbenchShellViewOptions{ToolbarKicker: "Website"})
+
+	html := gosx.RenderHTML(RenderWorkbenchToolbar(view, WorkbenchToolbarOptions{}))
+
+	want := `<span data-studio-selection-label="true">Hero</span>`
+	if !strings.Contains(html, want) {
+		t.Fatalf("expected reactive selection-label span %q in toolbar title html, got: %s", want, html)
+	}
+	if strings.Contains(html, "<span>Hero</span>") {
+		t.Fatalf("toolbar title summary span rendered WITHOUT a data-studio-selection-label hook — client-side setReadout() can never update it, reproducing the frozen 'No selection' defect: %s", html)
+	}
+}
+
 func TestRenderWorkbenchCommandPaletteUsesShellViewCommands(t *testing.T) {
 	view := WorkbenchShellView(WorkbenchShellSource{
 		Title: "Client Site",
