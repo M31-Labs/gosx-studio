@@ -246,7 +246,7 @@
         form.__gosxOperationRuntime.select({ route: button.getAttribute("data-gosx-studio-route") || form.getAttribute("data-studio-target-route") || "/", pageId: button.getAttribute("data-gosx-studio-page-id") || form.getAttribute("data-studio-target-page-id") || "", field: button.getAttribute("data-gosx-studio-field") || form.getAttribute("data-studio-target-field") || "", componentKey: button.getAttribute("data-gosx-studio-component") || form.getAttribute("data-studio-target-component") || "", property: button.getAttribute("data-gosx-studio-style-property") || "" });
         form.__gosxOperationRuntime.commit(kind, value, {
           componentKey: button.getAttribute("data-gosx-studio-component"), property: button.getAttribute("data-gosx-studio-style-property"),
-          breakpoint: button.getAttribute("data-gosx-studio-breakpoint"), state: button.getAttribute("data-gosx-studio-state"),
+          breakpoint: button.getAttribute("data-gosx-studio-breakpoint"), state: button.getAttribute("data-gosx-studio-style-state"),
           historyOperationId: button.getAttribute("data-gosx-studio-history-operation-id"),
           // Instance/interaction/flow durable operation addressing (see
           // DURABLE_FIELD_BY_KIND above). A panel opts into one of these

@@ -119,7 +119,7 @@ func renderResponsiveLayoutControl(options ResponsiveLayoutInspectorOptions, tar
 		gosx.El("label", gosx.Attrs(gosx.Attr("for", selectID)), gosx.Text(control.Label)),
 		gosx.El("select", gosx.Attrs(gosx.Attr("id", selectID), gosx.Attr("name", authoring.AuthoringFieldStyleValue), gosx.Attr("data-studio-layout-value", "true")), gosx.Fragment(optionNodes...)),
 		gosx.El("output", gosx.Attrs(gosx.Attr("data-studio-layout-presence", boolAttr(state.Present))), gosx.Text(readout)),
-		gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("data-gosx-studio-operation-kind", string(authoring.AuthoringOperationSetStyle)), gosx.Attr("data-gosx-studio-operation-value-source", "#"+selectID), gosx.Attr("data-gosx-studio-style-property", control.Property), gosx.Attr("data-gosx-studio-component", propertyTarget.ComponentKey), gosx.Attr("data-gosx-studio-breakpoint", breakpoint), gosx.Attr("data-gosx-studio-state", authoring.StyleStateDefault)), gosx.Text("Apply")),
+		gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("data-gosx-studio-operation-kind", string(authoring.AuthoringOperationSetStyle)), gosx.Attr("data-gosx-studio-operation-value-source", "#"+selectID), gosx.Attr("data-gosx-studio-style-property", control.Property), gosx.Attr("data-gosx-studio-component", propertyTarget.ComponentKey), gosx.Attr("data-gosx-studio-breakpoint", breakpoint), gosx.Attr("data-gosx-studio-style-state", authoring.StyleStateDefault)), gosx.Text("Apply")),
 		layoutResetButton(propertyTarget.ComponentKey, control.Property, breakpoint, !state.Present),
 		layoutHistoryControls(state, propertyTarget),
 	)
@@ -147,7 +147,7 @@ func responsiveLayoutEffective(values map[string]ResponsiveLayoutValue, breakpoi
 }
 
 func layoutResetButton(component, property, breakpoint string, disabled bool) gosx.Node {
-	attrs := []any{gosx.Attr("type", "button"), gosx.Attr("data-gosx-studio-operation-kind", string(authoring.AuthoringOperationResetStyle)), gosx.Attr("data-gosx-studio-style-property", property), gosx.Attr("data-gosx-studio-component", component), gosx.Attr("data-gosx-studio-breakpoint", breakpoint), gosx.Attr("data-gosx-studio-state", authoring.StyleStateDefault)}
+	attrs := []any{gosx.Attr("type", "button"), gosx.Attr("data-gosx-studio-operation-kind", string(authoring.AuthoringOperationResetStyle)), gosx.Attr("data-gosx-studio-style-property", property), gosx.Attr("data-gosx-studio-component", component), gosx.Attr("data-gosx-studio-breakpoint", breakpoint), gosx.Attr("data-gosx-studio-style-state", authoring.StyleStateDefault)}
 	if disabled {
 		attrs = append(attrs, gosx.Attr("disabled", "disabled"))
 	}
@@ -155,7 +155,7 @@ func layoutResetButton(component, property, breakpoint string, disabled bool) go
 }
 
 func layoutHistoryControls(state ResponsiveLayoutValue, target authoring.OperationTarget) gosx.Node {
-	targetAttrs := []any{gosx.Attr("data-gosx-studio-style-property", target.Property), gosx.Attr("data-gosx-studio-component", target.ComponentKey), gosx.Attr("data-gosx-studio-breakpoint", target.Breakpoint), gosx.Attr("data-gosx-studio-state", target.State)}
+	targetAttrs := []any{gosx.Attr("data-gosx-studio-style-property", target.Property), gosx.Attr("data-gosx-studio-component", target.ComponentKey), gosx.Attr("data-gosx-studio-breakpoint", target.Breakpoint), gosx.Attr("data-gosx-studio-style-state", target.State)}
 	undo := append([]any{gosx.Attr("type", "button"), gosx.Attr("data-gosx-studio-operation-kind", string(authoring.AuthoringOperationUndo)), gosx.Attr("data-gosx-studio-history-operation-id", state.UndoOperationID)}, targetAttrs...)
 	redo := append([]any{gosx.Attr("type", "button"), gosx.Attr("data-gosx-studio-operation-kind", string(authoring.AuthoringOperationRedo)), gosx.Attr("data-gosx-studio-history-operation-id", state.RedoOperationID)}, targetAttrs...)
 	if state.UndoOperationID == "" {

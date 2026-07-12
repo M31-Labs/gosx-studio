@@ -371,7 +371,7 @@
   }
 
   function initForm(form) {
-    if (!form || form.dataset.gosxStudioStateBound === "true") return;
+    if (!form || !form.elements || form.dataset.gosxStudioStateBound === "true") return;
     form.dataset.gosxStudioStateBound = "true";
     var saved = formSignature(form);
     var submitting = false;

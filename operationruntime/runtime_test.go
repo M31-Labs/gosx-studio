@@ -25,6 +25,19 @@ func TestScriptContainsDurableOperationContract(t *testing.T) {
 			t.Fatalf("style operations must not replace content value or content Undo history: found %q", forbidden)
 		}
 	}
+	// The style-state button attribute (panels/responsive_layout_inspector.go)
+	// must stay data-gosx-studio-style-state, never data-gosx-studio-state --
+	// the latter is reserved for the form-state runtime's own <form> element
+	// (hostruntime/assets/state_runtime.js's initAll() selector) and a
+	// collision there throws "forEach called on null or undefined" on every
+	// editor load once the layout inspector renders (real, pre-existing bug,
+	// fixed alongside this test).
+	if !strings.Contains(s, `getAttribute("data-gosx-studio-style-state")`) {
+		t.Fatal(`script must read the non-colliding data-gosx-studio-style-state attribute`)
+	}
+	if strings.Contains(s, `getAttribute("data-gosx-studio-state")`) {
+		t.Fatal(`script must not read data-gosx-studio-state -- that attribute is reserved for the form-state runtime`)
+	}
 }
 
 func TestRuntimePrefersAuthenticatedCollaborationTransport(t *testing.T) {

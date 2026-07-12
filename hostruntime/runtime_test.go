@@ -1606,6 +1606,22 @@ func TestStudioRuntimeScriptsAreNonEmpty(t *testing.T) {
 	}
 }
 
+// TestStateRuntimeInitFormGuardsNonFormElements locks the defense-in-depth
+// guard against the data-gosx-studio-state attribute collision fixed
+// alongside this test (panels/responsive_layout_inspector.go's style-state
+// buttons were renamed to data-gosx-studio-style-state so
+// initAll()'s querySelectorAll("[data-gosx-studio-state]") only ever matches
+// the workbench's own <form>). initForm must still fail closed -- rather than
+// throw "forEach called on null or undefined" out of formSignature -- if any
+// future non-form element ever matches that selector, since form.elements is
+// undefined on non-HTMLFormElement nodes.
+func TestStateRuntimeInitFormGuardsNonFormElements(t *testing.T) {
+	script := string(StateRuntimeScript())
+	if !strings.Contains(script, `if (!form || !form.elements || form.dataset.gosxStudioStateBound === "true") return;`) {
+		t.Fatal("state runtime's initForm must guard on form.elements before calling formSignature")
+	}
+}
+
 func TestPreviewSubscriberHandlerServesSubscriberScript(t *testing.T) {
 	rec := httptest.NewRecorder()
 	PreviewSubscriberHandler().ServeHTTP(rec, httptest.NewRequest("GET", PreviewSubscriberPath, nil))

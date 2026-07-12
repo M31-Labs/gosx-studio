@@ -32,6 +32,32 @@ func TestResponsiveLayoutInspectorRendersSelectedTargetTypedControlsAndInheritan
 	}
 }
 
+// TestResponsiveLayoutInspectorStyleStateAttributeDoesNotCollideWithFormStateRuntime
+// guards against regressing the attribute-name collision fixed alongside this
+// test: hostruntime/assets/state_runtime.js's initAll() selects
+// document.querySelectorAll("[data-gosx-studio-state]") expecting only the
+// workbench's own <form data-gosx-studio-state="true"> (shell/workbench_frame.go).
+// This panel's style-state buttons must use a distinct attribute name
+// (data-gosx-studio-style-state) so state_runtime.js never matches them and
+// calls initForm/formSignature on a non-form element (whose .elements is
+// undefined, throwing "forEach called on null or undefined").
+func TestResponsiveLayoutInspectorStyleStateAttributeDoesNotCollideWithFormStateRuntime(t *testing.T) {
+	node := RenderResponsiveLayoutInspector(ResponsiveLayoutInspectorOptions{
+		ID: "layout", Action: "/authoring", CSRFToken: "token", DocumentRevision: 9,
+		Target: authoring.OperationTarget{Route: "/", PageID: "page:home", ComponentKey: "home:hero"},
+		Values: map[string]ResponsiveLayoutValue{
+			"base/gap": {Present: true, Value: "var(--space-md)", TargetHead: "head-gap", UndoOperationID: "op-gap"},
+		},
+	})
+	html := gosx.RenderHTML(node)
+	if !strings.Contains(html, "data-gosx-studio-style-state=") {
+		t.Fatal("expected style-state buttons to carry the non-colliding data-gosx-studio-style-state attribute")
+	}
+	if strings.Contains(html, "data-gosx-studio-state=") {
+		t.Fatal("data-gosx-studio-state must remain reserved for the form-state runtime's own <form> element; the layout inspector must not emit it")
+	}
+}
+
 func TestResponsiveLayoutInspectorMobileInheritsTabletBeforeBase(t *testing.T) {
 	control, ok := func() (authoring.LayoutControl, bool) {
 		for _, candidate := range authoring.ResponsiveLayoutControls() {
