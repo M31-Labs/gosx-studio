@@ -333,7 +333,12 @@ export async function applyAuthoringPanelInPlace(page: Page, panelSelector: stri
 export async function saveEditableControl(page: Page, value: string, options?: ClickAuthoringOptions & { expectedMessage?: string }) {
   const panel = page.locator("[data-gosx-studio-editable-control='true']").first();
   await expect(panel).toBeVisible();
-  const input = panel.locator("input[name='gosx_studio_value']");
+  // The value field renders as <input> for plain controls and <textarea> for
+  // rich-text controls (e.g. Muddy's hero headline is studio.ControlRichText
+  // — app/admin/editor/site_map.server.go — so it always renders a
+  // textarea); both share the stable name="gosx_studio_value", so match
+  // either widget kind rather than assuming a plain <input>.
+  const input = panel.locator("input[name='gosx_studio_value'], textarea[name='gosx_studio_value']");
   await expect(input).toBeVisible();
   await setFieldValue(input, value);
   await expectPanelButtonReceivesPointer(page, "[data-gosx-studio-editable-control='true']");
@@ -357,7 +362,7 @@ export async function saveEditableControl(page: Page, value: string, options?: C
     await expect(page.locator("[data-gosx-studio-save-detail]").first()).toHaveText(options.expectedMessage ?? /./);
     return;
   }
-  await expect(page.locator("[data-gosx-studio-editable-control='true'] input[name='gosx_studio_value']").first()).toHaveValue(value);
+  await expect(page.locator("[data-gosx-studio-editable-control='true'] input[name='gosx_studio_value'], [data-gosx-studio-editable-control='true'] textarea[name='gosx_studio_value']").first()).toHaveValue(value);
 }
 
 export async function savePageMetadata(page: Page, title: string, route: string, options?: ClickAuthoringOptions & { expectedMessage?: string }) {

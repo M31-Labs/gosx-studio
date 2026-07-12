@@ -190,6 +190,12 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
         `wasm-free mode must have either zero WASM with no manifest runtime path, or an islands-only WASM footprint; footprint=${JSON.stringify(footprintEvidence)}`,
       ).toBe(true);
 
+      // Zoom out to the file's TEST_ZOOM before the very first rect discovery
+      // (see TEST_ZOOM/resetCamera's doc comment) so this board's narrower
+      // Advanced-panel width still frames >=2 site-map columns.
+      await resetCamera(page);
+      await page.waitForTimeout(60);
+
       // Discover the rects the DOM board can resolve, with on-screen + world
       // centers, from the live inline bundle + the live JS camera.
       const rects = await pollForRects(page);
@@ -380,11 +386,24 @@ async function readCamera(page: Page): Promise<{ x: number; y: number; z: number
   }, CANVAS_SELECTOR);
 }
 
+// TEST_ZOOM is the "reset" zoom used throughout this file. The Advanced-mode
+// panel hosting this board now shares its row with the persistent Layers +
+// Inspector rails (studio-pagecanvas-handoff's PageCanvas checkpoint), so the
+// board's on-screen width is narrower than it used to be. At zoom=1 (the
+// server-authored default), the site-map's 280-world-unit column stride no
+// longer frames two adjacent page columns inside that narrower width — only
+// the first column lands inside the canvas's own visible bounds. Zooming out
+// one notch is exactly what a real user would do to see more of the map, and
+// keeps every downstream assertion (pan/zoom/pick/marquee/nav) honestly
+// proven against genuinely-visible, genuinely-resolvable rects rather than
+// coincidentally-cropped ones.
+const TEST_ZOOM = 0.5;
+
 async function resetCamera(page: Page): Promise<void> {
-  await page.evaluate((sel) => {
+  await page.evaluate(({ sel, zoom }) => {
     const el = document.querySelector(sel) as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: { setCamera: (x: number, y: number, z: number) => void } }) | null;
-    el?.GoSXStudioCanvasWasmFree?.setCamera(0, 0, 1);
-  }, CANVAS_SELECTOR);
+    el?.GoSXStudioCanvasWasmFree?.setCamera(0, 0, zoom);
+  }, { sel: CANVAS_SELECTOR, zoom: TEST_ZOOM });
 }
 
 // paintSignature samples a coarse fingerprint of the painted backing store so we

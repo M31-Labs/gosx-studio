@@ -75,6 +75,12 @@ test.describe("@reference-apps canvas2d site-map board live interaction", () => 
           typeof w.__gosx_get_shared_signal === "function";
       }, null, { timeout: 120_000 });
 
+      // The legacy canvas board now lives deep inside the "Advanced" mode
+      // panel (studio-pagecanvas-handoff), well below the fold, so its
+      // boundingBox() must be read AFTER scrolling it into the viewport —
+      // otherwise the box coordinates land outside the actual viewport and
+      // every synthesized mouse event below misses the canvas entirely.
+      await canvas.scrollIntoViewIfNeeded();
       const box = await canvas.boundingBox();
       expect(box, "canvas should have a layout box").not.toBeNull();
       expect(box!.width, "canvas CSS width > 0").toBeGreaterThan(0);

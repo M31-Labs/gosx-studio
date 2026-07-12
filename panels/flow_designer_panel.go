@@ -291,6 +291,22 @@ func renderFlowDesignerEditorHead(flow map[string]any, formID, publishAction str
 			gosx.Attr("formmethod", "post"),
 			gosx.Attr("name", "flowKey"),
 			gosx.Attr("value", key),
+			// This button submits the SHARED websiteEditorForm (every panel's
+			// fields, including ones currently hidden by mode-gating CSS,
+			// are "listed" constraint-validation candidates of that one
+			// form). Native HTML5 validation runs BEFORE the browser
+			// dispatches the form's "submit" event; if ANY control anywhere
+			// in the form is invalid, the browser silently cancels the
+			// submission with no submit event at all, regardless of which
+			// button was clicked. formnovalidate exempts THIS submission
+			// from that shared-form validation surface, mirroring every
+			// other workbench-form action button (Publish/Discard/Schedule
+			// in publish_panel.go, Restore in revision_history_panel.go,
+			// Save navigation in navigation_panel.go, Save checkout in
+			// checkout_panel.go) — Publish flow must behave the same way or
+			// it silently no-ops whenever an unrelated hidden panel happens
+			// to carry an invalid value.
+			gosx.Attr("formnovalidate", "formnovalidate"),
 			gosx.Attr("data-studio-submit-action", "publish-flow"),
 		), gosx.Text("Publish flow")),
 	)

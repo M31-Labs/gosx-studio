@@ -525,6 +525,35 @@ button.button {
   max-height: none;
 }
 
+/* .studio-site-map-canvas is the sibling gosx.CanvasBoard (WebGPU/canvas2d) +
+ * WASM-free surface wrapper (canvas/sitemap_canvas.go
+ * RenderSiteMapCanvasEngine) rendered alongside .studio-site-map-engine inside
+ * the same .studio-advanced-canvas-board wrapper (see the comment above). It
+ * never had a bounded-height rule of its own, so once mounted inside a
+ * VISIBLE .studio-advanced-canvas-board its <canvas> child (a replaced element
+ * with no percentage sizing) and this unbounded section can compound with
+ * whatever the ancestor chain happens to measure at mount/resize time — the
+ * exact self-referential-collapse-or-balloon hazard gosx's client bootstrap
+ * documents (client/js/bootstrap-src/26b-feature-engines-prefix.js
+ * _measuredCanvasCSSBox: "an upstream DOM-nesting change breaks a
+ * descendant-combinator selector the host authored against an older
+ * structure"). Bound it exactly like its sibling so the canvas always
+ * measures a stable, viewport-scaled box and fills it. */
+.studio-site-map-canvas {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: calc(var(--studio-stage-height) - 5rem);
+  max-height: none;
+  overflow: hidden;
+}
+
+.studio-site-map-canvas > canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .studio-site-map-engine__chrome {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2301,6 +2330,18 @@ button.button {
 .editor-workbench[data-studio-mode="advanced"] .studio-advanced-canvas-board,
 .editor-workbench > [data-studio-workbench][data-studio-mode="advanced"] .studio-advanced-canvas-board {
   display: grid;
+  /* Without an explicit track, a grid container's implicit column defaults
+   * to `auto`, which sizes to its content's min-content width rather than
+   * the available space -- the classic CSS grid "blowout": a child panel
+   * (e.g. Pajaritos's own .studio-site-map-engine, whose
+   * .studio-site-map-engine__viewport uses
+   * `grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr))`) never
+   * shrinks its cards below their combined 18rem minimums, so this
+   * container happily grows past a narrow (e.g. mobile) viewport instead of
+   * clamping to it. minmax(0, 1fr) forces the track to respect the
+   * container's own available width, letting the child's own overflow/grid
+   * rules take over from there. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-xs);
 }
 

@@ -18,7 +18,7 @@ func TestRenderFlowDesignerPanelFull(t *testing.T) {
 		`<article class="studio-flow-editor" data-editor-flow="contact" data-studio-flow-editor="contact" data-studio-flow-valid="true" data-studio-flow-readiness-status="ready" data-studio-flow-dirty="false" data-studio-flow-editor-visible="true">`,
 		`<output class="studio-flow-editor__state studio-flow-editor__state--ready" data-studio-flow-editor-state="contact" data-studio-flow-editor-state-visible="true">Ready to publish</output>`,
 		`<output class="studio-flow-editor__state studio-flow-editor__state--watch" data-studio-flow-editor-state="contact" data-studio-flow-editor-state-visible="false">Unsaved changes</output>`,
-		`<button class="button button--secondary" type="submit" form="websiteEditorForm" formaction="/admin/editor/__actions/publishFlow" formmethod="post" name="flowKey" value="contact" data-studio-submit-action="publish-flow">Publish flow</button>`,
+		`<button class="button button--secondary" type="submit" form="websiteEditorForm" formaction="/admin/editor/__actions/publishFlow" formmethod="post" name="flowKey" value="contact" formnovalidate="formnovalidate" data-studio-submit-action="publish-flow">Publish flow</button>`,
 		`<div class="studio-flow-readiness studio-flow-readiness--ready" data-studio-flow-readiness="contact">`,
 		`<section class="studio-flow-check studio-flow-check--ready" role="listitem" tabindex="0" data-studio-flow-check="handler" data-studio-flow-check-status="ready">`,
 		`<div class="studio-flow-graph" role="list" aria-label="Flow map">`,

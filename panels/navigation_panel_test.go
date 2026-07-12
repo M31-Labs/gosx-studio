@@ -77,7 +77,7 @@ func TestRenderNavigationPanelPopulated(t *testing.T) {
 		`<input name="navigationEnabled0" type="checkbox" value="true" checked />`,
 		`<input name="navigationEnabled1" type="checkbox" value="true" />`,
 		`<input name="navigationOrder1" type="number" min="1" value="2" />`,
-		`<button class="button button--primary" type="submit" form="websiteEditorForm" formaction="/admin/editor/__actions/navigation" formmethod="post" data-studio-submit-action="navigation" data-studio-field-action-formaction="/admin/editor/__actions/navigation">Save navigation</button>`,
+		`<button class="button button--primary" type="submit" form="websiteEditorForm" formaction="/admin/editor/__actions/navigation" formmethod="post" formnovalidate="formnovalidate" data-studio-submit-action="navigation" data-studio-field-action-formaction="/admin/editor/__actions/navigation">Save navigation</button>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("rendered navigation panel missing %q:\n%s", fragment, html)
@@ -115,7 +115,7 @@ func TestRenderNavigationPanelEmpty(t *testing.T) {
 		`data-gosx-studio-navigation-panel-renderer="gosx-studio"`,
 		`<p class="empty">Navigation is derived from your published content.</p>`,
 		`<div class="inline-form studio-navigation-panel__form" hidden>`,
-		`<button class="button button--primary" type="submit" form="websiteEditorForm" formaction="/admin/editor/__actions/navigation" formmethod="post" data-studio-submit-action="navigation" data-studio-field-action-formaction="/admin/editor/__actions/navigation">Save navigation</button>`,
+		`<button class="button button--primary" type="submit" form="websiteEditorForm" formaction="/admin/editor/__actions/navigation" formmethod="post" formnovalidate="formnovalidate" data-studio-submit-action="navigation" data-studio-field-action-formaction="/admin/editor/__actions/navigation">Save navigation</button>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("empty navigation panel missing %q:\n%s", fragment, html)

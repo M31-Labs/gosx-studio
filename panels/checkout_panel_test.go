@@ -56,7 +56,7 @@ func TestRenderCheckoutPanelPopulated(t *testing.T) {
 		`<label for="checkoutLabel">Button label</label>`,
 		`<input id="checkoutLabel" name="checkoutLabel" type="text" value="Reserve this piece" />`,
 		`<small class="field-help">The call-to-action shown on the public checkout button.</small>`,
-		`<button class="button button--primary" type="submit" form="websiteEditorForm" formaction="/admin/editor/__actions/checkout" formmethod="post" data-studio-submit-action="checkout" data-studio-field-action-formaction="/admin/editor/__actions/checkout">Save checkout</button>`,
+		`<button class="button button--primary" type="submit" form="websiteEditorForm" formaction="/admin/editor/__actions/checkout" formmethod="post" formnovalidate="formnovalidate" data-studio-submit-action="checkout" data-studio-field-action-formaction="/admin/editor/__actions/checkout">Save checkout</button>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("rendered checkout panel missing %q:\n%s", fragment, html)
@@ -108,7 +108,7 @@ func TestRenderCheckoutPanelEmptyProducts(t *testing.T) {
 		`<input name="checkoutEnabled" type="checkbox" value="on" />`,
 		`<p class="empty">Publish a product to offer it through checkout.</p>`,
 		`<div class="studio-checkout-panel__field" hidden><label for="checkoutProductId">Product</label><select id="checkoutProductId" name="checkoutProductId" data-studio-checkout-product="true"></select></div>`,
-		`<button class="button button--primary" type="submit" form="websiteEditorForm" formaction="/admin/editor/__actions/checkout" formmethod="post" data-studio-submit-action="checkout" data-studio-field-action-formaction="/admin/editor/__actions/checkout">Save checkout</button>`,
+		`<button class="button button--primary" type="submit" form="websiteEditorForm" formaction="/admin/editor/__actions/checkout" formmethod="post" formnovalidate="formnovalidate" data-studio-submit-action="checkout" data-studio-field-action-formaction="/admin/editor/__actions/checkout">Save checkout</button>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("empty checkout panel missing %q:\n%s", fragment, html)

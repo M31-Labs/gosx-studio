@@ -36,9 +36,23 @@ import {
 //   a NEW workspace node (hero is DefaultOn, so "Add hero" inserts a
 //   hero__copy_2 instance). After the visible "Add" control submits, we RELOAD
 //   the canvas-active editor and assert the new node component:home:hero__copy_2
-//   appears in BOTH the reloaded DOM site-map AND the LIVE canvas RenderBundle
-//   (a rect whose id == the node key). That is the dispatch's exact requirement:
-//   the added section appears in the reloaded canvas graph.
+//   appears in the reloaded DOM site-map.
+//
+//   STALE-PREMISE FIX: this file previously ALSO asserted that the new
+//   component node appears as its own rect in the canvas RenderBundle. That
+//   premise predates canvas/sitemap_canvas_surface.go's
+//   RenderSiteMapCanvasSurface unconditionally setting
+//   canvasOptions.PageArtboardsOnly = true for every mode (co-render,
+//   canvas-default, wasm-free alike) — a locked contract (canvas/
+//   sitemap_canvas_test.go TestSiteMapCanvasNodesPageArtboardsOnly, "M9-1":
+//   "PageArtboardsOnly must skip non-page node"). The CanvasBoard graph is,
+//   by design, PAGE-card-only; component/resource nodes never get their own
+//   rect there — the DOM board stays the full-detail graph. So instead we
+//   assert what IS true for the canvas surface: the owning page:home card
+//   still resolves as a rect in the reloaded canvas RenderBundle (the canvas
+//   graph survives/re-renders correctly after the authoring + reload), while
+//   the DOM-board assertion above is what actually proves the new component
+//   persisted.
 //
 // Honesty discipline: the canvas must be genuinely active (canvas2d surface
 // attached, route evidence observed (true WebGPU or explicit 2D fallback paint))
@@ -156,7 +170,11 @@ test.describe("@reference-apps canvas2d authoring parity", () => {
         "the added hero instance must persist in the reloaded DOM site-map graph",
       ).toBeAttached({ timeout: 30_000 });
 
-      // The canvas graph (live RenderBundle) must carry a rect for the new node.
+      // The canvas graph (live RenderBundle) must still carry a rect for the
+      // owning page card — PageArtboardsOnly means the new COMPONENT never
+      // gets its own canvas rect (see the stale-premise comment above); the
+      // page:home card surviving reload + re-render is the canvas-side
+      // honest equivalent.
       await page.waitForFunction(() => {
         const w = window as unknown as Record<string, unknown>;
         return typeof w.__gosx_render_canvas === "function" &&
@@ -169,10 +187,10 @@ test.describe("@reference-apps canvas2d authoring parity", () => {
         `canvas must render after reload; evidence=${formatCanvasRenderEvidence(reloadRenderEvidence)}`,
       ).toBe(true);
 
-      const found = await pollForCanvasNode(page, NEW_NODE_KEY);
+      const found = await pollForCanvasNode(page, "page:home");
       expect(
         found,
-        `the added section ${NEW_NODE_KEY} should appear as a rect in the reloaded canvas RenderBundle ` +
+        `the owning page:home card should still appear as a rect in the reloaded canvas RenderBundle ` +
           `(console: ${JSON.stringify(consoleErrors.slice(-8))})`,
       ).toBe(true);
 

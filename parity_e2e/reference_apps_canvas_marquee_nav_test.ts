@@ -95,6 +95,13 @@ test.describe("@reference-apps canvas2d marquee + keyboard nav", () => {
           document.documentElement.getAttribute("data-gosx-studio-canvas-selection-bridge-bound") === "true";
       }, null, { timeout: 120_000 });
 
+      // The legacy canvas board now lives deep inside the "Advanced" mode
+      // panel (studio-pagecanvas-handoff), well below the fold, so its
+      // boundingBox() must be read AFTER scrolling it into the viewport —
+      // otherwise the box coordinates land outside the actual viewport and
+      // the synthesized marquee/nav interactions below miss the canvas
+      // entirely.
+      await canvas.scrollIntoViewIfNeeded();
       const box = await canvas.boundingBox();
       expect(box, "canvas should have a layout box").not.toBeNull();
 
@@ -103,6 +110,21 @@ test.describe("@reference-apps canvas2d marquee + keyboard nav", () => {
         renderEvidence.webgpuRoute || renderEvidence.fallback2D,
         `the canvas board must render before interaction; evidence=${formatCanvasRenderEvidence(renderEvidence)}`,
       ).toBe(true);
+
+      // The Advanced-mode panel hosting this board now shares its row with
+      // the persistent Layers + Inspector rails (studio-pagecanvas-handoff's
+      // PageCanvas checkpoint), so the board's on-screen width is narrower
+      // than it used to be. At the server-authored default zoom (1), the
+      // site-map's 280-world-unit column stride no longer frames two adjacent
+      // page columns inside that narrower width — only the first column
+      // lands inside the canvas's own visible bounds. Zoom out one notch
+      // first, exactly like a real user would to see more of the map, before
+      // relying on >=2 visible/resolvable targets for the marquee below.
+      await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+      for (let n = 0; n < 8; n++) {
+        await page.mouse.wheel(0, 120); // positive deltaY = zoom out
+      }
+      await page.waitForTimeout(120);
 
       // Discover the rects the DOM board can resolve, with on-screen + world
       // centers, from the live RenderBundle. Need >=2 fully on-screen to marquee.
