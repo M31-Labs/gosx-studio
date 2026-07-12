@@ -137,8 +137,25 @@
       if (sequence > acceptedSequence) { acceptedSequence = sequence; storageSet(sequenceKey, String(sequence)); }
       document.dispatchEvent(new CustomEvent("gosxstudio:collaboration-operation-accepted", { detail: ack || {} }));
       var operationID = ack && ack.record && ack.record.id;
-      if (ack && ack.record && ack.record.target) { heads[targetKey(ack.record.target)] = ack.record.targetHead || ""; storeHeads(); }
-      if (operationID && pending[operationID]) { pending[operationID].resolve(ack); clearTimeout(pending[operationID].timer); delete pending[operationID]; }
+      var isOwnPending = !!(operationID && pending[operationID]);
+      // Only trust this accepted operation as a new optimistic-concurrency
+      // baseline for future submits (expectedHead()) when it is either (a)
+      // this connection's own pending submit resolving, or (b) part of the
+      // pre-"connected" studio.sync.tail catch-up that runs once right after
+      // a fresh connect/reconnect (which always pairs with a freshly
+      // server-rendered DOM carrying the same head). A LIVE broadcast of
+      // another actor's accepted operation, received after this connection
+      // is already synced, must NOT silently rebase our local head cache --
+      // doing so let expectedHead() hand a form-path submit (see
+      // operationruntime/island_runtime.js's submit()) a head that matches
+      // the server's current state even though this session's own displayed
+      // field content is still stale, defeating the stale-write rejection
+      // the collaboration contract requires (HANDOFF-09 Defect 1).
+      if (ack && ack.record && ack.record.target && (isOwnPending || !synced)) {
+        heads[targetKey(ack.record.target)] = ack.record.targetHead || "";
+        storeHeads();
+      }
+      if (isOwnPending) { pending[operationID].resolve(ack); clearTimeout(pending[operationID].timer); delete pending[operationID]; }
     }
     function rejected(error) {
       if (conflict) { conflict.hidden = false; conflict.textContent = (error && error.message) || "The shared edit was rejected."; }
