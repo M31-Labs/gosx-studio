@@ -32,7 +32,12 @@ test.describe("@reference-apps browser authoring workflows", () => {
 
       await savePageMetadata(page, "Studio Test Notes", "/pages/studio-test-notes", {
         reloadAfter: false,
-        expectedMessage: "Studio Test Notes saved.",
+        // Muddy's authoring.server.go emits "<title> saved as a draft." (locked
+        // by its own TestEditorPageMetadataSave-style Go test) — this stale
+        // "<title> saved." expectation predates that draft-status wording and
+        // was never reachable before now (the CSS/stacking defect below
+        // blocked every click before the button could ever be reached).
+        expectedMessage: "Studio Test Notes saved as a draft.",
       });
 
       await applyCompositionIntentInPlace(page, "create-page:landing", {

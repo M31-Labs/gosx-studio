@@ -69,7 +69,7 @@ func TestRenderRevisionHistoryPanelPopulated(t *testing.T) {
 		`<p>Homepage copy updated.</p>`,
 		`<p class="revision-diff-summary">2 changes</p>`,
 		`<ul class="revision-diff-list"><li><span>Changed</span><code>appearance.palette</code></li><li><span>Added</span><code>home.sections.hero</code></li></ul>`,
-		`<button class="button button--secondary" type="submit" form="websiteEditorForm" formaction="/admin/editor/__actions/restoreRevision" formmethod="post" name="revisionId" value="rev_1" data-admin-confirm="Restore these editor settings? Current look and feel will be saved in history first." data-studio-submit-action="restoreRevision" data-studio-field-action-formaction="/admin/editor/__actions/restoreRevision">Restore this version</button>`,
+		`<button class="button button--secondary" type="submit" form="websiteEditorForm" formaction="/admin/editor/__actions/restoreRevision" formmethod="post" formnovalidate="formnovalidate" name="revisionId" value="rev_1" data-admin-confirm="Restore these editor settings? Current look and feel will be saved in history first." data-studio-submit-action="restoreRevision" data-studio-field-action-formaction="/admin/editor/__actions/restoreRevision">Restore this version</button>`,
 		`<li data-studio-revision="rev_2">`,
 		`<p hidden></p><p class="revision-diff-summary" hidden></p><ul class="revision-diff-list" hidden></ul>`,
 		`value="rev_2"`,

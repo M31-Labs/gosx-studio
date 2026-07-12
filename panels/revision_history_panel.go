@@ -78,6 +78,21 @@ func renderRevisionHistoryWorkbenchButton(item map[string]any) gosx.Node {
 		gosx.Attr("form", core.WorkbenchViewString(item, "formID")),
 		gosx.Attr("formaction", core.WorkbenchViewString(item, "restoreAction")),
 		gosx.Attr("formmethod", "post"),
+		// The workbench-button variant submits the SHARED websiteEditorForm
+		// (every panel's fields, including ones currently hidden by mode-gating
+		// CSS, are "listed" constraint-validation candidates of that one form).
+		// Native HTML5 validation runs BEFORE the browser dispatches the form's
+		// "submit" event (which is what studio's state_runtime.js listens on to
+		// intercept and fetch this action) — if ANY control anywhere in the form
+		// is invalid (e.g. a type=url field carrying a non-URL seeded value in a
+		// panel that isn't the active mode), the browser silently cancels the
+		// submission with no submit event at all, regardless of which button was
+		// clicked. formnovalidate exempts THIS submission from that shared-form
+		// validation surface, mirroring every other workbench-form action button
+		// (Publish/Discard/Schedule in publish_panel.go) — restore must behave
+		// the same way or it silently no-ops whenever an unrelated hidden panel
+		// happens to carry an invalid value.
+		gosx.Attr("formnovalidate", "formnovalidate"),
 		gosx.Attr("name", core.WorkbenchViewString(item, "revisionInputName")),
 		gosx.Attr("value", core.WorkbenchViewString(item, "revisionInputValue")),
 		gosx.Attr("data-admin-confirm", core.WorkbenchViewString(item, "confirm")),

@@ -510,7 +510,16 @@ button.button {
   padding: var(--space-xs);
 }
 
-.studio-canvas-board > .studio-site-map-engine,
+/* Was `.studio-canvas-board > .studio-site-map-engine` (direct child): the
+ * studio-pagecanvas-handoff branch wraps the legacy site-map engine (+ canvas)
+ * in an intervening <section class="studio-advanced-canvas-board"
+ * data-studio-mode-panel="advanced"> once a PageCanvas surface is present
+ * (shell/backend_editor_workbench.go RenderBackendEditorWorkbenchContent) —
+ * unconditional now that PageCanvas is the default. The `>` combinator no
+ * longer matches the live DOM at all, so this sizing rule went silently dead.
+ * Loosened to a descendant combinator so it matches regardless of the
+ * wrapper. */
+.studio-canvas-board .studio-site-map-engine,
 .studio-site-map-engine-host .studio-site-map-engine {
   height: calc(var(--studio-stage-height) - 5rem);
   max-height: none;

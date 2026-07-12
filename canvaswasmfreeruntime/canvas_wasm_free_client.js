@@ -305,6 +305,18 @@
     return root ? (root.getAttribute("data-studio-site-map-selected-node") || "") : "";
   }
 
+  // normalizeToPageKey reduces any workspace node key ("component:home:hero",
+  // "resource:shop:banner", "page:home") down to the owning PAGE-granularity
+  // key ("page:<pageToken>"), by workspace-key convention (kind:pageToken:slug
+  // for non-page kinds; page:pageToken for page kind itself). Returns "" if it
+  // cannot be parsed as a workspace key at all.
+  function normalizeToPageKey(key) {
+    if (!key) return "";
+    if (key.indexOf("page:") === 0) return key;
+    var parts = key.split(":");
+    return parts.length >= 2 ? "page:" + parts[1] : "";
+  }
+
   // ---- Per-canvas controller ----
 
   function mountCanvas(canvas) {
@@ -706,7 +718,17 @@
           ensureOverlay(size);
           if (!p) p = painter();
           if (p && typeof p.renderCanvasBoardHTML === "function") {
-            p.renderCanvasBoardHTML(htmlOverlay, composed, size.w, size.h);
+            // Resolve which page-granularity surface should stay
+            // pointer-interactive: selectedID (this closure's own
+            // click-to-select tracker) first, since it is exact and
+            // page-granularity already; it resets to "" on every fresh
+            // load/reload though, so fall back to the board's
+            // SERVER-PERSISTED selection (currentSelection(), survives
+            // reloads), normalized from possible component/resource
+            // granularity down to the owning page key. See
+            // canvas2d_painter.js's cross-page pointer-interception fix.
+            var activePageKey = selectedID || normalizeToPageKey(currentSelection());
+            p.renderCanvasBoardHTML(htmlOverlay, composed, size.w, size.h, activePageKey);
           }
           // Medium-tier LOD: faithful per-page thumbnail <img> overlays. Gated
           // internally to [THUMB_ZOOM, SURFACE_ZOOM) and idempotent, so it can be
