@@ -1041,3 +1041,242 @@ func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 		t.Fatalf("Bundle() must place island runtime before shim (island=%d shim=%d)", islandIdx, shimIdx)
 	}
 }
+
+// TestBindChromeIslandRestoresWorkingStateAcrossSimulatedSaveReload proves
+// the "save discards mode/selection/scroll" fix end to end in a real JS
+// engine: bindChrome on the "pre-save" form sets a non-default mode and a
+// selection, then a FRESH form (simulating the DOM a host form POST's page
+// navigation produces — new elements, but the same sessionStorage, exactly
+// as a real browser tab preserves sessionStorage across same-tab
+// navigation) is bound, and must come up already in the persisted mode with
+// the persisted selection restored, not the server-rendered "home" default.
+func TestBindChromeIslandRestoresWorkingStateAcrossSimulatedSaveReload(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node executable is required for executable IslandRuntimeJS DOM coverage")
+	}
+
+	runtimeJS, err := json.Marshal(string(IslandRuntimeJS()))
+	if err != nil {
+		t.Fatalf("marshal IslandRuntimeJS(): %v", err)
+	}
+
+	script := `
+const runtimeSource = ` + string(runtimeJS) + `;
+
+class TestEventTarget {
+  constructor() { this.listeners = new Map(); }
+  addEventListener(type, listener) {
+    const listeners = this.listeners.get(type) || [];
+    listeners.push(listener);
+    this.listeners.set(type, listeners);
+  }
+  dispatchEvent(event) {
+    event.target = event.target || this;
+    const listeners = this.listeners.get(event.type) || [];
+    for (const listener of listeners) listener.call(this, event);
+    return true;
+  }
+}
+
+class TestEvent {
+  constructor(type, options = {}) { this.type = type; this.bubbles = Boolean(options.bubbles); }
+}
+
+class TestCustomEvent extends TestEvent {
+  constructor(type, options = {}) { super(type, options); this.detail = options.detail || null; }
+}
+
+class TestElement extends TestEventTarget {
+  constructor(tagName) {
+    super();
+    this.tagName = tagName.toUpperCase();
+    this.attributes = new Map();
+    this.children = [];
+    this.parentElement = null;
+    this.style = { properties: new Map(), getPropertyValue(name) { return this.properties.get(name) || ""; }, setProperty(name, value) { this.properties.set(name, value); } };
+    this.scrollTop = 0;
+    this.scrollLeft = 0;
+    this.classSet = new Set();
+    this.classList = {
+      toggle: (name, force) => {
+        const on = force === undefined ? !this.classSet.has(name) : Boolean(force);
+        if (on) this.classSet.add(name); else this.classSet.delete(name);
+        return on;
+      },
+      contains: (name) => this.classSet.has(name),
+    };
+    const el = this;
+    this.dataset = new Proxy({}, {
+      get(_, prop) {
+        const attr = "data-" + String(prop).replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
+        const value = el.getAttribute(attr);
+        return value === null ? undefined : value;
+      },
+      set(_, prop, value) {
+        const attr = "data-" + String(prop).replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
+        el.setAttribute(attr, value);
+        return true;
+      }
+    });
+  }
+  appendChild(child) { child.parentElement = this; this.children.push(child); return child; }
+  setAttribute(name, value) { this.attributes.set(name, String(value)); }
+  getAttribute(name) { return this.attributes.has(name) ? this.attributes.get(name) : null; }
+  hasAttribute(name) { return this.attributes.has(name); }
+  removeAttribute(name) { this.attributes.delete(name); }
+  matches(selector) { return selector.split(",").some((part) => matchesSingleSelector(this, part.trim())); }
+  querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
+  querySelectorAll(selector) {
+    const found = [];
+    const visit = (node) => { for (const child of node.children) { if (child.matches(selector)) found.push(child); visit(child); } };
+    visit(this);
+    return found;
+  }
+  closest(selector) {
+    let node = this;
+    while (node) { if (node.matches(selector)) return node; node = node.parentElement; }
+    return null;
+  }
+}
+
+class TestDocument extends TestEventTarget {
+  constructor() { super(); this.body = new TestElement("body"); }
+  createElement(tagName) { return new TestElement(tagName); }
+  querySelector(selector) { return this.body.querySelector(selector); }
+  querySelectorAll(selector) { return this.body.querySelectorAll(selector); }
+}
+
+function matchesSingleSelector(element, selector) {
+  if (!selector) return false;
+  let rest = selector;
+  const tag = rest.match(/^[a-zA-Z][a-zA-Z0-9-]*/);
+  if (tag) {
+    if (element.tagName.toLowerCase() !== tag[0].toLowerCase()) return false;
+    rest = rest.slice(tag[0].length);
+  }
+  const attrPattern = /\[([^\]=]+)(?:=(['"]?)(.*?)\2)?\]/g;
+  let match;
+  let sawAttribute = false;
+  while ((match = attrPattern.exec(rest)) !== null) {
+    sawAttribute = true;
+    const actual = element.getAttribute(match[1]);
+    if (actual === null) return false;
+    if (match[3] !== undefined && actual !== match[3]) return false;
+  }
+  const consumedAttrs = rest.replace(attrPattern, "");
+  return consumedAttrs === "" && (Boolean(tag) || sawAttribute);
+}
+
+function assertEqual(actual, expected, message) {
+  if (actual !== expected) {
+    throw new Error(message + ": got " + JSON.stringify(actual) + ", want " + JSON.stringify(expected));
+  }
+}
+
+// A real browser tab's sessionStorage survives a same-tab form POST
+// navigation; this in-memory stub models exactly that (module-scope object,
+// shared across the two "page loads" simulated below, never reset).
+const sessionStorageBacking = new Map();
+const sessionStorage = {
+  getItem(key) { return sessionStorageBacking.has(key) ? sessionStorageBacking.get(key) : null; },
+  setItem(key, value) { sessionStorageBacking.set(key, value); },
+};
+
+function freshWindow() {
+  const document = new TestDocument();
+  const rafCallbacks = [];
+  const window = new TestEventTarget();
+  window.document = document;
+  window.sessionStorage = sessionStorage;
+  window.localStorage = { getItem() { return null; }, setItem() {} };
+  window.requestAnimationFrame = (callback) => { rafCallbacks.push(callback); return rafCallbacks.length; };
+  window.setTimeout = (callback) => { rafCallbacks.push(callback); return rafCallbacks.length; };
+  window.matchMedia = () => ({ matches: false });
+  globalThis.window = window;
+  globalThis.document = document;
+  globalThis.Event = TestEvent;
+  globalThis.CustomEvent = TestCustomEvent;
+  return { document, window, rafCallbacks };
+}
+
+function buildForm(document) {
+  const form = document.createElement("form");
+  form.setAttribute("data-editor-workbench", "true");
+  form.setAttribute("data-studio-workbench", "true");
+  // Server always renders the default mode — proving the restore overrides
+  // this, not merely reads it, is the whole point of this test.
+  form.setAttribute("data-studio-mode", "home");
+  const stage = document.createElement("div");
+  stage.setAttribute("data-studio-stage", "true");
+  form.appendChild(stage);
+  const homePanel = document.createElement("section");
+  homePanel.setAttribute("data-studio-mode-panel", "home");
+  homePanel.classList.toggle("editor-panel", true);
+  const advancedPanel = document.createElement("section");
+  advancedPanel.setAttribute("data-studio-mode-panel", "advanced");
+  advancedPanel.classList.toggle("editor-panel", true);
+  form.appendChild(homePanel);
+  form.appendChild(advancedPanel);
+  document.body.appendChild(form);
+  return { form, stage, homePanel, advancedPanel };
+}
+
+// ---- "Page load 1" (pre-save): operator switches to Advanced and selects an object.
+{
+  const { document } = freshWindow();
+  eval(runtimeSource);
+  const { form, stage, homePanel, advancedPanel } = buildForm(document);
+  stage.scrollTop = 240;
+  stage.scrollLeft = 12;
+
+  window.__gosx_workbench_runtime_island_bindChrome(form);
+  assertEqual(form.getAttribute("data-studio-mode"), "home", "initial bind honors server-rendered default before any mode switch");
+
+  window.__gosx_workbench_runtime_island_setMode(form, "advanced", false);
+  assertEqual(form.getAttribute("data-studio-mode"), "advanced", "setMode switches the form to advanced");
+  assertEqual(Boolean(advancedPanel.hidden), false, "advanced panel visible in advanced mode");
+  assertEqual(Boolean(homePanel.hidden), true, "home panel hidden outside home mode");
+
+  form.setAttribute("data-studio-selection", "home:hero");
+  // The MutationObserver persists selection changes; this Node stub has no
+  // MutationObserver, so persist directly the same way the observer
+  // callback would (proving the read/restore half of the contract without
+  // requiring a MutationObserver polyfill in this harness).
+  sessionStorage.setItem("gosx-studio-editor-working-state", JSON.stringify(Object.assign(
+    JSON.parse(sessionStorage.getItem("gosx-studio-editor-working-state") || "{}"),
+    { selection: "home:hero", scrollTop: stage.scrollTop, scrollLeft: stage.scrollLeft }
+  )));
+}
+
+// ---- "Page load 2" (post-save): a save POST reloads the page. The server
+// still renders the DEFAULT mode (it has no knowledge of client working
+// state) — the fresh form below models exactly that regression.
+{
+  const { document, rafCallbacks } = freshWindow();
+  eval(runtimeSource);
+  const { form, stage, homePanel, advancedPanel } = buildForm(document);
+  assertEqual(form.getAttribute("data-studio-mode"), "home", "fresh post-save DOM is server-rendered back to the default mode");
+
+  window.__gosx_workbench_runtime_island_bindChrome(form);
+
+  assertEqual(form.getAttribute("data-studio-mode"), "advanced", "bindChrome must restore the persisted mode across the simulated save reload, not the server default");
+  assertEqual(Boolean(advancedPanel.hidden), false, "advanced panel visible again after restore");
+  assertEqual(Boolean(homePanel.hidden), true, "home panel stays hidden after restore (still in advanced mode)");
+  assertEqual(form.getAttribute("data-studio-selection"), "home:hero", "bindChrome must restore the persisted selection across the simulated save reload");
+
+  for (const callback of rafCallbacks.splice(0)) callback();
+  assertEqual(stage.scrollTop, 240, "bindChrome must restore the persisted scroll position (top) across the simulated save reload");
+  assertEqual(stage.scrollLeft, 12, "bindChrome must restore the persisted scroll position (left) across the simulated save reload");
+}
+`
+
+	cmd := exec.Command(node)
+	cmd.Stdin = strings.NewReader(script)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("node working-state restore check failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+	}
+}

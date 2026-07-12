@@ -42,7 +42,7 @@ func brandPanelRootAttrs(view map[string]any, options BrandPanelOptions) []any {
 	attrs := []any{
 		gosx.Attr("class", "editor-panel editor-panel--brand-studio studio-brand-panel"),
 		gosx.Attr("data-studio-brand-panel", "true"),
-		gosx.Attr("data-studio-mode-panel", "brand"),
+		gosx.Attr("data-studio-mode-panel", core.FirstNonEmpty(core.WorkbenchViewString(view, "mode"), "brand")),
 		gosx.Attr("data-studio-panel", "brand"),
 		gosx.Attr("data-studio-engine-source", "gosx"),
 		gosx.Attr("data-studio-brand-group-active", core.WorkbenchViewString(view, "defaultGroupKey")),

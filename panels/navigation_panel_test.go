@@ -11,6 +11,7 @@ func TestRenderNavigationPanelPopulated(t *testing.T) {
 	view := map[string]any{
 		"class":       "panel editor-panel editor-panel--navigation studio-navigation-panel",
 		"panelKey":    "navigation",
+		"mode":        "advanced",
 		"headerClass": "panel__header",
 		"kicker":      "Navigation",
 		"title":       "Site navigation",
@@ -61,7 +62,7 @@ func TestRenderNavigationPanelPopulated(t *testing.T) {
 	html := gosx.RenderHTML(RenderNavigationPanel(view, NavigationPanelOptions{}))
 
 	for _, fragment := range []string{
-		`<section class="panel editor-panel editor-panel--navigation studio-navigation-panel" data-panel-key="navigation" data-studio-navigation-panel="true" data-gosx-studio-navigation-panel-renderer="gosx-studio">`,
+		`<section class="panel editor-panel editor-panel--navigation studio-navigation-panel" data-panel-key="navigation" data-studio-navigation-panel="true" data-studio-mode-panel="advanced" data-gosx-studio-navigation-panel-renderer="gosx-studio">`,
 		`<div class="panel__header">`,
 		`<p class="kicker">Navigation</p>`,
 		`<h2>Site navigation</h2>`,

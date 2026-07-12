@@ -11,6 +11,7 @@ func TestRenderCheckoutPanelPopulated(t *testing.T) {
 	view := map[string]any{
 		"class":          "panel editor-panel editor-panel--checkout studio-checkout-panel",
 		"panelKey":       "checkout",
+		"mode":           "advanced",
 		"headerClass":    "panel__header",
 		"kicker":         "Checkout",
 		"title":          "Stripe checkout",
@@ -41,7 +42,7 @@ func TestRenderCheckoutPanelPopulated(t *testing.T) {
 	html := gosx.RenderHTML(RenderCheckoutPanel(view, CheckoutPanelOptions{}))
 
 	for _, fragment := range []string{
-		`<section class="panel editor-panel editor-panel--checkout studio-checkout-panel" data-panel-key="checkout" data-studio-checkout-panel="true" data-gosx-studio-checkout-panel-renderer="gosx-studio">`,
+		`<section class="panel editor-panel editor-panel--checkout studio-checkout-panel" data-panel-key="checkout" data-studio-checkout-panel="true" data-studio-mode-panel="advanced" data-gosx-studio-checkout-panel-renderer="gosx-studio">`,
 		`<div class="panel__header">`,
 		`<p class="kicker">Checkout</p>`,
 		`<h2>Stripe checkout</h2>`,

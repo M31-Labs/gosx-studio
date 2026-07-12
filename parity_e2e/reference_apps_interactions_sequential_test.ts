@@ -29,7 +29,12 @@ test.describe("@reference-apps Muddy/Noni interactions: sequential same-page sav
     const server = await startMuddy(request);
     try {
       await gotoEditor(page, server.baseURL);
-      await revealModeIfPresent(page, "advanced");
+      // The interactions inspector is the Home-mode contextual inspector
+      // (declutter slice: workbenchruntime's Bundle() now actually binds, so
+      // "advanced" would hide it) — "home" is also the default, so this is a
+      // harmless no-op click, but explicit for clarity/robustness against a
+      // future default-mode change.
+      await revealModeIfPresent(page, "home");
 
       const revealForm = page.locator(REVEAL_FORM);
       await expect(revealForm, "the hero reveal-on-scroll interaction row must render").toBeAttached({ timeout: 15_000 });
@@ -51,7 +56,7 @@ test.describe("@reference-apps Muddy/Noni interactions: sequential same-page sav
       // request was sent) by reloading and reading the panel's own
       // rendered/attached state back from the server.
       await page.goto(page.url(), { waitUntil: "networkidle" });
-      await revealModeIfPresent(page, "advanced");
+      await revealModeIfPresent(page, "home");
       await expect(page.locator(REVEAL_FORM), "reveal-on-scroll must be attached after reload").toHaveAttribute("data-studio-interaction-attached", "true");
       await expect(page.locator(HOVER_FORM), "hover-focus-state must be attached after reload").toHaveAttribute("data-studio-interaction-attached", "true");
     } finally {

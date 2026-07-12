@@ -14,6 +14,7 @@ func RenderCheckoutPanel(view map[string]any, options CheckoutPanelOptions) gosx
 		gosx.Attr("class", core.WorkbenchViewString(view, "class")),
 		gosx.Attr("data-panel-key", core.WorkbenchViewString(view, "panelKey")),
 		gosx.Attr("data-studio-checkout-panel", "true"),
+		gosx.Attr("data-studio-mode-panel", core.WorkbenchViewString(view, "mode")),
 		gosx.Attr("data-gosx-studio-checkout-panel-renderer", "gosx-studio"),
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, options.RootAttrs)

@@ -59,7 +59,10 @@ test.describe("@reference-apps Muddy/Noni no-code interaction draft/live isolati
       // (gosx-studio) and `interaction_authoring_test.go` (Noni) cover at
       // the Go level; this drives the actual browser form submit.
       await gotoEditor(page, server.baseURL);
-      await revealModeIfPresent(page, "advanced");
+      // The interactions inspector is the Home-mode contextual inspector
+      // (declutter slice: workbenchruntime's Bundle() now actually binds
+      // mode tabs, so "advanced" would hide it instead of revealing it).
+      await revealModeIfPresent(page, "home");
       const revealForm = page.locator(REVEAL_FORM);
       await expect(revealForm, "the hero reveal-on-scroll interaction row must render").toBeAttached({ timeout: 15_000 });
       const setResponse = await clickAuthoringPanel(page, REVEAL_FORM);

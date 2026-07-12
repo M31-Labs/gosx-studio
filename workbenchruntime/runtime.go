@@ -45,7 +45,13 @@
 //     toggles is-mode-active / hidden / aria-hidden on
 //     [data-studio-mode-panel] siblings, scrolls active panel into view
 //     when requested, updates [data-studio-mode-label] readouts, emits
-//     gosxstudio:workbench-mode-change.
+//     gosxstudio:workbench-mode-change. Also persists the mode to
+//     sessionStorage (gosx-studio-editor-working-state) so it survives a
+//     host form POST's full-page navigation; bindChrome's initial bind
+//     restores the persisted mode (and the operator's data-studio-selection
+//     key + canvas stage scroll position) ahead of the server-rendered
+//     default, so saving an edit no longer discards the operator's working
+//     context. See island_runtime.js's restoreWorkbenchWorkingState.
 //     - setStyleState(form, state) — sets data-studio-style-state on the
 //     form, toggles aria-pressed on style-state buttons, writes
 //     data-style-state / data-style-breakpoint / data-style-valid on

@@ -146,6 +146,25 @@ func RenderWorkbenchToolbar(view map[string]any, options WorkbenchToolbarOptions
 			actions = append(actions, gosx.El("button", gosx.Attrs(
 				gosx.Attr("class", core.FirstNonEmpty(options.SaveButtonClass, "button button--primary")),
 				gosx.Attr("type", "submit"),
+				// This button submits the SHARED workbench form — every
+				// panel's fields, including any hidden behind a
+				// data-studio-mode-panel the operator isn't currently
+				// viewing, are "listed" constraint-validation candidates of
+				// that one form. Native HTML5 validation runs BEFORE the
+				// browser dispatches the form's "submit" event; if any
+				// hidden control is invalid, the browser can't focus it to
+				// show a validation bubble and instead silently cancels the
+				// submission with no submit event at all (Chrome logs "An
+				// invalid form control with name='<x>' is not focusable" and
+				// stops there) — the primary Save button would otherwise be
+				// a no-op click with no visible error whenever an unrelated
+				// hidden panel happens to carry an invalid value. Every
+				// other action button that submits this same shared form
+				// (Publish/Discard/Schedule in publish_panel.go, Restore in
+				// revision_history_panel.go, Save in navigation_panel.go /
+				// checkout_panel.go) already carries this exemption for the
+				// same reason; the primary Save button must too.
+				gosx.Attr("formnovalidate", "formnovalidate"),
 				gosx.Attr("data-editor-save-button", "true"),
 				gosx.Attr("data-gosx-studio-save-button", "true"),
 			), gosx.Text(saveLabel)))

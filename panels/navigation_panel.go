@@ -14,6 +14,7 @@ func RenderNavigationPanel(view map[string]any, options NavigationPanelOptions) 
 		gosx.Attr("class", core.WorkbenchViewString(view, "class")),
 		gosx.Attr("data-panel-key", core.WorkbenchViewString(view, "panelKey")),
 		gosx.Attr("data-studio-navigation-panel", "true"),
+		gosx.Attr("data-studio-mode-panel", core.WorkbenchViewString(view, "mode")),
 		gosx.Attr("data-gosx-studio-navigation-panel-renderer", "gosx-studio"),
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, options.RootAttrs)
