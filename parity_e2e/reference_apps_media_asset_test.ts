@@ -30,7 +30,14 @@ test.describe("@reference-apps Muddy/Noni media library delete guard", () => {
       await page.locator("#url").fill(url);
       await page.locator("#alt").fill(`Media e2e asset ${nonce}`);
       await page.locator("#filename").fill(filename);
-      await page.locator("form.admin-form--single button[type=submit]").first().click();
+      // /admin/media renders TWO forms sharing the class "admin-form
+      // admin-form--single" (RenderBackendMediaLibraryUploadForm's file
+      // upload form comes first in DOM order, then
+      // RenderBackendMediaLibraryRemoteAssetForm's #url/#alt/#filename
+      // form) -- see gosx-studio/backoffice/backend_media_library.go. A bare
+      // ".first()" over that shared class picks the WRONG (upload) form's
+      // submit button. Scope to the form that actually contains #url.
+      await page.locator("form:has(#url) button[type=submit]").first().click();
 
       // createAction redirects to /admin/media/<id> on success.
       await page.waitForURL(/\/admin\/media\/[^/?]+$/, { timeout: 30_000 });
