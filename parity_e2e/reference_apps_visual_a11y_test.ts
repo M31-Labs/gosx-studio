@@ -52,7 +52,12 @@ const referenceApps: ReferenceAppGate[] = [
 ];
 
 test.describe("@reference-apps visual and accessibility gates", () => {
-  test.describe.configure({ timeout: 120_000 });
+  // 240s: the Muddy editor now ships the full-WASM CanvasBoard by default
+  // (~30MB runtime) and this spec walks shell + canvas + publish + three
+  // responsive breakpoints with an a11y scan at each stop — CI's 2-core
+  // runners routinely need >120s for the Muddy entry while local runs
+  // finish in about half that. Assertions are unchanged.
+  test.describe.configure({ timeout: 240_000 });
   test.skip(process.env.GOSX_STUDIO_REFERENCE_APP_E2E !== "1", "set GOSX_STUDIO_REFERENCE_APP_E2E=1 to boot sibling reference apps");
 
   for (const app of referenceApps) {
