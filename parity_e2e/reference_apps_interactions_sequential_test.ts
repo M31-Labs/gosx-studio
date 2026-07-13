@@ -66,7 +66,10 @@ test.describe("@reference-apps Muddy/Noni interactions: sequential same-page sav
       // Confirm both interactions actually persisted (not just that a
       // request was sent) by reloading and reading the panel's own
       // rendered/attached state back from the server.
-      await page.goto(page.url(), { waitUntil: "networkidle" });
+      // domcontentloaded, not networkidle: the interaction-heavy editor page
+      // keeps background requests trickling and never reliably reaches idle
+      // on slow runners — the attribute assertions below are the real gate.
+      await page.goto(page.url(), { waitUntil: "domcontentloaded" });
       await revealModeIfPresent(page, "home");
       await expect(page.locator(REVEAL_FORM), "reveal-on-scroll must be attached after reload").toHaveAttribute("data-studio-interaction-attached", "true");
       await expect(page.locator(HOVER_FORM), "hover-focus-state must be attached after reload").toHaveAttribute("data-studio-interaction-attached", "true");

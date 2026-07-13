@@ -79,10 +79,15 @@ export async function clickEditorActionButton(page: Page, buttonSelector: string
   const response = await responsePromise;
   await navigationPromise;
   if (options?.settleAfter !== false) {
-    await page.waitForLoadState("networkidle");
+    // Best-effort settle: interaction-heavy pages (15 canvas targets) keep
+    // background requests trickling and never reach networkidle on slow CI
+    // runners — tests must rely on their own element/response assertions,
+    // not this wait, so a missed idle is not an error.
+    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
   }
   if (options?.reloadAfter !== false) {
-    await page.goto(page.url(), { waitUntil: "networkidle" });
+    await page.goto(page.url(), { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
   }
   return response;
 }
