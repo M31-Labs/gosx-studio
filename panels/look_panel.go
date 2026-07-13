@@ -271,6 +271,26 @@ func lookTooltipAttrs(markerAttr, value string) []any {
 	return attrs
 }
 
+// lookChoiceButtonAttrs builds a segmented-choice option button's attrs
+// (Hero shape's EDITORIAL/OVERLAY/SPLIT, Width's NARROW/STANDARD/WIDE,
+// etc.) plus a title tooltip mirroring its own label, unless the host
+// already supplied one. handoff-4 (text truncation sweep): these buttons
+// sit in a fixed 3-column grid (muddy-noni-commerce's public/site.css
+// .studio-style-choice-row) narrow enough that "IMMERSIVE"/"STANDARD"
+// clip to "IMMER…"/"STAND…" -- the accompanying CSS fix lets them wrap
+// onto two lines, and this tooltip covers hosts/viewports where a label
+// still doesn't fit.
+func lookChoiceButtonAttrs(values map[string]any, label string) []any {
+	attrs := BlockLibraryPanelMapAttrs(values)
+	if label == "" {
+		return attrs
+	}
+	if _, hasTitle := values["title"]; hasTitle {
+		return attrs
+	}
+	return append(attrs, gosx.Attr("title", label))
+}
+
 func renderLookStyleRecipe(recipe map[string]any) gosx.Node {
 	children := []gosx.Node{
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-style-recipe-card__head")),
@@ -304,7 +324,8 @@ func renderLookStyleControlGroup(control map[string]any) gosx.Node {
 	options := core.WorkbenchViewMapList(control, "options")
 	children := make([]gosx.Node, 0, len(options))
 	for _, option := range options {
-		children = append(children, gosx.El("button", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(option, "attrs"))...), gosx.Text(core.WorkbenchViewString(option, "label"))))
+		label := core.WorkbenchViewString(option, "label")
+		children = append(children, gosx.El("button", gosx.Attrs(lookChoiceButtonAttrs(core.WorkbenchViewMap(option, "attrs"), label)...), gosx.Text(label)))
 	}
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-style-control-group")),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-style-control-group__head")),

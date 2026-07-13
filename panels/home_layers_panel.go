@@ -62,6 +62,9 @@ func homeLayersPanelRootAttrs(view map[string]any, options HomeLayersPanelOption
 		gosx.Attr("data-studio-mode-panel", core.WorkbenchViewString(view, "mode")),
 		gosx.Attr("data-studio-engine-source", "gosx"),
 		gosx.Attr("data-gosx-studio-home-layers-panel-renderer", "gosx-studio"),
+		// handoff-4 (item 5 -- left rail section-collapse): see
+		// sitemap/site_navigator_panel.go's identical comment.
+		gosx.Attr("data-studio-rail-group", "layers"),
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, options.RootAttrs)
 	return attrs

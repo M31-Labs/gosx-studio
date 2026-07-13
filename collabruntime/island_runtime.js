@@ -48,7 +48,6 @@
     var resource = panel.getAttribute("data-studio-collab-resource") || "default";
     var status = qs(panel, "[data-studio-collab-status]");
     var live = qs(panel, "[data-studio-collab-live]");
-    var facepile = qs(panel, "[data-studio-collab-facepile]");
     var conflict = qs(panel, "[data-studio-collab-conflict]");
     var socket = null, connectionID = "", retry = 0, reconnectTimer = 0, stopped = false, lastCursor = 0, pending = {}, synced = false, serverPermissions = {};
     var sequenceKey = "gosxstudio:collab-sequence:" + resource;
@@ -57,8 +56,20 @@
     var heads = {}; try { heads = JSON.parse(storageGet(headsKey) || "{}") || {}; } catch (_) { heads = {}; }
     function targetKey(target) { target = target || {}; return [target.route || "/", target.pageId || "", target.field || "", target.componentKey || target.blockKey || "", target.nodeId || "", target.property || "", target.breakpoint || "base", target.state || "default"].join("|"); }
     function storeHeads() { storageSet(headsKey, JSON.stringify(heads)); }
+    // handoff-4 (punch #7 -- presence to top chrome): facepile()/counts()
+    // query the WHOLE document, not just this connection's own panel, so
+    // the toolbar's compact collaborators summary (shell.
+    // RenderWorkbenchCollaborationSummary, mounted OUTSIDE this panel)
+    // gets the exact same live roster this panel's own facepile always
+    // has, with no second socket/subscription — a presentation-only
+    // broadening of WHERE renderPresence/setStatus write, the
+    // socket/presence protocol itself (below) is unchanged.
+    function facepiles() { return qsa(document, "[data-studio-collab-facepile]"); }
+    function collabCounts() { return qsa(document, "[data-studio-collab-count]"); }
+    function collabSummaries() { return qsa(document, "[data-studio-collab-summary]"); }
     function setStatus(value, message) {
       panel.setAttribute("data-studio-collab-state", value);
+      collabSummaries().forEach(function (node) { node.setAttribute("data-studio-collab-state", value); });
       if (status) status.textContent = message;
     }
     function announce(message) { if (live) live.textContent = message || ""; }
@@ -80,7 +91,7 @@
     }
     function renderPresence(payload) {
       var members = (payload && payload.members) || [];
-      if (facepile) {
+      facepiles().forEach(function (facepile) {
         facepile.textContent = "";
         members.forEach(function (member) {
           var item = document.createElement("li"), avatar = document.createElement("span");
@@ -91,7 +102,8 @@
           avatar.setAttribute("aria-label", member.displayName || "Collaborator");
           item.appendChild(avatar); facepile.appendChild(item);
         });
-      }
+      });
+      collabCounts().forEach(function (node) { node.textContent = String(members.length); });
       var liveIDs = {};
       members.forEach(function (member) { liveIDs[member.connectionId] = true; });
       qsa(document, "[data-studio-remote-cursor]").forEach(function (node) { if (!liveIDs[node.getAttribute("data-studio-remote-cursor")]) node.remove(); });
@@ -207,8 +219,32 @@
     permissions({}); connect();
     return { submit: submit, expectedHead: function (request) { var key = targetKey(request && request.target); if (!Object.prototype.hasOwnProperty.call(heads, key)) { heads[key] = ""; storeHeads(); } return heads[key]; }, available: function () { return synced && !!connectionID && !!socket && socket.readyState === WebSocket.OPEN; }, resume: function () { synced = false; permissions({}); return send("studio.sync.resume", { afterSequence: acceptedSequence }); }, close: function () { stopped = true; synced = false; clearTimeout(reconnectTimer); rejectPending("Collaboration closed"); if (socket) socket.close(1000, "closed"); }, sequence: function () { return acceptedSequence; } };
   }
+  // handoff-4 (punch #7 -- presence to top chrome): the toolbar's compact
+  // collaborators summary (shell.RenderWorkbenchCollaborationSummary)
+  // reveals the full collaboration panel (panels.RenderCollaborationPanel,
+  // collapsed by default -- see its Expanded doc comment) as the detail
+  // view. Deliberately independent of create(panel)'s socket lifecycle:
+  // this is pure DOM show/hide, so it binds even before (or without) a
+  // live connection.
+  function toggleCollaborationDetail(button) {
+    var targetId = button.getAttribute("aria-controls");
+    var target = (targetId && document.getElementById(targetId)) || qs(document, "[data-studio-collab-detail]");
+    if (!target) return;
+    var reveal = target.hasAttribute("hidden");
+    if (reveal) target.removeAttribute("hidden"); else target.setAttribute("hidden", "hidden");
+    button.setAttribute("aria-expanded", reveal ? "true" : "false");
+    if (reveal && target.scrollIntoView) target.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+  function bindCollaborationSummaries(root) {
+    qsa(root || document, "[data-studio-collab-summary]").forEach(function (button) {
+      if (button.__gosxCollabSummaryBound) return;
+      button.__gosxCollabSummaryBound = true;
+      button.addEventListener("click", function () { toggleCollaborationDetail(button); });
+    });
+  }
   function bind(root) {
     qsa(root || document, "[data-gosx-studio-collaboration='true']").forEach(function (panel) { if (panel.__gosxCollaborationRuntime) return; panel.__gosxCollaborationRuntime = create(panel); runtimes.push(panel.__gosxCollaborationRuntime); });
+    bindCollaborationSummaries(root);
   }
   window.GoSXStudioCollaborationRuntime = { bind: bind, create: create, available: function () { return !!(runtimes.length && runtimes[0].available()); }, expectedHead: function (request) { return runtimes.length ? runtimes[0].expectedHead(request) : ""; }, submit: function (request) { return runtimes.length ? runtimes[0].submit(request) : Promise.reject(new Error("Collaboration is not mounted")); } };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { bind(document); }, { once: true }); else bind(document);

@@ -50,6 +50,36 @@ func TestRuntimeOwnsTrustedRealtimeContracts(t *testing.T) {
 	}
 }
 
+// TestRuntimeBroadensPresenceToEveryFacepileAndToggleSummaryDetail guards
+// handoff-4 (punch #7 -- presence to top chrome): the collaborators
+// facepile+count now lives in BOTH the toolbar's compact summary
+// (shell.RenderWorkbenchCollaborationSummary) and the full detail panel
+// (panels.RenderCollaborationPanel), fed by the SAME renderPresence
+// payload -- this is a presentation-only broadening of which DOM nodes
+// get written (document-wide query, not the one panel passed to
+// create(panel)), not a change to the socket/presence protocol itself.
+// Clicking the toolbar summary must reveal the (collapsed-by-default)
+// detail panel.
+func TestRuntimeBroadensPresenceToEveryFacepileAndToggleSummaryDetail(t *testing.T) {
+	script := string(Script())
+	for _, want := range []string{
+		`function facepiles() { return qsa(document, "[data-studio-collab-facepile]"); }`,
+		`function collabCounts() { return qsa(document, "[data-studio-collab-count]"); }`,
+		`function collabSummaries() { return qsa(document, "[data-studio-collab-summary]"); }`,
+		`facepiles().forEach(function (facepile) {`,
+		`collabCounts().forEach(function (node) { node.textContent = String(members.length); });`,
+		`collabSummaries().forEach(function (node) { node.setAttribute("data-studio-collab-state", value); });`,
+		`function toggleCollaborationDetail(button)`,
+		`var reveal = target.hasAttribute("hidden");`,
+		`function bindCollaborationSummaries(root)`,
+		`bindCollaborationSummaries(root);`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("runtime missing %q", want)
+		}
+	}
+}
+
 func TestHandlerServesNosniffJavaScript(t *testing.T) {
 	rec := httptest.NewRecorder()
 	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/collab.js", nil))

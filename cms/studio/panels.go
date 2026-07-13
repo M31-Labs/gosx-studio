@@ -1597,7 +1597,20 @@ func inspectorKindForWorkbenchField(kind workbench.FieldKind) InspectorFieldKind
 
 func inspectorInputTypeForBlockField(kind blockstudio.FieldKind) string {
 	switch kind {
-	case blockstudio.FieldURL, blockstudio.FieldImage:
+	// handoff-4 (save-vocabulary audit): FieldURL used to render
+	// type="url", but this codebase's own link fields (e.g. cms/blocks
+	// Hero's "ctaUrl") legitimately hold SITE-RELATIVE targets like "/shop"
+	// alongside absolute externals -- and the HTML "valid URL" constraint
+	// native <input type="url"> enforces rejects a bare relative path,
+	// which live-proved a false "Needs attention" (the row's
+	// :has(:invalid) CSS hook, muddy-noni-commerce's public/site.css) on a
+	// perfectly valid, already-saved CTA URL. NEEDS ATTENTION is reserved
+	// for real validation problems; a false native-constraint positive on
+	// legitimate data isn't one, so FieldURL renders as plain text (no
+	// native format constraint) while FieldImage -- always populated from
+	// the media picker's own resolved asset URL, never free-typed -- keeps
+	// the stricter type="url" hint.
+	case blockstudio.FieldImage:
 		return "url"
 	default:
 		return "text"

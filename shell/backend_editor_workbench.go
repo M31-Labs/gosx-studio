@@ -17,38 +17,46 @@ type BackendEditorWorkbenchProps struct {
 	CanvasBar        gosx.Node
 	CanvasStatus     gosx.Node
 	DisableCanvasBar bool
-	LeftRail         []gosx.Node
-	Board            []gosx.Node
-	RightRail        []gosx.Node
+	// CollaborationSummary (handoff-4, punch #7 -- presence to top chrome)
+	// feeds the auto-built toolbar's compact collaborators facepile+count
+	// (shell.RenderWorkbenchCollaborationSummary) when Toolbar itself isn't
+	// overridden. Ignored if Toolbar is set explicitly, matching how every
+	// other auto-built-toolbar input already behaves.
+	CollaborationSummary gosx.Node
+	LeftRail             []gosx.Node
+	Board                []gosx.Node
+	RightRail            []gosx.Node
 }
 
 type BackendEditorWorkbenchContentProps struct {
-	View            map[string]any
-	AuthoringURL    string
-	Toolbar         gosx.Node
-	CanvasBar       gosx.Node
-	CanvasStatus    gosx.Node
-	SiteNavigator   gosx.Node
-	BlockLayout     gosx.Node
-	PageCanvas      gosx.Node
-	SiteMapEngine   gosx.Node
-	SiteMapCanvas   gosx.Node
-	InspectorChrome gosx.Node
-	HomeInspector   gosx.Node
-	LookPanel       gosx.Node
-	BrandPanel      gosx.Node
-	NavigationPanel gosx.Node
-	CheckoutPanel   gosx.Node
-	PublishPanel    gosx.Node
-	AdvancedPanel   gosx.Node
+	View                 map[string]any
+	AuthoringURL         string
+	Toolbar              gosx.Node
+	CanvasBar            gosx.Node
+	CanvasStatus         gosx.Node
+	CollaborationSummary gosx.Node
+	SiteNavigator        gosx.Node
+	BlockLayout          gosx.Node
+	PageCanvas           gosx.Node
+	SiteMapEngine        gosx.Node
+	SiteMapCanvas        gosx.Node
+	InspectorChrome      gosx.Node
+	HomeInspector        gosx.Node
+	LookPanel            gosx.Node
+	BrandPanel           gosx.Node
+	NavigationPanel      gosx.Node
+	CheckoutPanel        gosx.Node
+	PublishPanel         gosx.Node
+	AdvancedPanel        gosx.Node
 }
 
 type BackendEditorWorkbenchPanelStackProps struct {
-	View         map[string]any
-	AuthoringURL string
-	Toolbar      gosx.Node
-	CanvasBar    gosx.Node
-	CanvasStatus gosx.Node
+	View                 map[string]any
+	AuthoringURL         string
+	Toolbar              gosx.Node
+	CanvasBar            gosx.Node
+	CanvasStatus         gosx.Node
+	CollaborationSummary gosx.Node
 
 	SiteNavigator                   gosx.Node
 	SiteNavigatorView               map[string]any
@@ -103,7 +111,7 @@ type BackendEditorWorkbenchPanelStackProps struct {
 func RenderBackendEditorWorkbench(props BackendEditorWorkbenchProps) gosx.Node {
 	toolbar := props.Toolbar
 	if core.WorkbenchNodeEmpty(toolbar) {
-		toolbar = RenderBackendEditorWorkbenchToolbar(props.View)
+		toolbar = renderBackendEditorWorkbenchToolbar(props.View, props.CollaborationSummary)
 	}
 	canvasBar := props.CanvasBar
 	if props.DisableCanvasBar {
@@ -139,6 +147,17 @@ func RenderBackendEditorWorkbench(props BackendEditorWorkbenchProps) gosx.Node {
 }
 
 func RenderBackendEditorWorkbenchToolbar(view map[string]any) gosx.Node {
+	return renderBackendEditorWorkbenchToolbar(view, gosx.Fragment())
+}
+
+// renderBackendEditorWorkbenchToolbar is RenderBackendEditorWorkbenchToolbar's
+// internal implementation, plus an optional collaboration-summary node
+// (handoff-4, punch #7 -- presence to top chrome) — kept unexported so the
+// existing 1-arg public function's signature (relied on directly by at
+// least one host test) never has to change; RenderBackendEditorWorkbench
+// is the only caller that supplies a real collaborationSummary, via
+// props.CollaborationSummary.
+func renderBackendEditorWorkbenchToolbar(view map[string]any, collaborationSummary gosx.Node) gosx.Node {
 	return RenderWorkbenchToolbar(view, WorkbenchToolbarOptions{
 		Class:        "editor-toolbar",
 		ActionsClass: "button-row",
@@ -146,7 +165,8 @@ func RenderBackendEditorWorkbenchToolbar(view map[string]any) gosx.Node {
 			RenderWorkbenchModebar(view, WorkbenchModebarOptions{Class: "studio-modebar"}),
 			RenderWorkbenchMetricStrip(view, WorkbenchMetricStripOptions{Class: "studio-context-strip"}),
 		},
-		CommandPaletteNode: RenderWorkbenchCommandPalette(view, WorkbenchCommandPaletteOptions{Class: "studio-command-palette"}),
+		CommandPaletteNode:       RenderWorkbenchCommandPalette(view, WorkbenchCommandPaletteOptions{Class: "studio-command-palette"}),
+		CollaborationSummaryNode: collaborationSummary,
 		SaveStatusNode: RenderWorkbenchSaveStatus(WorkbenchSaveStatusOptions{
 			Class:           "editor-save-status",
 			StateClass:      "editor-save-state",
@@ -204,12 +224,13 @@ func RenderBackendEditorWorkbenchContent(props BackendEditorWorkbenchContentProp
 		board = appendWorkbenchNode(board, props.SiteMapCanvas)
 	}
 	return RenderBackendEditorWorkbench(BackendEditorWorkbenchProps{
-		View:             props.View,
-		AuthoringURL:     props.AuthoringURL,
-		Toolbar:          props.Toolbar,
-		CanvasBar:        props.CanvasBar,
-		CanvasStatus:     props.CanvasStatus,
-		DisableCanvasBar: !core.WorkbenchNodeEmpty(props.PageCanvas),
+		View:                 props.View,
+		AuthoringURL:         props.AuthoringURL,
+		Toolbar:              props.Toolbar,
+		CanvasBar:            props.CanvasBar,
+		CanvasStatus:         props.CanvasStatus,
+		CollaborationSummary: props.CollaborationSummary,
+		DisableCanvasBar:     !core.WorkbenchNodeEmpty(props.PageCanvas),
 		LeftRail: []gosx.Node{
 			props.SiteNavigator,
 			props.BlockLayout,
@@ -343,24 +364,25 @@ func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelSta
 	}
 
 	return RenderBackendEditorWorkbenchContent(BackendEditorWorkbenchContentProps{
-		View:            props.View,
-		AuthoringURL:    props.AuthoringURL,
-		Toolbar:         props.Toolbar,
-		CanvasBar:       props.CanvasBar,
-		CanvasStatus:    props.CanvasStatus,
-		SiteNavigator:   siteNavigator,
-		BlockLayout:     blockLayout,
-		PageCanvas:      pageCanvas,
-		SiteMapEngine:   siteMapEngine,
-		SiteMapCanvas:   siteMapCanvas,
-		InspectorChrome: inspectorChrome,
-		HomeInspector:   homeInspector,
-		LookPanel:       lookPanel,
-		BrandPanel:      brandPanel,
-		NavigationPanel: navigationPanel,
-		CheckoutPanel:   checkoutPanel,
-		PublishPanel:    publishPanel,
-		AdvancedPanel:   advancedPanel,
+		View:                 props.View,
+		AuthoringURL:         props.AuthoringURL,
+		Toolbar:              props.Toolbar,
+		CanvasBar:            props.CanvasBar,
+		CanvasStatus:         props.CanvasStatus,
+		CollaborationSummary: props.CollaborationSummary,
+		SiteNavigator:        siteNavigator,
+		BlockLayout:          blockLayout,
+		PageCanvas:           pageCanvas,
+		SiteMapEngine:        siteMapEngine,
+		SiteMapCanvas:        siteMapCanvas,
+		InspectorChrome:      inspectorChrome,
+		HomeInspector:        homeInspector,
+		LookPanel:            lookPanel,
+		BrandPanel:           brandPanel,
+		NavigationPanel:      navigationPanel,
+		CheckoutPanel:        checkoutPanel,
+		PublishPanel:         publishPanel,
+		AdvancedPanel:        advancedPanel,
 	})
 }
 

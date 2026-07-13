@@ -2494,7 +2494,29 @@ html[data-gosx-studio-preview-selectable] [data-gosx-studio-preview-tab-stop]:fo
 .studio-remote-selection { outline: 2px solid var(--color-accent, #6d5efc) !important; outline-offset: 2px; }
 .studio-collaboration-panel [data-studio-collab-reconnect]:focus-visible { outline: 2px solid var(--color-accent, #6d5efc); outline-offset: 2px; }
 .studio-visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+
+/* handoff-4 (punch #7 -- presence to top chrome): the toolbar's compact
+   collaborators summary (shell.RenderWorkbenchCollaborationSummary) — a
+   small overlapping-avatar facepile + count, styled to sit inline among
+   the toolbar's other action controls (Save status, Undo/Redo, Preview). */
+.gosx-studio-collab-summary { display: inline-flex; align-items: center; gap: .35rem; border: 1px solid var(--color-line); border-radius: var(--radius-pill); background: var(--color-canvas); padding: .2rem .5rem .2rem .35rem; cursor: pointer; color: var(--color-ink); }
+.gosx-studio-collab-summary:hover, .gosx-studio-collab-summary:focus-visible { border-color: var(--color-accent); outline: 0; }
+.gosx-studio-collab-summary[aria-expanded="true"] { border-color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 8%, var(--color-canvas)); }
+.gosx-studio-collab-summary__facepile { display: flex; margin: 0; padding: 0; list-style: none; }
+.gosx-studio-collab-summary__facepile li { margin-left: -.5rem; }
+.gosx-studio-collab-summary__facepile li:first-child { margin-left: 0; }
+.gosx-studio-collab-summary__facepile .studio-collaboration-avatar { width: 1.5rem; height: 1.5rem; font-size: .6rem; border: 2px solid var(--color-canvas); }
+.gosx-studio-collab-summary__count { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-muted); }
+.gosx-studio-collab-summary[data-studio-collab-state="connected"] { border-color: color-mix(in srgb, var(--color-moss) 46%, var(--color-line)); }
+.gosx-studio-collab-summary[data-studio-collab-state="reconnecting"], .gosx-studio-collab-summary[data-studio-collab-state="offline"] { color: var(--color-muted); }
 @media (prefers-reduced-motion: reduce) { .studio-remote-cursor { transition: none; } }
+
+/* handoff-4 (item 5 -- left rail section-collapse): the small "Hide"/"Show"
+   toggle collapseLeftRailGroups() (hostruntime/assets/workbench_runtime.js)
+   inserts into each [data-studio-rail-group]'s own heading row (Site
+   areas / Sections / Layers). */
+.studio-rail-group-toggle { justify-self: end; border: 1px solid var(--color-line); border-radius: var(--radius-pill); background: var(--color-canvas); color: var(--color-muted); cursor: pointer; padding: .15rem .55rem; font-family: var(--font-mono); font-size: var(--text-xs); text-transform: uppercase; }
+.studio-rail-group-toggle:hover, .studio-rail-group-toggle:focus-visible { border-color: var(--color-accent); color: var(--color-accent-strong); outline: 0; }
 
 /* ---------------------------------------------------------------------- *
  * UX wave 2A (studio-surface quick wins)

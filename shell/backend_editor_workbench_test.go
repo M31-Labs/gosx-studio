@@ -325,7 +325,7 @@ func TestRenderBackendEditorWorkbenchPanelStackOwnsNestedPanelComposition(t *tes
 
 	for _, fragment := range []string{
 		`<header class="studio-panel-heading"><div><p class="kicker">Home</p><h2>Sections</h2></div><select data-home-layer-selection="true"></select></header>`,
-		`<div class="studio-block-layout-engine__layers" data-studio-block-layout-layers="true"><section class="" data-studio-mode-panel="" data-studio-engine-source="gosx" data-gosx-studio-home-layers-panel-renderer="gosx-studio">`,
+		`<div class="studio-block-layout-engine__layers" data-studio-block-layout-layers="true"><section class="" data-studio-mode-panel="" data-studio-engine-source="gosx" data-gosx-studio-home-layers-panel-renderer="gosx-studio" data-studio-rail-group="layers">`,
 		`<div class="studio-block-layout-engine__library" data-studio-block-layout-library="true"><section data-block-library="true">Library</section></div>`,
 		`<section class="studio-brand-panel__group-slot studio-brand-media-picker-slot" data-studio-brand-group-slot="files" data-studio-brand-group-selected="false"><section class="studio-brand-media-picker"`,
 		`data-studio-media-picker-island="brand"`,

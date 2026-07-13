@@ -502,6 +502,9 @@ type WorkbenchCanvasStatusOptions = shellpkg.WorkbenchCanvasStatusOptions
 // Deprecated: use shell.WorkbenchCommandPaletteOptions.
 type WorkbenchCommandPaletteOptions = shellpkg.WorkbenchCommandPaletteOptions
 
+// Deprecated: use shell.WorkbenchCollaborationSummaryOptions.
+type WorkbenchCollaborationSummaryOptions = shellpkg.WorkbenchCollaborationSummaryOptions
+
 // Deprecated: use shell.RenderWorkbenchToolbar.
 func RenderWorkbenchToolbar(view map[string]any, options WorkbenchToolbarOptions) gosx.Node {
 	return shellpkg.RenderWorkbenchToolbar(view, options)
@@ -555,4 +558,9 @@ func RenderWorkbenchSaveStatus(options WorkbenchSaveStatusOptions) gosx.Node {
 // Deprecated: use shell.RenderWorkbenchHistoryControls.
 func RenderWorkbenchHistoryControls(options WorkbenchHistoryControlsOptions) gosx.Node {
 	return shellpkg.RenderWorkbenchHistoryControls(options)
+}
+
+// Deprecated: use shell.RenderWorkbenchCollaborationSummary.
+func RenderWorkbenchCollaborationSummary(options WorkbenchCollaborationSummaryOptions) gosx.Node {
+	return shellpkg.RenderWorkbenchCollaborationSummary(options)
 }

@@ -34,7 +34,10 @@ func TestRenderLookPanelFull(t *testing.T) {
 		`data-studio-style-readout="heroWidth"`,
 		`data-studio-style-mark="1"`,
 		`data-studio-style-reset="heroWidth"`,
-		`<button aria-pressed="true" class="is-selected" data-studio-style-control="heroWidth" data-studio-style-value="wide" type="button">Wide</button>`,
+		// handoff-4 (text truncation sweep): segmented choice buttons
+		// (Hero shape/Width/Height etc.) now also carry a title tooltip
+		// mirroring their own label -- see lookChoiceButtonAttrs.
+		`<button aria-pressed="true" class="is-selected" data-studio-style-control="heroWidth" data-studio-style-value="wide" type="button" title="Wide">Wide</button>`,
 		`<section class="studio-look-panel__group-slot" data-studio-look-group-slot="theme" data-studio-look-group-selected="true">`,
 		`data-studio-look-group-body="theme"`,
 		`class="look-choice-card" data-kit-card="starter"`,

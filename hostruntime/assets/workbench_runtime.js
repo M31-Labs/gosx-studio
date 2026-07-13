@@ -50,6 +50,77 @@
     return Array.prototype.slice.call(root.querySelectorAll(selector));
   }
 
+  // handoff-4 (item 5 — left rail section-collapse): the 2489px-tall left
+  // rail (Site areas / Sections / Layers, magnolia-4 evidence) has no way
+  // to shrink any one of those groups out of the way. leftRailGroupState
+  // persists each group's collapsed/open state in sessionStorage — the
+  // SAME storage mechanism (one JSON blob, read-merge-write, session-only)
+  // workbenchruntime/island_runtime.js's restoreWorkbenchWorkingState
+  // already uses for mode/selection/scroll — so collapsing "Sections"
+  // survives a reload within the same tab session the same way switching
+  // to LOOK mode does, but resets for a fresh session.
+  var leftRailGroupStorageKey = "gosx-studio-left-rail-groups";
+  function readLeftRailGroupState() {
+    try {
+      return JSON.parse(window.sessionStorage.getItem(leftRailGroupStorageKey) || "{}") || {};
+    } catch (error) {
+      return {};
+    }
+  }
+  function writeLeftRailGroupState(key, collapsed) {
+    try {
+      var current = readLeftRailGroupState();
+      current[key] = collapsed;
+      window.sessionStorage.setItem(leftRailGroupStorageKey, JSON.stringify(current));
+    } catch (error) {
+      return;
+    }
+  }
+  // collapseLeftRailGroups adds one collapse toggle per [data-studio-rail-group]
+  // section (site_navigator_panel.go's "site-navigator",
+  // block_layout_engine.go's "sections", home_layers_panel.go's "layers" —
+  // each carries this attribute specifically BECAUSE their existing
+  // "-renderer" marker attributes repeat on nested sub-elements, not just
+  // the section root, so they can't be used to find "one card, once"
+  // here). Every child of the group other than its own heading row
+  // (<header> or .studio-panel-heading, matching every left-rail panel's
+  // existing head markup) gets toggled via [hidden] — cheap, and already
+  // display:none via the [hidden] rule at the top of this stylesheet.
+  function collapseLeftRailGroups(root) {
+    var state = readLeftRailGroupState();
+    queryAll(root || document, "[data-studio-rail-group]").forEach(function (group) {
+      if (group.dataset.gosxRailGroupBound === "true") return;
+      group.dataset.gosxRailGroupBound = "true";
+      var key = group.getAttribute("data-studio-rail-group") || "";
+      var heading = group.querySelector("h2");
+      if (!key || !heading) return;
+      var headRow = (heading.closest && heading.closest("header, .studio-panel-heading")) || heading.parentNode;
+      if (!headRow || headRow.parentNode !== group) return;
+      var body = queryAll(group, ":scope > *").filter(function (node) { return node !== headRow; });
+      if (!body.length) return;
+      var toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "studio-rail-group-toggle";
+      toggle.setAttribute("data-studio-rail-group-toggle", key);
+      headRow.appendChild(toggle);
+      function apply(collapsed) {
+        body.forEach(function (node) {
+          if (collapsed) node.setAttribute("hidden", "hidden");
+          else node.removeAttribute("hidden");
+        });
+        group.setAttribute("data-studio-rail-group-collapsed", collapsed ? "true" : "false");
+        toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        toggle.textContent = collapsed ? "Show" : "Hide";
+      }
+      toggle.addEventListener("click", function () {
+        var next = group.getAttribute("data-studio-rail-group-collapsed") !== "true";
+        apply(next);
+        writeLeftRailGroupState(key, next);
+      });
+      apply(!!state[key]);
+    });
+  }
+
   function storageKey(form) {
     return "gosx-studio-workbench:" + compactText(form.getAttribute("data-studio-shell") || form.getAttribute("action") || window.location.pathname || "studio");
   }
@@ -232,14 +303,43 @@
   // [data-studio-direct-edit-panel] forms) only ever finds the ACTIVE
   // target's panel(s) rendered, even though the host still composes every
   // target's panel every time.
-  function scopeSelectionPanels(form, selector, keyAttr) {
+  //
+  // handoff-3b2 (osier) found a namespace mismatch on top of the retrigger
+  // gap fixed below (see initWorkbench's MutationObserver): every REAL
+  // selection-changing gesture writes data-studio-selection in its OWN
+  // namespace, never the panel's own ComponentKey the keyAttr comparison
+  // alone expects:
+  //   1. A live preview field click writes the field path itself
+  //      ("pages.about.title"), not "about:content". direct_edit_panel.go
+  //      already emits BOTH data-studio-target-component (the ComponentKey)
+  //      AND data-studio-target-field (that same field path) on the
+  //      identical panel element, so the optional fieldAttr parameter lets a
+  //      caller match against either namespace with no new Go-side
+  //      attribute.
+  //   2. HOME's own Layers panel (selectionruntime/island_runtime.js's
+  //      updateSelection(), the ONLY producer of data-block-studio-block row
+  //      keys) writes the bare home-section key ("hero"), not "home:hero" —
+  //      and does so unconditionally at bind time (bindSelection() calls
+  //      updateSelection("") once outside advanced mode, which resolves to
+  //      the default-selected row), so this mismatch hit the DEFAULT view on
+  //      every single page load once the retrigger gap above was fixed, not
+  //      only a deliberate row click. Every ComponentKey in this codebase is
+  //      "<page-or-namespace>:<section>" (home:hero, about:content,
+  //      contact:contact-links) and a block-key selection is BY DEFINITION a
+  //      HOME section (Layers is HOME-only), so comparing the active value
+  //      against the ComponentKey's suffix after its LAST ":" bridges this
+  //      honestly without guessing at a hardcoded "home:" prefix.
+  function scopeSelectionPanels(form, selector, keyAttr, fieldAttr) {
     var panels = queryAll(document, selector);
     if (!panels.length) return;
     var active = form ? compactText(form.getAttribute("data-studio-selection")) : "";
     var fallbackKey = null;
     panels.forEach(function (panel) {
       var key = compactText(panel.getAttribute(keyAttr));
-      var show = active ? key === active : (fallbackKey === null || key === fallbackKey);
+      var fieldKey = fieldAttr ? compactText(panel.getAttribute(fieldAttr)) : "";
+      var keySuffix = key.indexOf(":") >= 0 ? key.slice(key.indexOf(":") + 1) : "";
+      var matches = key === active || (fieldKey !== "" && fieldKey === active) || (keySuffix !== "" && keySuffix === active);
+      var show = active ? matches : (fallbackKey === null || key === fallbackKey);
       if (show) {
         if (fallbackKey === null) fallbackKey = key;
         panel.removeAttribute("hidden");
@@ -257,9 +357,11 @@
   // same guard to panels/direct_edit_panel.go's RenderDirectEditPanel
   // instances (data-studio-direct-edit-panel="true", keyed by the panel's
   // own data-studio-target-component attribute — no new Go-side attribute
-  // needed, the ComponentKey it already emits is the selection key).
+  // needed, the ComponentKey it already emits is the selection key). The
+  // trailing data-studio-target-field argument is handoff-3b2's field-path
+  // bridge (see scopeSelectionPanels's doc comment above).
   function scopeDirectEditPanels(form) {
-    scopeSelectionPanels(form, "[data-studio-direct-edit-panel]", "data-studio-target-component");
+    scopeSelectionPanels(form, "[data-studio-direct-edit-panel]", "data-studio-target-component", "data-studio-target-field");
   }
 
   function scopeSupportSelectionPanels(form) {
@@ -1146,7 +1248,28 @@
     setZoom(form.getAttribute("data-studio-zoom") || "", { reason: "init" });
     syncRailButtons();
     syncActivityButtons();
+    collapseLeftRailGroups(document);
     scopeSupportSelectionPanels(form);
+    // handoff-3b2 (osier): scopeSupportSelectionPanels only ever re-ran on
+    // the "gosxstudio:canvas-select" CustomEvent, but no real selection path
+    // dispatches it — the Layers row click, the site-map board, and the
+    // live preview's own field-click selection (selectionruntime/
+    // island_runtime.js's updateSelection()/applyPreviewSelectionState())
+    // all write data-studio-selection directly, so the support panels
+    // scoped above at init froze at whatever the server's default selection
+    // rendered, no matter what the operator clicked afterward — the 4
+    // non-default direct-edit/responsive-layout panels became permanently
+    // unreachable. Mirrors the exact pattern
+    // workbenchruntime/island_runtime.js's restoreWorkbenchWorkingState
+    // already uses to persist this same attribute to sessionStorage: a
+    // MutationObserver on the attribute itself, not a single event type, so
+    // every current AND future way of writing data-studio-selection keeps
+    // this guard honest.
+    if (window.MutationObserver) {
+      new MutationObserver(function () {
+        scopeSupportSelectionPanels(form);
+      }).observe(form, { attributes: true, attributeFilter: ["data-studio-selection"] });
+    }
   }
 
   function initAll(root) {

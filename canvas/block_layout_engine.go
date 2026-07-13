@@ -106,6 +106,11 @@ func renderBlockLayoutEngineRootOpen(options BlockLayoutEngineOptions) gosx.Node
 		gosx.Attr("data-studio-panel", core.FirstNonEmpty(options.PanelKey, "block-layout")),
 		gosx.Attr("data-studio-engine-source", core.FirstNonEmpty(options.EngineSource, "gosx")),
 		gosx.Attr("data-gosx-studio-block-layout-engine-renderer", "gosx-studio"),
+		// handoff-4 (item 5 -- left rail section-collapse): see
+		// site_navigator_panel.go's identical comment for why this needs
+		// its OWN unambiguous group-key attribute rather than reusing one
+		// of the "-renderer" markers above.
+		gosx.Attr("data-studio-rail-group", "sections"),
 	}
 	return RenderBlockLayoutEngineOpenTag("section", attrs)
 }

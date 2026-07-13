@@ -437,3 +437,55 @@ func TestRenderWorkbenchToolbarHonorsDisabledActions(t *testing.T) {
 		}
 	}
 }
+
+// TestRenderWorkbenchToolbarPlacesCollaborationSummaryAheadOfSaveStatus
+// guards handoff-4 (punch #7 -- presence to top chrome): the collaborators
+// facepile+count moves into the shared toolbar action row (previously it
+// only lived in the page-bottom RenderCollaborationPanel), ahead of the
+// save-state indicator, so presence is visible from every mode without
+// scrolling.
+func TestRenderWorkbenchToolbarPlacesCollaborationSummaryAheadOfSaveStatus(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site", PreviewURL: "/"}, WorkbenchShellViewOptions{})
+	html := gosx.RenderHTML(RenderWorkbenchToolbar(view, WorkbenchToolbarOptions{
+		CollaborationSummaryNode: RenderWorkbenchCollaborationSummary(WorkbenchCollaborationSummaryOptions{
+			PanelID: "studio-collaboration-panel",
+		}),
+		SaveStatusNode: RenderWorkbenchSaveStatus(WorkbenchSaveStatusOptions{}),
+	}))
+	summaryIndex := strings.Index(html, `data-studio-collab-summary="true"`)
+	saveStatusIndex := strings.Index(html, `data-gosx-studio-save-status="true"`)
+	if summaryIndex < 0 || saveStatusIndex < 0 {
+		t.Fatalf("expected both collaboration summary and save status in toolbar: %s", html)
+	}
+	if summaryIndex > saveStatusIndex {
+		t.Fatalf("expected collaboration summary before save status:\n%s", html)
+	}
+	for _, want := range []string{
+		`data-studio-collab-facepile="true"`,
+		`data-studio-collab-count="true"`,
+		`aria-controls="studio-collaboration-panel"`,
+		`aria-expanded="false"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("toolbar missing %q:\n%s", want, html)
+		}
+	}
+}
+
+func TestRenderWorkbenchCollaborationSummaryOmitsAriaControlsWithoutPanelID(t *testing.T) {
+	html := gosx.RenderHTML(RenderWorkbenchCollaborationSummary(WorkbenchCollaborationSummaryOptions{}))
+	if strings.Contains(html, "aria-controls") {
+		t.Fatalf("expected no aria-controls without a PanelID: %s", html)
+	}
+	for _, want := range []string{
+		`data-studio-collab-summary="true"`,
+		`data-studio-collab-state="offline"`,
+		`data-studio-collab-facepile="true"`,
+		`data-studio-collab-count="true"`,
+		">0</output>",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("collaboration summary missing %q: %s", want, html)
+		}
+	}
+}

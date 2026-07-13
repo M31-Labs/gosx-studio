@@ -847,13 +847,27 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldActionIntentToSelectionRuntime(t *
 	for _, forbidden := range []string{
 		`function isFormSubmitControl`,
 		`function fieldActionSubmitter`,
+	} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should delegate concrete field-action submit mechanics; found %q", forbidden)
+		}
+	}
+
+	// handoff-4 (item 5 -- left rail section-collapse) added its own,
+	// unrelated document.createElement("button") for the rail-group
+	// collapse toggle (collapseLeftRailGroups) -- these four submit-
+	// mechanics fragments are specifically about submitPreviewFieldAction
+	// no longer synthesizing/clicking a submit button itself, so they are
+	// scoped to that function's own body rather than the whole bundle.
+	submitFieldActionBody := jsFunctionBody(t, script, "submitPreviewFieldAction")
+	for _, forbidden := range []string{
 		`form.requestSubmit`,
 		`document.createElement("button")`,
 		`form.dataset.gosxStudioPendingAction`,
 		`form.submit()`,
 	} {
-		if strings.Contains(script, forbidden) {
-			t.Fatalf("workbench runtime should delegate concrete field-action submit mechanics; found %q", forbidden)
+		if strings.Contains(submitFieldActionBody, forbidden) {
+			t.Fatalf("submitPreviewFieldAction should delegate concrete field-action submit mechanics; found %q in:\n%s", forbidden, submitFieldActionBody)
 		}
 	}
 
@@ -1731,7 +1745,7 @@ func TestEngineRuntimeHandlerServesIslandBundles(t *testing.T) {
 func TestWorkbenchRuntimeScopesResponsiveLayoutInspectorsBySelection(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
-		"function scopeSelectionPanels(form, selector, keyAttr)",
+		"function scopeSelectionPanels(form, selector, keyAttr, fieldAttr)",
 		"function scopeResponsiveLayoutInspectors(form)",
 		`scopeSelectionPanels(form, "[data-studio-responsive-layout-inspector]", "data-studio-selected-component")`,
 		`panel.setAttribute("hidden", "true")`,
@@ -1763,9 +1777,109 @@ func TestWorkbenchRuntimeScopesDirectEditPanelsBySelection(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
 		"function scopeDirectEditPanels(form)",
-		`scopeSelectionPanels(form, "[data-studio-direct-edit-panel]", "data-studio-target-component")`,
+		`scopeSelectionPanels(form, "[data-studio-direct-edit-panel]", "data-studio-target-component", "data-studio-target-field")`,
 		"function scopeSupportSelectionPanels(form)",
 		"scopeDirectEditPanels(form);",
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing %q", check)
+		}
+	}
+}
+
+// TestWorkbenchRuntimeScopeSelectionPanelsBridgesFieldPathSelection guards
+// handoff-3b2 (osier)'s namespace-mismatch finding: a real preview-field
+// click writes data-studio-selection as the field path itself
+// ("pages.about.title"), never the panel's ComponentKey
+// ("about:content"), so scopeSelectionPanels must also match a panel whose
+// OWN field attribute (data-studio-target-field on direct-edit panels)
+// equals the live selection, not only its ComponentKey attribute.
+func TestWorkbenchRuntimeScopeSelectionPanelsBridgesFieldPathSelection(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		"function scopeSelectionPanels(form, selector, keyAttr, fieldAttr)",
+		"var fieldKey = fieldAttr ? compactText(panel.getAttribute(fieldAttr)) : \"\";",
+		"(fieldKey !== \"\" && fieldKey === active)",
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing %q", check)
+		}
+	}
+}
+
+// TestWorkbenchRuntimeScopeSelectionPanelsBridgesHomeBlockKeySelection guards
+// the second half of handoff-3b2's namespace-mismatch finding: HOME's own
+// Layers panel (the only producer of data-block-studio-block row keys)
+// writes the BARE home-section key ("hero") to data-studio-selection, not
+// the panel's ComponentKey ("home:hero") -- and does so at bind time for the
+// default-selected row, so this mismatch hid the default home:hero panel on
+// every page load once the retrigger gap was fixed, not only a deliberate
+// row click. scopeSelectionPanels must also match a panel whose ComponentKey
+// SUFFIX (after its last ":") equals the live bare selection.
+func TestWorkbenchRuntimeScopeSelectionPanelsBridgesHomeBlockKeySelection(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`var keySuffix = key.indexOf(":") >= 0 ? key.slice(key.indexOf(":") + 1) : "";`,
+		"(keySuffix !== \"\" && keySuffix === active)",
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing %q", check)
+		}
+	}
+}
+
+// TestWorkbenchRuntimeRetriggersScopeOnSelectionAttributeMutation guards
+// handoff-3b2 (osier)'s root-cause finding: scopeSupportSelectionPanels
+// used to re-run ONLY inside the "gosxstudio:canvas-select" CustomEvent
+// handler, but no real selection-changing gesture (Layers row click,
+// site-map board, live preview field click) ever dispatches that event —
+// they all write the data-studio-selection attribute directly. A
+// MutationObserver on that attribute (the same pattern
+// workbenchruntime/island_runtime.js's restoreWorkbenchWorkingState already
+// uses to persist it to sessionStorage) is required so every real
+// selection change re-scopes the support panels, not just the one dead
+// event path.
+func TestWorkbenchRuntimeRetriggersScopeOnSelectionAttributeMutation(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		"if (window.MutationObserver) {",
+		"new MutationObserver(function () {",
+		`}).observe(form, { attributes: true, attributeFilter: ["data-studio-selection"] });`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing %q", check)
+		}
+	}
+	// Must be invoked at init (before the observer binds) AND on every
+	// subsequent attribute mutation the observer catches, mirroring the
+	// existing "at init and on selection change" contract.
+	if strings.Count(script, "scopeSupportSelectionPanels(form);") < 2 {
+		t.Fatalf("expected scopeSupportSelectionPanels(form) to appear at least twice (init + MutationObserver callback), got:\n%s", script)
+	}
+}
+
+// TestWorkbenchRuntimeCollapsesLeftRailGroupsWithPersistedState guards
+// handoff-4 (item 5 -- left rail section-collapse): each
+// [data-studio-rail-group] section (Site areas / Sections / Layers) gets
+// a collapse toggle inserted into its own heading row, persisted in
+// sessionStorage the same read-merge-write way
+// workbenchruntime/island_runtime.js's restoreWorkbenchWorkingState
+// already persists mode/selection/scroll, and collapseLeftRailGroups is
+// invoked at workbench init.
+func TestWorkbenchRuntimeCollapsesLeftRailGroupsWithPersistedState(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`var leftRailGroupStorageKey = "gosx-studio-left-rail-groups";`,
+		`function readLeftRailGroupState()`,
+		`function writeLeftRailGroupState(key, collapsed)`,
+		`function collapseLeftRailGroups(root)`,
+		`queryAll(root || document, "[data-studio-rail-group]")`,
+		`var heading = group.querySelector("h2");`,
+		`node.setAttribute("hidden", "hidden");`,
+		`group.setAttribute("data-studio-rail-group-collapsed", collapsed ? "true" : "false");`,
+		`toggle.setAttribute("data-studio-rail-group-toggle", key);`,
+		`writeLeftRailGroupState(key, next);`,
+		`collapseLeftRailGroups(document);`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing %q", check)

@@ -80,6 +80,13 @@ func RenderSiteNavigatorPanel(props SiteNavigatorProps, options SiteNavigatorPan
 		gosx.Attr("data-studio-engine-source", "gosx"),
 		gosx.Attr("data-studio-site-filter", "all"),
 		gosx.Attr("data-gosx-studio-site-navigator-renderer", "gosx-studio"),
+		// handoff-4 (item 5 -- left rail section-collapse): a stable,
+		// unambiguous group key the runtime's collapseLeftRailGroups()
+		// (hostruntime/assets/workbench_runtime.js) uses to add a
+		// persisted collapse toggle to this section without guessing at
+		// one of this panel's several "-renderer" marker attributes
+		// (those repeat on nested sub-elements, not just this root).
+		gosx.Attr("data-studio-rail-group", "site-navigator"),
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, options.RootAttrs)
 	return gosx.El("section", gosx.Attrs(attrs...),

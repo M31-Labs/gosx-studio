@@ -8,24 +8,25 @@ import (
 )
 
 type WorkbenchToolbarOptions struct {
-	Class                  string
-	ActionsClass           string
-	TitleClass             string
-	Kicker                 string
-	Title                  string
-	Summary                string
-	PreviewLinkClass       string
-	PreviewLabel           string
-	SaveButtonClass        string
-	SaveButtonLabel        string
-	DisablePreviewAction   bool
-	DisableSaveButton      bool
-	DisableHistoryControls bool
-	CommandPaletteNode     gosx.Node
-	SaveStatusNode         gosx.Node
-	HistoryControlsNode    gosx.Node
-	Controls               []gosx.Node
-	Actions                []gosx.Node
+	Class                    string
+	ActionsClass             string
+	TitleClass               string
+	Kicker                   string
+	Title                    string
+	Summary                  string
+	PreviewLinkClass         string
+	PreviewLabel             string
+	SaveButtonClass          string
+	SaveButtonLabel          string
+	DisablePreviewAction     bool
+	DisableSaveButton        bool
+	DisableHistoryControls   bool
+	CommandPaletteNode       gosx.Node
+	SaveStatusNode           gosx.Node
+	CollaborationSummaryNode gosx.Node
+	HistoryControlsNode      gosx.Node
+	Controls                 []gosx.Node
+	Actions                  []gosx.Node
 }
 
 type WorkbenchSaveStatusOptions struct {
@@ -121,6 +122,14 @@ func RenderWorkbenchToolbar(view map[string]any, options WorkbenchToolbarOptions
 	children = appendWorkbenchNode(children, options.CommandPaletteNode)
 
 	actions := []gosx.Node{}
+	// handoff-4 (punch #7 -- presence to top chrome): the collaborators
+	// facepile+count moves into this shared toolbar action row, ahead of
+	// the save-state indicator, so it's visible from every mode without
+	// scrolling to the (still-present, now-detail-view) collaboration
+	// panel lower on the page. Presentation-only move -- the collab
+	// runtime's socket/presence contract (collabruntime/island_runtime.js)
+	// is untouched; only WHERE its facepile/count DOM gets mounted widens.
+	actions = appendWorkbenchNode(actions, options.CollaborationSummaryNode)
 	actions = appendWorkbenchNode(actions, options.SaveStatusNode)
 	if !options.DisableHistoryControls {
 		if core.WorkbenchNodeEmpty(options.HistoryControlsNode) {
@@ -462,6 +471,52 @@ func RenderWorkbenchCommandPalette(view map[string]any, options WorkbenchCommand
 				),
 			),
 		),
+	)
+}
+
+type WorkbenchCollaborationSummaryOptions struct {
+	Class         string
+	FacepileClass string
+	CountClass    string
+	Label         string
+	PanelID       string
+}
+
+// RenderWorkbenchCollaborationSummary renders the compact collaborators
+// facepile+count control that lives in the top toolbar chrome (handoff-4,
+// punch #7 -- "presence to top chrome"). It is a presentation-only mount
+// point: collabruntime/island_runtime.js's renderPresence already updates
+// EVERY element in the document carrying data-studio-collab-facepile (not
+// only the one inside panels.RenderCollaborationPanel), so this toolbar
+// button free-rides the exact same live roster payload with no new
+// wiring, and a matching data-studio-collab-count output gets the live
+// member count the same way. Clicking it reveals PanelID (the existing
+// RenderCollaborationPanel section, still rendered lower on the page) as
+// the detail view — see workbench_runtime.js's toggleCollaborationDetail.
+func RenderWorkbenchCollaborationSummary(options WorkbenchCollaborationSummaryOptions) gosx.Node {
+	className := core.FirstNonEmpty(options.Class, "gosx-studio-collab-summary")
+	panelID := strings.TrimSpace(options.PanelID)
+	attrs := []any{
+		gosx.Attr("type", "button"),
+		gosx.Attr("class", className),
+		gosx.Attr("data-studio-collab-summary", "true"),
+		gosx.Attr("data-studio-collab-state", "offline"),
+		gosx.Attr("aria-label", core.FirstNonEmpty(options.Label, "Show collaborators")),
+		gosx.Attr("aria-expanded", "false"),
+	}
+	if panelID != "" {
+		attrs = append(attrs, gosx.Attr("aria-controls", panelID))
+	}
+	return gosx.El("button", gosx.Attrs(attrs...),
+		gosx.El("ul", gosx.Attrs(
+			gosx.Attr("class", core.FirstNonEmpty(options.FacepileClass, className+"__facepile")),
+			gosx.Attr("data-studio-collab-facepile", "true"),
+			gosx.Attr("aria-hidden", "true"),
+		)),
+		gosx.El("output", gosx.Attrs(
+			gosx.Attr("class", core.FirstNonEmpty(options.CountClass, className+"__count")),
+			gosx.Attr("data-studio-collab-count", "true"),
+		), gosx.Text("0")),
 	)
 }
 
