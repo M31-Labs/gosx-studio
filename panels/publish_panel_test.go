@@ -108,6 +108,139 @@ func TestRenderPublishPanelMinimalOmitsOptionalSections(t *testing.T) {
 	}
 }
 
+// TestRenderPublishPanelChangeSetGrouped proves the Release Center prefers
+// the richer, typed change-set (adversarial-review punch #4:
+// cms/lifecycle/engine Engine.PendingDiff surfaced through
+// cms/studio.PublishChangeSetView) over the legacy flat pendingChanges list
+// once a host supplies one: changes group by scope in the fixed Content /
+// Design / Layout / Components / Media / Interactions / Flows order, each
+// row shows label + before -> after + actor + when, and the legacy flat
+// "revision-diff-list" rendering (kindLabel/path only) is NOT also rendered.
+func TestRenderPublishPanelChangeSetGrouped(t *testing.T) {
+	view := publishPanelTestView()
+	view["hasChangeSet"] = true
+	view["hasChanges"] = true
+	view["changeSummaryLabel"] = "2 changes ready to publish."
+	view["changeGroups"] = []map[string]any{
+		{
+			"scopeKey":   "content",
+			"scopeLabel": "Content",
+			"count":      1,
+			"changes": []map[string]any{
+				{
+					"label": "site.title", "kind": "changed", "kindLabel": "Changed",
+					"hasBefore": true, "before": "Old title",
+					"hasAfter": true, "after": "New title",
+					"hasActor": true, "actorLabel": "Jane Doe",
+					"hasWhen": true, "whenLabel": "Jul 10, 2026 3:04 PM", "whenMachine": "2026-07-10T15:04:00Z",
+				},
+			},
+		},
+		{
+			"scopeKey":   "style",
+			"scopeLabel": "Design",
+			"count":      1,
+			"changes": []map[string]any{
+				{
+					"label": "hero heading shadow", "kind": "added", "kindLabel": "Added",
+					"hasBefore": false, "before": "",
+					"hasAfter": true, "after": "0 1px 2px #000",
+					"hasActor": false, "actorLabel": "",
+					"hasWhen": false, "whenLabel": "", "whenMachine": "",
+				},
+			},
+		},
+	}
+
+	html := gosx.RenderHTML(RenderPublishPanel(view, PublishPanelOptions{}))
+
+	for _, fragment := range []string{
+		`data-studio-publish-changeset="true"`,
+		`data-studio-publish-changeset-has-changes="true"`,
+		`<h3>What will change</h3><p data-studio-publish-changeset-empty="false">2 changes ready to publish.</p>`,
+		`<div class="studio-publish-panel__changeset-groups" data-studio-publish-changeset-groups="true">`,
+		`data-studio-publish-changeset-group="content"`,
+		`data-studio-publish-changeset-group="style"`,
+		`<h4>Design<span class="studio-publish-panel__changeset-count">1</span></h4>`,
+		`data-studio-publish-changeset-row="true" data-studio-publish-changeset-kind="changed"`,
+		`<code class="revision-diff-row__label">site.title</code>`,
+		`<span class="revision-diff-row__value revision-diff-row__value--before">Old title</span>`,
+		`<span class="revision-diff-row__value revision-diff-row__value--after">New title</span>`,
+		`data-studio-publish-changeset-actor="true"`,
+		`Jane Doe`,
+		`datetime="2026-07-10T15:04:00Z" data-viewer-time="datetime"`,
+		`data-studio-publish-changeset-kind="added"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("grouped change-set publish panel missing %q:\n%s", fragment, html)
+		}
+	}
+	for _, notWant := range []string{
+		`class="revision-diff-list"><li>`, // legacy flat list must not also render
+		`hero heading shadow" hidden`,
+	} {
+		if strings.Contains(html, notWant) {
+			t.Fatalf("grouped change-set publish panel must not include legacy flat fragment %q:\n%s", notWant, html)
+		}
+	}
+	// The added row (no prior value) must not fabricate a before value or a
+	// visible arrow between before/after.
+	addedRowStart := strings.Index(html, `data-studio-publish-changeset-kind="added"`)
+	if addedRowStart < 0 {
+		t.Fatalf("expected an added-kind row in html:\n%s", html)
+	}
+	addedRowHTML := html[addedRowStart:]
+	if !strings.Contains(addedRowHTML[:400], `revision-diff-row__value--before" hidden`) {
+		t.Fatalf("expected the added row's before span to be hidden:\n%s", addedRowHTML[:400])
+	}
+}
+
+// TestRenderPublishPanelChangeSetEmptyState proves a host-supplied but empty
+// change-set (Supplied=true, zero changes) renders the honest "nothing to
+// publish" copy instead of an empty list or the legacy flat section.
+func TestRenderPublishPanelChangeSetEmptyState(t *testing.T) {
+	view := publishPanelTestView()
+	view["hasChangeSet"] = true
+	view["hasChanges"] = false
+	view["changeSummaryLabel"] = "Nothing to publish — the site matches your draft."
+	view["changeGroups"] = []map[string]any{}
+
+	html := gosx.RenderHTML(RenderPublishPanel(view, PublishPanelOptions{}))
+
+	for _, fragment := range []string{
+		`data-studio-publish-changeset="true"`,
+		`data-studio-publish-changeset-has-changes="false"`,
+		`<p data-studio-publish-changeset-empty="true">Nothing to publish — the site matches your draft.</p>`,
+		`<div class="studio-publish-panel__changeset-groups" data-studio-publish-changeset-groups="true" hidden></div>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("empty change-set publish panel missing %q:\n%s", fragment, html)
+		}
+	}
+}
+
+// TestRenderPublishPanelChangeSetAbsentWhenNotSupplied proves the section is
+// OMITTED (not rendered blank/fake) when the host has not supplied a
+// change-set at all -- graceful degradation to the pre-existing legacy flat
+// list is covered by TestRenderPublishPanelFull, and full absence (neither
+// legacy nor typed data) is covered by TestRenderPublishPanelMinimalOmitsOptionalSections.
+func TestRenderPublishPanelChangeSetAbsentWhenNotSupplied(t *testing.T) {
+	view := publishPanelTestView()
+	view["hasPendingChanges"] = false
+	// hasChangeSet intentionally left unset (host has not wired the source).
+
+	html := gosx.RenderHTML(RenderPublishPanel(view, PublishPanelOptions{}))
+
+	for _, notWant := range []string{
+		`data-studio-publish-changeset`,
+		`class="studio-publish-panel__pending"`,
+	} {
+		if strings.Contains(html, notWant) {
+			t.Fatalf("publish panel must omit the change-set section entirely when unsupplied, found %q:\n%s", notWant, html)
+		}
+	}
+}
+
 func publishPanelTestView() map[string]any {
 	return map[string]any{
 		"status":             "draft",

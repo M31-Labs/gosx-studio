@@ -32,7 +32,7 @@ func RenderPublishPanel(view map[string]any, options PublishPanelOptions) gosx.N
 		renderPublishPanelDraftStatus(view),
 		renderPublishPanelActions(view),
 	}
-	if core.WorkbenchViewBool(view, "hasPendingChanges") {
+	if core.WorkbenchViewBool(view, "hasPendingChanges") || core.WorkbenchViewBool(view, "hasChangeSet") {
 		children = append(children, renderPublishPanelPendingChanges(view))
 	}
 	children = append(children,
@@ -121,7 +121,28 @@ func renderPublishPanelActions(view map[string]any) gosx.Node {
 	), gosx.Fragment(children...))
 }
 
+// renderPublishPanelPendingChanges renders the Release Center's "what will
+// change" section (adversarial-review punch #4). It prefers the richer,
+// typed change-set a host derives from
+// m31labs.dev/gosx-studio/cms/lifecycle/engine Engine.PendingDiff (grouped by
+// scope, with before -> after + who/when attribution -- see
+// cms/studio.PublishChangeSetView) when the host supplied one
+// ("hasChangeSet" true); a host that has not wired that integration yet
+// keeps getting the pre-existing flat kind+path list driven by the older
+// lifecycle.RevisionDiff ("hasPendingChanges") -- graceful degradation, not a
+// second competing section.
 func renderPublishPanelPendingChanges(view map[string]any) gosx.Node {
+	if core.WorkbenchViewBool(view, "hasChangeSet") {
+		return renderPublishPanelChangeSet(view)
+	}
+	return renderPublishPanelPendingChangesLegacy(view)
+}
+
+// renderPublishPanelPendingChangesLegacy is the original flat kind+path
+// "what will change" list, sourced from lifecycle.RevisionDiff.Changes
+// (Noni's PendingSettingsDiff). Kept verbatim for hosts that have not yet
+// wired the grouped engine.PendingDiff change-set.
+func renderPublishPanelPendingChangesLegacy(view map[string]any) gosx.Node {
 	items := make([]gosx.Node, 0, len(core.WorkbenchViewMapList(view, "pendingChanges")))
 	for _, change := range core.WorkbenchViewMapList(view, "pendingChanges") {
 		items = append(items, gosx.El("li", nil,
@@ -138,6 +159,98 @@ func renderPublishPanelPendingChanges(view map[string]any) gosx.Node {
 			gosx.El("p", nil, gosx.Text(core.WorkbenchViewString(view, "draftSummary"))),
 		),
 		gosx.El("ul", gosx.Attrs(gosx.Attr("class", "revision-diff-list")), gosx.Fragment(items...)),
+	)
+}
+
+// renderPublishPanelChangeSet renders the grouped, attributed "what will
+// change" section from a host-supplied cms/studio.PublishChangeSetView map:
+// one <section> per non-empty scope group (Content/Design/Layout/Components/
+// Media/Interactions/Flows, in that fixed order), each change as a row
+// carrying its label, before -> after (only the side(s) actually set --
+// never a faked value), actor, and when. hasChanges=false renders the
+// honest empty state ("Nothing to publish...") instead of an empty list.
+func renderPublishPanelChangeSet(view map[string]any) gosx.Node {
+	hasChanges := core.WorkbenchViewBool(view, "hasChanges")
+	groups := core.WorkbenchViewMapList(view, "changeGroups")
+	groupNodes := make([]gosx.Node, 0, len(groups))
+	for _, group := range groups {
+		groupNodes = append(groupNodes, renderPublishPanelChangeGroup(group))
+	}
+	return gosx.El("section", gosx.Attrs(
+		gosx.Attr("class", "studio-publish-panel__pending"),
+		gosx.Attr("aria-label", "Unpublished changes"),
+		gosx.Attr("data-studio-publish-changeset", "true"),
+		gosx.Attr("data-studio-publish-changeset-has-changes", core.BoolAttr(hasChanges)),
+	),
+		gosx.El("header", nil,
+			gosx.El("h3", nil, gosx.Text("What will change")),
+			gosx.El("p", gosx.Attrs(
+				gosx.Attr("data-studio-publish-changeset-empty", core.BoolAttr(!hasChanges)),
+			), gosx.Text(core.WorkbenchViewString(view, "changeSummaryLabel"))),
+		),
+		gosx.El("div", gosx.Attrs(
+			gosx.Attr("class", "studio-publish-panel__changeset-groups"),
+			gosx.Attr("data-studio-publish-changeset-groups", "true"),
+			gosx.Attr("hidden", !hasChanges),
+		), gosx.Fragment(groupNodes...)),
+	)
+}
+
+func renderPublishPanelChangeGroup(group map[string]any) gosx.Node {
+	items := core.WorkbenchViewMapList(group, "changes")
+	rows := make([]gosx.Node, 0, len(items))
+	for _, item := range items {
+		rows = append(rows, renderPublishPanelChangeRow(item))
+	}
+	return gosx.El("section", gosx.Attrs(
+		gosx.Attr("class", "studio-publish-panel__changeset-group"),
+		gosx.Attr("data-studio-publish-changeset-group", core.WorkbenchViewString(group, "scopeKey")),
+	),
+		gosx.El("h4", nil,
+			gosx.Text(core.WorkbenchViewString(group, "scopeLabel")),
+			gosx.El("span", gosx.Attrs(gosx.Attr("class", "studio-publish-panel__changeset-count")), gosx.Text(core.WorkbenchViewString(group, "count"))),
+		),
+		gosx.El("ul", gosx.Attrs(
+			gosx.Attr("class", "revision-diff-list revision-diff-list--changeset"),
+		), gosx.Fragment(rows...)),
+	)
+}
+
+func renderPublishPanelChangeRow(item map[string]any) gosx.Node {
+	hasBefore := core.WorkbenchViewBool(item, "hasBefore")
+	hasAfter := core.WorkbenchViewBool(item, "hasAfter")
+	hasActor := core.WorkbenchViewBool(item, "hasActor")
+	hasWhen := core.WorkbenchViewBool(item, "hasWhen")
+	return gosx.El("li", gosx.Attrs(
+		gosx.Attr("data-studio-publish-changeset-row", "true"),
+		gosx.Attr("data-studio-publish-changeset-kind", core.WorkbenchViewString(item, "kind")),
+	),
+		gosx.El("span", gosx.Attrs(gosx.Attr("class", "revision-diff-row__kind")), gosx.Text(core.WorkbenchViewString(item, "kindLabel"))),
+		gosx.El("code", gosx.Attrs(gosx.Attr("class", "revision-diff-row__label")), gosx.Text(core.WorkbenchViewString(item, "label"))),
+		gosx.El("span", gosx.Attrs(
+			gosx.Attr("class", "revision-diff-row__value revision-diff-row__value--before"),
+			gosx.Attr("hidden", !hasBefore),
+		), gosx.Text(core.WorkbenchViewString(item, "before"))),
+		gosx.El("span", gosx.Attrs(
+			gosx.Attr("class", "revision-diff-row__arrow"),
+			gosx.Attr("aria-hidden", "true"),
+			gosx.Attr("hidden", !(hasBefore && hasAfter)),
+		), gosx.Text("→")),
+		gosx.El("span", gosx.Attrs(
+			gosx.Attr("class", "revision-diff-row__value revision-diff-row__value--after"),
+			gosx.Attr("hidden", !hasAfter),
+		), gosx.Text(core.WorkbenchViewString(item, "after"))),
+		gosx.El("span", gosx.Attrs(
+			gosx.Attr("class", "revision-diff-row__actor"),
+			gosx.Attr("data-studio-publish-changeset-actor", "true"),
+			gosx.Attr("hidden", !hasActor),
+		), gosx.Text(core.WorkbenchViewString(item, "actorLabel"))),
+		gosx.El("time", gosx.Attrs(
+			gosx.Attr("class", "revision-diff-row__time"),
+			gosx.Attr("datetime", core.WorkbenchViewString(item, "whenMachine")),
+			gosx.Attr("data-viewer-time", "datetime"),
+			gosx.Attr("hidden", !hasWhen),
+		), gosx.Text(core.WorkbenchViewString(item, "whenLabel"))),
 	)
 }
 

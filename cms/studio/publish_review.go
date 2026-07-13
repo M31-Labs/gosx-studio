@@ -626,3 +626,247 @@ func publishTimeLabel(value time.Time, timezone string) string {
 	}
 	return value.Format("Jan 2, 2006 3:04 PM MST")
 }
+
+// PublishChangeScope classifies one pending Release Center change by the
+// authoring domain it belongs to, grouping the "what will change" section
+// (adversarial-review punch #4: m31labs.dev/gosx-studio/cms/lifecycle/engine
+// Engine.PendingDiff -- DraftPreview{Changes []DraftChange} -- was built in
+// slice S3 but never surfaced anywhere under panels/ or shell/; this is that
+// follow-up).
+//
+// The string values intentionally match engine.DraftChangeScope byte-for-byte
+// (content/style/layout/instances/assets/interactions/flows) so a host can
+// convert one engine.DraftChange into a PublishChange with a plain string
+// cast on Scope. This package cannot import cms/lifecycle/engine directly to
+// do that conversion itself: engine already imports cms/studio
+// (readiness_bridge.go, for PublishChecksFromGate), so the reverse import
+// would cycle. See the handoff report's "host contract" section for the
+// exact host-side mapping sketch a follow-up Noni slice implements
+// (app/admin/editor/lifecycle_engine.server.go / page.server.go).
+type PublishChangeScope string
+
+const (
+	PublishChangeScopeContent      PublishChangeScope = "content"
+	PublishChangeScopeStyle        PublishChangeScope = "style"
+	PublishChangeScopeLayout       PublishChangeScope = "layout"
+	PublishChangeScopeInstances    PublishChangeScope = "instances"
+	PublishChangeScopeAssets       PublishChangeScope = "assets"
+	PublishChangeScopeInteractions PublishChangeScope = "interactions"
+	PublishChangeScopeFlows        PublishChangeScope = "flows"
+)
+
+// PublishChange is one host-classified pending edit ready to publish -- the
+// Release Center's "what will change" row (label, before -> after, who,
+// when). Before/After mirror engine.DraftChange's own BeforeSet/AfterSet
+// honesty discipline: a host MUST leave BeforeSet/AfterSet false (not fake an
+// empty string) when the underlying value genuinely has no prior/next
+// representation -- e.g. a field with no value before this edit, or one this
+// edit reset/cleared. PublishChangeSetView renders exactly that: a row that
+// shows only the side(s) that are actually set, never a faked "empty string"
+// value.
+type PublishChange struct {
+	Scope      PublishChangeScope
+	Label      string
+	Before     string
+	BeforeSet  bool
+	After      string
+	AfterSet   bool
+	ActorLabel string
+	When       time.Time
+}
+
+// PublishChangeSet is the Release Center's optional, typed "what will
+// change" surface (adversarial-review punch #4). Supplied is the ONLY signal
+// panels.RenderPublishPanel uses to decide whether to render this section at
+// all: false means the host has not wired a change-set source yet (e.g. no
+// engine.Engine.PendingDiff integration landed), and the Release Center omits
+// the section entirely rather than showing an empty or fabricated list --
+// "graceful degradation", not fake data. Supplied true with zero Changes is a
+// real, honest "nothing to publish" state and DOES render (with the
+// empty-state copy): the host asked, and the answer was "no pending
+// changes", which is a materially different fact than "did not ask".
+type PublishChangeSet struct {
+	Supplied bool
+	Changes  []PublishChange
+}
+
+type publishChangeScopeMeta struct {
+	scope PublishChangeScope
+	label string
+}
+
+// publishChangeScopeOrder is the Release Center's canonical, fixed group
+// order (Content, Design, Layout, Components, Media, Interactions, Flows) --
+// independent of the order changes happen to arrive in, so an operator reads
+// the same section order on every publish review. "Design"/"Components"/
+// "Media" are the operator-facing labels for the engine's style/instances/
+// assets scopes respectively (see engine/change_set.go's DraftChangeScope
+// doc comment for why those internal names differ from the Release Center's
+// human copy).
+var publishChangeScopeOrder = []publishChangeScopeMeta{
+	{PublishChangeScopeContent, "Content"},
+	{PublishChangeScopeStyle, "Design"},
+	{PublishChangeScopeLayout, "Layout"},
+	{PublishChangeScopeInstances, "Components"},
+	{PublishChangeScopeAssets, "Media"},
+	{PublishChangeScopeInteractions, "Interactions"},
+	{PublishChangeScopeFlows, "Flows"},
+}
+
+// publishChangeScopeOther buckets a change whose Scope does not match any
+// known PublishChangeScope constant -- defensive completeness so a host
+// passing an unrecognized/future scope value never silently drops a change
+// from the Release Center, it just lands in a final "Other" group instead.
+const publishChangeScopeOther PublishChangeScope = "other"
+
+// PublishChangeSetView converts a PublishChangeSet into the render-ready,
+// flat map[string]any keys panels.RenderPublishPanel reads directly off its
+// view map -- the same "cmsstudio.XView(...) keys merge straight into the
+// host's flat panel map" contract PublishReviewView already established
+// (see the host wiring TODO in the handoff report for the exact merge call).
+// location formats each change's When (nil uses time.Local, matching
+// LifecycleTimeLabel's own default).
+func PublishChangeSetView(set PublishChangeSet, location *time.Location) map[string]any {
+	if !set.Supplied {
+		return map[string]any{"hasChangeSet": false}
+	}
+	changes := normalizePublishChanges(set.Changes)
+	total := len(changes)
+	summary := "Nothing to publish — the site matches your draft."
+	if total > 0 {
+		summary = pluralize(total, "change", "changes") + " ready to publish."
+	}
+	return map[string]any{
+		"hasChangeSet":       true,
+		"hasChanges":         total > 0,
+		"changeCount":        total,
+		"changeSummaryLabel": summary,
+		"changeGroups":       groupPublishChanges(changes, location),
+	}
+}
+
+func normalizePublishChanges(changes []PublishChange) []PublishChange {
+	out := make([]PublishChange, 0, len(changes))
+	for _, change := range changes {
+		change.Label = strings.TrimSpace(change.Label)
+		change.Before = strings.TrimSpace(change.Before)
+		change.After = strings.TrimSpace(change.After)
+		change.ActorLabel = strings.TrimSpace(change.ActorLabel)
+		if !change.BeforeSet {
+			change.Before = ""
+		}
+		if !change.AfterSet {
+			change.After = ""
+		}
+		if change.Label == "" {
+			continue
+		}
+		out = append(out, change)
+	}
+	return out
+}
+
+// groupPublishChanges buckets changes by scope in publishChangeScopeOrder's
+// fixed order, appending a trailing "Other" group only if a change actually
+// landed there. Order WITHIN a group preserves the input slice's order (the
+// engine's own chronological/collapsed operation-log order), matching how
+// the legacy flat pendingChanges list already behaves -- this section only
+// adds grouping/attribution/before-after, not a change in ordering semantics.
+func groupPublishChanges(changes []PublishChange, location *time.Location) []map[string]any {
+	buckets := map[PublishChangeScope][]PublishChange{}
+	order := make([]PublishChangeScope, 0, len(publishChangeScopeOrder)+1)
+	known := map[PublishChangeScope]bool{}
+	for _, meta := range publishChangeScopeOrder {
+		order = append(order, meta.scope)
+		known[meta.scope] = true
+	}
+	sawOther := false
+	for _, change := range changes {
+		scope := change.Scope
+		if !known[scope] {
+			scope = publishChangeScopeOther
+			sawOther = true
+		}
+		buckets[scope] = append(buckets[scope], change)
+	}
+	if sawOther {
+		order = append(order, publishChangeScopeOther)
+	}
+	groups := make([]map[string]any, 0, len(order))
+	for _, scope := range order {
+		items := buckets[scope]
+		if len(items) == 0 {
+			continue
+		}
+		groups = append(groups, map[string]any{
+			"scopeKey":   string(scope),
+			"scopeLabel": publishChangeScopeLabel(scope),
+			"count":      len(items),
+			"changes":    publishChangeRowViews(items, location),
+		})
+	}
+	return groups
+}
+
+func publishChangeScopeLabel(scope PublishChangeScope) string {
+	for _, meta := range publishChangeScopeOrder {
+		if meta.scope == scope {
+			return meta.label
+		}
+	}
+	return "Other"
+}
+
+func publishChangeRowViews(changes []PublishChange, location *time.Location) []map[string]any {
+	out := make([]map[string]any, 0, len(changes))
+	for _, change := range changes {
+		out = append(out, publishChangeRowView(change, location))
+	}
+	return out
+}
+
+// publishChangeRowView derives a "kind" (added/removed/changed) from
+// BeforeSet/AfterSet the same way the legacy lifecycle.RevisionChangeKind
+// classification already reads (no prior value = added; no next value =
+// removed; both set = changed), so the Release Center's kindLabel vocabulary
+// stays identical across the legacy flat list and this grouped view.
+func publishChangeRowView(change PublishChange, location *time.Location) map[string]any {
+	kind := "changed"
+	switch {
+	case !change.BeforeSet && change.AfterSet:
+		kind = "added"
+	case change.BeforeSet && !change.AfterSet:
+		kind = "removed"
+	}
+	whenMachine := ""
+	whenLabel := ""
+	if !change.When.IsZero() {
+		whenMachine = change.When.UTC().Format(time.RFC3339)
+		whenLabel = LifecycleTimeLabel(change.When, location)
+	}
+	return map[string]any{
+		"label":       change.Label,
+		"kind":        kind,
+		"kindLabel":   publishChangeKindLabel(kind),
+		"hasBefore":   change.BeforeSet,
+		"before":      change.Before,
+		"hasAfter":    change.AfterSet,
+		"after":       change.After,
+		"hasActor":    change.ActorLabel != "",
+		"actorLabel":  change.ActorLabel,
+		"hasWhen":     whenMachine != "",
+		"whenLabel":   whenLabel,
+		"whenMachine": whenMachine,
+	}
+}
+
+func publishChangeKindLabel(kind string) string {
+	switch kind {
+	case "added":
+		return "Added"
+	case "removed":
+		return "Removed"
+	default:
+		return "Changed"
+	}
+}
