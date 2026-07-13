@@ -38,8 +38,75 @@ func TestInteractionsPanelRendersRevealAndHoverFocusRows(t *testing.T) {
 		"gosx_studio_interaction_once",
 		"Reveal once",
 		"Reduced motion: content shows immediately, no animation plays.",
-		"Remove", // remove form only for the attached reveal row
-		"data-gosx-studio-authoring-managed=\"true\"",
+		"Remove", // remove button only for the attached reveal row
+		"data-gosx-studio-durable-history=\"true\"",
+		"data-studio-target-field=\"interactions.entry\"",
+		"data-gosx-studio-operation-kind=\"set-interaction\"",
+		"data-gosx-studio-operation-kind=\"remove-interaction\"",
+		"data-gosx-studio-interaction-key=\"hero:reveal-on-scroll\"",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing %q in:\n%s", want, html)
+		}
+	}
+}
+
+// TestInteractionsPanelRowSharesOneDurableFormForAttachAndRemove proves the
+// handoff-31 "one product path" design: attach (set-interaction) and remove
+// share a SINGLE <form>/operationruntime instance per row, not two, so both
+// actions read/advance the same cached target head instead of one racing a
+// stale cursor cached by the other. It also proves a never-attached row still
+// gets a real, non-blank Target.ControlKey (the deterministic
+// "<componentKey>:<kind>" default core.Interaction.Normalize() derives),
+// which authoring.OperationRequest.Validate() requires even for a first
+// attach.
+func TestInteractionsPanelRowSharesOneDurableFormForAttachAndRemove(t *testing.T) {
+	node := RenderInteractionsPanel(InteractionsPanelOptions{
+		Action: "/authoring", PageKey: "page:home", PageRoute: "/", ComponentKey: "home:hero",
+		Rows: []InteractionRow{
+			InteractionRowFromInteraction(core.InteractionHoverFocusState, core.Interaction{}, core.InteractionDiagnostic{}),
+		},
+	})
+	html := gosx.RenderHTML(node)
+
+	if got := strings.Count(html, "<form"); got != 1 {
+		t.Fatalf("expected exactly one <form> for the row (shared attach/remove), got %d:\n%s", got, html)
+	}
+	if strings.Contains(html, "Remove") {
+		t.Fatal("an unattached row must not render a Remove button")
+	}
+	if !strings.Contains(html, `data-gosx-studio-interaction-key="home:hero:hover-focus-state"`) {
+		t.Fatalf("expected the deterministic default interaction key on an unattached row's button, got:\n%s", html)
+	}
+	if !strings.Contains(html, `data-gosx-studio-operation-kind="set-interaction"`) {
+		t.Fatalf("expected the Add button to carry the set-interaction operation kind, got:\n%s", html)
+	}
+}
+
+// TestInteractionsPanelAttachedRowRendersTargetHeadForOptimisticConcurrency
+// proves an already-attached row's form carries the host-supplied durable
+// target head (both as the form's data-studio-target-head attribute
+// operationruntime seeds its cursor from, and as the redundant hidden
+// gosx_studio_expected_target_head input a no-collaboration plain-POST
+// fallback would submit) so a Save on an existing interaction after a fresh
+// page load is not rejected as a false conflict against its own blank
+// optimistic head.
+func TestInteractionsPanelAttachedRowRendersTargetHeadForOptimisticConcurrency(t *testing.T) {
+	reveal := core.Interaction{
+		Kind: core.InteractionRevealOnScroll, Effect: core.InteractionEffectFadeUp,
+		Target: core.CanvasIdentity{Route: "/", BlockKey: "hero"},
+	}.Normalize()
+	diagnostics := core.InteractionDiagnostics([]core.Interaction{reveal})
+	row := InteractionRowFromInteraction(core.InteractionRevealOnScroll, reveal, diagnostics[0])
+	row.TargetHead = "head-123"
+	node := RenderInteractionsPanel(InteractionsPanelOptions{
+		Action: "/authoring", ComponentKey: "hero",
+		Rows: []InteractionRow{row},
+	})
+	html := gosx.RenderHTML(node)
+	for _, want := range []string{
+		`data-studio-target-head="head-123"`,
+		`name="gosx_studio_expected_target_head" value="head-123"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("missing %q in:\n%s", want, html)

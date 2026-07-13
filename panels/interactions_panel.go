@@ -10,15 +10,30 @@ import (
 )
 
 // The interactions inspector attaches typed, allow-listed interactions
-// (core/interactions.go) to the selected canvas component. Each row posts an
-// ordinary form directly to the authoring action — it deliberately does not
-// opt into the durable-history/collaboration operation bridge
-// (operationruntime), whose OperationTarget/OperationKind shapes are frozen to
-// set-field/set-style/reset-style/undo/redo and a fixed target address; a
-// generic interaction payload (kind/effect/duration/delay/once) does not fit
-// that shape without extending the durable operation protocol, which is out
-// of scope here. A later slice can add collaboration-aware interaction
-// editing once that protocol grows an extensible payload.
+// (core/interactions.go) to the selected canvas component.
+//
+// Wave 5 (handoff-31, "one product path"): each row now opts into the
+// durable-history/collaboration operation bridge (operationruntime) the same
+// way panels/direct_edit_panel.go's Save/Undo/Redo buttons already do — the
+// set-interaction/remove-interaction OperationKinds and the
+// interactions.entry target/InteractionSettings payload shape have existed
+// since the HANDOFF-12 durable-ops consolidation, so there is no longer a
+// protocol reason to stay on a plain managed-AJAX form. Attach and remove now
+// share ONE <form> per row (not two): operationruntime keeps its optimistic
+// target-head cursor PER FORM, so a save and a remove that targeted two
+// separate forms for the same interaction would let one action's form serve
+// a stale cached head to the other the instant the operator used both
+// without a reload — sharing one form/one operationruntime instance keeps
+// the cursor correct across both actions. The row's own Effect/Duration/
+// Delay/Once controls stay ordinary named <select>/<input> elements;
+// operationruntime reads their LIVE value at click time (see
+// operationruntime/island_runtime.js's per-kind override in its click
+// handler), so nothing here needs to duplicate that value onto the button
+// itself. A host with no durable ledger wired for interactions.entry (i.e.
+// one that has not adopted handoff-12's host-adoption TODO) still gets a
+// working plain form: operationruntime falls back to an ordinary POST to
+// the same action when window.GoSXStudioCollaborationRuntime is absent or
+// unavailable, exactly like every other durable-history form already does.
 //
 // Wave 3A (inspector-presentation): this file used to render one full
 // "Interactions" section per canvas target, always fully expanded — a host
@@ -69,6 +84,12 @@ type InteractionRow struct {
 	Status            string
 	StatusLabel       string
 	Reason            string
+	// TargetHead is the durable ledger's current optimistic-concurrency head
+	// for this row's interactions.entry target (host-supplied, mirrors
+	// DirectEditPanelOptions.TargetHead). Blank for a never-attached target —
+	// the durable protocol treats a blank expected head as "no prior write"
+	// for a brand new target, exactly like set-field's first-ever save.
+	TargetHead string
 }
 
 // InteractionsPanelOptions describes one canvas target the interactions
@@ -279,13 +300,29 @@ func renderInteractionRow(options InteractionsPanelOptions, row InteractionRow) 
 		}
 		delayOptions = append(delayOptions, gosx.El("option", gosx.Attrs(attrs...), gosx.Text(value+" ms delay")))
 	}
+	// interactionKey falls back to the SAME deterministic
+	// "<componentKey>:<kind>" key core.Interaction.Normalize() derives for a
+	// never-yet-attached target (defaultInteractionKey), so the durable
+	// set-interaction dispatch always has a real Target.ControlKey to submit
+	// — authoring.OperationRequest.Validate() requires one even for a first
+	// attach. Recomputing it via core.Interaction{...}.Normalize() (rather
+	// than duplicating the algorithm here) keeps this panel and core's own
+	// default in lockstep by construction.
+	interactionKey := row.InteractionKey
+	if interactionKey == "" {
+		interactionKey = core.Interaction{
+			Kind:   core.InteractionKind(row.Kind),
+			Target: core.CanvasIdentity{Route: options.PageRoute, PageID: options.PageKey, BlockKey: options.ComponentKey},
+		}.Normalize().Key
+	}
 	saveChildren := []gosx.Node{
 		hidden(authoring.AuthoringFieldOperation, string(authoring.AuthoringOperationSetInteraction)),
 		hidden(authoring.AuthoringFieldPageKey, options.PageKey),
 		hidden(authoring.AuthoringFieldPageRoute, options.PageRoute),
 		hidden(authoring.AuthoringFieldComponentKey, options.ComponentKey),
-		hidden(authoring.AuthoringFieldInteractionKey, row.InteractionKey),
+		hidden(authoring.AuthoringFieldInteractionKey, interactionKey),
 		hidden(authoring.AuthoringFieldInteractionKind, row.Kind),
+		hidden(authoring.AuthoringFieldExpectedTargetHead, row.TargetHead),
 	}
 	if options.CSRFToken != "" {
 		saveChildren = append(saveChildren, hidden("csrf_token", options.CSRFToken))
@@ -310,12 +347,37 @@ func renderInteractionRow(options InteractionsPanelOptions, row InteractionRow) 
 	}
 	saveChildren = append(saveChildren,
 		gosx.El("p", gosx.Attrs(gosx.Attr("data-studio-interaction-reduced-motion-note", "true")), gosx.Text(row.ReducedMotionNote)),
-		gosx.El("button", gosx.Attrs(gosx.Attr("type", "submit")), gosx.Text(attachedButtonLabel(row.Attached))),
+		gosx.El("button", gosx.Attrs(
+			gosx.Attr("type", "submit"),
+			gosx.Attr("formnovalidate", "formnovalidate"),
+			gosx.Attr("data-gosx-studio-operation-kind", string(authoring.AuthoringOperationSetInteraction)),
+			gosx.Attr("data-gosx-studio-interaction-key", interactionKey),
+			gosx.Attr("data-gosx-studio-interaction-kind", row.Kind),
+		), gosx.Text(attachedButtonLabel(row.Attached))),
 	)
+	// Attach/remove share ONE form (and so one operationruntime instance —
+	// see the file doc comment above) so both actions read/advance the SAME
+	// cached target head; only the clicked button's data-gosx-studio-
+	// operation-kind decides which durable kind is submitted.
+	if row.Attached {
+		saveChildren = append(saveChildren, gosx.El("button", gosx.Attrs(
+			gosx.Attr("type", "submit"),
+			gosx.Attr("formnovalidate", "formnovalidate"),
+			gosx.Attr("data-gosx-studio-operation-kind", string(authoring.AuthoringOperationRemoveInteraction)),
+			gosx.Attr("data-gosx-studio-interaction-key", interactionKey),
+			gosx.Attr("data-gosx-studio-interaction-kind", row.Kind),
+		), gosx.Text("Remove")))
+	}
 	saveForm := gosx.El("form", gosx.Attrs(
 		gosx.Attr("method", "post"),
 		gosx.Attr("action", options.Action),
-		gosx.Attr("data-gosx-studio-authoring-managed", "true"),
+		gosx.Attr("data-gosx-studio-durable-history", "true"),
+		gosx.Attr("data-gosx-studio-operation-action", options.Action),
+		gosx.Attr("data-studio-target-route", options.PageRoute),
+		gosx.Attr("data-studio-target-page-id", options.PageKey),
+		gosx.Attr("data-studio-target-field", authoring.FieldInteractionsEntry),
+		gosx.Attr("data-studio-target-component", options.ComponentKey),
+		gosx.Attr("data-studio-target-head", row.TargetHead),
 		gosx.Attr("data-studio-interaction-row", row.Kind),
 		gosx.Attr("data-studio-interaction-attached", core.BoolAttr(row.Attached)),
 		gosx.Attr("data-studio-interaction-status", row.Status),
@@ -330,25 +392,6 @@ func renderInteractionRow(options InteractionsPanelOptions, row InteractionRow) 
 	}
 	if row.Reason != "" {
 		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("data-studio-interaction-reason", "true")), gosx.Text(row.Reason)))
-	}
-	if row.Attached {
-		removeChildren := []gosx.Node{
-			hidden(authoring.AuthoringFieldOperation, string(authoring.AuthoringOperationRemoveInteraction)),
-			hidden(authoring.AuthoringFieldPageKey, options.PageKey),
-			hidden(authoring.AuthoringFieldPageRoute, options.PageRoute),
-			hidden(authoring.AuthoringFieldComponentKey, options.ComponentKey),
-			hidden(authoring.AuthoringFieldInteractionKey, row.InteractionKey),
-		}
-		if options.CSRFToken != "" {
-			removeChildren = append(removeChildren, hidden("csrf_token", options.CSRFToken))
-		}
-		removeChildren = append(removeChildren, gosx.El("button", gosx.Attrs(gosx.Attr("type", "submit")), gosx.Text("Remove")))
-		children = append(children, gosx.El("form", gosx.Attrs(
-			gosx.Attr("method", "post"),
-			gosx.Attr("action", options.Action),
-			gosx.Attr("data-gosx-studio-authoring-managed", "true"),
-			gosx.Attr("data-studio-interaction-remove", row.Kind),
-		), gosx.Fragment(removeChildren...)))
 	}
 	return gosx.El("article", gosx.Attrs(
 		gosx.Attr("data-studio-interaction-card", row.Kind),

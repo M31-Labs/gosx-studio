@@ -17,13 +17,22 @@ import { revealModeIfPresent, startMuddyCollaboration } from "./reference_apps_h
 // (#studioDirectEditForm, the Home Inspector's hero-headline editor), which
 // posts a set-field operation through internal/cms.Store.ApplyStudioOperation
 // -- the durable operation log Engine.PendingDiff reads from
-// (OperationLog/PublishedOperationRevision). This is deliberately NOT the
-// canvas contenteditable inline-edit surface: that surface commits through a
-// save-control mutation (store.SaveDraftSettings directly, bypassing the
-// durable operation log entirely -- a real, separate, already-documented
-// product gap; see engine/change_set.go's own doc comments on which write
-// paths are durable-log-backed today), so it would never produce a change
-// here no matter how correct the host wiring is.
+// (OperationLog/PublishedOperationRevision).
+//
+// STALE-COMMENT UPDATE (handoff-31, "one product path"): this used to say
+// the canvas contenteditable inline-edit surface could never produce a
+// change here because it only ever posted a non-durable save-control
+// mutation. That gap is now closed for the specific fields a host opts in
+// (canvas/page_surface.go's DurableHeadlineField/DurableTitleField;
+// inlineeditruntime/island_runtime.js's data-gosx-studio-durable-history
+// dispatch) — reference_apps_canvas_inline_edit_test.ts's third test proves
+// a canvas-committed hero.headline edit produces the SAME
+// data-studio-publish-changeset-group='content' row this test checks for
+// below, end to end with a live collaboration transport. A canvas field the
+// host has NOT opted in (tagline/subhead/ctaLabel, or any page title other
+// than about's) still commits through the legacy save-control mutation and
+// correctly produces no change-set row here — that remaining gap is
+// intentional per-field scope, not an oversight.
 //
 // HONESTY NOTE (read before "fixing" a red run): if a host under test has NOT
 // wired Engine.PendingDiff into its publish-panel view (e.g. Pajaritos, or a

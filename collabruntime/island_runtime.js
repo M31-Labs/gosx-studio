@@ -54,7 +54,18 @@
     var headsKey = "gosxstudio:collab-heads:" + resource;
     var acceptedSequence = Number(storageGet(sequenceKey) || "0") || 0;
     var heads = {}; try { heads = JSON.parse(storageGet(headsKey) || "{}") || {}; } catch (_) { heads = {}; }
-    function targetKey(target) { target = target || {}; return [target.route || "/", target.pageId || "", target.field || "", target.componentKey || target.blockKey || "", target.nodeId || "", target.property || "", target.breakpoint || "base", target.state || "default"].join("|"); }
+    // controlKey addresses one named sub-key WITHIN a componentKey/pageId
+    // container (an interaction's key, a shared/override instance's control
+    // key, a flow field's name -- authoring.OperationTarget.ControlKey,
+    // HANDOFF-12). Omitting it here (handoff-31 finding) let every
+    // interaction attached to the SAME component collide onto one cache
+    // entry -- e.g. reveal-on-scroll and hover-focus-state on "home:hero"
+    // share the same route/pageId/field("interactions.entry")/componentKey,
+    // so accepting the FIRST interaction's operation cached a head the
+    // SECOND (a different, never-before-written target) then wrongly
+    // reused, getting rejected as a false stale-field conflict the instant
+    // both were attached in the same page load.
+    function targetKey(target) { target = target || {}; return [target.route || "/", target.pageId || "", target.field || "", target.componentKey || target.blockKey || "", target.controlKey || "", target.nodeId || "", target.property || "", target.breakpoint || "base", target.state || "default"].join("|"); }
     function storeHeads() { storageSet(headsKey, JSON.stringify(heads)); }
     // handoff-4 (punch #7 -- presence to top chrome): facepile()/counts()
     // query the WHOLE document, not just this connection's own panel, so
@@ -84,7 +95,16 @@
       panel.setAttribute("data-studio-collab-can-design", value.design ? "true" : "false");
       qsa(document, "[data-studio-requires-author]").forEach(function (node) { node.disabled = !value.author; node.setAttribute("aria-disabled", value.author ? "false" : "true"); });
       qsa(document, "[data-studio-requires-design]").forEach(function (node) { node.disabled = !value.design; node.setAttribute("aria-disabled", value.design ? "false" : "true"); });
-      qsa(document, "[data-gosx-studio-operation-kind]").forEach(function (node) { var design = !!node.getAttribute("data-gosx-studio-style-property") || !!node.closest("[data-studio-layout-control]"); var allowed = design ? !!value.design : !!value.author; node.disabled = !allowed; node.setAttribute("aria-disabled", allowed ? "false" : "true"); });
+      // handoff-31: set-interaction/remove-interaction require
+      // CapabilityDesign server-side (sqlstore.Apply groups them with
+      // style, per HANDOFF-12's capability switch), so the optimistic
+      // client-side gate must classify them as design actions too --
+      // otherwise a studio-author (non-designer) principal saw an ENABLED
+      // button that the server unconditionally rejected with "principal
+      // lacks the capability required for this operation" on every click, a
+      // false affordance. Every other durable kind (set-field/set-style/
+      // reset-style/undo/redo/instances/flows) is unaffected.
+      qsa(document, "[data-gosx-studio-operation-kind]").forEach(function (node) { var kind = node.getAttribute("data-gosx-studio-operation-kind"); var design = !!node.getAttribute("data-gosx-studio-style-property") || !!node.closest("[data-studio-layout-control]") || kind === "set-interaction" || kind === "remove-interaction"; var allowed = design ? !!value.design : !!value.author; node.disabled = !allowed; node.setAttribute("aria-disabled", allowed ? "false" : "true"); });
     }
     function initials(name) {
       return String(name || "?").trim().split(/\s+/).slice(0, 2).map(function (part) { return part.charAt(0).toUpperCase(); }).join("") || "?";

@@ -542,7 +542,7 @@ export async function startMuddy(request: APIRequestContext, extraEnv?: Record<s
   });
 }
 
-export async function startMuddyCollaboration(request: APIRequestContext): Promise<ServerHandle> {
+export async function startMuddyCollaboration(request: APIRequestContext, extraEnv?: Record<string, string>): Promise<ServerHandle> {
   await ensureMuddyDist();
   const port = await freePort();
   const tempDir = mkdtempSync(path.join(tmpdir(), "gosx-studio-muddy-collab-e2e-"));
@@ -564,9 +564,24 @@ export async function startMuddyCollaboration(request: APIRequestContext): Promi
       MUDDY_MEDIA_PATH: path.join(tempDir, "media"),
       MUDDY_LIFECYCLE_WORKER: "0",
       MUDDY_MOCK_CHECKOUT: "1",
+      ...(extraEnv ?? {}),
     },
     tempDir,
   });
+}
+
+// startMuddyCanvasHTMLSurfaceCollaboration combines the MUDDY_EDITOR_SCENE_DOM
+// canvas HTML-surface fixture (startMuddyCanvasHTMLSurface's env) with the
+// authenticated collaboration test-auth wiring (startMuddyCollaboration's
+// env) -- handoff-31's inline-edit durable-dispatch e2e proof needs BOTH: a
+// real contenteditable canvas surface to commit from, AND a live,
+// capability-granting websocket connection for that commit to actually take
+// the durable path instead of falling back to the legacy save-control POST
+// (see reference_apps_interactions_test.ts's header comment for why plain
+// startMuddy's MUDDY_MOCK_AUTH fallback does not cover the collaboration
+// websocket's own auth).
+export async function startMuddyCanvasHTMLSurfaceCollaboration(request: APIRequestContext): Promise<ServerHandle> {
+  return startMuddyCollaboration(request, { MUDDY_CANVAS_WASM_FREE: "1", MUDDY_EDITOR_SCENE_DOM: "1" });
 }
 
 function ensureMuddyDist(): Promise<void> {

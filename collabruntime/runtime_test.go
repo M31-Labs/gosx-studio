@@ -60,6 +60,42 @@ func TestRuntimeOwnsTrustedRealtimeContracts(t *testing.T) {
 // create(panel)), not a change to the socket/presence protocol itself.
 // Clicking the toolbar summary must reveal the (collapsed-by-default)
 // detail panel.
+// TestRuntimeClassifiesInteractionOperationsAsDesignCapability guards
+// handoff-31: set-interaction/remove-interaction require CapabilityDesign
+// server-side (sqlstore.Apply groups them with style, HANDOFF-12), so the
+// client-side optimistic-enable gate in permissions() must classify them as
+// design actions too -- a studio-author (Author-only, no Design) principal
+// must see these buttons DISABLED, matching what the server would reject,
+// instead of an enabled button that always fails server-side.
+func TestRuntimeClassifiesInteractionOperationsAsDesignCapability(t *testing.T) {
+	script := string(Script())
+	for _, want := range []string{
+		`var kind = node.getAttribute("data-gosx-studio-operation-kind");`,
+		`kind === "set-interaction" || kind === "remove-interaction"`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("runtime missing interaction-as-design classification %q", want)
+		}
+	}
+}
+
+// TestRuntimeTargetKeyIncludesControlKey guards handoff-31's discovered
+// cache-collision bug: two interactions (or shared-field/flow-field
+// targets) attached to the SAME component share the same
+// route/pageId/field/componentKey and differ ONLY by ControlKey. Before
+// this fix, targetKey() omitted ControlKey entirely, so accepting the
+// FIRST one's operation cached a head the SECOND (a distinct,
+// never-before-written target) then wrongly reused as its own
+// expectedTargetHead, getting rejected as a false stale-field conflict —
+// reproduced live attaching reveal-on-scroll then hover-focus-state to the
+// same canvas component in the same page load.
+func TestRuntimeTargetKeyIncludesControlKey(t *testing.T) {
+	script := string(Script())
+	if !strings.Contains(script, `target.controlKey || ""`) {
+		t.Fatalf("collabruntime's targetKey() must include target.controlKey so distinct interaction/instance/flow targets on the same component never collide:\n%s", script)
+	}
+}
+
 func TestRuntimeBroadensPresenceToEveryFacepileAndToggleSummaryDetail(t *testing.T) {
 	script := string(Script())
 	for _, want := range []string{

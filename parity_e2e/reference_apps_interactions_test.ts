@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { clickAuthoringPanel, gotoEditor, openInteractionsTargetDisclosure, revealModeIfPresent, startMuddy } from "./reference_apps_harness";
+import { expect, test, type Page } from "@playwright/test";
+import { openInteractionsTargetDisclosure, revealModeIfPresent, startMuddyCollaboration } from "./reference_apps_harness";
 
 // Descriptor 05/06 independent review P1 fix + P2b executing proof.
 //
@@ -30,9 +30,27 @@ import { clickAuthoringPanel, gotoEditor, openInteractionsTargetDisclosure, reve
 // hero section immediately, with no scroll needed — the exact runtime
 // contract interactions_smoke_test.ts already proves against a synthetic
 // fixture, now proven end-to-end against the real host.
+//
+// Wave 5 (handoff-31, "one product path"): the interactions panel's
+// attach/remove forms now dispatch through the durable operation protocol
+// (operationruntime/island_runtime.js's [data-gosx-studio-durable-history])
+// instead of a plain managed-AJAX POST. collabruntime/island_runtime.js's
+// global permissions() gate disables every [data-gosx-studio-operation-kind]
+// button — including these — until its websocket handshake completes and
+// the server grants real capabilities, and that handshake needs a real
+// authenticated session (MUDDY_MOCK_AUTH only covers plain HTTP action
+// handlers). This file now uses startMuddyCollaboration + the
+// MUDDY_COLLAB_TEST_AUTH sign-in route (the same mechanism
+// reference_apps_collaboration_direct_edit_form_test.ts and
+// reference_apps_publish_changeset_test.ts already prove out) instead of
+// the plain startMuddy + clickAuthoringPanel HTTP-response wait, and commits
+// through the SAME gosxstudio:operation-committed/-error event contract
+// those files use.
 const HERO_SELECTOR = "[data-gosx-component='home:hero']";
 const HERO_INTERACTIONS_PANEL = "#studio-interactions-home-hero";
 const REVEAL_FORM = `${HERO_INTERACTIONS_PANEL} article[data-studio-interaction-card='reveal-on-scroll'] form[data-studio-interaction-row='reveal-on-scroll']`;
+const SET_INTERACTION_BUTTON = "[data-gosx-studio-operation-kind='set-interaction']";
+const COLLAB_PANEL = "[data-gosx-studio-collaboration='true']";
 const PUBLISH_BUTTON = "[data-studio-submit-action='publish']";
 const PUBLISH_ROUTE = "/admin/editor/__actions/publish";
 
@@ -45,8 +63,15 @@ test.describe("@reference-apps Muddy/Noni no-code interaction draft/live isolati
     // data-admin-confirm; auto-accept so window.confirm never stalls the test.
     page.on("dialog", (dialog) => { void dialog.accept(); });
 
-    const server = await startMuddy(request);
+    const server = await startMuddyCollaboration(request);
     try {
+      await page.goto(`${server.baseURL}/__test/collaboration/signin/admin`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      const collabPanel = page.locator(COLLAB_PANEL).first();
+      await expect(
+        collabPanel,
+        "the collaboration runtime must connect before durable operation buttons enable",
+      ).toHaveAttribute("data-studio-collab-state", "connected", { timeout: 20_000 });
+
       // Baseline: nothing attached yet, the public hero section carries no
       // interaction kind.
       await page.goto(`${server.baseURL}/`, { waitUntil: "domcontentloaded", timeout: 60_000 });
@@ -57,8 +82,10 @@ test.describe("@reference-apps Muddy/Noni no-code interaction draft/live isolati
       // Author the reveal-on-scroll interaction via the REAL editor panel —
       // the same interactions inspector row `interactions_panel_test.go`
       // (gosx-studio) and `interaction_authoring_test.go` (Noni) cover at
-      // the Go level; this drives the actual browser form submit.
-      await gotoEditor(page, server.baseURL);
+      // the Go level; this drives the actual browser durable-operation
+      // commit (not a raw runtime.submit() call).
+      await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await expect(collabPanel).toHaveAttribute("data-studio-collab-state", "connected", { timeout: 20_000 });
       // The interactions inspector is the Home-mode contextual inspector
       // (declutter slice: workbenchruntime's Bundle() now actually binds
       // mode tabs, so "advanced" would hide it instead of revealing it).
@@ -71,8 +98,7 @@ test.describe("@reference-apps Muddy/Noni no-code interaction draft/live isolati
       // picker — open both before the human step of clicking the row's own
       // submit button.
       await openInteractionsTargetDisclosure(page, HERO_INTERACTIONS_PANEL);
-      const setResponse = await clickAuthoringPanel(page, REVEAL_FORM);
-      expect(setResponse.status(), "attaching the interaction must not fail server-side").toBe(200);
+      await commitInteraction(page, revealForm, SET_INTERACTION_BUTTON);
 
       // Draft/live isolation — the descriptor 05/06 review P1 fix's core
       // assertion: the public home page STILL carries nothing, while the
@@ -94,7 +120,7 @@ test.describe("@reference-apps Muddy/Noni no-code interaction draft/live isolati
       // Publish through the REAL publish panel (the SAME PUBLISH_BUTTON/
       // PUBLISH_ROUTE reference_apps_canvas_draft_publish_test.ts already
       // drives for hero-headline draft/live isolation).
-      await gotoEditor(page, server.baseURL);
+      await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
       await revealModeIfPresent(page, "publish");
       const publishButton = page.locator(PUBLISH_BUTTON).first();
       await expect(publishButton, "the Publish button must be present").toBeVisible({ timeout: 15_000 });
@@ -145,3 +171,18 @@ test.describe("@reference-apps Muddy/Noni no-code interaction draft/live isolati
     }
   });
 });
+
+// commitInteraction clicks the given operation-kind button inside form and
+// waits for the durable gosxstudio:operation-committed/-error event pair,
+// failing loudly if the commit was rejected instead of silently timing out.
+async function commitInteraction(page: Page, form: import("@playwright/test").Locator, buttonSelector: string) {
+  const outcome = page.evaluate(
+    () => new Promise<{ kind: "committed" | "error"; detail: unknown }>((resolve) => {
+      document.addEventListener("gosxstudio:operation-committed", (event) => resolve({ kind: "committed", detail: (event as CustomEvent).detail }), { once: true });
+      document.addEventListener("gosxstudio:operation-error", (event) => resolve({ kind: "error", detail: (event as CustomEvent).detail }), { once: true });
+    }),
+  );
+  await form.locator(buttonSelector).click();
+  const result = await outcome;
+  expect(result.kind, `the durable interaction commit must succeed; got ${JSON.stringify(result)}`).toBe("committed");
+}

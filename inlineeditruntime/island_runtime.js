@@ -59,6 +59,28 @@
   // Marks an overlay we have already wired so a second install() is a no-op.
   var INSTALLED_FLAG = "__gosxInlineEditInstalled";
 
+  // Durable-history opt-in (handoff-31, "one product path"): a host marks an
+  // editable field with DURABLE_ATTR="true" when a durable OperationKind
+  // ledger target already exists for it (e.g. panels/direct_edit_panel.go
+  // already established "hero.headline"/"pages.about.title" as durable
+  // set-field targets). DURABLE_FIELD_ATTR overrides the exact
+  // OperationTarget.Field literal the ledger expects when it differs from
+  // the canvas binding string itself (e.g. a canvas surface's
+  // data-studio-field="home.hero.headline" but the durable ledger's Field is
+  // "hero.headline" — same underlying value, two different addressing
+  // schemes that predate this slice); it defaults to the binding when
+  // absent, which already matches for bindings like "pages.about.title"
+  // that were authored identically on both paths. DURABLE_PAGE_ID_ATTR/
+  // DURABLE_ROUTE_ATTR/DURABLE_COMPONENT_ATTR are the OperationTarget's
+  // remaining addressing fields; a host must render them explicitly (no
+  // guessing) because the durable ledger's PageID convention ("page:home")
+  // does not overlap with PAGE_KEY_ATTR's bare update-page pageKey ("home").
+  var DURABLE_ATTR = "data-gosx-studio-durable-history";
+  var DURABLE_FIELD_ATTR = "data-gosx-studio-durable-field";
+  var DURABLE_PAGE_ID_ATTR = "data-gosx-studio-durable-page-id";
+  var DURABLE_ROUTE_ATTR = "data-gosx-studio-durable-route";
+  var DURABLE_COMPONENT_ATTR = "data-gosx-studio-durable-component";
+
   // isEditableField returns true when el is a non-null element that has a
   // non-empty data-studio-field attribute and contenteditable !== "false".
   function isEditableField(el) {
@@ -483,6 +505,50 @@
     };
   }
 
+  // durableMetaFromElement reports whether el opts into the durable
+  // collaboration-operation path and, if so, the OperationTarget address to
+  // submit against. enabled is false unless the host explicitly rendered
+  // DURABLE_ATTR="true" — every field that predates this opt-in (or that has
+  // no durable ledger counterpart yet) is completely unaffected.
+  function durableMetaFromElement(el, binding) {
+    if (!el || typeof el.getAttribute !== "function") return { enabled: false };
+    if (String(el.getAttribute(DURABLE_ATTR) || "").toLowerCase() !== "true") return { enabled: false };
+    return {
+      enabled: true,
+      field: el.getAttribute(DURABLE_FIELD_ATTR) || binding,
+      pageId: el.getAttribute(DURABLE_PAGE_ID_ATTR) || "",
+      route: el.getAttribute(DURABLE_ROUTE_ATTR) || "/",
+      componentKey: el.getAttribute(DURABLE_COMPONENT_ATTR) || deriveKeys(binding).component,
+    };
+  }
+
+  // durableOperationRequest builds a schema-1 OperationRequest for a
+  // contenteditable text commit: always kind "set-field", matching the exact
+  // wire shape operationruntime/island_runtime.js's collaborationRequest
+  // builds for the SAME kind, so the server-side decode path is identical
+  // regardless of which client island produced the request.
+  function durableOperationRequest(durable, value) {
+    return {
+      schemaVersion: 1,
+      id: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : (String(Date.now()) + Math.random()),
+      kind: "set-field",
+      target: {
+        route: durable.route || "/",
+        pageId: durable.pageId || "",
+        field: durable.field || "",
+        componentKey: durable.componentKey || "",
+        nodeId: "",
+        property: "",
+        breakpoint: "base",
+        state: "default",
+      },
+      value: value,
+      expectedDocumentRevision: 0,
+      expectedTargetHead: "",
+      historyOperationId: "",
+    };
+  }
+
   // buildBody assembles the application/x-www-form-urlencoded POST payload.
   function buildBody(binding, value, meta) {
     meta = meta || {};
@@ -576,16 +642,50 @@
       if (hasWeakMap) starts.set(el, value);
       else { fallbackEl = el; fallbackStart = value; }
 
+      // Optional pre-POST hook: lets hosts apply repaint-safe markup surgery
+      // (e.g. muddy's persistRepaintSafe) without that logic living here.
+      // Runs before EITHER commit path below so the visible DOM/painter cache
+      // surgery happens the same way regardless of which one is taken.
+      if (typeof opts.onCommit === "function") {
+        try { opts.onCommit(el, value); } catch (e) { /* never break the commit */ }
+      }
+
+      // Durable dispatch (handoff-31, "one product path"): a field the host
+      // opted in (DURABLE_ATTR="true") with a live, synced collaboration
+      // transport submits through the SAME durable operation protocol
+      // operationruntime/island_runtime.js's direct-edit forms use — the
+      // OperationRecord log, the publish change-set, undo/redo, and
+      // cross-session conflict detection all see this edit. This REPLACES
+      // the legacy save-control POST below for that one commit (never both —
+      // exactly one write per commit). Only when the field is not
+      // durable-enabled, or collaboration is unavailable/not yet synced,
+      // does this fall through to the legacy POST — the same fallback
+      // discipline operationruntime's own submit() already uses, so a
+      // collaboration outage degrades to the old behavior instead of
+      // breaking editing outright.
+      var durable = durableMetaFromElement(el, binding);
+      var collaboration = (typeof window !== "undefined") ? window.GoSXStudioCollaborationRuntime : null;
+      var collaborationReady = durable.enabled && collaboration &&
+        typeof collaboration.available === "function" && collaboration.available() &&
+        typeof collaboration.submit === "function";
+      if (collaborationReady) {
+        var request = durableOperationRequest(durable, value);
+        if (typeof collaboration.expectedHead === "function") request.expectedTargetHead = collaboration.expectedHead(request);
+        collaboration.submit(request).catch(function () {
+          // A rejection (stale head / conflict / transport error) is already
+          // surfaced generically by collabruntime/island_runtime.js's own
+          // rejected() handler (the [data-studio-collab-conflict] banner +
+          // gosxstudio:collaboration-operation-rejected event) — nothing
+          // further to do here, and this must never throw back into the
+          // caller's blur/keydown handler.
+        });
+        return; // Durable path taken: the legacy POST below never fires for this commit.
+      }
+
       // Resolve action + CSRF lazily at commit time so opts can be set after
       // install() and so the managed-form token is always the live value.
       var action = resolveAction(root, opts.action);
       var csrf = resolveCSRF(root, opts.csrfToken);
-
-      // Optional pre-POST hook: lets hosts apply repaint-safe markup surgery
-      // (e.g. muddy's persistRepaintSafe) without that logic living here.
-      if (typeof opts.onCommit === "function") {
-        try { opts.onCommit(el, value); } catch (e) { /* never break the commit */ }
-      }
 
       var doFetch = opts.fetch || (typeof window !== "undefined" ? window.fetch : null);
       if (typeof doFetch !== "function") return;

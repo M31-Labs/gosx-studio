@@ -185,7 +185,18 @@
     var targetHeads = {};
     function targetKey(target, extra) {
       extra = extra || {};
-      return [target.route || "/", target.pageId || "", target.field || "", extra.componentKey || target.componentKey || "", extra.property || target.property || "", extra.breakpoint || target.breakpoint || "base", extra.state || target.state || "default"].join("|");
+      // controlKey addresses one named sub-key WITHIN a componentKey/pageId
+      // container (an interaction's key, a shared/override instance's
+      // control key, a flow field's name). Omitting it here (handoff-31
+      // finding) let every interaction attached to the SAME component
+      // collide onto one local-cursor cache entry -- see the matching fix
+      // in collabruntime/island_runtime.js's own targetKey(), which is what
+      // actually gates a live-collaboration submit's expectedTargetHead;
+      // this local cache only matters for the plain-POST fallback (no
+      // collaboration) and this form's own updateHistoryButtons/undo-redo
+      // association, but must stay consistent with the same target-identity
+      // discipline.
+      return [target.route || "/", target.pageId || "", target.field || "", extra.componentKey || target.componentKey || "", extra.controlKey || target.controlKey || "", extra.property || target.property || "", extra.breakpoint || target.breakpoint || "base", extra.state || target.state || "default"].join("|");
     }
     function setSelection(detail) { selected = detail || null; form.dispatchEvent(new CustomEvent("gosxstudio:operation-selection", { bubbles: true, detail: selected })); }
     function request(kind, value, extra) {
@@ -197,7 +208,12 @@
       // The form cursor belongs to its selected content target. Style/reset
       // scopes have independent target heads and must start empty (or use the
       // per-target map), otherwise a prior headline save falsely conflicts.
-      if (expectedHead === "" && kind === "set-field" && effectiveKey === targetKey(target, {})) expectedHead = form.getAttribute("data-studio-target-head") || "";
+      // set-interaction/remove-interaction share this same form-level seed
+      // (handoff-31): an already-attached interaction's Save/Remove after a
+      // fresh page load must start from the host-rendered current head, not
+      // a blank in-memory cursor, or it would falsely conflict against its
+      // own real state the first time either button is clicked post-load.
+      if (expectedHead === "" && (kind === "set-field" || kind === "set-interaction" || kind === "remove-interaction") && effectiveKey === targetKey(target, {})) expectedHead = form.getAttribute("data-studio-target-head") || "";
       if (expectedHead === "" && form.hasAttribute("data-studio-layout-control")) expectedHead = form.getAttribute("data-studio-target-head") || "";
       var payload = { gosx_studio_operation: kind, gosx_studio_operation_id: extra.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()), gosx_studio_page_route: extra.route || target.route || "/", gosx_studio_page_key: extra.pageId || target.pageId || target.page || "", gosx_studio_component_key: extra.componentKey || target.componentKey || target.blockKey || "", gosx_studio_binding: extra.field || target.field || "", gosx_studio_value: value || "", gosx_studio_style_property: extra.property || target.property || "", gosx_studio_style_value: value || "", gosx_studio_breakpoint: extra.breakpoint || target.breakpoint || "base", gosx_studio_state: extra.state || target.state || "default", gosx_studio_expected_revision: extra.revision || form.getAttribute("data-studio-document-revision") || "0", gosx_studio_expected_target_head: expectedHead, gosx_studio_history_operation_id: extra.historyOperationId || "",
         // Instance/interaction/flow durable operation addressing + typed
@@ -244,6 +260,27 @@
           if (editorValue) value = "value" in editorValue ? editorValue.value : (editorValue.textContent || "");
         }
         form.__gosxOperationRuntime.select({ route: button.getAttribute("data-gosx-studio-route") || form.getAttribute("data-studio-target-route") || "/", pageId: button.getAttribute("data-gosx-studio-page-id") || form.getAttribute("data-studio-target-page-id") || "", field: button.getAttribute("data-gosx-studio-field") || form.getAttribute("data-studio-target-field") || "", componentKey: button.getAttribute("data-gosx-studio-component") || form.getAttribute("data-studio-target-component") || "", property: button.getAttribute("data-gosx-studio-style-property") || "" });
+        // set-interaction reads its Effect/Duration/Delay/Once from the
+        // form's own live named controls (the operator's current dropdown
+        // picks), NOT from any static button attribute — the button never
+        // carries one, and even if a host did render one it would go stale
+        // the instant the operator changed a select without a page reload.
+        // The field names are the exact authoring.AuthoringField* literals
+        // panels/interactions_panel.go's <select>/<input> elements render.
+        var interactionEffect = button.getAttribute("data-gosx-studio-interaction-effect");
+        var durationMs = button.getAttribute("data-gosx-studio-duration-ms");
+        var delayMs = button.getAttribute("data-gosx-studio-delay-ms");
+        var once = button.getAttribute("data-gosx-studio-once") === "true";
+        if (kind === "set-interaction") {
+          var effectNode = form.querySelector("[name='gosx_studio_interaction_effect']");
+          var durationNode = form.querySelector("[name='gosx_studio_interaction_duration_ms']");
+          var delayNode = form.querySelector("[name='gosx_studio_interaction_delay_ms']");
+          var onceNode = form.querySelector("[name='gosx_studio_interaction_once']");
+          if (effectNode) interactionEffect = effectNode.value;
+          if (durationNode) durationMs = durationNode.value;
+          if (delayNode) delayMs = delayNode.value;
+          if (onceNode) once = !!onceNode.checked;
+        }
         form.__gosxOperationRuntime.commit(kind, value, {
           componentKey: button.getAttribute("data-gosx-studio-component"), property: button.getAttribute("data-gosx-studio-style-property"),
           breakpoint: button.getAttribute("data-gosx-studio-breakpoint"), state: button.getAttribute("data-gosx-studio-style-state"),
@@ -259,8 +296,7 @@
           flowFieldLabel: button.getAttribute("data-gosx-studio-flow-field-label"), controlKind: button.getAttribute("data-gosx-studio-control-kind"),
           required: button.getAttribute("data-gosx-studio-required") === "true",
           interactionKey: button.getAttribute("data-gosx-studio-interaction-key"), interactionKind: button.getAttribute("data-gosx-studio-interaction-kind"),
-          interactionEffect: button.getAttribute("data-gosx-studio-interaction-effect"), durationMs: button.getAttribute("data-gosx-studio-duration-ms"),
-          delayMs: button.getAttribute("data-gosx-studio-delay-ms"), once: button.getAttribute("data-gosx-studio-once") === "true"
+          interactionEffect: interactionEffect, durationMs: durationMs, delayMs: delayMs, once: once
         });
       });
     });

@@ -89,3 +89,56 @@ func TestRuntimeDispatchesInstanceInteractionAndFlowDurableFamilies(t *testing.T
 		}
 	}
 }
+
+// TestRuntimeReadsLiveInteractionControlsAtClickTime guards handoff-31: the
+// interactions panel's Effect/Duration/Delay/Once controls are ordinary named
+// <select>/<input> elements the operator can change after page load. A
+// set-interaction click must submit whatever the operator currently has
+// selected, not a stale value snapshotted onto the button at render time (the
+// button never carries one for this kind — see
+// panels/interactions_panel.go — so without this the JSON settings payload
+// would silently submit blank/default values regardless of the operator's
+// picks).
+func TestRuntimeReadsLiveInteractionControlsAtClickTime(t *testing.T) {
+	script := string(Script())
+	for _, want := range []string{
+		`if (kind === "set-interaction") {`,
+		`form.querySelector("[name='gosx_studio_interaction_effect']")`,
+		`form.querySelector("[name='gosx_studio_interaction_duration_ms']")`,
+		`form.querySelector("[name='gosx_studio_interaction_delay_ms']")`,
+		`form.querySelector("[name='gosx_studio_interaction_once']")`,
+		`if (effectNode) interactionEffect = effectNode.value;`,
+		`if (onceNode) once = !!onceNode.checked;`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("runtime missing live interaction control read %q", want)
+		}
+	}
+}
+
+// TestRuntimeSeedsTargetHeadForInteractionKindsTooRow guards handoff-31: a
+// Save/Remove on an ALREADY-ATTACHED interaction, right after a fresh page
+// load (before any in-memory targetHeads cache entry exists for it), must
+// seed its expected head from the form's own data-studio-target-head
+// attribute — exactly like set-field already does — or it would submit a
+// blank expected head against a target that genuinely has one and get
+// rejected as a false conflict.
+func TestRuntimeSeedsTargetHeadForInteractionKindsTooRow(t *testing.T) {
+	script := string(Script())
+	if !strings.Contains(script, `(kind === "set-field" || kind === "set-interaction" || kind === "remove-interaction")`) {
+		t.Fatalf("runtime must seed the form-level target head for set-interaction/remove-interaction the same way set-field already does:\n%s", script)
+	}
+}
+
+// TestRuntimeLocalTargetKeyIncludesControlKey mirrors
+// collabruntime's own regression test: this form-local cache's targetKey()
+// must also key on controlKey, or two interactions attached to the same
+// component (same route/pageId/field/componentKey, different ControlKey)
+// would collide in the plain-POST fallback / undo-redo association path
+// too.
+func TestRuntimeLocalTargetKeyIncludesControlKey(t *testing.T) {
+	script := string(Script())
+	if !strings.Contains(script, `extra.controlKey || target.controlKey || ""`) {
+		t.Fatalf("operationruntime's local targetKey() must include controlKey so distinct interaction/instance/flow targets on the same component never collide:\n%s", script)
+	}
+}

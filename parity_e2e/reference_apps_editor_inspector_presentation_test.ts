@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 import { mkdtempSync, copyFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { clickAuthoringPanel, openInteractionsTargetDisclosure, revealModeIfPresent, startMuddy, type ServerHandle } from "./reference_apps_harness";
+import { openInteractionsTargetDisclosure, revealModeIfPresent, startMuddy, startMuddyCollaboration, type ServerHandle } from "./reference_apps_harness";
 
 // Wave 3A (inspector-presentation): the post-wave-2 re-score (6/10) found the
 // entire gap to 7-8 was the Home inspector's presentation once real content
@@ -27,6 +27,32 @@ async function startMuddyWithStagingSeed(request: APIRequestContext): Promise<Se
   const seedPath = path.join(seedDir, "cms.json");
   copyFileSync(path.join(__dirname, "fixtures", "noni_staging_seed.json"), seedPath);
   const server = await startMuddy(request, { MUDDY_DATA_PATH: seedPath });
+  const stop = server.stop.bind(server);
+  return {
+    ...server,
+    stop: async () => {
+      await stop();
+      rmSync(seedDir, { force: true, recursive: true });
+    },
+  };
+}
+
+// startMuddyCollaborationWithStagingSeed mirrors startMuddyWithStagingSeed but
+// boots with a live, authenticated collaboration transport (handoff-31): the
+// interactions row's Save/Add button now dispatches through the durable
+// operation protocol (operationruntime/island_runtime.js's
+// [data-gosx-studio-durable-history]), and collabruntime's permissions() gate
+// disables that button entirely until a real websocket handshake grants
+// capabilities — the plain startMuddy harness above never establishes one
+// (MUDDY_MOCK_AUTH only covers plain HTTP action handlers, not the
+// collaboration websocket's own auth; see
+// reference_apps_interactions_test.ts's header comment for the full
+// rationale), so any test that clicks that button needs this instead.
+async function startMuddyCollaborationWithStagingSeed(request: APIRequestContext): Promise<ServerHandle> {
+  const seedDir = mkdtempSync(path.join(tmpdir(), "gosx-studio-inspector-presentation-collab-seed-"));
+  const seedPath = path.join(seedDir, "cms.json");
+  copyFileSync(path.join(__dirname, "fixtures", "noni_staging_seed.json"), seedPath);
+  const server = await startMuddyCollaboration(request, { MUDDY_DATA_PATH: seedPath });
   const stop = server.stop.bind(server);
   return {
     ...server,
@@ -114,9 +140,17 @@ test.describe("@reference-apps Muddy/Noni inspector presentation (wave 3A)", () 
   });
 
   test("an interaction target's disclosure expands independently without affecting its siblings", async ({ page, request }) => {
-    const server = await startMuddyWithStagingSeed(request);
+    const server = await startMuddyCollaborationWithStagingSeed(request);
     try {
+      await page.goto(`${server.baseURL}/__test/collaboration/signin/designer`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      const collabPanel = page.locator("[data-gosx-studio-collaboration='true']");
+      await expect(
+        collabPanel,
+        "the collaboration runtime must connect before the durable operation button enables",
+      ).toHaveAttribute("data-studio-collab-state", "connected", { timeout: 20_000 });
+
       await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "networkidle", timeout: 60_000 });
+      await expect(collabPanel).toHaveAttribute("data-studio-collab-state", "connected", { timeout: 20_000 });
       await page.waitForTimeout(1_500);
 
       // This fixture's staging seed has ZERO pre-attached interactions (see
@@ -135,15 +169,22 @@ test.describe("@reference-apps Muddy/Noni inspector presentation (wave 3A)", () 
       const revealForm = `${heroPanel} article[data-studio-interaction-card='reveal-on-scroll'] form[data-studio-interaction-row='reveal-on-scroll']`;
       await expect(page.locator(revealForm), "the hero reveal-on-scroll interaction row must render").toBeAttached({ timeout: 15_000 });
       await openInteractionsTargetDisclosure(page, heroPanel);
-      // reloadAfter/settleAfter: false — this 15-target staging seed page
-      // has enough ongoing background asset activity that a strict
-      // networkidle wait (the harness's own default post-click behavior)
-      // isn't reliable within the config's 30s navigationTimeout. Reload
-      // explicitly below with the same domcontentloaded + generous-timeout
-      // pattern gotoEditor/reference_apps_interactions_test.ts already use
-      // for this reason.
-      const attachResponse = await clickAuthoringPanel(page, revealForm, { reloadAfter: false, settleAfter: false });
-      expect(attachResponse.status(), "attaching the hero interaction must not fail server-side").toBe(200);
+      // Commit through the durable operation protocol (handoff-31) instead
+      // of the retired plain-AJAX POST clickAuthoringPanel waited on —
+      // reload explicitly afterward with the same domcontentloaded +
+      // generous-timeout pattern gotoEditor/reference_apps_interactions_test.ts
+      // already use (this 15-target staging seed page has enough ongoing
+      // background asset activity that a strict networkidle wait isn't
+      // reliable within the config's 30s navigationTimeout).
+      const committed = page.evaluate(
+        () => new Promise<{ kind: "committed" | "error" }>((resolve) => {
+          document.addEventListener("gosxstudio:operation-committed", () => resolve({ kind: "committed" }), { once: true });
+          document.addEventListener("gosxstudio:operation-error", () => resolve({ kind: "error" }), { once: true });
+        }),
+      );
+      await page.locator(`${revealForm} [data-gosx-studio-operation-kind='set-interaction']`).click();
+      const outcome = await committed;
+      expect(outcome.kind, "attaching the hero interaction must not fail server-side").toBe("committed");
       await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
       await page.waitForTimeout(1_500);
 

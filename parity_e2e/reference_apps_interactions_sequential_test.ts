@@ -1,24 +1,26 @@
-import { expect, test } from "@playwright/test";
-import { clickAuthoringPanel, gotoEditor, openInteractionsTargetDisclosure, revealModeIfPresent, startMuddy } from "./reference_apps_harness";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { openInteractionsTargetDisclosure, revealModeIfPresent, startMuddyCollaboration } from "./reference_apps_harness";
 
 // HANDOFF-21 regression probe: "interaction fails after an edit" (owner
-// report on Noni staging). Every existing authoring-managed-form e2e test
-// (reference_apps_interactions_test.ts included) drives clicks through
-// clickEditorActionButton/clickAuthoringPanel, whose default `reloadAfter`
-// behavior forces an explicit page.goto(page.url()) reload after EVERY
-// click -- which re-executes every <script> on the page and re-runs every
-// runtime's DOMContentLoaded bind() from scratch. That default masks any
-// bug where a SECOND authoring-managed save on the SAME page load (no
-// reload in between -- the real end-user's browser behavior, since
-// authoringruntime/island_runtime.js's document-level submit listener
-// intercepts the click via fetch/AJAX, not a real navigation) silently
-// stops working. This test forces `reloadAfter: false` for both saves to
-// match the real end-user's browser behavior and checks whether the SECOND
-// interaction attach (a different interaction kind, same component, no
-// reload) actually reaches the server and persists.
+// report on Noni staging). This test forces two saves on the SAME page load
+// (no reload in between — the real end-user's browser behavior) and checks
+// whether the SECOND interaction attach (a different interaction kind, same
+// component, no reload) actually reaches the server and persists.
+//
+// Wave 5 (handoff-31, "one product path"): the interactions panel's
+// attach/remove forms now dispatch through the durable operation protocol
+// instead of a plain managed-AJAX POST, so this now drives
+// startMuddyCollaboration + the MUDDY_COLLAB_TEST_AUTH sign-in route and
+// commits through the gosxstudio:operation-committed/-error event contract —
+// see reference_apps_interactions_test.ts's header comment for the full
+// rationale (collabruntime's permissions() gate disables every
+// [data-gosx-studio-operation-kind] button until a real, authenticated
+// websocket handshake grants capabilities).
 const HERO_INTERACTIONS_PANEL = "#studio-interactions-home-hero";
 const REVEAL_FORM = `${HERO_INTERACTIONS_PANEL} article[data-studio-interaction-card='reveal-on-scroll'] form[data-studio-interaction-row='reveal-on-scroll']`;
 const HOVER_FORM = `${HERO_INTERACTIONS_PANEL} article[data-studio-interaction-card='hover-focus-state'] form[data-studio-interaction-row='hover-focus-state']`;
+const SET_INTERACTION_BUTTON = "[data-gosx-studio-operation-kind='set-interaction']";
+const COLLAB_PANEL = "[data-gosx-studio-collaboration='true']";
 
 test.describe("@reference-apps Muddy/Noni interactions: sequential same-page saves", () => {
   test.describe.configure({ timeout: 180_000 });
@@ -26,9 +28,17 @@ test.describe("@reference-apps Muddy/Noni interactions: sequential same-page sav
 
   test("attaching a second interaction on the same page load (no reload) still succeeds", async ({ page, request }) => {
     page.on("dialog", (dialog) => { void dialog.accept(); });
-    const server = await startMuddy(request);
+    const server = await startMuddyCollaboration(request);
     try {
-      await gotoEditor(page, server.baseURL);
+      await page.goto(`${server.baseURL}/__test/collaboration/signin/designer`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      const collabPanel = page.locator(COLLAB_PANEL).first();
+      await expect(
+        collabPanel,
+        "the collaboration runtime must connect before durable operation buttons enable",
+      ).toHaveAttribute("data-studio-collab-state", "connected", { timeout: 20_000 });
+
+      await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await expect(collabPanel).toHaveAttribute("data-studio-collab-state", "connected", { timeout: 20_000 });
       // The interactions inspector is the Home-mode contextual inspector
       // (declutter slice: workbenchruntime's Bundle() now actually binds, so
       // "advanced" would hide it) — "home" is also the default, so this is a
@@ -43,10 +53,7 @@ test.describe("@reference-apps Muddy/Noni interactions: sequential same-page sav
       // inside it) and the target's own per-target disclosure before the
       // human step of clicking the row's own submit button.
       await openInteractionsTargetDisclosure(page, HERO_INTERACTIONS_PANEL);
-      const firstResponse = await clickAuthoringPanel(page, REVEAL_FORM, { reloadAfter: false });
-      expect(firstResponse.status(), "attaching the first interaction must not fail server-side").toBe(200);
-      const firstBody = await firstResponse.json();
-      expect(firstBody?.data?.message ?? firstBody?.message ?? "", "first save should report success").toContain("saved");
+      await commitInteraction(page, revealForm, SET_INTERACTION_BUTTON, "first (reveal-on-scroll) attach");
 
       // NO page reload here -- this is the exact gap: a real user stays on
       // the same page and immediately attaches a second interaction. The
@@ -58,10 +65,7 @@ test.describe("@reference-apps Muddy/Noni interactions: sequential same-page sav
       const hoverForm = page.locator(HOVER_FORM);
       await expect(hoverForm, "the hero hover-focus-state interaction row must still be attached").toBeAttached({ timeout: 5_000 });
       await openInteractionsTargetDisclosure(page, HERO_INTERACTIONS_PANEL);
-      const secondResponse = await clickAuthoringPanel(page, HOVER_FORM, { reloadAfter: false, noWaitAfter: false });
-      expect(secondResponse.status(), "attaching the SECOND interaction (same page, no reload) must not fail server-side").toBe(200);
-      const secondBody = await secondResponse.json();
-      expect(secondBody?.data?.message ?? secondBody?.message ?? "", "second save should report success").toContain("saved");
+      await commitInteraction(page, hoverForm, SET_INTERACTION_BUTTON, "second (hover-focus-state) attach, same page, no reload");
 
       // Confirm both interactions actually persisted (not just that a
       // request was sent) by reloading and reading the panel's own
@@ -78,3 +82,18 @@ test.describe("@reference-apps Muddy/Noni interactions: sequential same-page sav
     }
   });
 });
+
+// commitInteraction clicks the given operation-kind button inside form and
+// waits for the durable gosxstudio:operation-committed/-error event pair,
+// failing loudly (with a labeled message) instead of silently timing out.
+async function commitInteraction(page: Page, form: Locator, buttonSelector: string, label: string) {
+  const outcome = page.evaluate(
+    () => new Promise<{ kind: "committed" | "error"; detail: unknown }>((resolve) => {
+      document.addEventListener("gosxstudio:operation-committed", (event) => resolve({ kind: "committed", detail: (event as CustomEvent).detail }), { once: true });
+      document.addEventListener("gosxstudio:operation-error", (event) => resolve({ kind: "error", detail: (event as CustomEvent).detail }), { once: true });
+    }),
+  );
+  await form.locator(buttonSelector).click();
+  const result = await outcome;
+  expect(result.kind, `${label} must succeed; got ${JSON.stringify(result)}`).toBe("committed");
+}
