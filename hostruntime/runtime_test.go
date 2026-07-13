@@ -1712,6 +1712,36 @@ func TestEngineRuntimeHandlerServesIslandBundles(t *testing.T) {
 	}
 }
 
+// TestWorkbenchRuntimeScopesResponsiveLayoutInspectorsBySelection guards
+// wave 3A fix (b): the "respLayoutCount=2" defect (muddy-noni-commerce's
+// editorDirectEditPanels always Fragments home:hero's AND about:content's
+// RenderResponsiveLayoutInspector together, outside this <form>, regardless
+// of which one is actually selected). scopeResponsiveLayoutInspectors is the
+// studio-side idempotence guard that hides every instance except the one
+// matching the live canvas selection (or the first, with no selection yet)
+// by toggling [hidden] — already display:none via the [hidden] rule in
+// studio.css — so a live measurement only ever finds one visible
+// "Responsive layout" heading even though the host still composes several.
+func TestWorkbenchRuntimeScopesResponsiveLayoutInspectorsBySelection(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		"function scopeResponsiveLayoutInspectors(form)",
+		`queryAll(document, "[data-studio-responsive-layout-inspector]")`,
+		`panel.setAttribute("hidden", "true")`,
+		`panel.removeAttribute("hidden")`,
+		"scopeResponsiveLayoutInspectors(form);",
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing %q", check)
+		}
+	}
+	// Must run both at initial bind (server-rendered default selection) and
+	// whenever the canvas selection changes, not just once.
+	if strings.Count(script, "scopeResponsiveLayoutInspectors(form)") < 2 {
+		t.Fatalf("expected scopeResponsiveLayoutInspectors to be invoked at init and on selection change, got:\n%s", script)
+	}
+}
+
 func TestAssetHrefAddsEscapedVersion(t *testing.T) {
 	if got := AssetHref(EngineRuntimePath, "build 1"); got != EngineRuntimePath+"?v=build+1" {
 		t.Fatalf("asset href = %q", got)

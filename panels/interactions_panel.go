@@ -2,6 +2,7 @@ package panels
 
 import (
 	"strconv"
+	"strings"
 
 	"m31labs.dev/gosx"
 	"m31labs.dev/gosx-studio/authoring"
@@ -18,6 +19,29 @@ import (
 // that shape without extending the durable operation protocol, which is out
 // of scope here. A later slice can add collaboration-aware interaction
 // editing once that protocol grows an extensible payload.
+//
+// Wave 3A (inspector-presentation): this file used to render one full
+// "Interactions" section per canvas target, always fully expanded — a host
+// composing N targets (editorInteractionsPanels in muddy-noni-commerce loops
+// over every canvas target and Fragments one RenderInteractionsPanel call per
+// target) produced N repeated headers and N*len(kinds) always-visible
+// Effect/Duration/Delay selects with no way to collapse or hide the ones
+// nobody attached ("HOME with staging content" measured 162 visible selects
+// across 15 targets). Two changes fix this without requiring a host rewrite:
+//
+//  1. RenderInteractionsPanel now renders ONE TARGET as a compact card: a
+//     summary row (target label + attached-interaction summary) plus a
+//     closed-by-default <details> disclosure holding the existing per-kind
+//     edit rows. A host that keeps calling this per-target (unchanged call
+//     signature) already gets a dramatically smaller render.
+//  2. RenderInteractionsInspector is the new, correct entry point: it takes
+//     every target's options together, renders the "Interactions" header
+//     exactly once, lists targets that already have an attached interaction
+//     as compact cards, and tucks every target with ZERO attached
+//     interactions behind one shared "+ Add interaction" picker instead of
+//     pre-expanding 15 control sets. Hosts should switch their per-target loop
+//     to build a []InteractionsPanelOptions and call this once; see the
+//     handoff report for the exact muddy-noni-commerce wiring change.
 
 // InteractionOption is one allow-listed choice for an interaction's effect,
 // duration, or delay control.
@@ -47,8 +71,8 @@ type InteractionRow struct {
 	Reason            string
 }
 
-// InteractionsPanelOptions describes the selected canvas component the
-// interactions inspector edits.
+// InteractionsPanelOptions describes one canvas target the interactions
+// inspector edits.
 type InteractionsPanelOptions struct {
 	ID, Action, CSRFToken         string
 	PageKey, PageLabel, PageRoute string
@@ -56,31 +80,158 @@ type InteractionsPanelOptions struct {
 	Rows                          []InteractionRow
 }
 
-// RenderInteractionsPanel renders the reveal-on-scroll and hover-focus-state
-// rows for the selected component.
+// InteractionsInspectorOptions describes every canvas target the aggregate
+// inspector composes into one panel. See RenderInteractionsInspector.
+type InteractionsInspectorOptions struct {
+	ID      string
+	Targets []InteractionsPanelOptions
+}
+
+// RenderInteractionsPanel renders ONE target's compact interactions card: a
+// summary row plus a closed-by-default disclosure with the reveal-on-scroll
+// and hover-focus-state edit rows. Kept as a standalone entry point for hosts
+// that still call it once per target (unchanged signature/back-compat); for
+// the correct multi-target "+ Add interaction" picker UX see
+// RenderInteractionsInspector.
 func RenderInteractionsPanel(options InteractionsPanelOptions) gosx.Node {
+	options = interactionsPanelDefaults(options)
+	return renderInteractionsTargetCard(options)
+}
+
+// RenderInteractionsInspector renders the interactions inspector for every
+// target at once: one "Interactions" header, a compact card per target that
+// already has an attached interaction, and every target with zero attached
+// interactions grouped behind a single "+ Add interaction" disclosure
+// (punch #24 — add-interaction discoverability) instead of pre-expanded per
+// target.
+func RenderInteractionsInspector(options InteractionsInspectorOptions) gosx.Node {
+	id := core.FirstNonEmpty(options.ID, "studio-interactions-inspector")
+	attachedCards := make([]gosx.Node, 0, len(options.Targets))
+	unattachedCards := make([]gosx.Node, 0, len(options.Targets))
+	for _, target := range options.Targets {
+		target = interactionsPanelDefaults(target)
+		if interactionsTargetAttached(target.Rows) {
+			attachedCards = append(attachedCards, renderInteractionsTargetCard(target))
+			continue
+		}
+		unattachedCards = append(unattachedCards, renderInteractionsTargetCard(target))
+	}
+	children := []gosx.Node{
+		gosx.El("header", nil,
+			gosx.El("h3", nil, gosx.Text("Interactions")),
+			gosx.El("p", nil, gosx.Text("Attach safe, typed behavior to canvas elements. Reduced motion always shows content immediately; keyboard focus always gets the same treatment as hover.")),
+		),
+	}
+	if len(attachedCards) > 0 {
+		children = append(children, gosx.El("div", gosx.Attrs(
+			gosx.Attr("class", "studio-interactions__list"),
+			gosx.Attr("data-studio-interactions-list", "true"),
+		), gosx.Fragment(attachedCards...)))
+	} else {
+		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text("No elements have interactions attached yet.")))
+	}
+	if len(unattachedCards) > 0 {
+		children = append(children, gosx.El("details", gosx.Attrs(
+			gosx.Attr("class", "studio-interactions__add"),
+			gosx.Attr("data-studio-interactions-add", "true"),
+		),
+			gosx.El("summary", nil, gosx.Text(interactionsAddSummaryLabel(len(unattachedCards)))),
+			gosx.Fragment(unattachedCards...),
+		))
+	}
+	return gosx.El("section", gosx.Attrs(
+		gosx.Attr("id", id),
+		gosx.Attr("data-studio-interactions-inspector-group", "true"),
+	), gosx.Fragment(children...))
+}
+
+func interactionsPanelDefaults(options InteractionsPanelOptions) InteractionsPanelOptions {
 	if options.ID == "" {
-		options.ID = "studio-interactions"
+		options.ID = "studio-interactions-" + interactionsTargetIDSuffix(options.ComponentKey)
 	}
 	if options.Action == "" {
 		options.Action = "/admin/editor/__actions/authoring"
 	}
+	return options
+}
+
+func interactionsAddSummaryLabel(count int) string {
+	if count == 1 {
+		return "+ Add interaction (1 element available)"
+	}
+	return "+ Add interaction (" + strconv.Itoa(count) + " elements available)"
+}
+
+// renderInteractionsTargetCard renders one target's compact card: a header
+// (target label + a one-line summary of whatever is attached) plus a
+// closed-by-default <details> disclosure with the full per-kind edit rows —
+// the same rows renderInteractionRow always rendered, just no longer
+// pre-expanded for every target on the page.
+func renderInteractionsTargetCard(options InteractionsPanelOptions) gosx.Node {
 	rows := make([]gosx.Node, 0, len(options.Rows))
 	for _, row := range options.Rows {
 		rows = append(rows, renderInteractionRow(options, row))
 	}
-	return gosx.El("section", gosx.Attrs(
+	label := core.FirstNonEmpty(options.ComponentLabel, options.ComponentKey, "Untitled element")
+	attached := interactionsTargetAttached(options.Rows)
+	return gosx.El("article", gosx.Attrs(
 		gosx.Attr("id", options.ID),
+		gosx.Attr("class", "studio-interactions-target"),
 		gosx.Attr("data-studio-interactions-inspector", "true"),
+		gosx.Attr("data-studio-interactions-target", "true"),
+		gosx.Attr("data-studio-interaction-target-attached", core.BoolAttr(attached)),
 		gosx.Attr("data-studio-selected-route", options.PageRoute),
 		gosx.Attr("data-studio-selected-component", options.ComponentKey),
 	),
-		gosx.El("header", nil,
-			gosx.El("h3", nil, gosx.Text("Interactions")),
-			gosx.El("p", nil, gosx.Text("Attach safe, typed behavior to the selected element. Reduced motion always shows content immediately; keyboard focus always gets the same treatment as hover.")),
+		gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-interactions-target__head")),
+			gosx.El("strong", gosx.Attrs(gosx.Attr("data-studio-interaction-target-label", "true")), gosx.Text(label)),
+			gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-interaction-target-summary", "true")), gosx.Text(interactionsTargetSummary(options.Rows))),
 		),
-		gosx.Fragment(rows...),
+		gosx.El("details", gosx.Attrs(gosx.Attr("class", "studio-interactions-target__editor")),
+			gosx.El("summary", nil, gosx.Text(interactionsDisclosureLabel(attached))),
+			gosx.Fragment(rows...),
+		),
 	)
+}
+
+func interactionsTargetAttached(rows []InteractionRow) bool {
+	for _, row := range rows {
+		if row.Attached {
+			return true
+		}
+	}
+	return false
+}
+
+func interactionsTargetSummary(rows []InteractionRow) string {
+	parts := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if !row.Attached {
+			continue
+		}
+		effectLabel := core.InteractionEffectLabel(core.InteractionEffect(row.Effect))
+		parts = append(parts, row.KindLabel+": "+effectLabel)
+	}
+	if len(parts) == 0 {
+		return "Not attached"
+	}
+	return strings.Join(parts, " · ")
+}
+
+func interactionsDisclosureLabel(attached bool) string {
+	if attached {
+		return "Edit interactions"
+	}
+	return "+ Add interaction"
+}
+
+func interactionsTargetIDSuffix(componentKey string) string {
+	key := strings.TrimSpace(componentKey)
+	if key == "" {
+		return "target"
+	}
+	replacer := strings.NewReplacer(":", "-", " ", "-", ".", "-")
+	return replacer.Replace(key)
 }
 
 func renderInteractionRow(options InteractionsPanelOptions, row InteractionRow) gosx.Node {

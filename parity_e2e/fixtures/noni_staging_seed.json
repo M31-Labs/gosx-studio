@@ -1,0 +1,2575 @@
+{
+  "settings": {
+    "siteTitle": "Muddy Noni",
+    "tagline": "Small-batch ceramics for daily rituals",
+    "description": "Handbuilt and wheel-thrown ceramics from a quiet studio practice.",
+    "studioName": "Muddy Noni",
+    "ownerName": "Noni",
+    "contactEmail": "studio@muddynoni.local",
+    "instagram": "@muddynoni",
+    "websiteUrl": "https://noni.m31labs.dev",
+    "primaryDomain": "noni.m31labs.dev",
+    "localPickupEnabled": true,
+    "localPickupCopy": "Local pickup can be coordinated after purchase.",
+    "hero": {
+      "headline": "Ceramic pieces with evidence of the hand",
+      "subhead": "Functional vessels, small sculptures, and one-off studio objects released in small batches.",
+      "ctaLabel": "Shop available work",
+      "ctaUrl": "/shop"
+    },
+    "theme": {
+      "kit": "studio-release",
+      "template": "studio",
+      "palette": "clay",
+      "imageRatio": "landscape",
+      "custom": {
+        "name": "Noni custom",
+        "heroLayout": "overlay",
+        "contentWidth": "standard",
+        "productDensity": "balanced",
+        "heroHeight": "standard"
+      },
+      "style": {
+        "nav": "links",
+        "buttons": "pill",
+        "cards": "quiet",
+        "spacing": "balanced",
+        "imageFrame": "sharp",
+        "motion": "subtle"
+      }
+    },
+    "appearance": {},
+    "home": {
+      "sections": [
+        {
+          "key": "hero",
+          "templateKey": "hero",
+          "enabled": true
+        },
+        {
+          "key": "products",
+          "templateKey": "products",
+          "enabled": true
+        },
+        {
+          "key": "gallery",
+          "templateKey": "gallery",
+          "enabled": true
+        },
+        {
+          "key": "blog",
+          "templateKey": "blog",
+          "enabled": true
+        },
+        {
+          "key": "contact",
+          "templateKey": "contact",
+          "enabled": false
+        }
+      ]
+    },
+    "customCode": {},
+    "checkout": {},
+    "shippingEnabled": true,
+    "shippingCountries": [
+      "US",
+      "CA"
+    ],
+    "shippingOptions": [
+      {
+        "label": "Studio packed ground",
+        "amount": 1400,
+        "detail": "Insured ground shipping"
+      },
+      {
+        "label": "Local pickup",
+        "amount": 0,
+        "detail": "Coordinate pickup after purchase"
+      }
+    ],
+    "meta": {
+      "title": "Muddy Noni",
+      "description": "Small-batch ceramic studio.",
+      "image": {
+        "url": "",
+        "alt": ""
+      }
+    }
+  },
+  "draftSettings": {
+    "siteTitle": "Muddy Noni",
+    "tagline": "Small-batch ceramics for daily rituals",
+    "description": "Handbuilt and wheel-thrown ceramics from a quiet studio practice.",
+    "studioName": "Muddy Noni",
+    "ownerName": "Noni",
+    "contactEmail": "studio@muddynoni.local",
+    "instagram": "@muddynoni",
+    "websiteUrl": "https://noni.m31labs.dev",
+    "primaryDomain": "noni.m31labs.dev",
+    "localPickupEnabled": true,
+    "localPickupCopy": "Local pickup can be coordinated after purchase.",
+    "hero": {
+      "headline": "Ceramic pieces with evidence of the hand",
+      "subhead": "Functional vessels, small sculptures, and one-off studio objects released in small batches.",
+      "ctaLabel": "Shop available work",
+      "ctaUrl": "/shop"
+    },
+    "theme": {
+      "kit": "studio-release",
+      "template": "custom",
+      "palette": "clay",
+      "imageRatio": "landscape",
+      "custom": {
+        "name": "Noni custom",
+        "heroLayout": "editorial",
+        "contentWidth": "standard",
+        "productDensity": "airy",
+        "heroHeight": "standard"
+      },
+      "style": {
+        "nav": "buttons",
+        "buttons": "pill",
+        "cards": "framed",
+        "spacing": "airy",
+        "imageFrame": "round",
+        "motion": "still"
+      }
+    },
+    "appearance": {
+      "logoAlt": "Site logo"
+    },
+    "home": {
+      "sections": [
+        {
+          "key": "hero",
+          "templateKey": "hero",
+          "enabled": true
+        },
+        {
+          "key": "products",
+          "templateKey": "products",
+          "enabled": true
+        },
+        {
+          "key": "gallery",
+          "templateKey": "gallery",
+          "enabled": true
+        },
+        {
+          "key": "blog",
+          "templateKey": "blog",
+          "enabled": true
+        },
+        {
+          "key": "contact",
+          "templateKey": "contact",
+          "enabled": false
+        }
+      ]
+    },
+    "navigation": [
+      {
+        "label": "Home",
+        "href": "/",
+        "enabled": true,
+        "order": 1
+      },
+      {
+        "label": "Shop",
+        "href": "/shop",
+        "enabled": true,
+        "order": 2
+      },
+      {
+        "label": "Gallery",
+        "href": "/gallery",
+        "enabled": true,
+        "order": 3
+      },
+      {
+        "label": "Blog",
+        "href": "/blog",
+        "enabled": true,
+        "order": 4
+      },
+      {
+        "label": "About",
+        "href": "/about",
+        "enabled": true,
+        "order": 5
+      },
+      {
+        "label": "Contact",
+        "href": "/contact",
+        "enabled": true,
+        "order": 6
+      },
+      {
+        "label": "About the studio",
+        "href": "/pages/about",
+        "enabled": true,
+        "order": 7
+      }
+    ],
+    "customCode": {},
+    "checkout": {
+      "productId": "prd_seed_moss_cup",
+      "label": "Buy now"
+    },
+    "shippingEnabled": true,
+    "shippingCountries": [
+      "US",
+      "CA"
+    ],
+    "shippingOptions": [
+      {
+        "label": "Studio packed ground",
+        "amount": 1400,
+        "detail": "Insured ground shipping"
+      },
+      {
+        "label": "Local pickup",
+        "amount": 0,
+        "detail": "Coordinate pickup after purchase"
+      }
+    ],
+    "meta": {
+      "title": "Muddy Noni",
+      "description": "Small-batch ceramic studio.",
+      "image": {
+        "url": "",
+        "alt": ""
+      }
+    }
+  },
+  "draftPages": {
+    "about": {
+      "id": "pg_about",
+      "title": "About the studio",
+      "slug": "about",
+      "body": "Muddy Noni is a small ceramic practice focused on objects that make daily rituals feel slower and more attentive. Pieces are made in short runs, often one at a time, with visible throwing lines, hand-built seams, and glaze variation left intact.",
+      "bodyFormat": "blocks",
+      "published": true,
+      "meta": {
+        "title": "",
+        "description": "",
+        "image": {
+          "url": "",
+          "alt": ""
+        }
+      },
+      "created": "2026-05-06T19:27:26.674232915Z",
+      "updated": "2026-05-06T19:27:26.674232915Z"
+    }
+  },
+  "studioAuthoring": {
+    "documentRevision": 16,
+    "collaborationSequence": 16,
+    "targetHeads": {
+      "target:05d528e576bc34fb66ac7cfb6dd5b51f4cb487c110e3996fbc3102ae156ca096": "e3b8d84b-3821-485d-9860-51cb7833db5d",
+      "target:29555ff7287a284dc202ec9eade716b5d94db37e17fbab7305be57f75e561692": "1094b1df-28df-4cd1-bc99-ec8dee08a0ff",
+      "target:32cdf51e4a093b39d833d046cc72b746d059585f56150d146a164364194c06dd": "73ea2128-d756-4a1c-94f4-aae41b7d3f1a",
+      "target:5b4ede471b2665d4638238558a48efbcecf7a72e58190094dfc2450deb89eaf6": "73a3e89d-089d-4205-8172-b7a7b7686047"
+    },
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "id": "218358b5-bf1b-4448-8908-1fe0fc0d4e4c",
+        "actorId": "noni:f7b0c5646d36eea386ce0a9098c8405c",
+        "actorLabel": "Acceptance Rehearsal A",
+        "kind": "set-style",
+        "route": "/",
+        "pageId": "page:home",
+        "componentKey": "home:hero",
+        "property": "display",
+        "breakpoint": "base",
+        "state": "default",
+        "targetKey": "target:5b4ede471b2665d4638238558a48efbcecf7a72e58190094dfc2450deb89eaf6",
+        "before": {
+          "present": false
+        },
+        "after": {
+          "present": true,
+          "value": "flex"
+        },
+        "documentRevision": 1,
+        "targetHead": "218358b5-bf1b-4448-8908-1fe0fc0d4e4c",
+        "created": "2026-07-12T04:49:32.842047446Z"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "e8866952-3390-40ff-bd81-1e32ea9653e9",
+        "actorId": "noni:f7b0c5646d36eea386ce0a9098c8405c",
+        "actorLabel": "Acceptance Rehearsal A",
+        "kind": "set-style",
+        "route": "/",
+        "pageId": "page:home",
+        "componentKey": "home:hero",
+        "property": "display",
+        "breakpoint": "base",
+        "state": "default",
+        "targetKey": "target:5b4ede471b2665d4638238558a48efbcecf7a72e58190094dfc2450deb89eaf6",
+        "before": {
+          "present": true,
+          "value": "flex"
+        },
+        "after": {
+          "present": true,
+          "value": "flex"
+        },
+        "documentRevision": 2,
+        "previousTargetHead": "218358b5-bf1b-4448-8908-1fe0fc0d4e4c",
+        "targetHead": "e8866952-3390-40ff-bd81-1e32ea9653e9",
+        "created": "2026-07-12T04:50:23.406375835Z"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "e10d6427-e653-4575-b441-cec95361461e",
+        "actorId": "noni:f7b0c5646d36eea386ce0a9098c8405c",
+        "actorLabel": "Acceptance Rehearsal A",
+        "kind": "set-style",
+        "route": "/",
+        "pageId": "page:home",
+        "componentKey": "home:hero",
+        "property": "display",
+        "breakpoint": "base",
+        "state": "default",
+        "targetKey": "target:5b4ede471b2665d4638238558a48efbcecf7a72e58190094dfc2450deb89eaf6",
+        "before": {
+          "present": true,
+          "value": "flex"
+        },
+        "after": {
+          "present": true,
+          "value": "flex"
+        },
+        "documentRevision": 3,
+        "previousTargetHead": "e8866952-3390-40ff-bd81-1e32ea9653e9",
+        "targetHead": "e10d6427-e653-4575-b441-cec95361461e",
+        "created": "2026-07-12T04:50:43.812276397Z"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "ca62ff26-7293-4790-8f30-506c58e8c3e0",
+        "actorId": "noni:f7b0c5646d36eea386ce0a9098c8405c",
+        "actorLabel": "Acceptance Rehearsal A",
+        "kind": "set-style",
+        "route": "/",
+        "pageId": "page:home",
+        "componentKey": "home:hero",
+        "property": "display",
+        "breakpoint": "base",
+        "state": "default",
+        "targetKey": "target:5b4ede471b2665d4638238558a48efbcecf7a72e58190094dfc2450deb89eaf6",
+        "before": {
+          "present": true,
+          "value": "flex"
+        },
+        "after": {
+          "present": true,
+          "value": "flex"
+        },
+        "documentRevision": 4,
+        "previousTargetHead": "e10d6427-e653-4575-b441-cec95361461e",
+        "targetHead": "ca62ff26-7293-4790-8f30-506c58e8c3e0",
+        "created": "2026-07-12T04:50:58.805702062Z"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "fd3652cd-348c-4588-b324-d406e8f857c3",
+        "actorId": "noni:f7b0c5646d36eea386ce0a9098c8405c",
+        "actorLabel": "Acceptance Rehearsal A",
+        "kind": "set-style",
+        "route": "/",
+        "pageId": "page:home",
+        "componentKey": "home:hero",
+        "property": "display",
+        "breakpoint": "mobile",
+        "state": "default",
+        "targetKey": "target:29555ff7287a284dc202ec9eade716b5d94db37e17fbab7305be57f75e561692",
+        "before": {
+          "present": false
+        },
+        "after": {
+          "present": true,
+          "value": "grid"
+        },
+        "documentRevision": 5,
+        "targetHead": "fd3652cd-348c-4588-b324-d406e8f857c3",
+        "created": "2026-07-12T04:54:47.044624445Z"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "1094b1df-28df-4cd1-bc99-ec8dee08a0ff",
+        "actorId": "noni:f7b0c5646d36eea386ce0a9098c8405c",
+        "actorLabel": "Acceptance Rehearsal A",
+        "kind": "reset-style",
+        "route": "/",
+        "pageId": "page:home",
+        "componentKey": "home:hero",
+        "property": "display",
+        "breakpoint": "mobile",
+        "state": "default",
+        "targetKey": "target:29555ff7287a284dc202ec9eade716b5d94db37e17fbab7305be57f75e561692",
+        "before": {
+          "present": true,
+          "value": "grid"
+        },
+        "after": {
+          "present": false
+        },
+        "documentRevision": 6,
+        "previousTargetHead": "fd3652cd-348c-4588-b324-d406e8f857c3",
+        "targetHead": "1094b1df-28df-4cd1-bc99-ec8dee08a0ff",
+        "created": "2026-07-12T04:56:43.523874884Z"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "73a3e89d-089d-4205-8172-b7a7b7686047",
+        "actorId": "noni:f7b0c5646d36eea386ce0a9098c8405c",
+        "actorLabel": "Acceptance Rehearsal A",
+        "kind": "reset-style",
+        "route": "/",
+        "pageId": "page:home",
+        "componentKey": "home:hero",
+        "property": "display",
+        "breakpoint": "base",
+        "state": "default",
+        "targetKey": "target:5b4ede471b2665d4638238558a48efbcecf7a72e58190094dfc2450deb89eaf6",
+        "before": {
+          "present": true,
+          "value": "flex"
+        },
+        "after": {
+          "present": false
+        },
+        "documentRevision": 7,
+        "previousTargetHead": "ca62ff26-7293-4790-8f30-506c58e8c3e0",
+        "targetHead": "73a3e89d-089d-4205-8172-b7a7b7686047",
+        "created": "2026-07-12T04:56:45.106717461Z"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "2d2fea7b-2513-446d-9a3d-9a91817e85f7",
+        "actorId": "noni:f7b0c5646d36eea386ce0a9098c8405c",
+        "actorLabel": "Acceptance Rehearsal A",
+        "kind": "set-field",
+        "route": "/",
+        "pageId": "page:home",
+        "field": "hero.headline",
+        "componentKey": "home:hero",
+        "breakpoint": "base",
+        "state": "default",
+        "targetKey": "target:32cdf51e4a093b39d833d046cc72b746d059585f56150d146a164364194c06dd",
+        "before": {
+          "present": true,
+          "value": "Ceramic pieces with evidence of the hand"
+        },
+        "after": {
+          "present": true,
+          "value": "COLLAB-A-1783832492660"
+        },
+        "documentRevision": 8,
+        "targetHead": "2d2fea7b-2513-446d-9a3d-9a91817e85f7",
+        "created": "2026-07-12T05:01:34.493939669Z"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "1125af93-559f-444b-a8da-329fcd505963",
+        "actorId": "noni:f7b0c5646d36eea386ce0a9098c8405c",
+        "actorLabel": "Acceptance Rehearsal A",
+        "kind": "set-field",
+        "route": "/",
+        "pageId": "page:home",
+        "field": "hero.headline",
+        "componentKey": "home:hero",
+        "breakpoint": "base",
+        "state": "default",
+        "targetKey": "target:32cdf51e4a093b39d833d046cc72b746d059585f56150d146a164364194c06dd",
+        "before": {
+          "present": true,
+          "value": "COLLAB-A-1783832492660"
+        },
+        "after": {
+          "present": true,
+          "value": "COLLAB-A-1783832563091"
+        },
+        "documentRevision": 9,
+        "previousTargetHead": "2d2fea7b-2513-446d-9a3d-9a91817e85f7",
+        "targetHead": "1125af93-559f-444b-a8da-329fcd505963",
+        "created": "2026-07-12T05:02:44.522422562Z"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "b130f070-df80-4acd-8feb-6efb6870b7f8",
+        "actorId": "noni:d4379f1f94476ce33471b67e3c09e629",
+        "actorLabel": "Acceptance Rehearsal B",
+        "kind": "set-field",
+        "route": "/about",
+        "pageId": "page:about",
+        "field": "pages.about.title",
+        "componentKey": "about:content",
+        "breakpoint": "base",
+        "state": "default",
+        "targetKey": "target:05d528e576bc34fb66ac7cfb6dd5b51f4cb487c110e3996fbc3102ae156ca096",
+        "before": {
+          "present": true,
+          "value": "About the studio"
+        },
+        "after": {
+          "present": true,
+          "value": "COLLAB-B-1783832563091"
+        },
+        "documentRevision": 10,
+        "targetHead": "b130f070-df80-4acd-8feb-6efb6870b7f8",
+        "created": "2026-07-12T05:02:46.637779045Z"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "7174c4ad-700b-49c4-b5d2-31dcda2616b3",
+        "actorId": "noni:f7b0c5646d36eea386ce0a9098c8405c",
+        "actorLabel": "Acceptance Rehearsal A",
+        "kind": "set-field",
+        "route": "/",
+        "pageId": "page:home",
+        "field": "hero.headline",
+        "componentKey": "home:hero",
+        "breakpoint": "base",
+        "state": "default",
+        "targetKey": "target:32cdf51e4a093b39d833d046cc72b746d059585f56150d146a164364194c06dd",
+        "before": {
+          "present": true,
+          "value": "COLLAB-A-1783832563091"
+        },
+        "after": {
+          "present": true,
+          "value": "STALE-WINNER-A-1783832613053"
+        },
+        "documentRevision": 11,
+        "previousTargetHead": "1125af93-559f-444b-a8da-329fcd505963",
+        "targetHead": "7174c4ad-700b-49c4-b5d2-31dcda2616b3",
+        "created": "2026-07-12T05:03:33.727275831Z"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "6e488dbf-b3ce-455d-b680-d8e265585b04",
+        "actorId": "noni:d4379f1f94476ce33471b67e3c09e629",
+        "actorLabel": "Acceptance Rehearsal B",
+        "kind": "set-field",
+        "route": "/",
+        "pageId": "page:home",
+        "field": "hero.headline",
+        "componentKey": "home:hero",
+        "breakpoint": "base",
+        "state": "default",
+        "targetKey": "target:32cdf51e4a093b39d833d046cc72b746d059585f56150d146a164364194c06dd",
+        "before": {
+          "present": true,
+          "value": "STALE-WINNER-A-1783832613053"
+        },
+        "after": {
+          "present": true,
+          "value": "STALE-LOSER-B-1783832615614"
+        },
+        "documentRevision": 12,
+        "previousTargetHead": "7174c4ad-700b-49c4-b5d2-31dcda2616b3",
+        "targetHead": "6e488dbf-b3ce-455d-b680-d8e265585b04",
+        "created": "2026-07-12T05:03:36.542927425Z"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "3fce3474-2796-4c82-9b8d-07aed7094b88",
+        "actorId": "noni:f7b0c5646d36eea386ce0a9098c8405c",
+        "actorLabel": "Acceptance Rehearsal A",
+        "kind": "set-field",
+        "route": "/",
+        "pageId": "page:home",
+        "field": "hero.headline",
+        "componentKey": "home:hero",
+        "breakpoint": "base",
+        "state": "default",
+        "targetKey": "target:32cdf51e4a093b39d833d046cc72b746d059585f56150d146a164364194c06dd",
+        "before": {
+          "present": true,
+          "value": "STALE-LOSER-B-1783832615614"
+        },
+        "after": {
+          "present": true,
+          "value": "Ceramic pieces with evidence of the hand"
+        },
+        "documentRevision": 13,
+        "previousTargetHead": "6e488dbf-b3ce-455d-b680-d8e265585b04",
+        "targetHead": "3fce3474-2796-4c82-9b8d-07aed7094b88",
+        "created": "2026-07-12T05:06:49.560195704Z"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "e3b8d84b-3821-485d-9860-51cb7833db5d",
+        "actorId": "noni:f7b0c5646d36eea386ce0a9098c8405c",
+        "actorLabel": "Acceptance Rehearsal A",
+        "kind": "set-field",
+        "route": "/about",
+        "pageId": "page:about",
+        "field": "pages.about.title",
+        "componentKey": "about:content",
+        "breakpoint": "base",
+        "state": "default",
+        "targetKey": "target:05d528e576bc34fb66ac7cfb6dd5b51f4cb487c110e3996fbc3102ae156ca096",
+        "before": {
+          "present": true,
+          "value": "COLLAB-B-1783832563091"
+        },
+        "after": {
+          "present": true,
+          "value": "About the studio"
+        },
+        "documentRevision": 14,
+        "previousTargetHead": "b130f070-df80-4acd-8feb-6efb6870b7f8",
+        "targetHead": "e3b8d84b-3821-485d-9860-51cb7833db5d",
+        "created": "2026-07-12T05:06:51.717978755Z"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "d65f2df1-1184-483f-9d77-c50c4b0058cd",
+        "actorId": "noni:f7b0c5646d36eea386ce0a9098c8405c",
+        "actorLabel": "Acceptance Rehearsal A",
+        "kind": "set-field",
+        "route": "/",
+        "pageId": "page:home",
+        "field": "hero.headline",
+        "componentKey": "home:hero",
+        "breakpoint": "base",
+        "state": "default",
+        "targetKey": "target:32cdf51e4a093b39d833d046cc72b746d059585f56150d146a164364194c06dd",
+        "before": {
+          "present": true,
+          "value": "Ceramic pieces with evidence of the hand"
+        },
+        "after": {
+          "present": true,
+          "value": "COND1-WINNER-A-1783836296254"
+        },
+        "documentRevision": 15,
+        "previousTargetHead": "3fce3474-2796-4c82-9b8d-07aed7094b88",
+        "targetHead": "d65f2df1-1184-483f-9d77-c50c4b0058cd",
+        "created": "2026-07-12T06:04:57.308809291Z"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "73ea2128-d756-4a1c-94f4-aae41b7d3f1a",
+        "actorId": "noni:f7b0c5646d36eea386ce0a9098c8405c",
+        "actorLabel": "Acceptance Rehearsal A",
+        "kind": "set-field",
+        "route": "/",
+        "pageId": "page:home",
+        "field": "hero.headline",
+        "componentKey": "home:hero",
+        "breakpoint": "base",
+        "state": "default",
+        "targetKey": "target:32cdf51e4a093b39d833d046cc72b746d059585f56150d146a164364194c06dd",
+        "before": {
+          "present": true,
+          "value": "COND1-WINNER-A-1783836296254"
+        },
+        "after": {
+          "present": true,
+          "value": "Ceramic pieces with evidence of the hand"
+        },
+        "documentRevision": 16,
+        "previousTargetHead": "d65f2df1-1184-483f-9d77-c50c4b0058cd",
+        "targetHead": "73ea2128-d756-4a1c-94f4-aae41b7d3f1a",
+        "created": "2026-07-12T06:05:29.639057526Z"
+      }
+    ]
+  },
+  "products": [
+    {
+      "id": "prd_seed_cloud_bowl",
+      "title": "Cloud slip bowl",
+      "slug": "cloud-slip-bowl",
+      "description": "A low serving bowl with a soft white slip, iron speckling, and a trimmed foot.",
+      "gallery": [
+        {
+          "url": "https://images.unsplash.com/photo-1610701596007-11502861dcfa?auto=format\u0026fit=crop\u0026w=1200\u0026q=80",
+          "alt": "Handmade ceramic bowl on a neutral table"
+        }
+      ],
+      "categoryIds": [
+        "cat_seed_bowls",
+        "cat_seed_tableware"
+      ],
+      "price": 12800,
+      "currency": "usd",
+      "availability": "available",
+      "featured": true,
+      "published": true,
+      "dimensions": {
+        "height": 2.4,
+        "width": 8.5,
+        "depth": 8.5,
+        "units": "in"
+      },
+      "weight": {},
+      "shipping": {
+        "requiresShipping": true,
+        "shippingNote": "Packed in recycled paper with double-wall boxing."
+      },
+      "meta": {
+        "title": "",
+        "description": "",
+        "image": {
+          "url": "",
+          "alt": ""
+        }
+      },
+      "created": "2026-05-13T19:27:26.674232915Z",
+      "updated": "2026-05-13T19:27:26.674232915Z"
+    },
+    {
+      "id": "prd_seed_moss_cup",
+      "title": "Moss handle cup",
+      "slug": "moss-handle-cup",
+      "description": "A handled cup with a satin green glaze and thumb rest pulled from the rim.",
+      "gallery": [
+        {
+          "url": "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?auto=format\u0026fit=crop\u0026w=1200\u0026q=80",
+          "alt": "Ceramic cup with earthy glaze"
+        }
+      ],
+      "categoryIds": [
+        "cat_seed_cups",
+        "cat_seed_tableware"
+      ],
+      "price": 6400,
+      "currency": "usd",
+      "availability": "available",
+      "featured": true,
+      "published": true,
+      "dimensions": {
+        "height": 3.8,
+        "width": 4.2,
+        "depth": 3.4,
+        "units": "in"
+      },
+      "weight": {},
+      "shipping": {
+        "requiresShipping": true,
+        "shippingNote": ""
+      },
+      "meta": {
+        "title": "",
+        "description": "",
+        "image": {
+          "url": "",
+          "alt": ""
+        }
+      },
+      "created": "2026-05-14T19:27:26.674232915Z",
+      "updated": "2026-05-14T19:27:26.674232915Z"
+    },
+    {
+      "id": "prd_seed_ash_vase",
+      "title": "Ash shoulder vase",
+      "slug": "ash-shoulder-vase",
+      "description": "A narrow neck vase fired with ash glaze variation across the shoulder.",
+      "gallery": [
+        {
+          "url": "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?auto=format\u0026fit=crop\u0026w=1200\u0026q=80",
+          "alt": "Tall ceramic vase on a shelf"
+        }
+      ],
+      "categoryIds": [
+        "cat_seed_vessels"
+      ],
+      "price": 18400,
+      "currency": "usd",
+      "availability": "sold",
+      "featured": false,
+      "published": true,
+      "dimensions": {
+        "height": 11,
+        "width": 4.5,
+        "depth": 4.5,
+        "units": "in"
+      },
+      "weight": {},
+      "shipping": {
+        "requiresShipping": true,
+        "shippingNote": ""
+      },
+      "meta": {
+        "title": "",
+        "description": "",
+        "image": {
+          "url": "",
+          "alt": ""
+        }
+      },
+      "created": "2026-05-12T19:27:26.674232915Z",
+      "updated": "2026-05-15T19:27:26.674232915Z"
+    }
+  ],
+  "gallery": [
+    {
+      "id": "wrk_seed_wall_tiles",
+      "title": "Pressed wall tile study",
+      "slug": "pressed-wall-tile-study",
+      "description": "A grid of pressed clay surfaces testing glaze pooling and low relief.",
+      "images": [
+        {
+          "url": "https://images.unsplash.com/photo-1611486212557-88be5ff6f941?auto=format\u0026fit=crop\u0026w=1200\u0026q=80",
+          "alt": "Ceramic tile study arranged on a wall"
+        }
+      ],
+      "year": "2026",
+      "materials": "Stoneware, iron wash, clear glaze",
+      "dimensions": "24 x 32 in",
+      "featured": true,
+      "published": true,
+      "meta": {
+        "title": "",
+        "description": "",
+        "image": {
+          "url": "",
+          "alt": ""
+        }
+      },
+      "created": "2026-05-11T19:27:26.674232915Z",
+      "updated": "2026-05-11T19:27:26.674232915Z"
+    },
+    {
+      "id": "wrk_seed_vessels",
+      "title": "Ridge vessel pair",
+      "slug": "ridge-vessel-pair",
+      "description": "Two coil-built vessels with exterior ribbing and a dry matte surface.",
+      "images": [
+        {
+          "url": "https://images.unsplash.com/photo-1603199506016-b9a594b593c0?auto=format\u0026fit=crop\u0026w=1200\u0026q=80",
+          "alt": "Pair of sculptural ceramic vessels"
+        }
+      ],
+      "year": "2025",
+      "materials": "Coiled stoneware, matte glaze",
+      "dimensions": "Variable",
+      "featured": true,
+      "published": true,
+      "meta": {
+        "title": "",
+        "description": "",
+        "image": {
+          "url": "",
+          "alt": ""
+        }
+      },
+      "created": "2026-05-09T07:27:26.674232915Z",
+      "updated": "2026-05-09T07:27:26.674232915Z"
+    }
+  ],
+  "pages": [
+    {
+      "id": "pg_about",
+      "title": "About the studio",
+      "slug": "about",
+      "body": "Muddy Noni is a small ceramic practice focused on objects that make daily rituals feel slower and more attentive. Pieces are made in short runs, often one at a time, with visible throwing lines, hand-built seams, and glaze variation left intact.",
+      "bodyFormat": "blocks",
+      "published": true,
+      "meta": {
+        "title": "",
+        "description": "",
+        "image": {
+          "url": "",
+          "alt": ""
+        }
+      },
+      "created": "2026-05-06T19:27:26.674232915Z",
+      "updated": "2026-05-06T19:27:26.674232915Z"
+    },
+    {
+      "id": "pg_7b376491bc05",
+      "title": "Acceptance Rehearsal 20260712",
+      "slug": "acceptance-rehearsal-20260712",
+      "body": "{\r\n  \"version\": 1,\r\n  \"blocks\": [\r\n    {\r\n      \"id\": \"blk_e4uhm3i\",\r\n      \"type\": \"heading\",\r\n      \"text\": \"ACCEPTANCE-REHEARSAL-20260712 1783831472600\"\r\n    },\r\n    {\r\n      \"id\": \"blk_jg3lhgl\",\r\n      \"type\": \"quote\",\r\n      \"text\": \"Add a quote...\"\r\n    },\r\n    {\r\n      \"id\": \"blk_s686yzu\",\r\n      \"type\": \"paragraph\",\r\n      \"text\": \"This page draft was created from the Showcase blueprint.\"\r\n    }\r\n  ]\r\n}",
+      "bodyFormat": "blocks",
+      "published": false,
+      "meta": {
+        "title": "",
+        "description": "",
+        "image": {
+          "url": "",
+          "alt": ""
+        }
+      },
+      "archivedAt": "2026-07-12T05:13:09.753699727Z",
+      "created": "2026-07-12T04:34:22.85568843Z",
+      "updated": "2026-07-12T05:13:09.753699727Z"
+    }
+  ],
+  "blog": [
+    {
+      "id": "post_seed_spring_release",
+      "title": "Spring release notes",
+      "slug": "spring-release-notes",
+      "excerpt": "A short note on the bowls, cups, and surface tests that shaped this small release.",
+      "body": "This release gathers the quieter pieces from the last firing: low bowls, handled cups, and vessels with surfaces that keep a record of the kiln. The goal is functional work that still carries the pace of the studio.\n\nMost pieces were made one at a time and held back until the glaze felt settled. Expect small differences in rim line, iron speckling, and pooling; those shifts are part of the work rather than defects.",
+      "bodyFormat": "blocks",
+      "coverImage": {
+        "url": "https://images.unsplash.com/photo-1610701596007-11502861dcfa?auto=format\u0026fit=crop\u0026w=1200\u0026q=80",
+        "alt": "Handmade ceramic bowl on a neutral table"
+      },
+      "authorName": "Noni",
+      "tags": [
+        "Release",
+        "Studio notes"
+      ],
+      "relatedProductIds": [
+        "prd_seed_cloud_bowl",
+        "prd_seed_moss_cup"
+      ],
+      "featured": true,
+      "published": true,
+      "publishedAt": "2026-05-15T07:27:26.674232915Z",
+      "meta": {
+        "title": "",
+        "description": "",
+        "image": {
+          "url": "",
+          "alt": ""
+        }
+      },
+      "created": "2026-05-15T03:27:26.674232915Z",
+      "updated": "2026-05-15T07:27:26.674232915Z"
+    },
+    {
+      "id": "post_seed_glaze_tests",
+      "title": "What the glaze kept",
+      "slug": "what-the-glaze-kept",
+      "excerpt": "Notes from a wall tile study and a pair of ridge vessels after a slower round of surface testing.",
+      "body": "The wall tile tests started as a way to watch how a thin clear glaze pools over pressed clay. The best surfaces held enough variation to reward a second look without becoming too loud.\n\nThat same restraint carried into the ridge vessel pair. The ribbing catches shadow first, then the dry matte surface gives the form a little gravity.",
+      "bodyFormat": "blocks",
+      "coverImage": {
+        "url": "https://images.unsplash.com/photo-1611486212557-88be5ff6f941?auto=format\u0026fit=crop\u0026w=1200\u0026q=80",
+        "alt": "Ceramic tile study arranged on a wall"
+      },
+      "authorName": "Noni",
+      "tags": [
+        "Glaze",
+        "Process"
+      ],
+      "relatedGalleryWorkIds": [
+        "wrk_seed_wall_tiles",
+        "wrk_seed_vessels"
+      ],
+      "featured": true,
+      "published": true,
+      "publishedAt": "2026-05-13T07:27:26.674232915Z",
+      "meta": {
+        "title": "",
+        "description": "",
+        "image": {
+          "url": "",
+          "alt": ""
+        }
+      },
+      "created": "2026-05-13T01:27:26.674232915Z",
+      "updated": "2026-05-13T07:27:26.674232915Z"
+    }
+  ],
+  "media": [
+    {
+      "id": "med_seed_cloud_bowl",
+      "url": "https://images.unsplash.com/photo-1610701596007-11502861dcfa?auto=format\u0026fit=crop\u0026w=1200\u0026q=80",
+      "alt": "Handmade ceramic bowl on a neutral table",
+      "filename": "cloud-slip-bowl.jpg",
+      "contentType": "image/jpeg",
+      "size": 0,
+      "created": "2026-05-13T19:27:26.674232915Z",
+      "updated": "2026-05-13T19:27:26.674232915Z"
+    },
+    {
+      "id": "med_seed_moss_cup",
+      "url": "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?auto=format\u0026fit=crop\u0026w=1200\u0026q=80",
+      "alt": "Ceramic cup with earthy glaze",
+      "filename": "moss-handle-cup.jpg",
+      "contentType": "image/jpeg",
+      "size": 0,
+      "created": "2026-05-14T19:27:26.674232915Z",
+      "updated": "2026-05-14T19:27:26.674232915Z"
+    },
+    {
+      "id": "med_seed_ash_vase",
+      "url": "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?auto=format\u0026fit=crop\u0026w=1200\u0026q=80",
+      "alt": "Tall ceramic vase on a shelf",
+      "filename": "ash-shoulder-vase.jpg",
+      "contentType": "image/jpeg",
+      "size": 0,
+      "created": "2026-05-12T19:27:26.674232915Z",
+      "updated": "2026-05-15T19:27:26.674232915Z"
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat_seed_bowls",
+      "title": "Bowls",
+      "slug": "bowls",
+      "created": "2026-05-12T19:27:26.674232915Z",
+      "updated": "2026-05-12T19:27:26.674232915Z"
+    },
+    {
+      "id": "cat_seed_cups",
+      "title": "Cups",
+      "slug": "cups",
+      "created": "2026-05-12T19:27:26.674232915Z",
+      "updated": "2026-05-12T19:27:26.674232915Z"
+    },
+    {
+      "id": "cat_seed_tableware",
+      "title": "Tableware",
+      "slug": "tableware",
+      "created": "2026-05-12T19:27:26.674232915Z",
+      "updated": "2026-05-12T19:27:26.674232915Z"
+    },
+    {
+      "id": "cat_seed_vessels",
+      "title": "Vessels",
+      "slug": "vessels",
+      "created": "2026-05-12T19:27:26.674232915Z",
+      "updated": "2026-05-12T19:27:26.674232915Z"
+    }
+  ],
+  "orders": null,
+  "contacts": null,
+  "audit": [
+    {
+      "id": "aud_5b1fd5ed6e32",
+      "actor": "system",
+      "resourceKind": "page",
+      "resourceId": "pg_7b376491bc05",
+      "action": "page.created",
+      "summary": "Showcase",
+      "created": "2026-07-12T04:34:22.85568843Z"
+    },
+    {
+      "id": "aud_3bc55ada8660",
+      "actor": "system",
+      "resourceKind": "page",
+      "resourceId": "pg_7b376491bc05",
+      "action": "page.updated",
+      "summary": "Acceptance Rehearsal 20260712",
+      "created": "2026-07-12T04:44:34.731363643Z"
+    },
+    {
+      "id": "aud_c37938713bf8",
+      "actor": "system",
+      "resourceKind": "page",
+      "resourceId": "pg_7b376491bc05",
+      "action": "page.updated",
+      "summary": "Acceptance Rehearsal 20260712",
+      "created": "2026-07-12T05:09:55.754964576Z"
+    },
+    {
+      "id": "aud_b35bb1f9ce7f",
+      "actor": "system",
+      "resourceKind": "page",
+      "resourceId": "pg_7b376491bc05",
+      "action": "page.revision_restored",
+      "summary": "Acceptance Rehearsal 20260712",
+      "created": "2026-07-12T05:10:39.866107033Z"
+    },
+    {
+      "id": "aud_ad71ec0d7839",
+      "actor": "system",
+      "resourceKind": "page",
+      "resourceId": "pg_7b376491bc05",
+      "action": "page.archived",
+      "summary": "Acceptance Rehearsal 20260712",
+      "created": "2026-07-12T05:13:09.753699727Z"
+    }
+  ],
+  "revisions": [
+    {
+      "id": "rev_969eb32260f6",
+      "resourceKind": "page",
+      "resourceId": "pg_7b376491bc05",
+      "resourceTitle": "Showcase",
+      "action": "page.updated",
+      "summary": "Before page update",
+      "snapshot": {
+        "id": "pg_7b376491bc05",
+        "title": "Showcase",
+        "slug": "showcase",
+        "body": "## Showcase\n\nStore\n\nThis page draft was created from the Showcase blueprint.",
+        "bodyFormat": "mdpp",
+        "published": false,
+        "meta": {
+          "title": "",
+          "description": "",
+          "image": {
+            "url": "",
+            "alt": ""
+          }
+        },
+        "created": "2026-07-12T04:34:22.85568843Z",
+        "updated": "2026-07-12T04:34:22.85568843Z"
+      },
+      "created": "2026-07-12T04:44:34.731363643Z"
+    },
+    {
+      "id": "rev_98942178e7fb",
+      "resourceKind": "settings",
+      "resourceId": "site",
+      "resourceTitle": "Muddy Noni",
+      "action": "editor.saved",
+      "summary": "Editor draft saved.",
+      "snapshot": {
+        "siteTitle": "Muddy Noni",
+        "tagline": "Small-batch ceramics for daily rituals",
+        "description": "Handbuilt and wheel-thrown ceramics from a quiet studio practice.",
+        "studioName": "Muddy Noni",
+        "ownerName": "Noni",
+        "contactEmail": "studio@muddynoni.local",
+        "instagram": "@muddynoni",
+        "websiteUrl": "https://noni.m31labs.dev",
+        "primaryDomain": "noni.m31labs.dev",
+        "localPickupEnabled": true,
+        "localPickupCopy": "Local pickup can be coordinated after purchase.",
+        "hero": {
+          "headline": "Ceramic pieces with evidence of the hand",
+          "subhead": "Functional vessels, small sculptures, and one-off studio objects released in small batches.",
+          "ctaLabel": "Shop available work",
+          "ctaUrl": "/shop"
+        },
+        "theme": {
+          "kit": "studio-release",
+          "template": "custom",
+          "palette": "clay",
+          "imageRatio": "landscape",
+          "custom": {
+            "name": "Noni custom",
+            "heroLayout": "editorial",
+            "contentWidth": "standard",
+            "productDensity": "balanced",
+            "heroHeight": "standard"
+          },
+          "style": {
+            "nav": "links",
+            "buttons": "pill",
+            "cards": "quiet",
+            "spacing": "balanced",
+            "imageFrame": "sharp",
+            "motion": "subtle"
+          }
+        },
+        "appearance": {
+          "logoAlt": "Site logo"
+        },
+        "home": {
+          "sections": [
+            {
+              "key": "hero",
+              "templateKey": "hero",
+              "enabled": true
+            },
+            {
+              "key": "products",
+              "templateKey": "products",
+              "enabled": true
+            },
+            {
+              "key": "gallery",
+              "templateKey": "gallery",
+              "enabled": true
+            },
+            {
+              "key": "blog",
+              "templateKey": "blog",
+              "enabled": true
+            },
+            {
+              "key": "contact",
+              "templateKey": "contact",
+              "enabled": false
+            }
+          ]
+        },
+        "navigation": [
+          {
+            "label": "Home",
+            "href": "/",
+            "enabled": true,
+            "order": 1
+          },
+          {
+            "label": "Shop",
+            "href": "/shop",
+            "enabled": true,
+            "order": 2
+          },
+          {
+            "label": "Gallery",
+            "href": "/gallery",
+            "enabled": true,
+            "order": 3
+          },
+          {
+            "label": "Blog",
+            "href": "/blog",
+            "enabled": true,
+            "order": 4
+          },
+          {
+            "label": "About",
+            "href": "/about",
+            "enabled": true,
+            "order": 5
+          },
+          {
+            "label": "Contact",
+            "href": "/contact",
+            "enabled": true,
+            "order": 6
+          },
+          {
+            "label": "About the studio",
+            "href": "/pages/about",
+            "enabled": true,
+            "order": 7
+          }
+        ],
+        "customCode": {},
+        "checkout": {
+          "productId": "prd_seed_moss_cup",
+          "label": "Buy now"
+        },
+        "shippingEnabled": true,
+        "shippingCountries": [
+          "US",
+          "CA"
+        ],
+        "shippingOptions": [
+          {
+            "label": "Studio packed ground",
+            "amount": 1400,
+            "detail": "Insured ground shipping"
+          },
+          {
+            "label": "Local pickup",
+            "amount": 0,
+            "detail": "Coordinate pickup after purchase"
+          }
+        ],
+        "meta": {
+          "title": "Muddy Noni",
+          "description": "Small-batch ceramic studio.",
+          "image": {
+            "url": "",
+            "alt": ""
+          }
+        }
+      },
+      "created": "2026-07-12T04:46:12.534056376Z"
+    },
+    {
+      "id": "rev_02fc6aed7e99",
+      "resourceKind": "settings",
+      "resourceId": "site",
+      "resourceTitle": "Muddy Noni",
+      "action": "editor.saved",
+      "summary": "Editor draft saved.",
+      "snapshot": {
+        "siteTitle": "Muddy Noni",
+        "tagline": "Small-batch ceramics for daily rituals",
+        "description": "Handbuilt and wheel-thrown ceramics from a quiet studio practice.",
+        "studioName": "Muddy Noni",
+        "ownerName": "Noni",
+        "contactEmail": "studio@muddynoni.local",
+        "instagram": "@muddynoni",
+        "websiteUrl": "https://noni.m31labs.dev",
+        "primaryDomain": "noni.m31labs.dev",
+        "localPickupEnabled": true,
+        "localPickupCopy": "Local pickup can be coordinated after purchase.",
+        "hero": {
+          "headline": "Ceramic pieces with evidence of the hand",
+          "subhead": "Functional vessels, small sculptures, and one-off studio objects released in small batches.",
+          "ctaLabel": "Shop available work",
+          "ctaUrl": "/shop"
+        },
+        "theme": {
+          "kit": "studio-release",
+          "template": "custom",
+          "palette": "clay",
+          "imageRatio": "landscape",
+          "custom": {
+            "name": "Noni custom",
+            "heroLayout": "split",
+            "contentWidth": "standard",
+            "productDensity": "balanced",
+            "heroHeight": "standard"
+          },
+          "style": {
+            "nav": "links",
+            "buttons": "pill",
+            "cards": "quiet",
+            "spacing": "balanced",
+            "imageFrame": "sharp",
+            "motion": "subtle"
+          }
+        },
+        "appearance": {
+          "logoAlt": "Site logo"
+        },
+        "home": {
+          "sections": [
+            {
+              "key": "hero",
+              "templateKey": "hero",
+              "enabled": true
+            },
+            {
+              "key": "products",
+              "templateKey": "products",
+              "enabled": true
+            },
+            {
+              "key": "gallery",
+              "templateKey": "gallery",
+              "enabled": true
+            },
+            {
+              "key": "blog",
+              "templateKey": "blog",
+              "enabled": true
+            },
+            {
+              "key": "contact",
+              "templateKey": "contact",
+              "enabled": false
+            }
+          ]
+        },
+        "navigation": [
+          {
+            "label": "Home",
+            "href": "/",
+            "enabled": true,
+            "order": 1
+          },
+          {
+            "label": "Shop",
+            "href": "/shop",
+            "enabled": true,
+            "order": 2
+          },
+          {
+            "label": "Gallery",
+            "href": "/gallery",
+            "enabled": true,
+            "order": 3
+          },
+          {
+            "label": "Blog",
+            "href": "/blog",
+            "enabled": true,
+            "order": 4
+          },
+          {
+            "label": "About",
+            "href": "/about",
+            "enabled": true,
+            "order": 5
+          },
+          {
+            "label": "Contact",
+            "href": "/contact",
+            "enabled": true,
+            "order": 6
+          },
+          {
+            "label": "About the studio",
+            "href": "/pages/about",
+            "enabled": true,
+            "order": 7
+          }
+        ],
+        "customCode": {},
+        "checkout": {
+          "productId": "prd_seed_moss_cup",
+          "label": "Buy now"
+        },
+        "shippingEnabled": true,
+        "shippingCountries": [
+          "US",
+          "CA"
+        ],
+        "shippingOptions": [
+          {
+            "label": "Studio packed ground",
+            "amount": 1400,
+            "detail": "Insured ground shipping"
+          },
+          {
+            "label": "Local pickup",
+            "amount": 0,
+            "detail": "Coordinate pickup after purchase"
+          }
+        ],
+        "meta": {
+          "title": "Muddy Noni",
+          "description": "Small-batch ceramic studio.",
+          "image": {
+            "url": "",
+            "alt": ""
+          }
+        }
+      },
+      "created": "2026-07-12T04:46:14.377513522Z"
+    },
+    {
+      "id": "rev_2c9f33691a43",
+      "resourceKind": "settings",
+      "resourceId": "site",
+      "resourceTitle": "Muddy Noni",
+      "action": "editor.saved",
+      "summary": "Editor draft saved.",
+      "snapshot": {
+        "siteTitle": "Muddy Noni",
+        "tagline": "Small-batch ceramics for daily rituals",
+        "description": "Handbuilt and wheel-thrown ceramics from a quiet studio practice.",
+        "studioName": "Muddy Noni",
+        "ownerName": "Noni",
+        "contactEmail": "studio@muddynoni.local",
+        "instagram": "@muddynoni",
+        "websiteUrl": "https://noni.m31labs.dev",
+        "primaryDomain": "noni.m31labs.dev",
+        "localPickupEnabled": true,
+        "localPickupCopy": "Local pickup can be coordinated after purchase.",
+        "hero": {
+          "headline": "Ceramic pieces with evidence of the hand",
+          "subhead": "Functional vessels, small sculptures, and one-off studio objects released in small batches.",
+          "ctaLabel": "Shop available work",
+          "ctaUrl": "/shop"
+        },
+        "theme": {
+          "kit": "studio-release",
+          "template": "custom",
+          "palette": "clay",
+          "imageRatio": "landscape",
+          "custom": {
+            "name": "Noni custom",
+            "heroLayout": "editorial",
+            "contentWidth": "standard",
+            "productDensity": "balanced",
+            "heroHeight": "standard"
+          },
+          "style": {
+            "nav": "links",
+            "buttons": "pill",
+            "cards": "quiet",
+            "spacing": "balanced",
+            "imageFrame": "sharp",
+            "motion": "subtle"
+          }
+        },
+        "appearance": {
+          "logoAlt": "Site logo"
+        },
+        "home": {
+          "sections": [
+            {
+              "key": "hero",
+              "templateKey": "hero",
+              "enabled": true
+            },
+            {
+              "key": "products",
+              "templateKey": "products",
+              "enabled": true
+            },
+            {
+              "key": "gallery",
+              "templateKey": "gallery",
+              "enabled": true
+            },
+            {
+              "key": "blog",
+              "templateKey": "blog",
+              "enabled": true
+            },
+            {
+              "key": "contact",
+              "templateKey": "contact",
+              "enabled": false
+            }
+          ]
+        },
+        "navigation": [
+          {
+            "label": "Home",
+            "href": "/",
+            "enabled": true,
+            "order": 1
+          },
+          {
+            "label": "Shop",
+            "href": "/shop",
+            "enabled": true,
+            "order": 2
+          },
+          {
+            "label": "Gallery",
+            "href": "/gallery",
+            "enabled": true,
+            "order": 3
+          },
+          {
+            "label": "Blog",
+            "href": "/blog",
+            "enabled": true,
+            "order": 4
+          },
+          {
+            "label": "About",
+            "href": "/about",
+            "enabled": true,
+            "order": 5
+          },
+          {
+            "label": "Contact",
+            "href": "/contact",
+            "enabled": true,
+            "order": 6
+          },
+          {
+            "label": "About the studio",
+            "href": "/pages/about",
+            "enabled": true,
+            "order": 7
+          }
+        ],
+        "customCode": {},
+        "checkout": {
+          "productId": "prd_seed_moss_cup",
+          "label": "Buy now"
+        },
+        "shippingEnabled": true,
+        "shippingCountries": [
+          "US",
+          "CA"
+        ],
+        "shippingOptions": [
+          {
+            "label": "Studio packed ground",
+            "amount": 1400,
+            "detail": "Insured ground shipping"
+          },
+          {
+            "label": "Local pickup",
+            "amount": 0,
+            "detail": "Coordinate pickup after purchase"
+          }
+        ],
+        "meta": {
+          "title": "Muddy Noni",
+          "description": "Small-batch ceramic studio.",
+          "image": {
+            "url": "",
+            "alt": ""
+          }
+        }
+      },
+      "created": "2026-07-12T04:53:14.362502382Z"
+    },
+    {
+      "id": "rev_7cf8db70ac0b",
+      "resourceKind": "page",
+      "resourceId": "pg_7b376491bc05",
+      "resourceTitle": "Acceptance Rehearsal 20260712",
+      "action": "page.updated",
+      "summary": "Before page update",
+      "snapshot": {
+        "id": "pg_7b376491bc05",
+        "title": "Acceptance Rehearsal 20260712",
+        "slug": "acceptance-rehearsal-20260712",
+        "body": "{\r\n  \"version\": 1,\r\n  \"blocks\": [\r\n    {\r\n      \"id\": \"blk_e4uhm3i\",\r\n      \"type\": \"heading\",\r\n      \"text\": \"ACCEPTANCE-REHEARSAL-20260712 1783831472600\"\r\n    },\r\n    {\r\n      \"id\": \"blk_jg3lhgl\",\r\n      \"type\": \"quote\",\r\n      \"text\": \"Add a quote...\"\r\n    },\r\n    {\r\n      \"id\": \"blk_s686yzu\",\r\n      \"type\": \"paragraph\",\r\n      \"text\": \"This page draft was created from the Showcase blueprint.\"\r\n    }\r\n  ]\r\n}",
+        "bodyFormat": "blocks",
+        "published": false,
+        "meta": {
+          "title": "",
+          "description": "",
+          "image": {
+            "url": "",
+            "alt": ""
+          }
+        },
+        "created": "2026-07-12T04:34:22.85568843Z",
+        "updated": "2026-07-12T04:44:34.731363643Z"
+      },
+      "created": "2026-07-12T05:09:55.754964576Z"
+    },
+    {
+      "id": "rev_19db6b856f48",
+      "resourceKind": "page",
+      "resourceId": "pg_7b376491bc05",
+      "resourceTitle": "Acceptance Rehearsal 20260712",
+      "action": "page.revision_restore",
+      "summary": "Before revision restore",
+      "snapshot": {
+        "id": "pg_7b376491bc05",
+        "title": "Acceptance Rehearsal 20260712",
+        "slug": "acceptance-rehearsal-20260712",
+        "body": "{\r\n  \"version\": 1,\r\n  \"blocks\": [\r\n    {\r\n      \"id\": \"blk_e4uhm3i\",\r\n      \"type\": \"heading\",\r\n      \"text\": \"ACCEPTANCE-REHEARSAL-20260712 1783831472600\"\r\n    },\r\n    {\r\n      \"id\": \"blk_jg3lhgl\",\r\n      \"type\": \"quote\",\r\n      \"text\": \"Add a quote...\"\r\n    },\r\n    {\r\n      \"id\": \"blk_s686yzu\",\r\n      \"type\": \"paragraph\",\r\n      \"text\": \"This page draft was created from the Showcase blueprint.\"\r\n    }\r\n  ]\r\n}",
+        "bodyFormat": "blocks",
+        "published": true,
+        "meta": {
+          "title": "",
+          "description": "",
+          "image": {
+            "url": "",
+            "alt": ""
+          }
+        },
+        "created": "2026-07-12T04:34:22.85568843Z",
+        "updated": "2026-07-12T05:09:55.754964576Z"
+      },
+      "created": "2026-07-12T05:10:39.866107033Z"
+    },
+    {
+      "id": "rev_e7c23884b725",
+      "resourceKind": "settings",
+      "resourceId": "site",
+      "resourceTitle": "Muddy Noni",
+      "action": "editor.saved",
+      "summary": "Editor draft saved.",
+      "snapshot": {
+        "siteTitle": "Muddy Noni",
+        "tagline": "Small-batch ceramics for daily rituals",
+        "description": "Handbuilt and wheel-thrown ceramics from a quiet studio practice.",
+        "studioName": "Muddy Noni",
+        "ownerName": "Noni",
+        "contactEmail": "studio@muddynoni.local",
+        "instagram": "@muddynoni",
+        "websiteUrl": "https://noni.m31labs.dev",
+        "primaryDomain": "noni.m31labs.dev",
+        "localPickupEnabled": true,
+        "localPickupCopy": "Local pickup can be coordinated after purchase.",
+        "hero": {
+          "headline": "Ceramicc pieces with evidence of the hand",
+          "subhead": "Functional vessels, small sculptures, and one-off studio objects released in small batches.",
+          "ctaLabel": "Shop available work",
+          "ctaUrl": "/shop"
+        },
+        "theme": {
+          "kit": "studio-release",
+          "template": "custom",
+          "palette": "clay",
+          "imageRatio": "landscape",
+          "custom": {
+            "name": "Noni custom",
+            "heroLayout": "editorial",
+            "contentWidth": "standard",
+            "productDensity": "airy",
+            "heroHeight": "standard"
+          },
+          "style": {
+            "nav": "buttons",
+            "buttons": "pill",
+            "cards": "framed",
+            "spacing": "airy",
+            "imageFrame": "round",
+            "motion": "still"
+          }
+        },
+        "appearance": {
+          "logoAlt": "Site logo"
+        },
+        "home": {
+          "sections": [
+            {
+              "key": "hero",
+              "templateKey": "hero",
+              "enabled": true
+            },
+            {
+              "key": "products",
+              "templateKey": "products",
+              "enabled": true
+            },
+            {
+              "key": "gallery",
+              "templateKey": "gallery",
+              "enabled": true
+            },
+            {
+              "key": "blog",
+              "templateKey": "blog",
+              "enabled": true
+            },
+            {
+              "key": "contact",
+              "templateKey": "contact",
+              "enabled": false
+            }
+          ]
+        },
+        "navigation": [
+          {
+            "label": "Home",
+            "href": "/",
+            "enabled": true,
+            "order": 1
+          },
+          {
+            "label": "Shop",
+            "href": "/shop",
+            "enabled": true,
+            "order": 2
+          },
+          {
+            "label": "Gallery",
+            "href": "/gallery",
+            "enabled": true,
+            "order": 3
+          },
+          {
+            "label": "Blog",
+            "href": "/blog",
+            "enabled": true,
+            "order": 4
+          },
+          {
+            "label": "About",
+            "href": "/about",
+            "enabled": true,
+            "order": 5
+          },
+          {
+            "label": "Contact",
+            "href": "/contact",
+            "enabled": true,
+            "order": 6
+          },
+          {
+            "label": "About the studio",
+            "href": "/pages/about",
+            "enabled": true,
+            "order": 7
+          }
+        ],
+        "customCode": {},
+        "checkout": {
+          "productId": "prd_seed_moss_cup",
+          "label": "Buy now"
+        },
+        "shippingEnabled": true,
+        "shippingCountries": [
+          "US",
+          "CA"
+        ],
+        "shippingOptions": [
+          {
+            "label": "Studio packed ground",
+            "amount": 1400,
+            "detail": "Insured ground shipping"
+          },
+          {
+            "label": "Local pickup",
+            "amount": 0,
+            "detail": "Coordinate pickup after purchase"
+          }
+        ],
+        "meta": {
+          "title": "Muddy Noni",
+          "description": "Small-batch ceramic studio.",
+          "image": {
+            "url": "",
+            "alt": ""
+          }
+        }
+      },
+      "created": "2026-07-13T03:26:06.464871316Z"
+    },
+    {
+      "id": "rev_02f99509f44a",
+      "resourceKind": "settings",
+      "resourceId": "site",
+      "resourceTitle": "Muddy Noni",
+      "action": "editor.saved",
+      "summary": "Editor draft saved.",
+      "snapshot": {
+        "siteTitle": "Muddy Noni",
+        "tagline": "Small-batch ceramics for daily rituals",
+        "description": "Handbuilt and wheel-thrown ceramics from a quiet studio practice.",
+        "studioName": "Muddy Noni",
+        "ownerName": "Noni",
+        "contactEmail": "studio@muddynoni.local",
+        "instagram": "@muddynoni",
+        "websiteUrl": "https://noni.m31labs.dev",
+        "primaryDomain": "noni.m31labs.dev",
+        "localPickupEnabled": true,
+        "localPickupCopy": "Local pickup can be coordinated after purchase.",
+        "hero": {
+          "headline": "Ceramiccc pieces with evidence of the hand",
+          "subhead": "Functional vessels, small sculptures, and one-off studio objects released in small batches.",
+          "ctaLabel": "Shop available work",
+          "ctaUrl": "/shop"
+        },
+        "theme": {
+          "kit": "studio-release",
+          "template": "custom",
+          "palette": "clay",
+          "imageRatio": "landscape",
+          "custom": {
+            "name": "Noni custom",
+            "heroLayout": "editorial",
+            "contentWidth": "standard",
+            "productDensity": "airy",
+            "heroHeight": "standard"
+          },
+          "style": {
+            "nav": "buttons",
+            "buttons": "pill",
+            "cards": "framed",
+            "spacing": "airy",
+            "imageFrame": "round",
+            "motion": "still"
+          }
+        },
+        "appearance": {
+          "logoAlt": "Site logo"
+        },
+        "home": {
+          "sections": [
+            {
+              "key": "hero",
+              "templateKey": "hero",
+              "enabled": true
+            },
+            {
+              "key": "products",
+              "templateKey": "products",
+              "enabled": true
+            },
+            {
+              "key": "gallery",
+              "templateKey": "gallery",
+              "enabled": true
+            },
+            {
+              "key": "blog",
+              "templateKey": "blog",
+              "enabled": true
+            },
+            {
+              "key": "contact",
+              "templateKey": "contact",
+              "enabled": false
+            }
+          ]
+        },
+        "navigation": [
+          {
+            "label": "Home",
+            "href": "/",
+            "enabled": true,
+            "order": 1
+          },
+          {
+            "label": "Shop",
+            "href": "/shop",
+            "enabled": true,
+            "order": 2
+          },
+          {
+            "label": "Gallery",
+            "href": "/gallery",
+            "enabled": true,
+            "order": 3
+          },
+          {
+            "label": "Blog",
+            "href": "/blog",
+            "enabled": true,
+            "order": 4
+          },
+          {
+            "label": "About",
+            "href": "/about",
+            "enabled": true,
+            "order": 5
+          },
+          {
+            "label": "Contact",
+            "href": "/contact",
+            "enabled": true,
+            "order": 6
+          },
+          {
+            "label": "About the studio",
+            "href": "/pages/about",
+            "enabled": true,
+            "order": 7
+          }
+        ],
+        "customCode": {},
+        "checkout": {
+          "productId": "prd_seed_moss_cup",
+          "label": "Buy now"
+        },
+        "shippingEnabled": true,
+        "shippingCountries": [
+          "US",
+          "CA"
+        ],
+        "shippingOptions": [
+          {
+            "label": "Studio packed ground",
+            "amount": 1400,
+            "detail": "Insured ground shipping"
+          },
+          {
+            "label": "Local pickup",
+            "amount": 0,
+            "detail": "Coordinate pickup after purchase"
+          }
+        ],
+        "meta": {
+          "title": "Muddy Noni",
+          "description": "Small-batch ceramic studio.",
+          "image": {
+            "url": "",
+            "alt": ""
+          }
+        }
+      },
+      "created": "2026-07-13T03:26:09.022742635Z"
+    },
+    {
+      "id": "rev_bc16522a29af",
+      "resourceKind": "settings",
+      "resourceId": "site",
+      "resourceTitle": "Muddy Noni",
+      "action": "editor.saved",
+      "summary": "Editor draft saved.",
+      "snapshot": {
+        "siteTitle": "Muddy Noni",
+        "tagline": "Small-batch ceramics for daily rituals",
+        "description": "Handbuilt and wheel-thrown ceramics from a quiet studio practice.",
+        "studioName": "Muddy Noni",
+        "ownerName": "Noni",
+        "contactEmail": "studio@muddynoni.local",
+        "instagram": "@muddynoni",
+        "websiteUrl": "https://noni.m31labs.dev",
+        "primaryDomain": "noni.m31labs.dev",
+        "localPickupEnabled": true,
+        "localPickupCopy": "Local pickup can be coordinated after purchase.",
+        "hero": {
+          "headline": "Ceramic pieces with evidence of the hand",
+          "subhead": "Functional vessels, small sculptures, and one-off studio objects released in small batches.",
+          "ctaLabel": "Shop available work",
+          "ctaUrl": "/shop"
+        },
+        "theme": {
+          "kit": "studio-release",
+          "template": "custom",
+          "palette": "clay",
+          "imageRatio": "landscape",
+          "custom": {
+            "name": "Noni custom",
+            "heroLayout": "editorial",
+            "contentWidth": "standard",
+            "productDensity": "airy",
+            "heroHeight": "standard"
+          },
+          "style": {
+            "nav": "buttons",
+            "buttons": "pill",
+            "cards": "framed",
+            "spacing": "airy",
+            "imageFrame": "round",
+            "motion": "still"
+          }
+        },
+        "appearance": {
+          "logoAlt": "Site logo"
+        },
+        "home": {
+          "sections": [
+            {
+              "key": "hero",
+              "templateKey": "hero",
+              "enabled": true
+            },
+            {
+              "key": "products",
+              "templateKey": "products",
+              "enabled": true
+            },
+            {
+              "key": "gallery",
+              "templateKey": "gallery",
+              "enabled": true
+            },
+            {
+              "key": "blog",
+              "templateKey": "blog",
+              "enabled": true
+            },
+            {
+              "key": "contact",
+              "templateKey": "contact",
+              "enabled": false
+            }
+          ]
+        },
+        "navigation": [
+          {
+            "label": "Home",
+            "href": "/",
+            "enabled": true,
+            "order": 1
+          },
+          {
+            "label": "Shop",
+            "href": "/shop",
+            "enabled": true,
+            "order": 2
+          },
+          {
+            "label": "Gallery",
+            "href": "/gallery",
+            "enabled": true,
+            "order": 3
+          },
+          {
+            "label": "Blog",
+            "href": "/blog",
+            "enabled": true,
+            "order": 4
+          },
+          {
+            "label": "About",
+            "href": "/about",
+            "enabled": true,
+            "order": 5
+          },
+          {
+            "label": "Contact",
+            "href": "/contact",
+            "enabled": true,
+            "order": 6
+          },
+          {
+            "label": "About the studio",
+            "href": "/pages/about",
+            "enabled": true,
+            "order": 7
+          }
+        ],
+        "customCode": {},
+        "checkout": {
+          "productId": "prd_seed_moss_cup",
+          "label": "Buy now"
+        },
+        "shippingEnabled": true,
+        "shippingCountries": [
+          "US",
+          "CA"
+        ],
+        "shippingOptions": [
+          {
+            "label": "Studio packed ground",
+            "amount": 1400,
+            "detail": "Insured ground shipping"
+          },
+          {
+            "label": "Local pickup",
+            "amount": 0,
+            "detail": "Coordinate pickup after purchase"
+          }
+        ],
+        "meta": {
+          "title": "Muddy Noni",
+          "description": "Small-batch ceramic studio.",
+          "image": {
+            "url": "",
+            "alt": ""
+          }
+        }
+      },
+      "created": "2026-07-13T03:26:11.420663993Z"
+    },
+    {
+      "id": "rev_b72efd09bbff",
+      "resourceKind": "settings",
+      "resourceId": "site",
+      "resourceTitle": "Muddy Noni",
+      "action": "editor.saved",
+      "summary": "Editor draft saved.",
+      "snapshot": {
+        "siteTitle": "Muddy Noni",
+        "tagline": "Small-batch ceramics for daily rituals",
+        "description": "Handbuilt and wheel-thrown ceramics from a quiet studio practice.",
+        "studioName": "Muddy Noni",
+        "ownerName": "Noni",
+        "contactEmail": "studio@muddynoni.local",
+        "instagram": "@muddynoni",
+        "websiteUrl": "https://noni.m31labs.dev",
+        "primaryDomain": "noni.m31labs.dev",
+        "localPickupEnabled": true,
+        "localPickupCopy": "Local pickup can be coordinated after purchase.",
+        "hero": {
+          "headline": "Ceramic pieces with evidence of the hand",
+          "subhead": "Functional vessels, small sculptures, and one-off studio objects released in small batches.nnvbnb",
+          "ctaLabel": "Shop available work",
+          "ctaUrl": "/shop"
+        },
+        "theme": {
+          "kit": "studio-release",
+          "template": "custom",
+          "palette": "clay",
+          "imageRatio": "landscape",
+          "custom": {
+            "name": "Noni custom",
+            "heroLayout": "editorial",
+            "contentWidth": "standard",
+            "productDensity": "airy",
+            "heroHeight": "standard"
+          },
+          "style": {
+            "nav": "buttons",
+            "buttons": "pill",
+            "cards": "framed",
+            "spacing": "airy",
+            "imageFrame": "round",
+            "motion": "still"
+          }
+        },
+        "appearance": {
+          "logoAlt": "Site logo"
+        },
+        "home": {
+          "sections": [
+            {
+              "key": "hero",
+              "templateKey": "hero",
+              "enabled": true
+            },
+            {
+              "key": "products",
+              "templateKey": "products",
+              "enabled": true
+            },
+            {
+              "key": "gallery",
+              "templateKey": "gallery",
+              "enabled": true
+            },
+            {
+              "key": "blog",
+              "templateKey": "blog",
+              "enabled": true
+            },
+            {
+              "key": "contact",
+              "templateKey": "contact",
+              "enabled": false
+            }
+          ]
+        },
+        "navigation": [
+          {
+            "label": "Home",
+            "href": "/",
+            "enabled": true,
+            "order": 1
+          },
+          {
+            "label": "Shop",
+            "href": "/shop",
+            "enabled": true,
+            "order": 2
+          },
+          {
+            "label": "Gallery",
+            "href": "/gallery",
+            "enabled": true,
+            "order": 3
+          },
+          {
+            "label": "Blog",
+            "href": "/blog",
+            "enabled": true,
+            "order": 4
+          },
+          {
+            "label": "About",
+            "href": "/about",
+            "enabled": true,
+            "order": 5
+          },
+          {
+            "label": "Contact",
+            "href": "/contact",
+            "enabled": true,
+            "order": 6
+          },
+          {
+            "label": "About the studio",
+            "href": "/pages/about",
+            "enabled": true,
+            "order": 7
+          }
+        ],
+        "customCode": {},
+        "checkout": {
+          "productId": "prd_seed_moss_cup",
+          "label": "Buy now"
+        },
+        "shippingEnabled": true,
+        "shippingCountries": [
+          "US",
+          "CA"
+        ],
+        "shippingOptions": [
+          {
+            "label": "Studio packed ground",
+            "amount": 1400,
+            "detail": "Insured ground shipping"
+          },
+          {
+            "label": "Local pickup",
+            "amount": 0,
+            "detail": "Coordinate pickup after purchase"
+          }
+        ],
+        "meta": {
+          "title": "Muddy Noni",
+          "description": "Small-batch ceramic studio.",
+          "image": {
+            "url": "",
+            "alt": ""
+          }
+        }
+      },
+      "created": "2026-07-13T03:26:54.64071011Z"
+    },
+    {
+      "id": "rev_cf1d9fe289fd",
+      "resourceKind": "settings",
+      "resourceId": "site",
+      "resourceTitle": "Muddy Noni",
+      "action": "editor.saved",
+      "summary": "Editor draft saved.",
+      "snapshot": {
+        "siteTitle": "Muddy Noni",
+        "tagline": "Small-batch ceramics for daily rituals",
+        "description": "Handbuilt and wheel-thrown ceramics from a quiet studio practice.",
+        "studioName": "Muddy Noni",
+        "ownerName": "Noni",
+        "contactEmail": "studio@muddynoni.local",
+        "instagram": "@muddynoni",
+        "websiteUrl": "https://noni.m31labs.dev",
+        "primaryDomain": "noni.m31labs.dev",
+        "localPickupEnabled": true,
+        "localPickupCopy": "Local pickup can be coordinated after purchase.",
+        "hero": {
+          "headline": "Ceramic pieces with evidence of the hand",
+          "subhead": "Functional vessels, small sculptures, and one-off studio objects released in small batches.nnvbnb",
+          "ctaLabel": "Shop available work",
+          "ctaUrl": "/shop"
+        },
+        "theme": {
+          "kit": "studio-release",
+          "template": "custom",
+          "palette": "clay",
+          "imageRatio": "landscape",
+          "custom": {
+            "name": "Noni custom",
+            "heroLayout": "editorial",
+            "contentWidth": "standard",
+            "productDensity": "airy",
+            "heroHeight": "standard"
+          },
+          "style": {
+            "nav": "buttons",
+            "buttons": "pill",
+            "cards": "framed",
+            "spacing": "airy",
+            "imageFrame": "round",
+            "motion": "still"
+          }
+        },
+        "appearance": {
+          "logoAlt": "Site logo"
+        },
+        "home": {
+          "sections": [
+            {
+              "key": "hero",
+              "templateKey": "hero",
+              "enabled": true
+            },
+            {
+              "key": "products",
+              "templateKey": "products",
+              "enabled": true
+            },
+            {
+              "key": "gallery",
+              "templateKey": "gallery",
+              "enabled": true
+            },
+            {
+              "key": "blog",
+              "templateKey": "blog",
+              "enabled": true
+            },
+            {
+              "key": "contact",
+              "templateKey": "contact",
+              "enabled": false
+            }
+          ]
+        },
+        "navigation": [
+          {
+            "label": "Home",
+            "href": "/",
+            "enabled": true,
+            "order": 1
+          },
+          {
+            "label": "Shop",
+            "href": "/shop",
+            "enabled": true,
+            "order": 2
+          },
+          {
+            "label": "Gallery",
+            "href": "/gallery",
+            "enabled": true,
+            "order": 3
+          },
+          {
+            "label": "Blog",
+            "href": "/blog",
+            "enabled": true,
+            "order": 4
+          },
+          {
+            "label": "About",
+            "href": "/about",
+            "enabled": true,
+            "order": 5
+          },
+          {
+            "label": "Contact",
+            "href": "/contact",
+            "enabled": true,
+            "order": 6
+          },
+          {
+            "label": "About the studio",
+            "href": "/pages/about",
+            "enabled": true,
+            "order": 7
+          }
+        ],
+        "customCode": {},
+        "checkout": {
+          "productId": "prd_seed_moss_cup",
+          "label": "Buy now"
+        },
+        "shippingEnabled": true,
+        "shippingCountries": [
+          "US",
+          "CA"
+        ],
+        "shippingOptions": [
+          {
+            "label": "Studio packed ground",
+            "amount": 1400,
+            "detail": "Insured ground shipping"
+          },
+          {
+            "label": "Local pickup",
+            "amount": 0,
+            "detail": "Coordinate pickup after purchase"
+          }
+        ],
+        "meta": {
+          "title": "Muddy Noni",
+          "description": "Small-batch ceramic studio.",
+          "image": {
+            "url": "",
+            "alt": ""
+          }
+        }
+      },
+      "created": "2026-07-13T03:26:57.107536091Z"
+    },
+    {
+      "id": "rev_e2cd543a4119",
+      "resourceKind": "settings",
+      "resourceId": "site",
+      "resourceTitle": "Muddy Noni",
+      "action": "editor.saved",
+      "summary": "Editor draft saved.",
+      "snapshot": {
+        "siteTitle": "Muddy Noni",
+        "tagline": "Small-batch ceramics for daily rituals",
+        "description": "Handbuilt and wheel-thrown ceramics from a quiet studio practice.",
+        "studioName": "Muddy Noni",
+        "ownerName": "Noni",
+        "contactEmail": "studio@muddynoni.local",
+        "instagram": "@muddynoni",
+        "websiteUrl": "https://noni.m31labs.dev",
+        "primaryDomain": "noni.m31labs.dev",
+        "localPickupEnabled": true,
+        "localPickupCopy": "Local pickup can be coordinated after purchase.",
+        "hero": {
+          "headline": "Ceramic pieces with evidence of the hand",
+          "subhead": "Functional vessels, small sculptures, and one-off studio objects released in small batches.",
+          "ctaLabel": "Shop available work",
+          "ctaUrl": "/shop"
+        },
+        "theme": {
+          "kit": "studio-release",
+          "template": "custom",
+          "palette": "clay",
+          "imageRatio": "landscape",
+          "custom": {
+            "name": "Noni custom",
+            "heroLayout": "editorial",
+            "contentWidth": "standard",
+            "productDensity": "airy",
+            "heroHeight": "standard"
+          },
+          "style": {
+            "nav": "buttons",
+            "buttons": "pill",
+            "cards": "framed",
+            "spacing": "airy",
+            "imageFrame": "round",
+            "motion": "still"
+          }
+        },
+        "appearance": {
+          "logoAlt": "Site logo"
+        },
+        "home": {
+          "sections": [
+            {
+              "key": "hero",
+              "templateKey": "hero",
+              "enabled": true
+            },
+            {
+              "key": "products",
+              "templateKey": "products",
+              "enabled": true
+            },
+            {
+              "key": "gallery",
+              "templateKey": "gallery",
+              "enabled": true
+            },
+            {
+              "key": "blog",
+              "templateKey": "blog",
+              "enabled": true
+            },
+            {
+              "key": "contact",
+              "templateKey": "contact",
+              "enabled": false
+            }
+          ]
+        },
+        "navigation": [
+          {
+            "label": "Home",
+            "href": "/",
+            "enabled": true,
+            "order": 1
+          },
+          {
+            "label": "Shop",
+            "href": "/shop",
+            "enabled": true,
+            "order": 2
+          },
+          {
+            "label": "Gallery",
+            "href": "/gallery",
+            "enabled": true,
+            "order": 3
+          },
+          {
+            "label": "Blog",
+            "href": "/blog",
+            "enabled": true,
+            "order": 4
+          },
+          {
+            "label": "About",
+            "href": "/about",
+            "enabled": true,
+            "order": 5
+          },
+          {
+            "label": "Contact",
+            "href": "/contact",
+            "enabled": true,
+            "order": 6
+          },
+          {
+            "label": "About the studio",
+            "href": "/pages/about",
+            "enabled": true,
+            "order": 7
+          }
+        ],
+        "customCode": {},
+        "checkout": {
+          "productId": "prd_seed_moss_cup",
+          "label": "Buy now"
+        },
+        "shippingEnabled": true,
+        "shippingCountries": [
+          "US",
+          "CA"
+        ],
+        "shippingOptions": [
+          {
+            "label": "Studio packed ground",
+            "amount": 1400,
+            "detail": "Insured ground shipping"
+          },
+          {
+            "label": "Local pickup",
+            "amount": 0,
+            "detail": "Coordinate pickup after purchase"
+          }
+        ],
+        "meta": {
+          "title": "Muddy Noni",
+          "description": "Small-batch ceramic studio.",
+          "image": {
+            "url": "",
+            "alt": ""
+          }
+        }
+      },
+      "created": "2026-07-13T03:27:09.582637288Z"
+    }
+  ],
+  "studioActivity": {},
+  "editorLayout": {},
+  "secrets": {
+    "payment": {
+      "updated": "0001-01-01T00:00:00Z"
+    }
+  },
+  "interactionsLiveMigrated": true,
+  "updated": "2026-07-13T03:27:09.582637288Z"
+}

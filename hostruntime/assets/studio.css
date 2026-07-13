@@ -962,13 +962,26 @@ button.button {
   font-size: var(--text-lg);
 }
 
-.studio-home-inspector__target span,
-.studio-home-inspector__target-status,
+/* Wave 3A (vocabulary pruning, fix (e)): this rule used to also match
+   .studio-home-inspector__target span and .studio-home-inspector__target-
+   status — conflating a full instructional SENTENCE (targetSummary, a bare
+   <span> with no class of its own in panels/home_inspector_panel.go) with
+   genuinely tiny status pills, turning the sentence into small monospace
+   caps too (handoff-30-create-actions-report.md's root-cause finding). The
+   target-status pills are gone now (folded into the single Saved/Unsaved
+   indicator), so this rule is scoped to what's actually left: the brand
+   preview shell's header. */
 .studio-brand-panel__preview-shell > header {
   color: var(--color-muted);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   text-transform: uppercase;
+}
+
+.studio-home-inspector__target span {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: 1.4;
 }
 
 .studio-home-inspector__groups,
@@ -2589,8 +2602,168 @@ html[data-gosx-studio-preview-selectable] [data-gosx-studio-preview-tab-stop]:fo
   gap: 0.3rem;
 }
 
-/* #1 — brand color token rows (LOOK panel swatches) rendered as raw inline
-   <span> chips with no size/gap CSS at all. */
+/* Wave 3A (inspector-presentation, fix (c)): the "Responsive layout" heading
+   plus a one-line summary stay visible outside the (now closed-by-default)
+   details disclosure, so a collapsed panel still reads as "home:hero · 1
+   override" rather than an empty card. */
+.studio-responsive-layout__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-xs);
+}
+
+.studio-responsive-layout__summary {
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Wave 3A (inspector-presentation, fix (a)): the interactions inspector used
+   to render one full "Interactions" header + every allow-listed kind's
+   Effect/Duration/Delay selects, always fully expanded, per canvas target —
+   a host composing 15 targets (editorInteractionsPanels in
+   muddy-noni-commerce) produced ~160 always-visible bare selects with zero
+   card styling. Each target is now a bordered, compact card
+   (studio-interactions-target) with a one-line summary and a
+   closed-by-default disclosure for the actual edit controls, and
+   RenderInteractionsInspector lists them in a responsive multi-column grid
+   so the wasted cream void beside a single narrow column of cards (fix (d))
+   gets used instead of left empty. */
+.studio-interactions-target {
+  display: grid;
+  gap: 0.4rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-canvas-soft) 78%, transparent);
+  padding: var(--space-xs);
+  min-width: 0;
+}
+
+.studio-interactions-target__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.15rem;
+}
+
+.studio-interactions-target__head strong {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+}
+
+.studio-interactions-target__head span {
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-interactions-target__editor {
+  border: 1px solid color-mix(in srgb, var(--color-line) 78%, transparent);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-canvas) 60%, transparent);
+  overflow: hidden;
+}
+
+.studio-interactions-target__editor > summary {
+  cursor: pointer;
+  padding: 0.4rem 0.6rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+}
+
+.studio-interactions-target__editor [data-studio-interaction-card] {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.4rem 0.6rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-line) 60%, transparent);
+}
+
+.studio-interactions-target__editor [data-studio-interaction-card] header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.studio-interactions-target__editor label {
+  font-size: var(--text-xs);
+  color: var(--color-ink-soft);
+}
+
+.studio-interactions-target__editor select,
+.studio-interactions-target__editor input[type="checkbox"] {
+  min-height: 1.9rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  padding: 0.1rem 0.35rem;
+  font-size: var(--text-xs);
+}
+
+.studio-interactions-target__editor button {
+  min-height: 1.8rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink-soft);
+  padding: 0 0.6rem;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.studio-interactions-target__editor [data-studio-interaction-reduced-motion-note] {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
+/* Fix (d) — reclaim the empty right half: with compact cards in hand, flow
+   them into as many columns as fit instead of one narrow column with a wide
+   unused margin beside it. */
+.studio-interactions__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: var(--space-xs);
+  align-items: start;
+}
+
+.studio-interactions__add {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  padding: var(--space-xs);
+}
+
+.studio-interactions__add > summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+}
+
+.studio-interactions__add .studio-interactions-target {
+  margin-top: var(--space-xs);
+}
+
+/* Fix (d) — the direct-edit/interactions/responsive-layout "support node"
+   panels (shell/backend_editor_page.go's backendEditorSupportNodes) render
+   as siblings of the three-zone workbench grid, not inside
+   .editor-sidebar's ~24rem column, so they previously spanned the page's
+   full content width with a single narrow column of controls and a wide
+   cream void beside it. Give the mode-gated wrapper the same bordered-card
+   treatment .editor-panel already has (it inherits the class) plus a frame
+   width cap so it doesn't outgrow the three-zone stage above it. */
+[data-studio-mode-gate-wrapper="true"] {
+  max-width: var(--size-studio-frame, 88rem);
+  margin-inline: auto;
+}
 .theme-swatch-row {
   display: flex;
   flex-wrap: wrap;

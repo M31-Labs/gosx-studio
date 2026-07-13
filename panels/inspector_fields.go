@@ -78,7 +78,12 @@ func renderHomeInspectorFieldRow(field map[string]any, options InspectorFieldRow
 			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(field, "kindLabel"))),
 		),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-home-field__meta")),
-			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(field, "validationLabel"))),
+			// Wave 3A (vocabulary pruning, fix (e)): a per-field "READY" chip
+			// on every valid field was pure noise (162 selects' worth of
+			// context also meant dozens of these on one page) — only an
+			// actual validation problem is worth a chip here, so this output
+			// is hidden whenever the field isn't invalid.
+			gosx.El("output", gosx.Attrs(gosx.Attr("hidden", !core.WorkbenchViewBool(field, "invalid"))), gosx.Text(core.WorkbenchViewString(field, "validationLabel"))),
 			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(field, "reactionLabel"))),
 			gosx.El("small", gosx.Attrs(gosx.Attr("class", "studio-home-field__invalid")), gosx.Text(options.InvalidLabel)),
 		),

@@ -58,6 +58,36 @@ func TestResponsiveLayoutInspectorStyleStateAttributeDoesNotCollideWithFormState
 	}
 }
 
+// TestResponsiveLayoutInspectorCollapsesControlsByDefaultWithSummary guards
+// wave 3A fix (c): the breakpoint controls (base/tablet/mobile, each with
+// several property selects) must sit behind one closed-by-default
+// disclosure, with the heading and a one-line override-count summary staying
+// outside it so a collapsed panel is still scannable.
+func TestResponsiveLayoutInspectorCollapsesControlsByDefaultWithSummary(t *testing.T) {
+	node := RenderResponsiveLayoutInspector(ResponsiveLayoutInspectorOptions{
+		ID: "layout", Action: "/authoring", CSRFToken: "token", DocumentRevision: 9,
+		Target: authoring.OperationTarget{Route: "/", PageID: "page:home", ComponentKey: "home:hero"},
+		Values: map[string]ResponsiveLayoutValue{
+			"base/gap":            {Present: true, Value: "var(--space-md)"},
+			"base/flex-direction": {Present: true, Value: "row"},
+		},
+	})
+	html := gosx.RenderHTML(node)
+	for _, want := range []string{
+		`<header class="studio-responsive-layout__head"><h3>Responsive layout</h3>`,
+		`data-studio-layout-summary="true">home:hero · 2 overrides</span>`,
+		`<details class="studio-responsive-layout__disclosure">`,
+		`<summary>Edit layout</summary>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing %q in:\n%s", want, html)
+		}
+	}
+	if strings.Contains(html, `<details class="studio-responsive-layout__disclosure" open`) {
+		t.Fatal("the layout-controls disclosure must be closed by default")
+	}
+}
+
 func TestResponsiveLayoutInspectorMobileInheritsTabletBeforeBase(t *testing.T) {
 	control, ok := func() (authoring.LayoutControl, bool) {
 		for _, candidate := range authoring.ResponsiveLayoutControls() {

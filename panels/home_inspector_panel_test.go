@@ -15,7 +15,6 @@ func TestRenderHomeInspectorPanelFull(t *testing.T) {
 		`<header class="studio-home-inspector__head"><div><p class="kicker">Home</p><h2>Inspector</h2></div><output class="studio-home-inspector__state" data-studio-inspector-state="Saved">Saved</output><label class="studio-home-inspector__close" for="studioSiteMapInspectorFocus" role="button" tabindex="0">Close</label></header>`,
 		`<section class="studio-home-inspector__target" aria-label="Selected section">`,
 		`<strong data-studio-selection-label="true">Hero</strong>`,
-		`<div class="studio-home-inspector__target-status"><output>Preview ready</output><output>Draft saved</output></div>`,
 		`<div class="studio-home-inspector__groups" role="toolbar" aria-label="Inspector groups">`,
 		`<button type="button" class="studio-home-inspector__group" data-studio-inspector-group="copy" aria-pressed="true"><strong>Copy</strong></button>`,
 		`<button type="button" class="studio-home-inspector__group" data-studio-inspector-group="media" aria-pressed="false"><strong>Media</strong></button>`,
@@ -32,10 +31,40 @@ func TestRenderHomeInspectorPanelFull(t *testing.T) {
 			t.Fatalf("home inspector panel missing %q:\n%s", fragment, html)
 		}
 	}
-	for _, notWant := range []string{"<form", "csrf_token"} {
+	for _, notWant := range []string{
+		"<form", "csrf_token",
+		// Wave 3A (vocabulary pruning, fix (e)): the separate "Live preview" /
+		// "Draft safe"-style status pills are gone — the single Saved/Unsaved
+		// indicator in the header is now the only save-state vocabulary.
+		"studio-home-inspector__target-status", "Preview ready", "Draft saved",
+	} {
 		if strings.Contains(html, notWant) {
 			t.Fatalf("home inspector panel must not include %q:\n%s", notWant, html)
 		}
+	}
+}
+
+// TestRenderHomeInspectorPanelFoldsReadyIntoSaved guards wave 3A fix (e):
+// muddy-noni-commerce's editorHomeInspectorView unconditionally supplies
+// "cleanLabel": "Ready" (never empty), so the FirstNonEmpty-only guard this
+// panel used to have never actually caught it. The panel must present the
+// same canonical "Saved" word the top toolbar's save status already uses,
+// not invent a second word for the same concept.
+func TestRenderHomeInspectorPanelFoldsReadyIntoSaved(t *testing.T) {
+	view := homeInspectorPanelTestView()
+	view["cleanLabel"] = "Ready"
+	html := gosx.RenderHTML(RenderHomeInspectorPanel(view, homeInspectorPanelTestContentFields(), HomeInspectorPanelOptions{}))
+	for _, fragment := range []string{
+		`data-studio-inspector-clean-label="Saved"`,
+		`data-studio-inspector-state="Saved"`,
+		`>Saved</output>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("expected host-supplied \"Ready\" to fold into \"Saved\", missing %q:\n%s", fragment, html)
+		}
+	}
+	if strings.Contains(html, ">Ready<") {
+		t.Fatalf("expected \"Ready\" not to leak into the rendered clean-state label:\n%s", html)
 	}
 }
 

@@ -1,10 +1,12 @@
 package panels
 
 import (
+	"strconv"
 	"strings"
 
 	"m31labs.dev/gosx"
 	"m31labs.dev/gosx-studio/authoring"
+	"m31labs.dev/gosx-studio/core"
 )
 
 // ResponsiveLayoutValue carries one explicit persisted override and its
@@ -30,6 +32,20 @@ type ResponsiveLayoutInspectorOptions struct {
 // RenderResponsiveLayoutInspector renders real property controls for the
 // selected component. Each property/scope owns a separate durable form so its
 // head and Undo/Redo chain cannot corrupt the selected content target.
+//
+// Wave 3A (inspector-presentation): the breakpoint controls now live behind
+// one closed-by-default <details> disclosure (fix (c) — collapsed-by-default
+// sections). The "Responsive layout" heading and a one-line summary (target +
+// override count) stay outside the disclosure so the panel is still
+// scannable collapsed. A host that composes more than one target's inspector
+// on the same page (muddy-noni-commerce's editorDirectEditPanels always
+// renders both home:hero's and about:content's panel together, regardless of
+// which one is actually selected — the respLayoutCount=2 defect) is expected
+// to hide every instance except the one matching the live canvas selection;
+// hostruntime/assets/workbench_runtime.js's scopeResponsiveLayoutInspectors
+// is the studio-side idempotence guard that does this at runtime by toggling
+// [hidden] (see that file), so double-inclusion still renders once even if
+// the host keeps composing every target unconditionally.
 func RenderResponsiveLayoutInspector(options ResponsiveLayoutInspectorOptions) gosx.Node {
 	if options.ID == "" {
 		options.ID = "studio-responsive-layout"
@@ -38,12 +54,7 @@ func RenderResponsiveLayoutInspector(options ResponsiveLayoutInspectorOptions) g
 		options.Action = "/admin/editor/__actions/authoring"
 	}
 	target := options.Target.Normalize()
-	children := []gosx.Node{
-		gosx.El("header", nil,
-			gosx.El("h3", nil, gosx.Text("Responsive layout")),
-			gosx.El("p", nil, gosx.Text("Edit the selected canvas object with safe layout tokens. Smaller devices inherit until you add an override.")),
-		),
-	}
+	breakpointNodes := make([]gosx.Node, 0, len(authoring.SupportedStyleBreakpoints()))
 	for _, breakpoint := range authoring.SupportedStyleBreakpoints() {
 		controls := make([]gosx.Node, 0, len(authoring.ResponsiveLayoutControls()))
 		for _, control := range authoring.ResponsiveLayoutControls() {
@@ -53,7 +64,7 @@ func RenderResponsiveLayoutInspector(options ResponsiveLayoutInspectorOptions) g
 		if breakpoint == authoring.StyleBreakpointBase {
 			attrs = append(attrs, gosx.Attr("open", "open"))
 		}
-		children = append(children, gosx.El("details", gosx.Attrs(attrs...),
+		breakpointNodes = append(breakpointNodes, gosx.El("details", gosx.Attrs(attrs...),
 			gosx.El("summary", nil, gosx.Text(layoutBreakpointLabel(breakpoint))),
 			gosx.Fragment(controls...),
 		))
@@ -63,7 +74,42 @@ func RenderResponsiveLayoutInspector(options ResponsiveLayoutInspectorOptions) g
 		gosx.Attr("data-studio-responsive-layout-inspector", "true"),
 		gosx.Attr("data-studio-selected-route", target.Route),
 		gosx.Attr("data-studio-selected-component", target.ComponentKey),
-	), gosx.Fragment(children...))
+	),
+		gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-responsive-layout__head")),
+			gosx.El("h3", nil, gosx.Text("Responsive layout")),
+			gosx.El("span", gosx.Attrs(
+				gosx.Attr("class", "studio-responsive-layout__summary"),
+				gosx.Attr("data-studio-layout-summary", "true"),
+			), gosx.Text(responsiveLayoutSummaryLabel(target, responsiveLayoutOverrideCount(options.Values)))),
+		),
+		gosx.El("details", gosx.Attrs(gosx.Attr("class", "studio-responsive-layout__disclosure")),
+			gosx.El("summary", nil, gosx.Text("Edit layout")),
+			gosx.El("p", nil, gosx.Text("Edit the selected canvas object with safe layout tokens. Smaller devices inherit until you add an override.")),
+			gosx.Fragment(breakpointNodes...),
+		),
+	)
+}
+
+func responsiveLayoutOverrideCount(values map[string]ResponsiveLayoutValue) int {
+	count := 0
+	for _, value := range values {
+		if value.Present {
+			count++
+		}
+	}
+	return count
+}
+
+func responsiveLayoutSummaryLabel(target authoring.OperationTarget, overrideCount int) string {
+	label := core.FirstNonEmpty(target.ComponentKey, "Selected object")
+	switch overrideCount {
+	case 0:
+		return label + " · No overrides"
+	case 1:
+		return label + " · 1 override"
+	default:
+		return label + " · " + strconv.Itoa(overrideCount) + " overrides"
+	}
 }
 
 func renderResponsiveLayoutControl(options ResponsiveLayoutInspectorOptions, target authoring.OperationTarget, breakpoint string, control authoring.LayoutControl) gosx.Node {

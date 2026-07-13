@@ -262,7 +262,11 @@ func TestRenderInspectorFieldListHomeVariantPreservesRowControlAttrsAndMeta(t *t
 		`<label for="heroHeadline">Headline</label>`,
 		`<span>Text</span>`,
 		`<div class="studio-home-field__meta">`,
-		`<output>Ready</output>`,
+		// Wave 3A (vocabulary pruning, fix (e)): a per-field "READY" chip
+		// is noise once you have 15+ fields on a page — the validation
+		// output stays in the DOM (so a script toggling it later doesn't
+		// need new markup) but hidden unless the field is actually invalid.
+		`<output hidden>Ready</output>`,
 		`<small>Live preview</small>`,
 		`<small class="studio-home-field__invalid">Needs attention</small>`,
 		`name="heroHeadline"`,
@@ -286,6 +290,38 @@ func TestRenderInspectorFieldListHomeVariantPreservesRowControlAttrsAndMeta(t *t
 	}
 	if !strings.Contains(html, "\n  Preserve this copy.\n") {
 		t.Fatalf("home textarea did not preserve raw whitespace:\n%s", html)
+	}
+}
+
+// TestRenderInspectorFieldRowHomeVariantShowsValidationOutputOnlyWhenInvalid
+// guards wave 3A fix (e): the per-field "READY"/"Required"/"Linked" chip is
+// vocabulary noise on a valid field (it was visible on every single field in
+// the inspector, all the time) — only an actual validation problem
+// ("invalid": true) is worth surfacing here.
+func TestRenderInspectorFieldRowHomeVariantShowsValidationOutputOnlyWhenInvalid(t *testing.T) {
+	valid := gosx.RenderHTML(RenderInspectorFieldRow(map[string]any{
+		"isInput":         true,
+		"id":              "tagline",
+		"label":           "Tagline",
+		"validationLabel": "Ready",
+		"invalid":         false,
+	}, InspectorFieldRowOptions{Variant: InspectorFieldRowVariantHome}))
+	if !strings.Contains(valid, `<output hidden>Ready</output>`) {
+		t.Fatalf("expected a valid field's validation output to be present but hidden, got:\n%s", valid)
+	}
+
+	invalid := gosx.RenderHTML(RenderInspectorFieldRow(map[string]any{
+		"isInput":         true,
+		"id":              "tagline",
+		"label":           "Tagline",
+		"validationLabel": "Needs value",
+		"invalid":         true,
+	}, InspectorFieldRowOptions{Variant: InspectorFieldRowVariantHome}))
+	if !strings.Contains(invalid, `<output>Needs value</output>`) {
+		t.Fatalf("expected an invalid field's validation error to render visibly, got:\n%s", invalid)
+	}
+	if strings.Contains(invalid, `<output hidden>`) {
+		t.Fatalf("an invalid field's validation output must not be hidden:\n%s", invalid)
 	}
 }
 

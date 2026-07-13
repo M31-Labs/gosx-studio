@@ -202,6 +202,38 @@
     return parsed > 0 ? parsed : 1;
   }
 
+  // Wave 3A (inspector-presentation, fix (b)): scopeResponsiveLayoutInspectors
+  // is the studio-side idempotence guard for the "respLayoutCount=2" defect.
+  // [data-studio-responsive-layout-inspector] panels are rendered by the HOST
+  // outside this <form> (muddy-noni-commerce's editorDirectEditPanels Fragments
+  // one panel per flagship target — home:hero AND about:content — always
+  // together, regardless of which one is actually selected on canvas), so they
+  // can't be found via form.querySelector and can't be deduped by a Go-side
+  // render guard alone. This walks the whole document (not just this form) for
+  // that reason. It shows only the panel whose data-studio-selected-component
+  // matches the form's current data-studio-selection; with no selection yet it
+  // falls back to the first panel, matching the server's own default selected
+  // target. Every non-matching panel gets [hidden] — already display:none via
+  // the [hidden] rule at the top of studio.css — so a real browser measurement
+  // (e.g. querying h1/h2/h3 text) only ever finds ONE "Responsive layout"
+  // heading rendered, even though the host still composes several.
+  function scopeResponsiveLayoutInspectors(form) {
+    var panels = queryAll(document, "[data-studio-responsive-layout-inspector]");
+    if (!panels.length) return;
+    var active = form ? compactText(form.getAttribute("data-studio-selection")) : "";
+    var shown = false;
+    panels.forEach(function (panel) {
+      var key = compactText(panel.getAttribute("data-studio-selected-component"));
+      var show = active ? key === active : !shown;
+      if (show) {
+        panel.removeAttribute("hidden");
+        shown = true;
+      } else {
+        panel.setAttribute("hidden", "true");
+      }
+    });
+  }
+
   function initWorkbench(form) {
     if (!form || (form.dataset.gosxStudioWorkbenchBound === "true" && form.__gosxStudioWorkbenchRuntime)) return;
     form.dataset.gosxStudioWorkbenchBound = "true";
@@ -1009,6 +1041,7 @@
       form.setAttribute("data-studio-selection-kind", detail.kind || "");
       setReadout("[data-studio-selection-label]", detail.label || "No selection");
       setReadout("[data-studio-selection-status]", detail.key ? (detail.kind || "Selected") : "No selection");
+      scopeResponsiveLayoutInspectors(form);
     });
 
     form.addEventListener("input", function (event) {
@@ -1080,6 +1113,7 @@
     setZoom(form.getAttribute("data-studio-zoom") || "", { reason: "init" });
     syncRailButtons();
     syncActivityButtons();
+    scopeResponsiveLayoutInspectors(form);
   }
 
   function initAll(root) {
