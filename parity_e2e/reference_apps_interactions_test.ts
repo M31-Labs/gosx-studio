@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { clickAuthoringPanel, gotoEditor, revealModeIfPresent, startMuddy } from "./reference_apps_harness";
+import { clickAuthoringPanel, gotoEditor, openInteractionsTargetDisclosure, revealModeIfPresent, startMuddy } from "./reference_apps_harness";
 
 // Descriptor 05/06 independent review P1 fix + P2b executing proof.
 //
@@ -65,6 +65,12 @@ test.describe("@reference-apps Muddy/Noni no-code interaction draft/live isolati
       await revealModeIfPresent(page, "home");
       const revealForm = page.locator(REVEAL_FORM);
       await expect(revealForm, "the hero reveal-on-scroll interaction row must render").toBeAttached({ timeout: 15_000 });
+      // Wave 3A (inspector-presentation): the target's controls now sit
+      // behind a closed-by-default disclosure, and with nothing attached yet
+      // the target itself is nested inside the shared "+ Add interaction"
+      // picker — open both before the human step of clicking the row's own
+      // submit button.
+      await openInteractionsTargetDisclosure(page, HERO_INTERACTIONS_PANEL);
       const setResponse = await clickAuthoringPanel(page, REVEAL_FORM);
       expect(setResponse.status(), "attaching the interaction must not fail server-side").toBe(200);
 

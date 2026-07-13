@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { clickAuthoringPanel, gotoEditor, revealModeIfPresent, startMuddy } from "./reference_apps_harness";
+import { clickAuthoringPanel, gotoEditor, openInteractionsTargetDisclosure, revealModeIfPresent, startMuddy } from "./reference_apps_harness";
 
 // HANDOFF-21 regression probe: "interaction fails after an edit" (owner
 // report on Noni staging). Every existing authoring-managed-form e2e test
@@ -38,15 +38,26 @@ test.describe("@reference-apps Muddy/Noni interactions: sequential same-page sav
 
       const revealForm = page.locator(REVEAL_FORM);
       await expect(revealForm, "the hero reveal-on-scroll interaction row must render").toBeAttached({ timeout: 15_000 });
+      // Wave 3A (inspector-presentation): open the shared "+ Add interaction"
+      // picker (home:hero starts unattached, so its whole card is nested
+      // inside it) and the target's own per-target disclosure before the
+      // human step of clicking the row's own submit button.
+      await openInteractionsTargetDisclosure(page, HERO_INTERACTIONS_PANEL);
       const firstResponse = await clickAuthoringPanel(page, REVEAL_FORM, { reloadAfter: false });
       expect(firstResponse.status(), "attaching the first interaction must not fail server-side").toBe(200);
       const firstBody = await firstResponse.json();
       expect(firstBody?.data?.message ?? firstBody?.message ?? "", "first save should report success").toContain("saved");
 
       // NO page reload here -- this is the exact gap: a real user stays on
-      // the same page and immediately attaches a second interaction.
+      // the same page and immediately attaches a second interaction. The
+      // first save's in-place fragment refresh may have re-rendered the
+      // target's card (now attached, so it has moved out of the "+ Add
+      // interaction" picker and its own disclosure defaults back to closed
+      // again) — re-run the same disclosure-opening step against the live
+      // DOM before the second click.
       const hoverForm = page.locator(HOVER_FORM);
       await expect(hoverForm, "the hero hover-focus-state interaction row must still be attached").toBeAttached({ timeout: 5_000 });
+      await openInteractionsTargetDisclosure(page, HERO_INTERACTIONS_PANEL);
       const secondResponse = await clickAuthoringPanel(page, HOVER_FORM, { reloadAfter: false, noWaitAfter: false });
       expect(secondResponse.status(), "attaching the SECOND interaction (same page, no reload) must not fail server-side").toBe(200);
       const secondBody = await secondResponse.json();

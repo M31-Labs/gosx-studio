@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 import { mkdtempSync, copyFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { startMuddy, type ServerHandle } from "./reference_apps_harness";
+import { clickAuthoringPanel, openInteractionsTargetDisclosure, startMuddy, type ServerHandle } from "./reference_apps_harness";
 
 // Wave 3A (inspector-presentation): the post-wave-2 re-score (6/10) found the
 // entire gap to 7-8 was the Home inspector's presentation once real content
@@ -48,6 +48,14 @@ async function startMuddyWithStagingSeed(request: APIRequestContext): Promise<Se
 const isRenderedFn = `(el) => typeof el.checkVisibility === "function" ? el.checkVisibility() : el.offsetParent !== null`;
 
 test.describe("@reference-apps Muddy/Noni inspector presentation (wave 3A)", () => {
+  // The second test below drives a real authoring round trip (attach +
+  // in-place fragment refresh, then a full networkidle reload) against the
+  // 15-target staging seed, on top of the editor boot itself — the default
+  // 30s Playwright test timeout is too tight for that combination on this
+  // fixture size. Matches the longer budget the sibling interaction specs
+  // (reference_apps_interactions_test.ts et al.) already use for the same
+  // reason.
+  test.describe.configure({ timeout: 180_000 });
   test.skip(process.env.GOSX_STUDIO_REFERENCE_APP_E2E !== "1", "set GOSX_STUDIO_REFERENCE_APP_E2E=1 to boot sibling reference apps");
 
   test("HOME with realistic content volume stays under a height and visible-select budget", async ({ page, request }) => {
@@ -111,11 +119,44 @@ test.describe("@reference-apps Muddy/Noni inspector presentation (wave 3A)", () 
       await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "networkidle", timeout: 60_000 });
       await page.waitForTimeout(1_500);
 
+      // This fixture's staging seed has ZERO pre-attached interactions (see
+      // the file header comment above), and RenderInteractionsInspector
+      // nests every target with zero attached interactions behind one
+      // shared "+ Add interaction" picker by design (fix (a)/(d) — the whole
+      // point is not pre-expanding N empty control sets at once). Proving
+      // "one target's disclosure expands independently" against the real
+      // wiring therefore means first attaching one interaction the same way
+      // an operator would (the exact flow
+      // reference_apps_interactions_test.ts already drives end to end),
+      // which promotes that target out of the shared picker into the
+      // top-level `.studio-interactions__list` — the realistic shape this
+      // assertion is actually about.
+      const heroPanel = "#studio-interactions-home-hero";
+      const revealForm = `${heroPanel} article[data-studio-interaction-card='reveal-on-scroll'] form[data-studio-interaction-row='reveal-on-scroll']`;
+      await expect(page.locator(revealForm), "the hero reveal-on-scroll interaction row must render").toBeAttached({ timeout: 15_000 });
+      await openInteractionsTargetDisclosure(page, heroPanel);
+      // reloadAfter/settleAfter: false — this 15-target staging seed page
+      // has enough ongoing background asset activity that a strict
+      // networkidle wait (the harness's own default post-click behavior)
+      // isn't reliable within the config's 30s navigationTimeout. Reload
+      // explicitly below with the same domcontentloaded + generous-timeout
+      // pattern gotoEditor/reference_apps_interactions_test.ts already use
+      // for this reason.
+      const attachResponse = await clickAuthoringPanel(page, revealForm, { reloadAfter: false, settleAfter: false });
+      expect(attachResponse.status(), "attaching the hero interaction must not fail server-side").toBe(200);
+      await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await page.waitForTimeout(1_500);
+
       const targets = page.locator('[data-studio-interactions-target="true"]');
       const count = await targets.count();
       expect(count, "staging seed should produce multiple canvas targets").toBeGreaterThanOrEqual(15);
 
+      // RenderInteractionsInspector lists every attached target ahead of the
+      // shared add picker, so the just-attached hero target (now a
+      // top-level card, no longer nested inside any outer disclosure) is
+      // the first match.
       const first = targets.first();
+      await expect(first, "the newly-attached hero target should render as the first top-level card").toHaveAttribute("id", "studio-interactions-home-hero");
       const firstEditor = first.locator(".studio-interactions-target__editor");
       const firstSelects = firstEditor.locator("select");
       await expect(firstSelects.first()).toBeHidden();
@@ -124,7 +165,11 @@ test.describe("@reference-apps Muddy/Noni inspector presentation (wave 3A)", () 
       await expect(firstSelects.first()).toBeVisible();
 
       // A sibling target's controls must stay collapsed — expanding one
-      // target's disclosure is not a "expand everything" global toggle.
+      // target's disclosure is not a "expand everything" global toggle. This
+      // sibling is still unattached (nested inside the shared "+ Add
+      // interaction" picker), which is itself further proof the two kinds
+      // of disclosure (the shared picker and each target's own editor) are
+      // independent of one another.
       const second = targets.nth(1);
       await expect(second.locator(".studio-interactions-target__editor select").first()).toBeHidden();
     } finally {

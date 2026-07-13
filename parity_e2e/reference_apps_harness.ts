@@ -211,6 +211,42 @@ export async function revealModeIfPresent(page: Page, mode: string | undefined) 
   await page.waitForTimeout(150);
 }
 
+// openInteractionsTargetDisclosure opens whatever native <details> disclosures
+// currently stand between the DOM and one interactions-target card's own
+// controls, matching the real human steps wave 3A's inspector-presentation
+// pass introduced (panels/interactions_panel.go):
+//   1. RenderInteractionsInspector groups every canvas target with ZERO
+//      attached interactions behind one shared closed-by-default
+//      `[data-studio-interactions-add]` "+ Add interaction" picker. A target
+//      that hasn't had anything attached yet (the common starting state for
+//      these tests) is nested inside that picker and must have it opened
+//      first, or its own card never reaches the layout at all.
+//   2. Every target card (attached or not) additionally wraps its own
+//      Effect/Duration/Delay rows in a second, per-target closed-by-default
+//      `.studio-interactions-target__editor` disclosure (RenderInteractionsPanel).
+// Both checks re-read the LIVE DOM at call time (not a one-shot assumption
+// about page structure), so this is safe to call again after an in-place
+// authoring save/fragment-refresh moves a target between the attached and
+// unattached buckets.
+export async function openInteractionsTargetDisclosure(page: Page, targetSelector: string) {
+  const target = page.locator(targetSelector).first();
+  await expect(target, `interactions target ${targetSelector} must render`).toBeAttached();
+
+  const nestedInClosedAddPicker = await target.evaluate((el) => {
+    const picker = el.closest("[data-studio-interactions-add]");
+    return picker instanceof HTMLDetailsElement && !picker.open;
+  });
+  if (nestedInClosedAddPicker) {
+    await page.locator("[data-studio-interactions-add] > summary").first().click();
+  }
+
+  const editor = target.locator(".studio-interactions-target__editor");
+  const editorClosed = await editor.evaluate((el) => el instanceof HTMLDetailsElement && !el.open);
+  if (editorClosed) {
+    await editor.locator("summary").first().click();
+  }
+}
+
 export async function waitForStudioPreviewRefresh(page: Page, reason: string) {
   return page.evaluate((expectedReason) => new Promise<{ reason: string; route: string } | null>((resolve) => {
     let handler: EventListener;
