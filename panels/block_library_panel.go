@@ -13,8 +13,16 @@ type BlockLibraryPanelOptions struct {
 	RootAttrs map[string]any
 }
 
+// blockLibraryPanelAnchorID is the stable DOM id the section manager's "+ Add
+// section" link (panels/home_layers_panel.go) jumps to. It is a plain anchor
+// (href="#id"), so revealing this panel needs no script — the browser
+// scrolls it into view natively. There is exactly one home-mode block
+// library panel per rendered page, so a fixed id is safe.
+const blockLibraryPanelAnchorID = "gosx-studio-block-library"
+
 func RenderBlockLibraryPanel(view map[string]any, options BlockLibraryPanelOptions) gosx.Node {
 	attrs := []any{
+		gosx.Attr("id", blockLibraryPanelAnchorID),
 		gosx.Attr("class", core.WorkbenchViewString(view, "class")),
 		gosx.Attr("data-panel-key", core.WorkbenchViewString(view, "key")),
 		gosx.Attr("data-studio-mode-panel", core.WorkbenchViewString(view, "mode")),
@@ -24,6 +32,7 @@ func RenderBlockLibraryPanel(view map[string]any, options BlockLibraryPanelOptio
 	attrs = appendBlockLibraryPanelAttrs(attrs, options.RootAttrs)
 
 	children := []gosx.Node{
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text("Add a section")),
 		gosx.El("h2", nil, gosx.Text(core.WorkbenchViewString(view, "title"))),
 	}
 	items := core.WorkbenchViewMapList(view, "items")
@@ -39,10 +48,19 @@ func RenderBlockLibraryPanel(view map[string]any, options BlockLibraryPanelOptio
 func renderBlockLibraryPanelItems(items []map[string]any) []gosx.Node {
 	nodes := make([]gosx.Node, 0, len(items))
 	for _, item := range items {
-		nodes = append(nodes, gosx.El("button", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(item, "attrs"))...),
+		attrs := core.WorkbenchViewMap(item, "attrs")
+		children := []gosx.Node{}
+		// A leading "+" only reads as an add affordance when the section isn't
+		// already active (aria-pressed=true means "added"/toggled-on, where the
+		// button's own label already communicates the current state).
+		if !core.WorkbenchViewBool(attrs, "aria-pressed") {
+			children = append(children, gosx.El("span", gosx.Attrs(gosx.Attr("class", "icon"), gosx.Attr("aria-hidden", "true")), gosx.Text("+")))
+		}
+		children = append(children,
 			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(item, "label"))),
 			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(item, "buttonLabel"))),
-		))
+		)
+		nodes = append(nodes, gosx.El("button", gosx.Attrs(BlockLibraryPanelMapAttrs(attrs)...), gosx.Fragment(children...)))
 	}
 	return nodes
 }

@@ -131,6 +131,9 @@ type SiteNavigatorItem = sitemap.SiteNavigatorItem
 // Deprecated: use sitemap.SiteNavigatorProps.
 type SiteNavigatorProps = sitemap.SiteNavigatorProps
 
+// Deprecated: use sitemap.SiteNavigatorNewPageItem.
+type SiteNavigatorNewPageItem = sitemap.SiteNavigatorNewPageItem
+
 // Deprecated: use sitemap.SiteNavigatorPanelOptions.
 type SiteNavigatorPanelOptions = sitemap.SiteNavigatorPanelOptions
 
@@ -142,6 +145,11 @@ func SiteNavigatorPropsFromMap(view map[string]any) SiteNavigatorProps {
 // Deprecated: use sitemap.RenderSiteNavigatorPanel.
 func RenderSiteNavigatorPanel(props SiteNavigatorProps, options SiteNavigatorPanelOptions) gosx.Node {
 	return sitemap.RenderSiteNavigatorPanel(props, options)
+}
+
+// Deprecated: use sitemap.RenderSiteNavigatorNewPage.
+func RenderSiteNavigatorNewPage(view map[string]any, options SiteNavigatorPanelOptions) gosx.Node {
+	return sitemap.RenderSiteNavigatorNewPage(view, options)
 }
 
 // Deprecated: use sitemap.RenderSiteNavigatorHeader.

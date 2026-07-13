@@ -16,6 +16,7 @@ type HomeLayersPanelSegments struct {
 	RootOpen    gosx.Node
 	HeaderOpen  gosx.Node
 	HeaderClose gosx.Node
+	Toolbar     gosx.Node
 	Body        gosx.Node
 	RootClose   gosx.Node
 }
@@ -25,6 +26,7 @@ func RenderHomeLayersPanelSegments(view map[string]any, options HomeLayersPanelO
 		RootOpen:    renderHomeLayersPanelRootOpen(view, options),
 		HeaderOpen:  renderHomeLayersPanelHeaderOpen(view),
 		HeaderClose: gosx.RawHTML("</header>"),
+		Toolbar:     renderHomeLayersPanelToolbar(),
 		Body:        renderHomeLayersPanelBody(view),
 		RootClose:   gosx.RawHTML("</section>"),
 	}
@@ -33,7 +35,24 @@ func RenderHomeLayersPanelSegments(view map[string]any, options HomeLayersPanelO
 func RenderHomeLayersPanel(view map[string]any, options HomeLayersPanelOptions) gosx.Node {
 	return gosx.El("section", gosx.Attrs(homeLayersPanelRootAttrs(view, options)...),
 		renderHomeLayersPanelHeader(view, options.PickerNode),
+		renderHomeLayersPanelToolbar(),
 		renderHomeLayersPanelBody(view),
+	)
+}
+
+// renderHomeLayersPanelToolbar renders the section manager's visible "+ Add
+// section" affordance. It is a plain same-page anchor to the block library
+// ("Sections") panel that RenderBlockLayoutEngine already stacks directly
+// below this one in Home mode — no script is required to reveal it, and no
+// new insertion flow is introduced: clicking through lands on the exact
+// existing "Add"/"Add another" buttons block_library_panel.go renders.
+func renderHomeLayersPanelToolbar() gosx.Node {
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-panel-toolbar")),
+		gosx.El("a", gosx.Attrs(
+			gosx.Attr("class", "button button--secondary studio-add-section"),
+			gosx.Attr("href", "#"+blockLibraryPanelAnchorID),
+			gosx.Attr("data-studio-add-section", "true"),
+		), gosx.Text("+ Add section")),
 	)
 }
 
@@ -126,8 +145,55 @@ func renderHomeLayersPanelItem(item map[string]any) gosx.Node {
 				gosx.El("button", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(item, "upButtonAttrs"))...), gosx.Text("Move up")),
 				gosx.El("button", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(item, "downButtonAttrs"))...), gosx.Text("Move down")),
 			),
+			renderHomeLayersPanelDelete(item),
 		),
 	)
+}
+
+// renderHomeLayersPanelDelete renders a section row's real, confirmable
+// "Delete" action, dispatching the existing delete-component durable
+// authoring operation (studio.AuthoringOperationDeleteComponent), separate
+// from the "editor-visibility" checkbox above it (which stays a plain
+// hide/show toggle bundled into the next Save). It only renders when the
+// host supplies a "delete" sub-map with hasDelete=true; hosts that have not
+// wired a delete action yet see no button (never a silently-broken one).
+//
+// This deliberately does NOT render its own <form>: the whole workbench
+// (this panel included) already sits inside one shared <form> (see
+// shell/workbench_frame.go), and a nested <form> is invalid HTML — the
+// browser's parser drops the inner tag and re-associates its children with
+// the outer form anyway (the exact failure mode documented on
+// renderRevisionHistoryWorkbenchButton). Instead this mirrors that same
+// proven pattern: fixed (operation, page key) hidden inputs that are
+// identical across every row (harmless if the browser submits the same
+// name/value more than once) plus a formaction-overriding submit button
+// whose OWN name/value pair carries the one field that truly varies per
+// row — this section's component key.
+func renderHomeLayersPanelDelete(item map[string]any) gosx.Node {
+	del := core.WorkbenchViewMap(item, "delete")
+	if !core.WorkbenchViewBool(del, "hasDelete") {
+		return gosx.Fragment()
+	}
+	children := make([]gosx.Node, 0, 4)
+	for _, input := range core.WorkbenchViewMapList(del, "hiddenInputs") {
+		children = append(children, gosx.El("input", gosx.Attrs(
+			gosx.Attr("type", "hidden"),
+			gosx.Attr("name", core.WorkbenchViewString(input, "name")),
+			gosx.Attr("value", core.WorkbenchViewString(input, "value")),
+		)))
+	}
+	children = append(children, gosx.El("button", gosx.Attrs(
+		gosx.Attr("type", "submit"),
+		gosx.Attr("class", "button button--danger studio-delete-section"),
+		gosx.Attr("formaction", core.WorkbenchViewString(del, "action")),
+		gosx.Attr("formmethod", "post"),
+		gosx.Attr("formnovalidate", "formnovalidate"),
+		gosx.Attr("name", core.WorkbenchViewString(del, "componentKeyName")),
+		gosx.Attr("value", core.WorkbenchViewString(del, "componentKeyValue")),
+		gosx.Attr("data-admin-confirm", core.WorkbenchViewString(del, "confirm")),
+		gosx.Attr("data-studio-delete-section", "true"),
+	), gosx.Text(core.FirstNonEmpty(core.WorkbenchViewString(del, "buttonLabel"), "Delete"))))
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "editor-block__delete")), gosx.Fragment(children...))
 }
 
 func renderHomeLayersPanelPreviewActions(preview map[string]any) gosx.Node {

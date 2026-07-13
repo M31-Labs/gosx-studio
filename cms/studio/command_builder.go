@@ -20,10 +20,23 @@ type CommandFlow struct {
 	HasEmbedTarget bool
 }
 
+// CommandPage is one create-page-from-blueprint choice the command palette
+// offers under "New page: <label>" (Ctrl+K → search "page" or "new page").
+// Target must match the "page-<key>" data-editor-add-block value the host
+// renders on its own New page button (e.g. sitemap.SiteNavigatorNewPageItem
+// in the Pages panel), so choosing the palette entry clicks that existing
+// button — the same create-page composition intent, no duplicate wiring.
+type CommandPage struct {
+	Key     string
+	Label   string
+	Summary string
+}
+
 type StudioCommandOptions struct {
 	Shell        Shell
 	Blocks       []CommandBlock
 	Flows        []CommandFlow
+	Pages        []CommandPage
 	Extra        []Command
 	SaveLabel    string
 	SaveSummary  string
@@ -118,6 +131,22 @@ func StudioCommands(options StudioCommandOptions) []Command {
 			Group:    "Blocks",
 			Target:   target,
 			Keywords: []string{block.PreviewTitle, block.Summary},
+		})
+	}
+	for _, page := range options.Pages {
+		label := strings.TrimSpace(page.Label)
+		key := normalizeKey(firstNonEmpty(page.Key, page.Label))
+		if label == "" || key == "" {
+			continue
+		}
+		commands = append(commands, Command{
+			Kind:     CommandInsert,
+			Key:      "new-page-" + key,
+			Label:    "New page: " + label,
+			Summary:  firstNonEmpty(page.Summary, "Create a new page from the "+label+" blueprint."),
+			Group:    "Pages",
+			Target:   "page-" + key,
+			Keywords: []string{"new page", "create page", "add page", "page", label},
 		})
 	}
 	commands = append(commands, options.Extra...)

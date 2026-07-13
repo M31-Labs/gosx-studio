@@ -33,7 +33,8 @@ func TestRenderBlockLibraryPanelNonEmpty(t *testing.T) {
 	html := gosx.RenderHTML(RenderBlockLibraryPanel(view, BlockLibraryPanelOptions{}))
 
 	for _, fragment := range []string{
-		`<section class="editor-panel editor-panel--library" data-panel-key="blocks" data-studio-mode-panel="home" data-studio-engine-source="gosx" data-gosx-studio-block-library-panel-renderer="gosx-studio">`,
+		`<section id="gosx-studio-block-library" class="editor-panel editor-panel--library" data-panel-key="blocks" data-studio-mode-panel="home" data-studio-engine-source="gosx" data-gosx-studio-block-library-panel-renderer="gosx-studio">`,
+		`<p class="kicker">Add a section</p>`,
 		`<h2>Sections</h2>`,
 		`<div class="editor-block-library">`,
 		`<button aria-pressed="true" class="button button--secondary is-active" data-editor-add-block="hero" data-editor-button-base="button button--secondary" type="button">`,
@@ -46,6 +47,36 @@ func TestRenderBlockLibraryPanelNonEmpty(t *testing.T) {
 	}
 	if strings.Contains(html, `class="empty"`) {
 		t.Fatalf("non-empty block library panel should not render empty state:\n%s", html)
+	}
+}
+
+func TestRenderBlockLibraryPanelAddableItemGetsPlusAffordance(t *testing.T) {
+	view := map[string]any{
+		"class":     "editor-panel editor-panel--library",
+		"key":       "blocks",
+		"mode":      "home",
+		"title":     "Sections",
+		"listClass": "editor-block-library",
+		"hasItems":  true,
+		"items": []map[string]any{{
+			"label":       "Gallery",
+			"buttonLabel": "Add",
+			"attrs": map[string]any{
+				"class":                         "button button--secondary",
+				"type":                          "button",
+				blocklayoutruntime.AddBlockAttr: "gallery",
+			},
+		}},
+	}
+
+	html := gosx.RenderHTML(RenderBlockLibraryPanel(view, BlockLibraryPanelOptions{}))
+
+	for _, fragment := range []string{
+		`<span class="icon" aria-hidden="true">+</span><span>Gallery</span><small>Add</small>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("rendered addable block library item missing %q:\n%s", fragment, html)
+		}
 	}
 }
 
