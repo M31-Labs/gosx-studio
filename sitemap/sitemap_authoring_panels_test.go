@@ -132,3 +132,67 @@ func TestRenderSiteMapAuthoringPanelsUsesSharedAuthoringContracts(t *testing.T) 
 		t.Fatalf("shared authoring forms must not inject visible platform copy:\n%s", formsHTML)
 	}
 }
+
+// TestRenderSiteMapSharedComponentPalettePanelDispatchesPlaceInstance proves
+// the composition workspace palette's real, functional "place another
+// instance" action: a rendered button referencing a hidden form (by id) that
+// RenderSiteMapAuthoringForms independently emits, carrying the durable
+// place-instance operation's hidden fields — the SAME
+// `form=`/hidden-input/action-endpoint pattern the existing composition
+// intent panel already uses, so shared components dispatch through the
+// identical mechanism as every other placeable palette entry.
+func TestRenderSiteMapSharedComponentPalettePanelDispatchesPlaceInstance(t *testing.T) {
+	siteMap := core.SiteMap{Pages: []core.Page{{
+		Key: "about", Label: "About", Route: "/about", GoSXComponent: "ContentPage", Editable: true, Selected: true,
+		Components: []core.Component{{Key: "testimonial-1", Label: "One", GoSXComponent: "SharedComponentInstance", DefinitionKey: "testimonial"}},
+	}}, Library: core.CompositionLibrary{
+		ComponentDefinitions: []core.ComponentDefinition{{
+			Key: "testimonial", Label: "Testimonial", Summary: "Reusable quote block.",
+			Controls: []core.Control{{Key: "quote", Label: "Quote", Kind: core.ControlText}},
+		}},
+	}}
+	view := SiteMapAuthoringView(siteMap, SiteMapViewOptions{})
+
+	panelsHTML := gosx.RenderHTML(RenderSiteMapAuthoringPanels(view, SiteMapAuthoringPanelsOptions{}))
+	for _, fragment := range []string{
+		`data-studio-shared-component-palette-panel="true"`,
+		`data-studio-shared-component-palette-entry="testimonial"`,
+		`data-studio-shared-component-place-form="testimonial"`,
+		`form="studioSiteMapPlaceInstanceForm-testimonial"`,
+		`data-studio-shared-component-instance-count="true"`,
+		`Add another Testimonial`,
+		`name="gosx_studio_component_template_key" value="testimonial"`,
+		`name="gosx_studio_page_key" value="about"`,
+	} {
+		if !strings.Contains(panelsHTML, fragment) {
+			t.Fatalf("rendered shared component palette panel missing %q:\n%s", fragment, panelsHTML)
+		}
+	}
+
+	formsHTML := gosx.RenderHTML(RenderSiteMapAuthoringForms(view, SiteMapAuthoringFormsOptions{
+		Action:    "/admin/editor/__actions/authoring",
+		CSRFToken: "csrf-token",
+	}))
+	for _, fragment := range []string{
+		`id="studioSiteMapPlaceInstanceForm-testimonial"`,
+		`data-studio-shared-component-place-form="testimonial"`,
+		`action="/admin/editor/__actions/authoring"`,
+	} {
+		if !strings.Contains(formsHTML, fragment) {
+			t.Fatalf("rendered shared component place-instance form missing %q:\n%s", fragment, formsHTML)
+		}
+	}
+}
+
+// TestRenderSiteMapSharedComponentPalettePanelAbsentWithoutSharedDefinitions
+// proves the new panel adds no markup at all for a library with no reusable
+// ComponentDefinitions (existing hosts see zero-byte-identical output).
+func TestRenderSiteMapSharedComponentPalettePanelAbsentWithoutSharedDefinitions(t *testing.T) {
+	view := SiteMapAuthoringView(core.SiteMap{Pages: []core.Page{{
+		Key: "home", Label: "Home", Route: "/", GoSXComponent: "HomePage", Editable: true, Selected: true,
+	}}}, SiteMapViewOptions{})
+	html := gosx.RenderHTML(RenderSiteMapAuthoringPanels(view, SiteMapAuthoringPanelsOptions{}))
+	if strings.Contains(html, "data-studio-shared-component-palette-panel") {
+		t.Fatalf("expected no shared component palette panel without any ComponentDefinitions:\n%s", html)
+	}
+}

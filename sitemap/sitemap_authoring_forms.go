@@ -32,6 +32,17 @@ func RenderSiteMapAuthoringForms(siteMapView map[string]any, options SiteMapAuth
 		}
 		nodes = append(nodes, renderSiteMapAuthoringForm(formID, options.Action, options, gosx.Attr("data-studio-composition-intent-form", core.WorkbenchViewString(intent, "key"))))
 	}
+	// One hidden form per shared-component palette entry
+	// (AuthoringSiteMapComponentDefinitionPaletteViews), matching the
+	// composition-intent forms above — renderSiteMapSharedPaletteEntry's
+	// visible fields/button reference this same id via `form=`.
+	for _, entry := range siteMapSharedPaletteEntries(siteMapView) {
+		formID := core.WorkbenchViewString(entry, "formID")
+		if formID == "" {
+			continue
+		}
+		nodes = append(nodes, renderSiteMapAuthoringForm(formID, options.Action, options, gosx.Attr("data-studio-shared-component-place-form", core.WorkbenchViewString(entry, "definitionKey"))))
+	}
 	operationForms := []struct {
 		enabled bool
 		id      string

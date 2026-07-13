@@ -712,7 +712,21 @@ func renderSiteMapBoardTemplate(template map[string]any, state siteMapBoardState
 		), gosx.Text(core.WorkbenchViewString(control, "label"))))
 	}
 	selected := state.selectedTemplateKey != "" && state.selectedTemplateKey == core.WorkbenchViewString(template, "key")
-	return gosx.El("label", gosx.Attrs(
+	isShared := core.WorkbenchViewBool(template, "isShared")
+	metaChildren := []gosx.Node{
+		gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(template, "statusLabel"))),
+		gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(template, "controlLabel"))),
+	}
+	// A shared ComponentDefinition entry (AuthoringSiteMapComponentDefinitionPaletteViews)
+	// additionally shows how many instances are currently attached, so the
+	// browse/filter board matches what the real "place another instance"
+	// action (renderSiteMapSharedComponentPalettePanel) reports.
+	if isShared {
+		metaChildren = append(metaChildren, gosx.El("small", gosx.Attrs(
+			gosx.Attr("data-studio-shared-component-instance-count", "true"),
+		), gosx.Text(core.WorkbenchViewString(template, "instanceCountLabel"))))
+	}
+	cardAttrs := []any{
 		gosx.Attr("class", "studio-site-map-palette-card"),
 		gosx.Attr("data-studio-site-map-component-template", core.WorkbenchViewString(template, "key")),
 		gosx.Attr("data-studio-site-map-template-category", core.WorkbenchViewString(template, "categoryKey")),
@@ -720,7 +734,11 @@ func renderSiteMapBoardTemplate(template map[string]any, state siteMapBoardState
 		gosx.Attr("data-studio-site-map-default-binding", core.WorkbenchViewString(template, "defaultBinding")),
 		gosx.Attr("data-studio-gosx-component", core.WorkbenchViewString(template, "gosxComponent")),
 		gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(siteMapBoardMatchesPalette(state.palette, core.WorkbenchViewString(template, "categoryKey")))),
-	),
+	}
+	if isShared {
+		cardAttrs = append(cardAttrs, gosx.Attr("data-studio-shared-component-definition", core.WorkbenchViewString(template, "definitionKey")))
+	}
+	return gosx.El("label", gosx.Attrs(cardAttrs...),
 		gosx.El("input", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-builder__input"),
 			gosx.Attr("id", core.WorkbenchViewString(template, "inputID")),
@@ -732,10 +750,7 @@ func renderSiteMapBoardTemplate(template map[string]any, state siteMapBoardState
 		)),
 		gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(template, "label"))),
 		gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(template, "summary"))),
-		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-site-map-palette-card__meta")),
-			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(template, "statusLabel"))),
-			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(template, "controlLabel"))),
-		),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-site-map-palette-card__meta")), gosx.Fragment(metaChildren...)),
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "studio-site-map-palette-card__plan"),
 			gosx.Attr("data-studio-site-map-visible", siteMapBoardBoolString(core.WorkbenchViewBool(template, "hasControls"))),

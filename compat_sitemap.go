@@ -93,6 +93,11 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 	return sitemap.AuthoringSiteMapView(surface, options)
 }
 
+// Deprecated: use sitemap.AuthoringSiteMapComponentDefinitionPaletteViews.
+func AuthoringSiteMapComponentDefinitionPaletteViews(definitions []ComponentDefinition, pages []Page, selectedPage Page, hasSelectedPage bool, options SiteMapViewOptions) []map[string]any {
+	return sitemap.AuthoringSiteMapComponentDefinitionPaletteViews(definitions, pages, selectedPage, hasSelectedPage, options)
+}
+
 // --- Site-map board (sitemap/sitemap_board.go) ---
 
 // Deprecated: use sitemap.SiteMapBoardOptions.
@@ -111,6 +116,11 @@ type SiteMapAuthoringPanelsOptions = sitemap.SiteMapAuthoringPanelsOptions
 // Deprecated: use sitemap.RenderSiteMapAuthoringPanels.
 func RenderSiteMapAuthoringPanels(siteMapView map[string]any, options SiteMapAuthoringPanelsOptions) gosx.Node {
 	return sitemap.RenderSiteMapAuthoringPanels(siteMapView, options)
+}
+
+// Deprecated: use sitemap.RenderSharedComponentPalettePanel.
+func RenderSharedComponentPalettePanel(siteMapView map[string]any, options SiteMapAuthoringPanelsOptions) gosx.Node {
+	return sitemap.RenderSharedComponentPalettePanel(siteMapView, options)
 }
 
 // --- Site-map authoring forms (sitemap/sitemap_authoring_forms.go) ---

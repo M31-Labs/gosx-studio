@@ -48,6 +48,7 @@ func RenderSiteMapAuthoringPanels(siteMapView map[string]any, options SiteMapAut
 		renderSiteMapVisibilityPanel(siteMapView, options),
 		renderSiteMapDeletePanel(siteMapView, options),
 		renderSiteMapCompositionIntentPanel(siteMapView, options),
+		renderSiteMapSharedComponentPalettePanel(siteMapView, options),
 	}
 	out := make([]gosx.Node, 0, len(nodes))
 	for _, node := range nodes {
@@ -308,6 +309,93 @@ func renderSiteMapCompositionIntent(intent map[string]any, options SiteMapAuthor
 		gosx.Attr("data-studio-composition-intent-apply", "true"),
 		gosx.Attr("data-studio-composition-intent", core.WorkbenchViewString(intent, "key")),
 		gosx.Attr("data-studio-composition-kind", core.WorkbenchViewString(intent, "kind")),
+	), gosx.Fragment(children...))
+}
+
+// RenderSharedComponentPalettePanel is the standalone, exported form of
+// renderSiteMapSharedComponentPalettePanel, for a host that needs to mount
+// the shared-component palette scoped to a DIFFERENT page than whichever
+// page core.SiteMap.SelectedPage() resolves for its main site-map engine
+// render (e.g. a host whose top-level site map has no live, server-synced
+// "current page" selection). Callers can build a minimal view map — just
+// {"palette": AuthoringSiteMapComponentDefinitionPaletteViews(...)} — scoped
+// to whatever page they want placement to target, without pulling in the
+// other authoring panels (metadata/editable-control/reorder/etc.), which
+// would otherwise render a second time (and collide on fixed form ids) for
+// that page's components.
+func RenderSharedComponentPalettePanel(siteMapView map[string]any, options SiteMapAuthoringPanelsOptions) gosx.Node {
+	return renderSiteMapSharedComponentPalettePanel(siteMapView, options)
+}
+
+// renderSiteMapSharedComponentPalettePanel is the real "place another
+// instance" action for the composition workspace palette's shared-component
+// entries (siteMapView["palette"] items with isShared=true — see
+// AuthoringSiteMapComponentDefinitionPaletteViews). It mirrors
+// renderSiteMapCompositionIntentPanel's exact hidden-input/`form=` +
+// visible-submit-button pattern (the matching hidden `<form id=...>` element
+// is rendered separately by RenderSiteMapAuthoringForms), so shared
+// components dispatch authoring.AuthoringOperationPlaceInstance through the
+// SAME durable authoring-action endpoint every other composition/instance
+// operation already uses — one product path, not a standalone host action.
+func renderSiteMapSharedComponentPalettePanel(siteMapView map[string]any, options SiteMapAuthoringPanelsOptions) gosx.Node {
+	entries := siteMapSharedPaletteEntries(siteMapView)
+	if len(entries) == 0 {
+		return gosx.Fragment()
+	}
+	children := []gosx.Node{
+		renderSiteMapPanelHeader("Shared components", core.WorkbenchViewString(siteMapView, "selectedPageLabel"), countLabel(len(entries), "component", "components")),
+	}
+	for _, entry := range entries {
+		children = append(children, renderSiteMapSharedPaletteEntry(entry))
+	}
+	return gosx.El("section", gosx.Attrs(
+		gosx.Attr("class", core.FirstNonEmpty(options.PanelClass, "studio-site-map-page-edit studio-site-map-builder__panel")),
+		gosx.Attr("data-gosx-studio-shared-component-palette", "true"),
+		gosx.Attr("data-studio-shared-component-palette-panel", "true"),
+		gosx.Attr("data-gosx-studio-authoring-panel-renderer", "gosx-studio"),
+	), gosx.Fragment(children...))
+}
+
+// siteMapSharedPaletteEntries filters siteMapView's "palette" list down to
+// the shared-ComponentDefinition entries (isShared=true) — every fresh
+// ComponentTemplate entry is excluded (those are placed through the existing
+// composition-intent panel instead).
+func siteMapSharedPaletteEntries(siteMapView map[string]any) []map[string]any {
+	out := make([]map[string]any, 0)
+	for _, entry := range core.WorkbenchViewMapList(siteMapView, "palette") {
+		if core.WorkbenchViewBool(entry, "isShared") {
+			out = append(out, entry)
+		}
+	}
+	return out
+}
+
+// renderSiteMapSharedPaletteEntry renders one shared definition's name,
+// current attached-instance count, and (when a page is selected, so the
+// entry carries a non-empty formInputs) a real "place another instance"
+// submit button wired to its own hidden form (entry["formID"]).
+func renderSiteMapSharedPaletteEntry(entry map[string]any) gosx.Node {
+	formID := core.WorkbenchViewString(entry, "formID")
+	formInputs := SiteMapInputViews(entry, "formInputs")
+	children := SiteMapHiddenInputs(formID, formInputs)
+	children = append(children,
+		gosx.El("div", nil,
+			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(entry, "label"))),
+			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(entry, "summary"))),
+		),
+		gosx.El("output", gosx.Attrs(gosx.Attr("data-studio-shared-component-instance-count", "true")), gosx.Text(core.WorkbenchViewString(entry, "instanceCountLabel"))),
+	)
+	if len(formInputs) > 0 {
+		children = append(children, gosx.El("button", gosx.Attrs(
+			gosx.Attr("form", formID),
+			gosx.Attr("type", "submit"),
+		), gosx.Text(core.FirstNonEmpty(core.WorkbenchViewString(entry, "actionLabel"), "Add another instance"))))
+	}
+	return gosx.El("article", gosx.Attrs(
+		gosx.Attr("class", "studio-site-map-shared-component-palette-entry"),
+		gosx.Attr("data-studio-shared-component-palette-entry", core.WorkbenchViewString(entry, "definitionKey")),
+		gosx.Attr("data-studio-shared-component-place-form", core.WorkbenchViewString(entry, "definitionKey")),
+		gosx.Attr("data-studio-shared-component-instance-count-value", core.WorkbenchViewString(entry, "instanceCountValue")),
 	), gosx.Fragment(children...))
 }
 

@@ -98,6 +98,21 @@ const (
 	// validation and the submit binding before publish. Test values are
 	// host-defined field names, so they travel in RawForm like save-appearance.
 	AuthoringOperationTestFlowAction AuthoringOperationKind = "test-flow-action"
+	// AuthoringOperationPlaceInstance places another instance of an EXISTING
+	// shared ComponentDefinition (identified by ComponentTemplateKey, the same
+	// field AuthoringOperationSetSharedField already reuses for a definition
+	// key) onto PageKey. It is the durable counterpart of the reusable
+	// component/instance family above (core/instances.go) for the ONE
+	// operation that family didn't yet have: placement itself. ComponentKey/
+	// ComponentLabel are an optional operator-supplied instance key/label —
+	// when ComponentKey is empty the host picks one (see
+	// InstancePlaceWriter). This is the operation the composition workspace
+	// palette (sitemap.AuthoringSiteMapView's "palette" — every
+	// ComponentTemplate plus every reusable ComponentDefinition available for
+	// another instance) dispatches so shared components are placed from the
+	// SAME palette/operation family as everything else, rather than a
+	// standalone host-specific action.
+	AuthoringOperationPlaceInstance AuthoringOperationKind = "place-instance"
 )
 
 const (
@@ -459,6 +474,24 @@ func AuthoringMutationForInstanceRestore(page core.Page, component core.Componen
 	}.Normalize()
 }
 
+// AuthoringMutationForPlaceInstance places another instance of an EXISTING
+// shared ComponentDefinition (definitionKey, carried in ComponentTemplateKey
+// like AuthoringMutationForSharedField) onto page. instanceKey/instanceLabel
+// are optional — an empty instanceKey lets the host writer choose one (see
+// InstancePlaceWriter).
+func AuthoringMutationForPlaceInstance(page core.Page, definitionKey, instanceKey, instanceLabel string) AuthoringMutation {
+	page = page.Normalize()
+	return AuthoringMutation{
+		Kind:                 AuthoringOperationPlaceInstance,
+		PageKey:              page.Key,
+		PageLabel:            page.Label,
+		PageRoute:            page.Route,
+		ComponentTemplateKey: strings.TrimSpace(definitionKey),
+		ComponentKey:         strings.TrimSpace(instanceKey),
+		ComponentLabel:       strings.TrimSpace(instanceLabel),
+	}.Normalize()
+}
+
 // AuthoringMutationForSetInteraction creates or updates one interaction
 // attached to a placed component. The interaction is normalized first so the
 // mutation always carries the allow-listed trigger/effect/reduced-motion the
@@ -790,6 +823,13 @@ func (mutation AuthoringMutation) Validate() AuthoringValidation {
 		}
 	case AuthoringOperationDetachInstance, AuthoringOperationRestoreInstance:
 		requirePageComponent(&validation, mutation)
+	case AuthoringOperationPlaceInstance:
+		if mutation.ComponentTemplateKey == "" {
+			validation.AddFieldError(AuthoringFieldComponentTemplateKey, "Choose a shared component.")
+		}
+		if mutation.PageKey == "" {
+			validation.AddFieldError(AuthoringFieldPageKey, "Choose a target page.")
+		}
 	case AuthoringOperationSetInteraction:
 		validateSetInteractionMutation(&validation, mutation)
 	case AuthoringOperationRemoveInteraction:
@@ -1185,6 +1225,8 @@ func normalizeAuthoringOperationKind(kind AuthoringOperationKind) AuthoringOpera
 		return AuthoringOperationSetFlowAction
 	case AuthoringOperationTestFlowAction:
 		return AuthoringOperationTestFlowAction
+	case AuthoringOperationPlaceInstance:
+		return AuthoringOperationPlaceInstance
 	default:
 		return ""
 	}

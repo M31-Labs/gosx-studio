@@ -301,6 +301,15 @@ type PageBlueprint = core.PageBlueprint
 // Deprecated: use core.ComponentTemplate.
 type ComponentTemplate = core.ComponentTemplate
 
+// Deprecated: use core.ComponentDefinition.
+type ComponentDefinition = core.ComponentDefinition
+
+// Deprecated: use core.ComponentOverride.
+type ComponentOverride = core.ComponentOverride
+
+// Deprecated: use core.PaletteEntry.
+type PaletteEntry = core.PaletteEntry
+
 // Deprecated: use core.CompositionIntent.
 type CompositionIntent = core.CompositionIntent
 

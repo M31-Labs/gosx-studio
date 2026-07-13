@@ -130,6 +130,62 @@ func ApplyDetachInstance(m AuthoringMutation, write InstanceDetachWriter) (Autho
 	}, nil
 }
 
+// InstancePlaceWriter places a new instance of an EXISTING shared
+// ComponentDefinition (identified by definitionKey) onto pageKey.
+// instanceKey/instanceLabel are the operator-supplied identity for the new
+// instance; when instanceKey is empty the host chooses one (e.g. derived
+// from definitionKey with a numeric suffix) and returns it, so the mutation
+// result can report which instance was actually placed without the caller
+// reloading first. Unlike the companion "create a brand-new shared
+// component" host action, a writer implementing this MUST fail (a plain Go
+// error, propagated by ApplyPlaceInstance exactly like the other instance
+// writers) when definitionKey does not already exist — placement always
+// targets a definition the palette already listed.
+type InstancePlaceWriter func(pageKey, definitionKey, instanceKey, instanceLabel string) (string, error)
+
+// ApplyPlaceInstance is the host-agnostic body for the place-instance
+// authoring operation: the composition workspace palette's "place another
+// instance" action for a shared ComponentDefinition. It requires an existing
+// definition (ComponentTemplateKey) and a target page (PageKey);
+// ComponentKey/ComponentLabel are an optional operator-supplied instance
+// key/label for the new instance.
+func ApplyPlaceInstance(m AuthoringMutation, write InstancePlaceWriter) (AuthoringMutationResult, error) {
+	definitionKey := strings.TrimSpace(m.ComponentTemplateKey)
+	pageKey := strings.TrimSpace(m.PageKey)
+	if definitionKey == "" {
+		return AuthoringMutationResult{
+			Message:     "Choose a shared component to place.",
+			FieldErrors: map[string]string{AuthoringFieldComponentTemplateKey: "Choose a shared component."},
+			Values:      m.FormValues(),
+		}, nil
+	}
+	if pageKey == "" {
+		return AuthoringMutationResult{
+			Message:     "Choose a page to place this instance on.",
+			FieldErrors: map[string]string{AuthoringFieldPageKey: "Choose a target page."},
+			Values:      m.FormValues(),
+		}, nil
+	}
+	instanceKey, err := write(pageKey, definitionKey, strings.TrimSpace(m.ComponentKey), strings.TrimSpace(m.ComponentLabel))
+	if err != nil {
+		return AuthoringMutationResult{}, err
+	}
+	return AuthoringMutationResult{
+		Message:        "Instance placed.",
+		PreviewURL:     "/",
+		RefreshPreview: true,
+		Values:         m.FormValues(),
+		Changes: []AuthoringChange{{
+			Key:       "place:" + instanceKey,
+			Label:     "Place instance",
+			Summary:   "Placed another instance of this shared component.",
+			Kind:      "instance-place",
+			PageKey:   pageKey,
+			Component: instanceKey,
+		}},
+	}, nil
+}
+
 // ApplyRestoreInstance is the host-agnostic body for the restore-instance
 // authoring operation.
 func ApplyRestoreInstance(m AuthoringMutation, write InstanceRestoreWriter) (AuthoringMutationResult, error) {

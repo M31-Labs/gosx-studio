@@ -309,3 +309,91 @@ func TestSiteMapAuthoringViewProjectsInteractiveEditorPayload(t *testing.T) {
 		t.Fatalf("unexpected workspace canvas: %#v", view)
 	}
 }
+
+// TestAuthoringSiteMapViewPaletteIncludesSharedComponentDefinitions closes
+// elm's HANDOFF-0506 caveat 2: SiteMapAuthoringView's palette only ever read
+// Library.ComponentTemplates, so a reusable ComponentDefinition never had a
+// placement affordance inside the composition workspace palette. The palette
+// must now list templates FIRST (unchanged order/shape for existing
+// consumers), THEN shared definitions with an accurate attached-instance
+// count and a ready-to-submit place-instance mutation.
+func TestAuthoringSiteMapViewPaletteIncludesSharedComponentDefinitions(t *testing.T) {
+	siteMap := core.SiteMap{Pages: []core.Page{{
+		Key: "about", Label: "About", Route: "/about", Group: core.PageGroupContent,
+		GoSXComponent: "ContentPage", Editable: true, Selected: true,
+		Components: []core.Component{
+			{Key: "testimonial-1", Label: "One", GoSXComponent: "SharedComponentInstance", DefinitionKey: "testimonial"},
+			{Key: "testimonial-2", Label: "Two", GoSXComponent: "SharedComponentInstance", DefinitionKey: "testimonial", Detached: true},
+		},
+	}}, Library: core.CompositionLibrary{
+		ComponentTemplates: []core.ComponentTemplate{{Key: "rich-text", Label: "Story copy", Category: "Content", GoSXComponent: "ContentSection"}},
+		ComponentDefinitions: []core.ComponentDefinition{{
+			Key: "testimonial", Label: "Testimonial", Summary: "Reusable quote block.", Category: "Content",
+			GoSXComponent: "TestimonialBlock", Source: core.ComponentSourceCMS,
+			Controls: []core.Control{{Key: "quote", Label: "Quote", Kind: core.ControlText}},
+		}},
+	}}
+
+	view := SiteMapAuthoringView(siteMap, SiteMapViewOptions{})
+	palette := view["palette"].([]map[string]any)
+	if len(palette) != 2 {
+		t.Fatalf("expected 1 template + 1 shared definition, got %d: %#v", len(palette), palette)
+	}
+	if palette[0]["key"] != "rich-text" || palette[0]["isShared"] == true {
+		t.Fatalf("expected the fresh template first, unaffected by shared entries: %#v", palette[0])
+	}
+	shared := palette[1]
+	if shared["isShared"] != true || shared["definitionKey"] != "testimonial" || shared["label"] != "Testimonial" {
+		t.Fatalf("unexpected shared palette entry: %#v", shared)
+	}
+	// Only the attached instance ("testimonial-1") counts; the detached one
+	// ("testimonial-2") no longer follows the shared definition
+	// (core.Component.IsSharedInstance()) so it must not inflate the count.
+	if shared["instanceCount"] != 1 || shared["instanceCountLabel"] != "1 instance" {
+		t.Fatalf("expected exactly 1 attached instance counted, got %#v", shared)
+	}
+	if shared["addLabel"] != "Add another Testimonial" || shared["controlLabel"] != "1 field" {
+		t.Fatalf("unexpected shared entry labels: %#v", shared)
+	}
+	if shared["authoringOperation"] != "place-instance" || shared["authoringPageKey"] != "about" || shared["authoringDefinitionKey"] != "testimonial" {
+		t.Fatalf("expected a ready place-instance mutation for the selected page: %#v", shared)
+	}
+	formValues := shared["formValues"].(map[string]string)
+	if formValues[authoring.AuthoringFieldOperation] != "place-instance" || formValues[authoring.AuthoringFieldPageKey] != "about" || formValues[authoring.AuthoringFieldComponentTemplateKey] != "testimonial" {
+		t.Fatalf("unexpected place-instance form values: %#v", formValues)
+	}
+	formInputs := shared["formInputs"].([]map[string]string)
+	if !authoringFormInputsContain(formInputs, authoring.AuthoringFieldComponentTemplateKey, "testimonial") {
+		t.Fatalf("expected place-instance form inputs to carry the definition key: %#v", formInputs)
+	}
+}
+
+// TestAuthoringSiteMapViewSharedInstanceCountUpdatesAfterPlacement proves the
+// palette's instance count is live-recomputed from the site map's placed
+// components (not cached/stale) — the exact "count updates" contract a host
+// re-renders through after a place-instance mutation lands.
+func TestAuthoringSiteMapViewSharedInstanceCountUpdatesAfterPlacement(t *testing.T) {
+	library := core.CompositionLibrary{
+		ComponentDefinitions: []core.ComponentDefinition{{Key: "testimonial", Label: "Testimonial"}},
+	}
+	before := SiteMapAuthoringView(core.SiteMap{Pages: []core.Page{{
+		Key: "about", Label: "About", Route: "/about", GoSXComponent: "ContentPage", Editable: true, Selected: true,
+		Components: []core.Component{{Key: "testimonial-1", Label: "One", GoSXComponent: "SharedComponentInstance", DefinitionKey: "testimonial"}},
+	}}, Library: library}, SiteMapViewOptions{})
+	beforeEntry := before["palette"].([]map[string]any)[0]
+	if beforeEntry["instanceCountLabel"] != "1 instance" {
+		t.Fatalf("expected 1 instance before placing another, got %#v", beforeEntry)
+	}
+
+	after := SiteMapAuthoringView(core.SiteMap{Pages: []core.Page{{
+		Key: "about", Label: "About", Route: "/about", GoSXComponent: "ContentPage", Editable: true, Selected: true,
+		Components: []core.Component{
+			{Key: "testimonial-1", Label: "One", GoSXComponent: "SharedComponentInstance", DefinitionKey: "testimonial"},
+			{Key: "testimonial-2", Label: "Two", GoSXComponent: "SharedComponentInstance", DefinitionKey: "testimonial"},
+		},
+	}}, Library: library}, SiteMapViewOptions{})
+	afterEntry := after["palette"].([]map[string]any)[0]
+	if afterEntry["instanceCountLabel"] != "2 instances" {
+		t.Fatalf("expected the count to update to 2 instances after placing another, got %#v", afterEntry)
+	}
+}

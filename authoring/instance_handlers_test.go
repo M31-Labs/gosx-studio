@@ -173,6 +173,68 @@ func TestApplyDetachAndRestoreInstanceRequirePageAndComponent(t *testing.T) {
 	}
 }
 
+// --- ApplyPlaceInstance tests ---
+
+func TestApplyPlaceInstanceCallsWriterAndReportsThePlacedInstance(t *testing.T) {
+	var gotPage, gotDefinition, gotInstanceKey, gotInstanceLabel string
+	write := InstancePlaceWriter(func(pageKey, definitionKey, instanceKey, instanceLabel string) (string, error) {
+		gotPage, gotDefinition, gotInstanceKey, gotInstanceLabel = pageKey, definitionKey, instanceKey, instanceLabel
+		return "testimonial-2", nil
+	})
+	page := core.Page{Key: "about", Label: "About", Route: "/about", GoSXComponent: "ContentPage"}
+	m := AuthoringMutationForPlaceInstance(page, "testimonial", "", "")
+
+	result, err := ApplyPlaceInstance(m, write)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.HasErrors() {
+		t.Fatalf("unexpected field errors: %#v", result.FieldErrors)
+	}
+	if gotPage != "about" || gotDefinition != "testimonial" || gotInstanceKey != "" || gotInstanceLabel != "" {
+		t.Fatalf("unexpected writer args: page=%q definition=%q key=%q label=%q", gotPage, gotDefinition, gotInstanceKey, gotInstanceLabel)
+	}
+	if len(result.Changes) != 1 || result.Changes[0].Kind != "instance-place" || result.Changes[0].Component != "testimonial-2" {
+		t.Fatalf("expected the writer-reported instance key to surface in Changes, got %#v", result.Changes)
+	}
+	if !result.RefreshPreview {
+		t.Fatal("expected RefreshPreview so the newly placed instance renders")
+	}
+}
+
+func TestApplyPlaceInstanceRequiresDefinitionAndPage(t *testing.T) {
+	write := InstancePlaceWriter(func(pageKey, definitionKey, instanceKey, instanceLabel string) (string, error) {
+		t.Fatal("write must not be called")
+		return "", nil
+	})
+	result, err := ApplyPlaceInstance(AuthoringMutation{Kind: AuthoringOperationPlaceInstance}, write)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := result.FieldErrors[AuthoringFieldComponentTemplateKey]; !ok {
+		t.Fatalf("expected a definition-key field error, got %#v", result.FieldErrors)
+	}
+
+	result, err = ApplyPlaceInstance(AuthoringMutation{Kind: AuthoringOperationPlaceInstance, ComponentTemplateKey: "testimonial"}, write)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := result.FieldErrors[AuthoringFieldPageKey]; !ok {
+		t.Fatalf("expected a page-key field error, got %#v", result.FieldErrors)
+	}
+}
+
+func TestApplyPlaceInstancePropagatesWriterError(t *testing.T) {
+	write := InstancePlaceWriter(func(pageKey, definitionKey, instanceKey, instanceLabel string) (string, error) {
+		return "", errors.New("unknown shared component definition")
+	})
+	page := core.Page{Key: "about", Label: "About", Route: "/about"}
+	m := AuthoringMutationForPlaceInstance(page, "testimonial", "", "")
+	if _, err := ApplyPlaceInstance(m, write); err == nil {
+		t.Fatal("expected the writer's error to propagate (e.g. an unknown definition)")
+	}
+}
+
 // --- AuthoringMutationFromForm/Validate integration for the new kinds ---
 
 func TestAuthoringMutationValidateAcceptsNewInstanceOperationKinds(t *testing.T) {
@@ -181,6 +243,7 @@ func TestAuthoringMutationValidateAcceptsNewInstanceOperationKinds(t *testing.T)
 		{Kind: AuthoringOperationOverrideInstance, PageKey: "home", ComponentKey: "testimonial-1", ControlKey: "quote"},
 		{Kind: AuthoringOperationDetachInstance, PageKey: "home", ComponentKey: "testimonial-1"},
 		{Kind: AuthoringOperationRestoreInstance, PageKey: "home", ComponentKey: "testimonial-1"},
+		{Kind: AuthoringOperationPlaceInstance, PageKey: "home", ComponentTemplateKey: "testimonial"},
 	}
 	for _, mutation := range cases {
 		if validation := mutation.Validate(); !validation.OK() {
@@ -195,6 +258,7 @@ func TestAuthoringMutationValidateRejectsIncompleteInstanceOperations(t *testing
 		AuthoringOperationOverrideInstance,
 		AuthoringOperationDetachInstance,
 		AuthoringOperationRestoreInstance,
+		AuthoringOperationPlaceInstance,
 	}
 	for _, kind := range cases {
 		mutation := AuthoringMutation{Kind: kind}

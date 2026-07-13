@@ -49,6 +49,10 @@ test.describe("@reference-apps Muddy/Noni editor declutter", () => {
         "[data-studio-checkout-panel='true']",
         "[data-studio-flow-field-editor='true']",
         "[data-studio-shared-components-panel='true']",
+        // HANDOFF-13: the composition workspace palette's shared-component
+        // placement panel (shared_component_palette.server.go) is homed to
+        // Advanced exactly like its sibling detail panel above.
+        "[data-studio-shared-component-palette-panel='true']",
       ]) {
         await expect(page.locator(selector).first(), `${selector} must be hidden in the default Home mode`).toBeHidden();
       }
@@ -63,6 +67,12 @@ test.describe("@reference-apps Muddy/Noni editor declutter", () => {
       await expect(page.locator("[data-studio-navigation-panel='true']").first()).toBeVisible();
       await expect(page.locator("[data-studio-checkout-panel='true']").first()).toBeVisible();
       await expect(page.locator("[data-studio-home-inspector-panel='true']").first()).toBeHidden();
+      // The shared-component companion detail panel and the composition
+      // workspace palette both reveal together in Advanced mode. The
+      // palette panel itself only renders once at least one shared
+      // definition exists (see RenderSharedComponentPalettePanel), so this
+      // asserts presence-when-populated rather than bare visibility.
+      await expect(page.locator("[data-studio-shared-components-panel='true']").first()).toBeVisible();
 
       // Switching to Look reveals the merged Brand+Look surface.
       await page.locator('[data-studio-mode-control="look"]').first().click();
