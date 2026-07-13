@@ -636,12 +636,81 @@ type LoggedCommandOptions = {
   label: string;
 };
 
+// ── Orphaned-process-group prevention ───────────────────────────────────────
+//
+// `go run <pkg>` does not exec(2) into the compiled binary — it forks a real
+// child process for it and stays alive as a supervisor/relay. On a graceful
+// SIGINT, `go run` forwards the signal to that child and waits for it, but a
+// SIGKILL (our 5s-timeout fallback below) or an abrupt external kill of the
+// Node harness itself (mid-test Ctrl-C/SIGINT on the Playwright process, a
+// timed-out test, an afterAll that never runs) kills `go run` with no chance
+// to relay anything — its exec'd `muddy-noni`/`pajaritos` binary is simply
+// reparented to init and keeps running forever, accumulating across runs
+// (proven: a `muddy-noni` binary from an earlier ad hoc session was still
+// alive, PPID reparented to /init, when this fix started).
+//
+// The fix is to always start these processes `detached: true`. On POSIX,
+// that makes each spawned process its own process-group LEADER (pgid ===
+// its own pid) instead of joining the harness's group. `go run`'s exec'd
+// child inherits `go run`'s (new, detached) pgid by default (Go's os/exec
+// does not set a new group for its own children), so `process.kill(-pgid,
+// signal)` — the negative-pid form targets the whole process GROUP, not
+// just one process — reaches `go run` AND its compiled-binary child in one
+// signal, however the group leader dies (graceful or SIGKILL).
+//
+// `activeProcessGroups` tracks every live group so a process-level SIGINT/
+// SIGTERM/exit on the Playwright/Node runner itself (a mid-test abort) also
+// sweeps every still-tracked group as a last resort, even if a test's own
+// `finally`/`afterAll` never gets to call `stop()`.
+const activeProcessGroups = new Set<number>();
+
+function trackProcessGroup(pid: number | undefined) {
+  if (pid !== undefined) activeProcessGroups.add(pid);
+}
+
+function untrackProcessGroup(pid: number | undefined) {
+  if (pid !== undefined) activeProcessGroups.delete(pid);
+}
+
+function killProcessGroup(pid: number, signal: NodeJS.Signals) {
+  try {
+    process.kill(-pid, signal);
+  } catch {
+    // ESRCH: the group is already gone (process exited/reaped on its own,
+    // or this is a stale entry from a group we already killed). Cleanup is
+    // best-effort here — never throw out of a shutdown path.
+  }
+}
+
+let processGroupCleanupInstalled = false;
+
+// installProcessGroupCleanupOnce registers a last-resort sweep of every
+// still-tracked process group on process exit and on SIGINT/SIGTERM
+// delivered to this Node process (e.g. Ctrl-C on `npx playwright test`).
+// It intentionally does not call process.exit() itself — Playwright installs
+// its own SIGINT handling for graceful worker teardown/reporting; we only
+// need to piggyback cleanup, not own the exit sequence.
+function installProcessGroupCleanupOnce() {
+  if (processGroupCleanupInstalled) return;
+  processGroupCleanupInstalled = true;
+  const sweep = () => {
+    for (const pid of activeProcessGroups) killProcessGroup(pid, "SIGKILL");
+    activeProcessGroups.clear();
+  };
+  process.on("exit", sweep);
+  process.on("SIGINT", sweep);
+  process.on("SIGTERM", sweep);
+}
+
 async function runLoggedCommand(command: string, args: string[], options: LoggedCommandOptions): Promise<void> {
+  installProcessGroupCleanupOnce();
   const proc = spawn(command, args, {
     cwd: options.cwd,
     env: options.env,
     stdio: ["ignore", "pipe", "pipe"],
+    detached: true,
   });
+  trackProcessGroup(proc.pid);
   const stdout: string[] = [];
   const stderr: string[] = [];
   proc.stdout?.on("data", (chunk: Buffer) => stdout.push(chunk.toString()));
@@ -649,9 +718,11 @@ async function runLoggedCommand(command: string, args: string[], options: Logged
 
   return new Promise((resolve, reject) => {
     proc.on("error", (error) => {
+      untrackProcessGroup(proc.pid);
       reject(new Error(`${options.label} failed to start: ${error.message}\n\nstdout:\n${stdout.join("")}\n\nstderr:\n${stderr.join("")}`));
     });
     proc.on("exit", (code, signal) => {
+      untrackProcessGroup(proc.pid);
       if (code === 0) {
         resolve();
         return;
@@ -662,11 +733,14 @@ async function runLoggedCommand(command: string, args: string[], options: Logged
 }
 
 async function startGoServer(request: APIRequestContext, options: ServerOptions): Promise<ServerHandle> {
+  installProcessGroupCleanupOnce();
   const proc = spawn("go", ["run", options.command], {
     cwd: options.cwd,
     env: { ...process.env, GOWORK: "off", ...options.env },
     stdio: ["ignore", "pipe", "pipe"],
+    detached: true,
   });
+  trackProcessGroup(proc.pid);
   const logs: string[] = [];
   proc.stdout?.on("data", (chunk: Buffer) => logs.push(chunk.toString()));
   proc.stderr?.on("data", (chunk: Buffer) => logs.push(chunk.toString()));
@@ -738,16 +812,31 @@ async function freePort(): Promise<number> {
 }
 
 async function stopProcess(proc: ChildProcess) {
-  if (proc.exitCode !== null || proc.signalCode !== null) return;
-  const exited = new Promise<void>((resolve) => proc.once("exit", () => resolve()));
-  proc.kill("SIGINT");
-  const timeout = new Promise<void>((resolve) => {
-    setTimeout(() => {
-      if (proc.exitCode === null && proc.signalCode === null) proc.kill("SIGKILL");
-      resolve();
-    }, 5_000);
-  });
-  await Promise.race([exited, timeout]);
+  const pid = proc.pid;
+  try {
+    if (proc.exitCode !== null || proc.signalCode !== null) return;
+    const exited = new Promise<void>((resolve) => proc.once("exit", () => resolve()));
+    // Kill the whole process GROUP (negative pid), not just the immediate
+    // child: `go run` does not exec(2) into its compiled binary, so a plain
+    // proc.kill() only reaches the `go run` supervisor and leaves the
+    // muddy-noni/pajaritos binary it forked running as an orphan. Both
+    // processes share this pgid because we spawned with `detached: true`
+    // (see installProcessGroupCleanupOnce's comment above).
+    if (pid !== undefined) killProcessGroup(pid, "SIGINT");
+    else proc.kill("SIGINT");
+    const timeout = new Promise<void>((resolve) => {
+      setTimeout(() => {
+        if (proc.exitCode === null && proc.signalCode === null) {
+          if (pid !== undefined) killProcessGroup(pid, "SIGKILL");
+          else proc.kill("SIGKILL");
+        }
+        resolve();
+      }, 5_000);
+    });
+    await Promise.race([exited, timeout]);
+  } finally {
+    untrackProcessGroup(pid);
+  }
 }
 
 function cleanupTempDir(tempDir: string) {

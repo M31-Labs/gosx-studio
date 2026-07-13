@@ -129,6 +129,16 @@ test.describe("@reference-apps canvas2d site-map WASM-free restore-revision loop
         "the revision history panel must render after two publishes",
       ).toBeAttached({ timeout: 30_000 });
 
+      // Regression guard for #20 (owner-reported: the panel showed "No
+      // previous versions yet." simultaneously with a populated, working
+      // revision list). The empty-state <p class="empty"> must stay
+      // gated `hidden` (and therefore not visible) once the list is
+      // populated -- this is a real in-browser check, not just the Go
+      // render-level unit test, since the reported bug was a live-DOM
+      // observation.
+      const emptyState = page.locator(`${REVISION_HISTORY} p.empty`).first();
+      await expect(emptyState, "empty-state text must not render as visible once revisions exist").toBeHidden({ timeout: 30_000 });
+
       // STALE-PREMISE FIX: the lifecycle engine mints an AUTOMATIC "restore
       // point" revision (labeled "Previous version") alongside every
       // publish's own "editor published" revision, pairing a pre-publish

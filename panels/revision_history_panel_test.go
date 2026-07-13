@@ -82,6 +82,12 @@ func TestRenderRevisionHistoryPanelPopulated(t *testing.T) {
 		"<form",
 		"csrf_token",
 		`<ul class="field-list field-list--stacked" hidden>`,
+		// Regression guard for #20: the owner-reported staging bug rendered
+		// "No previous versions yet." simultaneously with a populated,
+		// working revision list. The empty-state <p> must ALWAYS carry
+		// `hidden` when hasItems is true -- this exact (non-hidden) fragment
+		// must never appear in populated output.
+		`<p class="empty">No previous versions yet.</p>`,
 	} {
 		if strings.Contains(html, notWant) {
 			t.Fatalf("rendered revision history must not include %q:\n%s", notWant, html)
@@ -171,6 +177,9 @@ func TestRenderRevisionHistoryPanelStandaloneForms(t *testing.T) {
 		`formaction=`,
 		`formmethod=`,
 		`data-studio-submit-action="restoreRevision"`,
+		// Regression guard for #20 (see TestRenderRevisionHistoryPanelPopulated):
+		// the empty-state gating must hold for the StandaloneForms path too.
+		`<p class="empty">No previous versions yet.</p>`,
 	} {
 		if strings.Contains(html, notWant) {
 			t.Fatalf("standalone revision history must not include %q:\n%s", notWant, html)
