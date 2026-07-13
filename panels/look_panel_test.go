@@ -59,6 +59,42 @@ func TestRenderLookPanelFull(t *testing.T) {
 	}
 }
 
+// TestRenderLookPanelImpactCardCarriesTitleTooltips guards wave 3B's
+// residual #6 fix (LOOK Recipes card crowding): the impact card's
+// label/summary/count/scope/state values must carry a title tooltip when
+// non-empty (the #15 pattern renderLookScopeField already established) so
+// the full value stays discoverable on hover/focus once the card's own
+// width-constrained CSS (host-side, see public/site.css
+// .studio-style-impact/.studio-style-impact__meta) truncates it.
+func TestRenderLookPanelImpactCardCarriesTitleTooltips(t *testing.T) {
+	html := gosx.RenderHTML(RenderLookPanel(lookPanelTestView(), LookPanelOptions{}))
+	for _, want := range []string{
+		`data-studio-style-impact-label="true" title="Hero width"`,
+		`data-studio-style-impact-summary="true" title="One field affected."`,
+		`data-studio-style-impact-count="true" title="1 affected"`,
+		`data-studio-style-impact-scope="true" title="site &gt; home"`,
+		`data-studio-style-impact-state="true" title="default / desktop"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("look panel impact card missing tooltip %q:\n%s", want, html)
+		}
+	}
+}
+
+// TestRenderLookPanelImpactCardOmitsTooltipWhenValueEmpty guards the
+// no-crash/no-noise empty path: an empty value must not emit a bare
+// title="" attribute.
+func TestRenderLookPanelImpactCardOmitsTooltipWhenValueEmpty(t *testing.T) {
+	view := lookPanelTestView()
+	settings := view["settings"].(map[string]any)
+	workbench := settings["workbench"].(map[string]any)
+	workbench["impact"] = map[string]any{"kicker": "Preview impact"}
+	html := gosx.RenderHTML(RenderLookPanel(view, LookPanelOptions{}))
+	if strings.Contains(html, `data-studio-style-impact-label="true" title=`) {
+		t.Fatalf("empty impact label must not carry a title tooltip:\n%s", html)
+	}
+}
+
 func TestRenderLookPanelMinimalKeepsRootAndSlots(t *testing.T) {
 	html := gosx.RenderHTML(RenderLookPanel(map[string]any{}, LookPanelOptions{}))
 	for _, fragment := range []string{

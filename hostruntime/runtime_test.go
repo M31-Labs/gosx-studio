@@ -1722,14 +1722,21 @@ func TestEngineRuntimeHandlerServesIslandBundles(t *testing.T) {
 // by toggling [hidden] — already display:none via the [hidden] rule in
 // studio.css — so a live measurement only ever finds one visible
 // "Responsive layout" heading even though the host still composes several.
+//
+// Wave 3B (tamarind) generalized the mechanism into a shared
+// scopeSelectionPanels(form, selector, keyAttr) helper (see fix #2 below),
+// so this test now checks for the shared helper plus
+// scopeResponsiveLayoutInspectors's use of it, rather than asserting the
+// old inlined selector string verbatim.
 func TestWorkbenchRuntimeScopesResponsiveLayoutInspectorsBySelection(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
+		"function scopeSelectionPanels(form, selector, keyAttr)",
 		"function scopeResponsiveLayoutInspectors(form)",
-		`queryAll(document, "[data-studio-responsive-layout-inspector]")`,
+		`scopeSelectionPanels(form, "[data-studio-responsive-layout-inspector]", "data-studio-selected-component")`,
 		`panel.setAttribute("hidden", "true")`,
 		`panel.removeAttribute("hidden")`,
-		"scopeResponsiveLayoutInspectors(form);",
+		"scopeSupportSelectionPanels(form);",
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing %q", check)
@@ -1737,8 +1744,32 @@ func TestWorkbenchRuntimeScopesResponsiveLayoutInspectorsBySelection(t *testing.
 	}
 	// Must run both at initial bind (server-rendered default selection) and
 	// whenever the canvas selection changes, not just once.
-	if strings.Count(script, "scopeResponsiveLayoutInspectors(form)") < 2 {
-		t.Fatalf("expected scopeResponsiveLayoutInspectors to be invoked at init and on selection change, got:\n%s", script)
+	if strings.Count(script, "scopeSupportSelectionPanels(form)") < 2 {
+		t.Fatalf("expected scopeSupportSelectionPanels to be invoked at init and on selection change, got:\n%s", script)
+	}
+}
+
+// TestWorkbenchRuntimeScopesDirectEditPanelsBySelection guards wave 3B fix
+// #2 (dedupe "Selected content"): muddy-noni-commerce's editorDirectEditPanels
+// Fragments home:hero's, about:content's, and all three
+// contact:contact-links direct-edit forms together, outside this <form>,
+// regardless of which target is actually selected on canvas (the magnolia-3
+// re-score's "5 stacked Selected content forms" finding). scopeDirectEditPanels
+// generalizes the same scopeSelectionPanels guard wave 3A built for the
+// Responsive layout duplicate: it hides every [data-studio-direct-edit-panel]
+// form except the one (or ones — Contact's three fields share one
+// ComponentKey and are meant to stay together) matching the live selection.
+func TestWorkbenchRuntimeScopesDirectEditPanelsBySelection(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		"function scopeDirectEditPanels(form)",
+		`scopeSelectionPanels(form, "[data-studio-direct-edit-panel]", "data-studio-target-component")`,
+		"function scopeSupportSelectionPanels(form)",
+		"scopeDirectEditPanels(form);",
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing %q", check)
+		}
 	}
 }
 

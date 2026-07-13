@@ -124,6 +124,16 @@ func TestRenderInteractionsPanelCollapsesTargetIntoOneCompactRowWithDisclosure(t
 // the "+ Add interaction" affordance (punch #24) at the single-target level:
 // a target with nothing attached must read as an explicit add affordance,
 // not a pre-expanded "Save" control set.
+//
+// Wave 3B (tamarind, residual #6): the inner disclosure's own summary text
+// no longer repeats the outer "+ Add interaction" CTA verbatim (see
+// interactionsDisclosureLabel) — it names the target instead
+// ("CTA button"), since RenderInteractionsInspector already wraps unattached
+// cards in its own shared "+ Add interaction (N elements available)"
+// picker, and a second, identically-worded nested toggle read as a
+// meaningless repeat with no new information (confirmed live: expanding the
+// picker then a target showed "+ ADD INTERACTION (N AVAILABLE)" immediately
+// followed by "Hero" / "+ ADD INTERACTION" again).
 func TestRenderInteractionsPanelUnattachedTargetOffersAddDisclosureLabel(t *testing.T) {
 	node := RenderInteractionsPanel(InteractionsPanelOptions{
 		ComponentKey: "home:cta", ComponentLabel: "CTA button",
@@ -135,11 +145,14 @@ func TestRenderInteractionsPanelUnattachedTargetOffersAddDisclosureLabel(t *test
 	for _, want := range []string{
 		`data-studio-interaction-target-attached="false"`,
 		`<span data-studio-interaction-target-summary="true">Not attached</span>`,
-		`<summary>+ Add interaction</summary>`,
+		`<summary>CTA button</summary>`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("missing %q in:\n%s", want, html)
 		}
+	}
+	if strings.Contains(html, "<summary>+ Add interaction</summary>") {
+		t.Fatalf("the inner per-target disclosure must not repeat the outer picker's own CTA text:\n%s", html)
 	}
 }
 

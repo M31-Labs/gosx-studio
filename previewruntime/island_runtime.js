@@ -1126,7 +1126,20 @@
         frame.setAttribute("data-studio-preview-src", frame.getAttribute("src") || "");
       }
       frame.addEventListener("load", function () {
-        setEditorPreviewStatus(form, "ready", "Ready", "load");
+        // Wave 3B (tamarind, residual #6 — stray ready-family chip): the
+        // canvas preview status output used to write the literal word
+        // "Ready" once the iframe finished loading — a second, differently
+        // worded "good state" vocabulary item living right next to the
+        // toolbar's own unified Saved/Unsaved indicator (wave 3A fix (e)
+        // already folded the field-level "Ready" synonym into "Saved" for
+        // that exact reason). The state/reason attributes
+        // (data-gosx-studio-preview-state="ready", data-studio-preview-reason)
+        // still record the transition for CSS/JS/tests; only the visible
+        // label goes silent in this happy-path case, matching the same
+        // "quiet unless something needs attention" pattern already used for
+        // the per-field READY/Required/Linked chips — loading/error/dirty/
+        // syncing states below still write a real, visible label.
+        setEditorPreviewStatus(form, "ready", "", "load");
         syncEditorPreviewFrame(form, frame, "load", typeof host.shouldTransportPreviewPatch === "function" ? host.shouldTransportPreviewPatch : null);
         bindEditorPreviewFrameDocument(form, frame, host);
         restoreEditorPreviewSelection(form, frame, host);

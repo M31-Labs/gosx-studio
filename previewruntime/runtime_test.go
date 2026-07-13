@@ -645,7 +645,7 @@ func TestPreviewRuntimeIslandJSPreviewFrameLifecycleHandlersRunLocally(t *testin
 	for _, fragment := range []string{
 		`function bindEditorPreviewFrameDocument(form, frame, host)`,
 		`return bindEditorPreviewDocument(form, frame, host)`,
-		`setEditorPreviewStatus(form, "ready", "Ready", "load")`,
+		`setEditorPreviewStatus(form, "ready", "", "load")`,
 		`syncEditorPreviewFrame(form, frame, "load", typeof host.shouldTransportPreviewPatch === "function" ? host.shouldTransportPreviewPatch : null)`,
 		`var route = editorPreviewURL(frame) || frame.getAttribute("src") || ""`,
 		`postEditorPreviewPatch(form, "load-sync", editorPreviewPatchEnvelope("load-sync", { route: route }, null))`,

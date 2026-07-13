@@ -202,36 +202,69 @@
     return parsed > 0 ? parsed : 1;
   }
 
-  // Wave 3A (inspector-presentation, fix (b)): scopeResponsiveLayoutInspectors
-  // is the studio-side idempotence guard for the "respLayoutCount=2" defect.
-  // [data-studio-responsive-layout-inspector] panels are rendered by the HOST
-  // outside this <form> (muddy-noni-commerce's editorDirectEditPanels Fragments
-  // one panel per flagship target — home:hero AND about:content — always
-  // together, regardless of which one is actually selected on canvas), so they
-  // can't be found via form.querySelector and can't be deduped by a Go-side
-  // render guard alone. This walks the whole document (not just this form) for
-  // that reason. It shows only the panel whose data-studio-selected-component
-  // matches the form's current data-studio-selection; with no selection yet it
-  // falls back to the first panel, matching the server's own default selected
-  // target. Every non-matching panel gets [hidden] — already display:none via
-  // the [hidden] rule at the top of studio.css — so a real browser measurement
-  // (e.g. querying h1/h2/h3 text) only ever finds ONE "Responsive layout"
-  // heading rendered, even though the host still composes several.
-  function scopeResponsiveLayoutInspectors(form) {
-    var panels = queryAll(document, "[data-studio-responsive-layout-inspector]");
+  // Wave 3A (inspector-presentation, fix (b)) / wave 3B (tamarind, generalized):
+  // scopeSelectionPanels is the studio-side idempotence guard for hosts that
+  // compose more than one selected-target's support panel on the same page at
+  // once (muddy-noni-commerce's editorDirectEditPanels Fragments home:hero's,
+  // about:content's, AND all three contact:contact-links direct-edit forms
+  // together, regardless of which is actually selected on canvas — the same
+  // root cause wave 3A found for its "respLayoutCount=2" defect, just wider).
+  // These panels are rendered by the HOST outside this <form> (a <form>
+  // cannot legally nest inside the workbench's own <form>, so hosts render
+  // them as siblings instead — see workbenchruntime/island_runtime.js's
+  // workbenchModeGateRoot for the same constraint), so they can't be found
+  // via form.querySelector and can't be deduped by a Go-side render guard
+  // alone. This walks the whole document (not just this form) for that
+  // reason. It shows every panel whose data-studio-selected-component (or,
+  // for direct-edit panels, data-studio-target-component — the same
+  // ComponentKey concept under the panel's own existing attribute name)
+  // matches the form's current data-studio-selection; with no selection yet
+  // it falls back to showing every panel sharing the FIRST panel's key
+  // (not just the first panel alone), matching the server's own
+  // default-selected target while still keeping panels that share one
+  // selected component together (e.g. Contact's three direct-edit fields —
+  // email/Instagram/newsletter — all key off the same "contact:contact-links"
+  // ComponentKey and are meant to show together once that component is
+  // selected, the same way Contact's own canvas selection covers all three
+  // fields at once). Every non-matching panel gets [hidden] — already
+  // display:none via the [hidden] rule at the top of studio.css — so a real
+  // browser measurement (e.g. querying h1/h2/h3 text, or counting visible
+  // [data-studio-direct-edit-panel] forms) only ever finds the ACTIVE
+  // target's panel(s) rendered, even though the host still composes every
+  // target's panel every time.
+  function scopeSelectionPanels(form, selector, keyAttr) {
+    var panels = queryAll(document, selector);
     if (!panels.length) return;
     var active = form ? compactText(form.getAttribute("data-studio-selection")) : "";
-    var shown = false;
+    var fallbackKey = null;
     panels.forEach(function (panel) {
-      var key = compactText(panel.getAttribute("data-studio-selected-component"));
-      var show = active ? key === active : !shown;
+      var key = compactText(panel.getAttribute(keyAttr));
+      var show = active ? key === active : (fallbackKey === null || key === fallbackKey);
       if (show) {
+        if (fallbackKey === null) fallbackKey = key;
         panel.removeAttribute("hidden");
-        shown = true;
       } else {
         panel.setAttribute("hidden", "true");
       }
     });
+  }
+
+  function scopeResponsiveLayoutInspectors(form) {
+    scopeSelectionPanels(form, "[data-studio-responsive-layout-inspector]", "data-studio-selected-component");
+  }
+
+  // Wave 3B (tamarind, fix #2 — dedupe "Selected content"): generalizes the
+  // same guard to panels/direct_edit_panel.go's RenderDirectEditPanel
+  // instances (data-studio-direct-edit-panel="true", keyed by the panel's
+  // own data-studio-target-component attribute — no new Go-side attribute
+  // needed, the ComponentKey it already emits is the selection key).
+  function scopeDirectEditPanels(form) {
+    scopeSelectionPanels(form, "[data-studio-direct-edit-panel]", "data-studio-target-component");
+  }
+
+  function scopeSupportSelectionPanels(form) {
+    scopeResponsiveLayoutInspectors(form);
+    scopeDirectEditPanels(form);
   }
 
   function initWorkbench(form) {
@@ -1041,7 +1074,7 @@
       form.setAttribute("data-studio-selection-kind", detail.kind || "");
       setReadout("[data-studio-selection-label]", detail.label || "No selection");
       setReadout("[data-studio-selection-status]", detail.key ? (detail.kind || "Selected") : "No selection");
-      scopeResponsiveLayoutInspectors(form);
+      scopeSupportSelectionPanels(form);
     });
 
     form.addEventListener("input", function (event) {
@@ -1113,7 +1146,7 @@
     setZoom(form.getAttribute("data-studio-zoom") || "", { reason: "init" });
     syncRailButtons();
     syncActivityButtons();
-    scopeResponsiveLayoutInspectors(form);
+    scopeSupportSelectionPanels(form);
   }
 
   function initAll(root) {

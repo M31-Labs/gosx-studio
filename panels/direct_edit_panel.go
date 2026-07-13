@@ -36,7 +36,19 @@ func RenderDirectEditPanel(options DirectEditPanelOptions) gosx.Node {
 		options.Breakpoint = authoring.StyleBreakpointBase
 	}
 	target := options.Target.Normalize()
-	attrs := []any{gosx.Attr("id", options.FormID), gosx.Attr("method", "post"), gosx.Attr("action", options.Action), gosx.Attr("data-gosx-studio-durable-history", boolAttr(options.DurableHistory)), gosx.Attr("data-gosx-studio-operation-action", options.Action), gosx.Attr("data-studio-document-revision", options.DocumentRevision), gosx.Attr("data-studio-target-head", options.TargetHead)}
+	// Wave 3B (tamarind): data-studio-direct-edit-panel is the marker
+	// hostruntime/assets/workbench_runtime.js's scopeSelectionPanels() looks
+	// for (the same generalized guard scopeResponsiveLayoutInspectors used,
+	// see that file) — it, plus the already-emitted
+	// data-studio-target-component below, let the runtime show only the
+	// direct-edit form(s) whose component matches the live canvas selection
+	// and hide the rest, the same way the duplicate Responsive layout panel
+	// was resolved in wave 3A. A host that composes more than one selected
+	// target's direct-edit panel on the same page (muddy-noni-commerce's
+	// editorDirectEditPanels always renders home:hero, about:content, and
+	// all three contact:contact-links fields together) still gets exactly
+	// one target's form(s) visible at a time.
+	attrs := []any{gosx.Attr("id", options.FormID), gosx.Attr("method", "post"), gosx.Attr("action", options.Action), gosx.Attr("data-gosx-studio-durable-history", boolAttr(options.DurableHistory)), gosx.Attr("data-gosx-studio-operation-action", options.Action), gosx.Attr("data-studio-document-revision", options.DocumentRevision), gosx.Attr("data-studio-target-head", options.TargetHead), gosx.Attr("data-studio-direct-edit-panel", "true")}
 	attrs = append(attrs, gosx.Attr("data-studio-target-route", target.Route), gosx.Attr("data-studio-target-page-id", target.PageID), gosx.Attr("data-studio-target-field", target.Field), gosx.Attr("data-studio-target-component", target.ComponentKey))
 	children := []gosx.Node{
 		gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", authoring.AuthoringFieldOperation), gosx.Attr("value", string(authoring.AuthoringOperationSetField)))),

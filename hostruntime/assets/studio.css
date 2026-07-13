@@ -54,6 +54,18 @@ body:has(.editor-page),
   --size-studio-right-min: 17rem;
   --size-studio-right-max: 24rem;
   --size-studio-frame: 88rem;
+  /* Wave 3B (tamarind, fix #1 — width system): the shared max-width for
+     every support-node panel that renders below/beside the three-zone
+     workbench (direct-edit forms, Responsive layout, the Interactions
+     inspector, the LOOK-gated style/theme panel, the flow field editor, the
+     shared-components palette — see [data-studio-mode-gate-wrapper] below).
+     Before this fix each one measured a different width on a live staging
+     seed (483px direct-edit stack, ~1213px Interactions, ~1440px raw
+     full-bleed sections) purely as a byproduct of its own content's
+     intrinsic sizing inside .admin-page.editor-page's single-column grid,
+     not a deliberate design. One consistent column (62.5rem = 1000px, within
+     the 960-1100px band) replaces that accidental variety. */
+  --size-studio-support-panel: 62.5rem;
   --size-studio-resizer: 0.85rem;
   --studio-stage-height: clamp(48rem, calc(100svh - 6rem), 92rem);
   --space-chip-y: 0.28rem;
@@ -2759,9 +2771,24 @@ html[data-gosx-studio-preview-selectable] [data-gosx-studio-preview-tab-stop]:fo
    full content width with a single narrow column of controls and a wide
    cream void beside it. Give the mode-gated wrapper the same bordered-card
    treatment .editor-panel already has (it inherits the class) plus a frame
-   width cap so it doesn't outgrow the three-zone stage above it. */
+   width cap so it doesn't outgrow the three-zone stage above it.
+
+   Wave 3B (tamarind, fix #1 — width system): `width: 100%` is the actual
+   fix here. Without it, each wrapper's real rendered width came from its own
+   content's intrinsic (max-content) sizing inside .admin-page.editor-page's
+   implicit single-column grid — a plain div, as a stretch-default grid item,
+   should fill that column, but because each wrapper's own children establish
+   their own layout context (a nested `display:grid` per instance below),
+   Chromium sized the wrapper to its content instead of the shared column,
+   producing three unrelated widths on a live seed (483px direct-edit,
+   ~1213px Interactions, full-bleed elsewhere). `width: 100%` makes the
+   wrapper unconditionally fill its column up to --size-studio-support-panel,
+   so every mode-gated support panel (direct-edit stack, Responsive layout,
+   Interactions, the LOOK-gated style/theme panel, flow field editor, shared
+   components) now shares one column width instead of three accidental ones. */
 [data-studio-mode-gate-wrapper="true"] {
-  max-width: var(--size-studio-frame, 88rem);
+  width: 100%;
+  max-width: var(--size-studio-support-panel, 62.5rem);
   margin-inline: auto;
 }
 .theme-swatch-row {
@@ -2854,7 +2881,11 @@ html[data-gosx-studio-preview-selectable] [data-gosx-studio-preview-tab-stop]:fo
 [data-gosx-studio-style-panel] {
   display: grid;
   gap: 0.4rem;
-  max-width: 40rem;
+  /* Wave 3B (tamarind, fix #1 — width system): matches the direct-edit
+     panel's own width fix above — fill the (now consistently sized,
+     LOOK-gated, see shell/backend_editor_page.go) wrapper instead of capping
+     narrower than it. */
+  width: 100%;
   padding: var(--space-sm);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
@@ -2938,11 +2969,20 @@ html[data-gosx-studio-preview-selectable] [data-gosx-studio-preview-tab-stop]:fo
    caller-supplied and may repeat across selected targets), so key off the
    one child every instance carries. Was raw block-stacked
    label/textarea/readout/Save/Cancel/Undo/Redo — several of these render at
-   once (one per selected canvas target), compounding the HOME dead space. */
+   once (one per selected canvas target), compounding the HOME dead space.
+
+   Wave 3B (tamarind, fix #1 — width system): a fixed 40rem (640px) cap
+   inside a wrapper now consistently sized to --size-studio-support-panel
+   (62.5rem/1000px, see [data-studio-mode-gate-wrapper]) left a lopsided
+   ~360px cream gutter beside every direct-edit form — the exact "direct-edit
+   marooned, centered in cream" defect the re-score named. `width: 100%`
+   fills the wrapper's own column instead, matching every other support
+   panel (Responsive layout, Interactions, the style/theme panel) at the
+   same width. */
 form:has(> [data-studio-direct-edit-field]) {
   display: grid;
   gap: 0.4rem;
-  max-width: 40rem;
+  width: 100%;
   margin-bottom: var(--space-xs);
   padding: var(--space-sm);
   border: 1px solid var(--color-line);

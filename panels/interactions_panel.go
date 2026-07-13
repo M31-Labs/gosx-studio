@@ -188,7 +188,7 @@ func renderInteractionsTargetCard(options InteractionsPanelOptions) gosx.Node {
 			gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-interaction-target-summary", "true")), gosx.Text(interactionsTargetSummary(options.Rows))),
 		),
 		gosx.El("details", gosx.Attrs(gosx.Attr("class", "studio-interactions-target__editor")),
-			gosx.El("summary", nil, gosx.Text(interactionsDisclosureLabel(attached))),
+			gosx.El("summary", nil, gosx.Text(interactionsDisclosureLabel(attached, label))),
 			gosx.Fragment(rows...),
 		),
 	)
@@ -218,11 +218,28 @@ func interactionsTargetSummary(rows []InteractionRow) string {
 	return strings.Join(parts, " · ")
 }
 
-func interactionsDisclosureLabel(attached bool) string {
+// interactionsDisclosureLabel is the per-target disclosure's own toggle
+// text.
+//
+// Wave 3B (tamarind, residual #6 — nested "+ Add interaction" redundancy):
+// an unattached target's card already sits inside
+// RenderInteractionsInspector's own shared "+ Add interaction (N elements
+// available)" picker (see renderInteractionsTargetCard's <header>, which
+// already shows the target's own label right above this disclosure), so a
+// SECOND, identically-worded "+ Add interaction" toggle directly beneath it
+// read as a meaningless repeat of the same CTA with no new information —
+// confirmed live: expanding the outer picker then the first target inside it
+// showed "+ ADD INTERACTION (15 ELEMENTS AVAILABLE)" immediately followed by
+// "Hero" / "Not attached" / "+ ADD INTERACTION" again. The inner disclosure
+// now names the target instead of repeating the CTA, so its own accessible
+// name (what a screen reader announces for the toggle in isolation) carries
+// information instead of being indistinguishable from every other target's
+// toggle and from the outer picker's own summary.
+func interactionsDisclosureLabel(attached bool, label string) string {
 	if attached {
 		return "Edit interactions"
 	}
-	return "+ Add interaction"
+	return label
 }
 
 func interactionsTargetIDSuffix(componentKey string) string {

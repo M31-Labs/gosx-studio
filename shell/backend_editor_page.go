@@ -109,7 +109,44 @@ func backendEditorStylePanelNode(props BackendEditorPageProps) gosx.Node {
 	if formID == "" {
 		formID = "editorStylePaletteForm"
 	}
-	return panels.RenderStylePanel(props.StylePanelView, formID, props.StylePanelAction, props.StylePanelCSRFToken)
+	panel := panels.RenderStylePanel(props.StylePanelView, formID, props.StylePanelAction, props.StylePanelCSRFToken)
+	if panel.IsZero() {
+		return panel
+	}
+	return supportModeGatePanel("look", panel)
+}
+
+// supportModeGatePanel wraps a support node (rendered as a sibling of the
+// workbench <form> — see backendEditorSupportNodes) in the SAME mode-gate
+// convention muddy-noni-commerce's own editorGatedModePanel already uses for
+// its host-composed support nodes (direct-edit forms, the interactions
+// inspector, ...): a data-studio-mode-panel-tagged .editor-panel wrapper,
+// carrying data-studio-mode-gate-wrapper="true" so it gets the shared
+// support-panel width treatment (studio.css) and so
+// workbenchruntime/island_runtime.js's setModeIsland (which widens its
+// [data-studio-mode-panel] search to
+// [data-gosx-studio-backend-editor-renderer] specifically so it can reach
+// these out-of-form siblings) hides it outside the named mode.
+//
+// Wave 3B (tamarind): the color-token/font style panel
+// (backendEditorStylePanelNode) previously rendered unconditionally in every
+// mode — it carried no data-studio-mode-panel at all, so it was composed as
+// a permanent, un-gated fixture at the bottom of every mode's page (visually
+// "dumped at HOME's bottom" simply because HOME is the default mode, but it
+// rendered identically under LOOK/PREVIEW/PUBLISH/ADVANCED too — confirmed
+// live: stylePanelModeTag was null and stylePanelVis was true in all five
+// modes before this fix). It belongs to LOOK (the raw token editor is a
+// second, ungrouped surface for the same "visual system" LOOK's own grouped
+// RenderLookPanel already owns as the primary one) so it is now gated there.
+func supportModeGatePanel(mode string, node gosx.Node) gosx.Node {
+	if node.IsZero() {
+		return node
+	}
+	return gosx.El("div", gosx.Attrs(
+		gosx.Attr("class", "editor-panel editor-panel--mode-gate"),
+		gosx.Attr("data-studio-mode-panel", mode),
+		gosx.Attr("data-studio-mode-gate-wrapper", "true"),
+	), node)
 }
 
 func RenderBackendEditorMediaDatalist(media []BackendEditorMediaAsset) gosx.Node {

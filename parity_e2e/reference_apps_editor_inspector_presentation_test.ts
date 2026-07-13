@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 import { mkdtempSync, copyFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { clickAuthoringPanel, openInteractionsTargetDisclosure, startMuddy, type ServerHandle } from "./reference_apps_harness";
+import { clickAuthoringPanel, openInteractionsTargetDisclosure, revealModeIfPresent, startMuddy, type ServerHandle } from "./reference_apps_harness";
 
 // Wave 3A (inspector-presentation): the post-wave-2 re-score (6/10) found the
 // entire gap to 7-8 was the Home inspector's presentation once real content
@@ -172,6 +172,216 @@ test.describe("@reference-apps Muddy/Noni inspector presentation (wave 3A)", () 
       // independent of one another.
       const second = targets.nth(1);
       await expect(second.locator(".studio-interactions-target__editor select").first()).toBeHidden();
+    } finally {
+      await server.stop();
+    }
+  });
+});
+
+// Wave 3B (tamarind): the magnolia-3 re-score (7/10) found the presentation
+// gap wave 3A fixed for HOME's own inspector repeated across the rest of the
+// editor surface: ADVANCED measured 9,497px with 18 always-visible <select>
+// elements and 4 duplicate "Fields, validation, and binding" panels; HOME's
+// support-node region below the workbench stacked 5 duplicate "Selected
+// content" direct-edit forms across 3 different, accidental panel widths
+// (483px/1182px/1440px) plus an always-composed (never mode-gated)
+// color-token/font editor and one completely blank bordered box. This spec
+// extends the wave 3A budget guard with the ADVANCED-mode equivalent plus
+// the new fixes: direct-edit dedupe (generalizing wave 3A's
+// scopeResponsiveLayoutInspectors into scopeSelectionPanels/
+// scopeDirectEditPanels, hostruntime/assets/workbench_runtime.js), one
+// consistent support-panel width (--size-studio-support-panel, 62.5rem),
+// and the LOOK-only style/theme panel mode-gate (shell/backend_editor_page.go).
+//
+// Root-cause note on the "one empty bordered box" finding (verified live,
+// not guessed): it was NOT a Go-side "render nothing when empty" gap. It was
+// muddy-noni-commerce's own CSS (public/site.css) applying
+// `content-visibility: auto; contain-intrinsic-size: 8rem` to `.editor-panel`
+// — the exact class the mode-gated Interactions/direct-edit/flow-field-editor
+// support-node wrappers carry. `contain-intrinsic-size: 8rem` (128px) is far
+// smaller than these panels' real rendered height (the Interactions panel
+// alone measures ~185px on this seed), and a panel far enough down the page
+// (Interactions starts around y=2476 on the realistic 15-canvas-target seed)
+// never gets promoted "relevant to the user" before a full-page capture,
+// painting as a totally blank rounded-rect despite
+// "Interactions"/"Attach safe, typed behavior..." genuinely being in the DOM
+// (confirmed: `textContent` had the real copy, `innerText` was `""` —
+// Chromium's content-visibility "skipped" signature — and a pixel crop of
+// the rendered page exactly matched a blank box). The fix removed
+// `.editor-panel` from that content-visibility rule (composition-level,
+// muddy-side; left uncommitted per the handoff, see the report). This spec
+// guards the OUTCOME (the panel actually paints its own text), not the CSS
+// property directly, since the property lives in the host, not gosx-studio.
+test.describe("@reference-apps Muddy/Noni editor surface presentation (wave 3B)", () => {
+  test.describe.configure({ timeout: 180_000 });
+  test.skip(process.env.GOSX_STUDIO_REFERENCE_APP_E2E !== "1", "set GOSX_STUDIO_REFERENCE_APP_E2E=1 to boot sibling reference apps");
+
+  test("ADVANCED with realistic content volume stays under a height and visible-select budget", async ({ page, request }) => {
+    const server = await startMuddyWithStagingSeed(request);
+    try {
+      await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "networkidle", timeout: 60_000 });
+      await page.waitForTimeout(1_500);
+      await revealModeIfPresent(page, "advanced");
+      await page.waitForTimeout(1_500);
+
+      const metrics = await page.evaluate(([isRenderedSrc]) => {
+        // eslint-disable-next-line no-eval
+        const isRendered = eval(isRenderedSrc) as (el: Element) => boolean;
+        const visibleSelects = [...document.querySelectorAll("select")].filter(isRendered).length;
+        const flowFieldHeaderCount = [...document.querySelectorAll("h3")].filter(
+          (h) => (h.textContent || "").trim() === "Fields, validation, and binding" && isRendered(h),
+        ).length;
+        const flowFieldCardCount = document.querySelectorAll(".studio-flow-field-editor").length;
+        const flowFieldEditorsOpenByDefault = document.querySelectorAll(".studio-flow-field-editor__editor[open]").length;
+        return {
+          advancedHeightPx: document.body.scrollHeight,
+          visibleSelects,
+          flowFieldHeaderCount,
+          flowFieldCardCount,
+          flowFieldEditorsOpenByDefault,
+        };
+      }, [isRenderedFn] as const);
+
+      // Fix #5 (ADVANCED discipline): the pre-fix baseline on this exact
+      // seed was 9,497px; budget well under the task's 5,000px target.
+      expect(metrics.advancedHeightPx, "ADVANCED height budget (collapsed-by-default flow field editor)").toBeLessThan(5_000);
+
+      // Fix #5: the pre-fix baseline was 18 always-visible selects (4 flow
+      // actions x [4-5 Kind selects each]). One legitimate select remains on
+      // this seed regardless of this fix: the Stripe checkout product
+      // picker (`#checkoutProductId`), an ADVANCED sitemap/commerce control
+      // unrelated to the flow field editor and out of this fix's scope —
+      // budget with headroom above that honest floor, not zero.
+      expect(metrics.visibleSelects, "visible <select> budget (flow field editor collapsed by default)").toBeLessThan(6);
+
+      // Fix #5 (dedupe): exactly one "Fields, validation, and binding"
+      // header for the whole aggregate inspector, not one per flow action.
+      expect(metrics.flowFieldHeaderCount, "exactly one visible \"Fields, validation, and binding\" header").toBe(1);
+
+      // This seed's flow catalog (contact, purchase-request,
+      // checkout-handoff, newsletter) — every action still renders as its
+      // own compact card, just not one per header.
+      expect(metrics.flowFieldCardCount, "every flow action renders as a compact card").toBeGreaterThanOrEqual(4);
+      expect(metrics.flowFieldEditorsOpenByDefault, "no flow action's editor is pre-expanded").toBe(0);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("HOME's direct-edit panels are scoped to the active selection (dedupe)", async ({ page, request }) => {
+    const server = await startMuddyWithStagingSeed(request);
+    try {
+      await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "networkidle", timeout: 60_000 });
+      await page.waitForTimeout(1_500);
+
+      const metrics = await page.evaluate(([isRenderedSrc]) => {
+        // eslint-disable-next-line no-eval
+        const isRendered = eval(isRenderedSrc) as (el: Element) => boolean;
+        const panels = [...document.querySelectorAll("[data-studio-direct-edit-panel]")];
+        return {
+          totalPanels: panels.length,
+          visiblePanels: panels.filter(isRendered).length,
+          // The label's own textContent also picks up its sibling
+          // <textarea>'s value text (they share one <label> element — see
+          // panels/direct_edit_panel.go), so match the inner <span> alone,
+          // not the whole label.
+          visibleLabels: [...document.querySelectorAll("[data-studio-direct-edit-field] span")].filter(
+            (s) => /^selected content$/i.test((s.textContent || "").trim()) && isRendered(s),
+          ).length,
+        };
+      }, [isRenderedFn] as const);
+
+      // The host (editorDirectEditPanels) still composes all 5 (home:hero,
+      // about:content, and 3 contact:contact-links fields) unconditionally —
+      // this is the studio-side idempotence guard's job, not a host rewrite.
+      expect(metrics.totalPanels, "host still composes every target's direct-edit panel").toBeGreaterThanOrEqual(5);
+
+      // Fix #2: with no explicit canvas selection yet, only the
+      // first-composed target's panel(s) — home:hero, a single panel — are
+      // visible. The magnolia-3 re-score's baseline was 5 simultaneously
+      // visible "Selected content" forms.
+      expect(metrics.visiblePanels, "only the active selection's direct-edit panel(s) are visible").toBe(1);
+      expect(metrics.visibleLabels, "only one visible \"Selected content\" label").toBe(1);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("support-node panels share one consistent width", async ({ page, request }) => {
+    const server = await startMuddyWithStagingSeed(request);
+    try {
+      await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "networkidle", timeout: 60_000 });
+      await page.waitForTimeout(1_500);
+
+      const widths = await page.evaluate(() => {
+        const isRendered = (el: Element) => (el as HTMLElement).checkVisibility ? (el as HTMLElement).checkVisibility() : true;
+        return [...document.querySelectorAll("[data-studio-mode-gate-wrapper]")]
+          .filter(isRendered)
+          .map((el) => Math.round(el.getBoundingClientRect().width));
+      });
+
+      // Fix #1 (width system): the magnolia-3 re-score measured 483px
+      // (direct-edit stack) vs ~1182-1244px (Interactions) vs full-bleed
+      // elsewhere on HOME alone. Every visible support-node wrapper must now
+      // share one width (--size-studio-support-panel).
+      expect(widths.length, "at least one support-node panel is visible on HOME").toBeGreaterThan(0);
+      const distinct = [...new Set(widths)];
+      expect(distinct.length, `expected one consistent support-panel width, got ${JSON.stringify(widths)}`).toBe(1);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("the color-token/font style panel only renders in LOOK mode", async ({ page, request }) => {
+    const server = await startMuddyWithStagingSeed(request);
+    try {
+      await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "networkidle", timeout: 60_000 });
+      await page.waitForTimeout(1_500);
+
+      const isStylePanelVisible = () => page.evaluate(() => {
+        const panel = document.querySelector("[data-gosx-studio-style-panel]");
+        if (!panel) return false;
+        return (panel as HTMLElement).checkVisibility ? (panel as HTMLElement).checkVisibility() : true;
+      });
+
+      // Fix #3: previously composed with no data-studio-mode-panel at all,
+      // so it rendered unconditionally (confirmed live: visible under
+      // HOME/LOOK/PREVIEW/PUBLISH/ADVANCED alike before this fix).
+      expect(await isStylePanelVisible(), "style panel must be hidden on HOME").toBe(false);
+
+      await revealModeIfPresent(page, "look");
+      await page.waitForTimeout(500);
+      expect(await isStylePanelVisible(), "style panel must be visible on LOOK").toBe(true);
+
+      await revealModeIfPresent(page, "publish");
+      await page.waitForTimeout(500);
+      expect(await isStylePanelVisible(), "style panel must be hidden on PUBLISH").toBe(false);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  // Regression guard for the "one empty bordered box" root cause (see the
+  // file-level comment above): a mode-gated support panel far down the page
+  // must actually paint its own header text, not just have it present but
+  // unrendered in the DOM (content-visibility:auto's "skipped" state).
+  test("the Interactions panel actually paints its header text (content-visibility regression guard)", async ({ page, request }) => {
+    const server = await startMuddyWithStagingSeed(request);
+    try {
+      await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "networkidle", timeout: 60_000 });
+      await page.waitForTimeout(1_500);
+
+      const rendered = await page.evaluate(() => {
+        const h3 = [...document.querySelectorAll("h3")].find((h) => (h.textContent || "").trim() === "Interactions");
+        if (!h3) return { found: false };
+        return { found: true, innerText: (h3 as HTMLElement).innerText, textContent: h3.textContent };
+      });
+      expect(rendered.found, "an \"Interactions\" header must exist").toBe(true);
+      expect(rendered.textContent, "textContent must have the real copy").toBe("Interactions");
+      // innerText requires layout; it is empty when content-visibility:auto
+      // has skipped rendering this element's contents (the exact defect this
+      // guards against). A real fix keeps both in sync.
+      expect(rendered.innerText, "innerText must match textContent (not content-visibility-skipped)").toBe("Interactions");
     } finally {
       await server.stop();
     }
