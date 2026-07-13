@@ -376,6 +376,13 @@ func TestLifecycleInspectorFieldsExposeSubmitActions(t *testing.T) {
 	for _, check := range []string{
 		`data-studio-field-action-formaction="/admin/editor/__actions/publish"`,
 		`formaction="/admin/editor/__actions/publish"`,
+		// Shared-form validation hardening (mirrors panels/*_panel.go and
+		// panels/inspector_fields.go's Home field-row actions): this card
+		// action button has no form= attribute of its own (nests inside
+		// whatever <form> the caller wraps the field list in), so a hidden
+		// invalid control elsewhere in that ancestor form would otherwise
+		// silently cancel this submission.
+		`formnovalidate="formnovalidate"`,
 		`data-studio-submit-action="publish"`,
 		`data-admin-confirm="Publish this draft?"`,
 		`>Publish</button>`,

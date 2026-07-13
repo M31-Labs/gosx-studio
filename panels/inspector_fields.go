@@ -114,6 +114,30 @@ func renderHomeInspectorFieldActions(field map[string]any) []gosx.Node {
 				gosx.Attr("type", "submit"),
 				gosx.Attr("formaction", core.WorkbenchViewString(action, "formAction")),
 				gosx.Attr("formmethod", core.WorkbenchViewString(action, "formMethod")),
+				// This button submits the SHARED websiteEditorForm (every
+				// Home-mode field row renders inside that one <form>; every
+				// panel's fields — including ones currently hidden by
+				// mode-gating CSS — are "listed" constraint-validation
+				// candidates of it). Native HTML5 validation runs BEFORE the
+				// browser dispatches the form's "submit" event; if ANY
+				// control anywhere in the form is invalid, the browser
+				// silently cancels the submission with no submit event at
+				// all, regardless of which button was clicked. formnovalidate
+				// exempts THIS submission from that shared-form validation
+				// surface, mirroring every other workbench-form action button
+				// (Publish/Discard/Schedule in publish_panel.go, Restore in
+				// revision_history_panel.go, Save navigation in
+				// navigation_panel.go, Save checkout in checkout_panel.go,
+				// Publish flow in flow_designer_panel.go) — a Home field's
+				// formaction-driven action (e.g. a future "detach shared
+				// component"/"reset to default" button) must behave the same
+				// way or it would silently no-op whenever an unrelated hidden
+				// panel happens to carry an invalid value. Present
+				// unconditionally alongside formaction/formmethod above
+				// (which are also always rendered, gated only by the sibling
+				// hidden attribute below), so it costs nothing when
+				// hasFormAction is false.
+				gosx.Attr("formnovalidate", "formnovalidate"),
 				gosx.Attr("name", core.WorkbenchViewString(action, "name")),
 				gosx.Attr("value", inspectorFieldRawString(action, "value")),
 				gosx.Attr("data-admin-confirm", core.WorkbenchViewString(action, "confirm")),

@@ -1358,6 +1358,20 @@ func renderFieldAction(action FieldAction) gosx.Node {
 			gosx.Attr("class", className),
 			gosx.Attr("type", "submit"),
 			gosx.Attr("formaction", action.FormAction),
+			// This button submits a shared, ancestor-nested <form> (a card
+			// field action has no form= attribute of its own — it relies on
+			// DOM nesting inside whatever <form> the caller wraps the field
+			// list in). If that shared form has ANY invalid control anywhere
+			// in it — including one hidden by mode-gating CSS elsewhere in
+			// the panel stack — native HTML5 validation silently cancels
+			// this submission before the browser ever dispatches "submit",
+			// regardless of which button was clicked. formnovalidate exempts
+			// this action from that shared-form validation surface, mirroring
+			// every workbench-form action button in the panels package
+			// (Publish/Discard/Schedule, Restore, Save navigation, Save
+			// checkout, Publish flow — see panels/*_panel.go) and
+			// panels/inspector_fields.go's Home field-row actions.
+			gosx.Attr("formnovalidate", "formnovalidate"),
 			gosx.Attr("data-studio-field-action-formaction", action.FormAction),
 		}
 		if method := strings.TrimSpace(action.FormMethod); method != "" {

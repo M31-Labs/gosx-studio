@@ -343,6 +343,13 @@ func TestRenderInspectorFieldRowHomeVariantRendersCardActions(t *testing.T) {
 		`data-studio-field-action-formaction="/admin/editor/__actions/save"`,
 		`formaction="/admin/editor/__actions/save"`,
 		`formmethod="post"`,
+		// Edit-revert regression (Noni staging incident, handoff-24): this
+		// button submits the SHARED websiteEditorForm without its own form=
+		// attribute (relies on DOM nesting) — formnovalidate must be present
+		// or a hidden invalid control elsewhere in the form silently cancels
+		// the submission with no server round trip, indistinguishable from a
+		// revert.
+		`formnovalidate="formnovalidate"`,
 		`name="refresh"`,
 		`value="hero"`,
 		`data-admin-confirm="Refresh source?"`,
