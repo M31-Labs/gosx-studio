@@ -133,6 +133,11 @@ func RenderSiteMapAuthoringForms(siteMapView map[string]any, options SiteMapAuth
 	return sitemap.RenderSiteMapAuthoringForms(siteMapView, options)
 }
 
+// Deprecated: use sitemap.RenderSharedComponentPaletteForms.
+func RenderSharedComponentPaletteForms(siteMapView map[string]any, options SiteMapAuthoringFormsOptions) gosx.Node {
+	return sitemap.RenderSharedComponentPaletteForms(siteMapView, options)
+}
+
 // --- Site navigator panel (sitemap/site_navigator_panel.go) ---
 
 // Deprecated: use sitemap.SiteNavigatorItem.
