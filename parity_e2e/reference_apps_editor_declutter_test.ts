@@ -84,7 +84,8 @@ test.describe("@reference-apps Muddy/Noni editor declutter", () => {
       // Switch to a non-default mode/panel.
       await page.locator('[data-studio-mode-control="advanced"]').first().click();
       await expect(form).toHaveAttribute("data-studio-mode", "advanced");
-      await expect(page.locator("[data-studio-navigation-panel='true']").first()).toBeVisible();
+      const navigationPanel = page.locator("[data-studio-navigation-panel='true']").first();
+      await expect(navigationPanel).toBeVisible();
 
       // Select an object. Canvas click-to-select (selectionruntime) is a
       // separate, not-yet-wired concern (see this slice's report) — this
@@ -92,6 +93,18 @@ test.describe("@reference-apps Muddy/Noni editor declutter", () => {
       // data-studio-selection attribute selectionruntime would set, purely
       // to prove the working-state PERSISTENCE contract this slice adds.
       await form.evaluate((node) => node.setAttribute("data-studio-selection", "home:hero"));
+
+      // Make a real edit so the shared form is genuinely dirty. #12/#13 (UX
+      // wave 2A) made the primary Save button visible only while dirty (see
+      // hostruntime/assets/studio.css [data-gosx-studio-save-button-state]
+      // and state_runtime.js setState()) instead of a static always-on
+      // button — a synthetic data-studio-selection attribute alone (above)
+      // does not dirty the form, so type into a real, visible Advanced-mode
+      // field first, exactly like an operator would before saving.
+      const navigationField = navigationPanel.locator("input[type='text']").first();
+      await expect(navigationField).toBeVisible();
+      await navigationField.fill("Shop the collection");
+      await expect(page.locator("[data-gosx-studio-save-button]").first()).toBeVisible();
 
       // Save an edit: the toolbar's primary Save button submits the whole
       // shared workbench form via a real (unintercepted) POST to the editor

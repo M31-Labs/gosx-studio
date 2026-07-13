@@ -257,11 +257,11 @@
       return {};
     }
 
-    function clearPreviewSelections() {
+    function clearPreviewSelections(options) {
       if (typeof window.__gosx_preview_runtime_island_clearSelections !== "function") return null;
       return window.__gosx_preview_runtime_island_clearSelections(form, {
         finishInlineTextEdit: finishInlineTextEdit
-      }) || null;
+      }, options) || null;
     }
 
     function emitPreviewDockAction(action, detail) {
@@ -1061,7 +1061,11 @@
       } else if (event.key === "Escape" && form.getAttribute("data-studio-focus") === "true") {
         setFocus(false, "keyboard");
       } else if (event.key === "Escape" && form.querySelector("[data-gosx-studio-preview-dock]:not([hidden])")) {
-        clearPreviewSelections();
+        // #5 — Escape cancels an in-progress inline edit rather than
+        // committing it (clearEditorPreviewSelections defaults to committing,
+        // which is correct when moving to a NEW selection, but Escape is a
+        // cancel gesture, not a navigation — it must revert instead).
+        clearPreviewSelections({ commit: false });
         dispatchPreviewSelectionClear("keyboard-escape");
       }
     });

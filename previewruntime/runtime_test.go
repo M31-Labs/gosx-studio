@@ -914,12 +914,19 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionClearHelper(t *testing.
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`window.__gosx_preview_runtime_island_clearSelections = function (form, host)`,
-		`return clearEditorPreviewSelections(form, host);`,
-		`function clearEditorPreviewSelections(form, host)`,
+		`window.__gosx_preview_runtime_island_clearSelections = function (form, host, options)`,
+		`return clearEditorPreviewSelections(form, host, options);`,
+		`function clearEditorPreviewSelections(form, host, options)`,
+		// #5 — Escape must cancel an in-progress inline edit, not commit it.
+		// options.commit defaults to true (the "move to a new selection"
+		// caller below still legitimately commits the prior edit); the
+		// keyboard-Escape caller (hostruntime/assets/workbench_runtime.js)
+		// passes { commit: false } so cancelling reverts instead.
+		`var commit = options.commit !== false`,
+		`var reason = commit ? "clear-selection" : "escape"`,
 		`if (!form) return { handled: false, frames: 0, fieldMaps: 0, markers: 0, chrome: null, docks: null }`,
 		`var frames = editorPreviewFrames(form)`,
-		`editorPreviewHostCall(host, "finishInlineTextEdit", null, frame, true, "clear-selection")`,
+		`editorPreviewHostCall(host, "finishInlineTextEdit", null, frame, commit, reason)`,
 		`var fieldMap = clearEditorPreviewFieldMap(frame)`,
 		`var marker = clearEditorPreviewSelectionMarker(frame)`,
 		`fieldMaps += fieldMap && fieldMap.count ? fieldMap.count : 0`,
@@ -936,8 +943,9 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionClearHelper(t *testing.
 	clearBody := islandJSFunctionBody(t, body, "clearEditorPreviewSelections")
 	for _, ordered := range [][]string{
 		{
+			`var commit = options.commit !== false`,
 			`var frames = editorPreviewFrames(form)`,
-			`editorPreviewHostCall(host, "finishInlineTextEdit", null, frame, true, "clear-selection")`,
+			`editorPreviewHostCall(host, "finishInlineTextEdit", null, frame, commit, reason)`,
 			`var fieldMap = clearEditorPreviewFieldMap(frame)`,
 			`var marker = clearEditorPreviewSelectionMarker(frame)`,
 			`var chrome = clearEditorPreviewSelectionChrome(form)`,
@@ -963,6 +971,30 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionClearHelper(t *testing.
 		if strings.Contains(body, forbidden) {
 			t.Fatalf("IslandRuntimeJS() must use clear selection helper without retired event boundary; found %q", forbidden)
 		}
+	}
+}
+
+// TestPreviewRuntimeIslandJSClearSelectionsCommitDefaultsTrue verifies the #5
+// fix: clearEditorPreviewSelections defaults to committing an in-progress
+// inline edit (the "moving to a new selection" caller,
+// applyEditorPreviewSelectionSync, must keep committing the prior edit
+// unchanged) and only cancels/reverts when a caller explicitly passes
+// { commit: false } — the keyboard-Escape path.
+func TestPreviewRuntimeIslandJSClearSelectionsCommitDefaultsTrue(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	clearBody := islandJSFunctionBody(t, body, "clearEditorPreviewSelections")
+	for _, fragment := range []string{
+		`options = options || {}`,
+		`var commit = options.commit !== false`,
+	} {
+		if !strings.Contains(clearBody, fragment) {
+			t.Fatalf("clearEditorPreviewSelections missing commit-default fragment %q in:\n%s", fragment, clearBody)
+		}
+	}
+	// The "apply a new selection" caller must NOT pass a third argument, so it
+	// keeps the default (commit) behavior unchanged.
+	if !strings.Contains(body, `var cleared = clearEditorPreviewSelections(form, host)`) {
+		t.Fatalf("applyEditorPreviewSelectionSync must call clearEditorPreviewSelections(form, host) with no options override:\n%s", body)
 	}
 }
 

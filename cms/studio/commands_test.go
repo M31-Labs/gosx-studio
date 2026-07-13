@@ -69,6 +69,7 @@ func TestStudioCommandsBuildsDefaultBlocksAndFlows(t *testing.T) {
 			},
 		},
 		Blocks: []CommandBlock{{Key: "hero", Label: "Hero", Summary: "Homepage hero"}},
+		Pages:  []CommandPage{{Key: "landing", Label: "Landing page", Summary: "Hero, story, and a direct next step."}},
 		Flows: []CommandFlow{{
 			Key:            "schedule-tour",
 			Label:          "Schedule tour",
@@ -85,7 +86,7 @@ func TestStudioCommandsBuildsDefaultBlocksAndFlows(t *testing.T) {
 	for _, command := range commands {
 		byKey[command.Key] = command
 	}
-	for _, key := range []string{"save", "undo", "redo", "toggle-layers", "mode-structure", "viewport-desktop", "zoom-fit", "canvas-fit", "canvas-open-selected", "canvas-nudge-left", "open-public", "selection-reveal", "insert-hero", "media", "open-flow-schedule-tour", "insert-flow-schedule-tour"} {
+	for _, key := range []string{"save", "undo", "redo", "toggle-layers", "mode-structure", "viewport-desktop", "zoom-fit", "canvas-fit", "canvas-open-selected", "canvas-nudge-left", "open-public", "selection-reveal", "insert-hero", "new-page-landing", "media", "open-flow-schedule-tour", "insert-flow-schedule-tour"} {
 		if byKey[key].Key == "" {
 			t.Fatalf("expected command %q in %#v", key, commands)
 		}
@@ -93,6 +94,21 @@ func TestStudioCommandsBuildsDefaultBlocksAndFlows(t *testing.T) {
 	if byKey["save"].Label != "Save checkpoint" || byKey["open-public"].Label != "Open public site" || byKey["undo"].Kind != CommandHistory || byKey["redo"].Shortcut != "Ctrl Shift Z" || byKey["canvas-fit"].Kind != CommandCanvas || byKey["canvas-open-selected"].Target != "open-selected" || byKey["insert-hero"].Kind != CommandInsert || byKey["open-flow-schedule-tour"].Href == "" || byKey["insert-flow-schedule-tour"].Target != "tour-form" {
 		t.Fatalf("unexpected generated commands: %#v", byKey)
 	}
+	if byKey["new-page-landing"].Kind != CommandInsert || byKey["new-page-landing"].Label != "New page: Landing page" || byKey["new-page-landing"].Target != "page-landing" || byKey["new-page-landing"].Group != "Pages" {
+		t.Fatalf("unexpected new-page command: %#v", byKey["new-page-landing"])
+	}
+	if !containsString(byKey["new-page-landing"].Keywords, "new page") {
+		t.Fatalf("expected new-page command to be findable by searching \"new page\", got keywords %#v", byKey["new-page-landing"].Keywords)
+	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestShellActionCommandsBuildLinks(t *testing.T) {

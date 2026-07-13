@@ -72,7 +72,29 @@ func RenderAdvancedPanelSegments(view map[string]any, options AdvancedPanelOptio
 	}
 }
 
+// advancedPanelGroupViewHasNoContent reports whether an Advanced group's view
+// carries nothing worth rendering: no kicker/title, no explicit empty-state
+// copy, and no real content of its own. The shell (RenderBackendEditorWorkbenchPanelStack)
+// always default-renders every Advanced group even when its caller never
+// wired real data for it (e.g. Noni only implements a subset of
+// flows/tools/schema/schedule/typography/settings); without this guard that
+// produced a full card shell (header + a truly blank <p class="empty">) for
+// every unwired group — the #14 "empty dead-zone card" below Page details.
+func advancedPanelGroupViewHasNoContent(view map[string]any, hasRealContent bool) bool {
+	if hasRealContent {
+		return false
+	}
+	return core.WorkbenchViewString(view, "kicker") == "" &&
+		core.WorkbenchViewString(view, "title") == "" &&
+		core.WorkbenchViewString(view, "empty") == ""
+}
+
 func RenderAdvancedToolsPanel(view map[string]any, options AdvancedToolsPanelOptions) gosx.Node {
+	items := core.WorkbenchViewMapList(view, "items")
+	adapters := core.WorkbenchViewMapList(view, "adapters")
+	if advancedPanelGroupViewHasNoContent(view, len(items) > 0 || core.WorkbenchViewBool(view, "hasItems") || len(adapters) > 0 || core.WorkbenchViewBool(view, "hasAdapters")) {
+		return gosx.Fragment()
+	}
 	attrs := []any{
 		gosx.Attr("class", core.WorkbenchViewString(view, "class")),
 		gosx.Attr("data-panel-key", core.WorkbenchViewString(view, "key")),
@@ -90,7 +112,6 @@ func RenderAdvancedToolsPanel(view map[string]any, options AdvancedToolsPanelOpt
 		),
 		renderAdvancedToolsResources(view),
 	}
-	items := core.WorkbenchViewMapList(view, "items")
 	if len(items) == 0 && !core.WorkbenchViewBool(view, "hasItems") {
 		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(core.WorkbenchViewString(view, "empty"))))
 	}
@@ -101,6 +122,11 @@ func RenderAdvancedToolsPanel(view map[string]any, options AdvancedToolsPanelOpt
 }
 
 func RenderAdvancedFieldPanel(view map[string]any, options AdvancedFieldPanelOptions) gosx.Node {
+	fieldList, hasFieldList := view["fieldList"].(gosx.Node)
+	hasRealFieldList := hasFieldList && !core.WorkbenchNodeEmpty(fieldList) && core.WorkbenchViewBool(view, "hasFields")
+	if advancedPanelGroupViewHasNoContent(view, hasRealFieldList) {
+		return gosx.Fragment()
+	}
 	attrs := []any{
 		gosx.Attr("class", core.WorkbenchViewString(view, "class")),
 		gosx.Attr("data-panel-key", core.WorkbenchViewString(view, "key")),
@@ -117,8 +143,7 @@ func RenderAdvancedFieldPanel(view map[string]any, options AdvancedFieldPanelOpt
 			gosx.El("h2", nil, gosx.Text(core.WorkbenchViewString(view, "title"))),
 		),
 	}
-	fieldList, ok := view["fieldList"].(gosx.Node)
-	if !ok || core.WorkbenchNodeEmpty(fieldList) || !core.WorkbenchViewBool(view, "hasFields") {
+	if !hasRealFieldList {
 		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(core.WorkbenchViewString(view, "empty"))))
 	} else {
 		children = append(children, fieldList)
@@ -127,6 +152,13 @@ func RenderAdvancedFieldPanel(view map[string]any, options AdvancedFieldPanelOpt
 }
 
 func RenderAdvancedSettingsPanel(view map[string]any, options AdvancedSettingsPanelOptions) gosx.Node {
+	fieldList, hasFieldList := view["fieldList"].(gosx.Node)
+	hasRealFieldList := hasFieldList && !core.WorkbenchNodeEmpty(fieldList) && core.WorkbenchViewBool(view, "hasFields")
+	hasSummary := core.WorkbenchViewString(view, "summary") != ""
+	hasStatusCards := len(core.WorkbenchViewMapList(view, "statusCards")) > 0
+	if advancedPanelGroupViewHasNoContent(view, hasRealFieldList || hasSummary || hasStatusCards) {
+		return gosx.Fragment()
+	}
 	attrs := []any{
 		gosx.Attr("class", core.WorkbenchViewString(view, "class")),
 		gosx.Attr("data-panel-key", core.WorkbenchViewString(view, "key")),
@@ -143,11 +175,10 @@ func RenderAdvancedSettingsPanel(view map[string]any, options AdvancedSettingsPa
 			gosx.El("h2", nil, gosx.Text(core.WorkbenchViewString(view, "title"))),
 		),
 	}
-	if summary := core.WorkbenchViewString(view, "summary"); summary != "" {
-		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "studio-advanced-settings-panel__summary")), gosx.Text(summary)))
+	if hasSummary {
+		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "studio-advanced-settings-panel__summary")), gosx.Text(core.WorkbenchViewString(view, "summary"))))
 	}
-	fieldList, ok := view["fieldList"].(gosx.Node)
-	if ok && !core.WorkbenchNodeEmpty(fieldList) && core.WorkbenchViewBool(view, "hasFields") {
+	if hasRealFieldList {
 		children = append(children, fieldList)
 	} else {
 		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(core.WorkbenchViewString(view, "empty"))))
@@ -247,6 +278,15 @@ func renderAdvancedPanelGroups(view map[string]any, groups []map[string]any) gos
 
 func renderAdvancedPanelGroupSlot(group map[string]any, groupNodes map[string]gosx.Node) gosx.Node {
 	key := core.WorkbenchViewString(group, "key")
+	body := renderAdvancedPanelGroupNode(key, groupNodes)
+	// #14 — a group with no hosted content (no GroupNodes entry, or a caller
+	// default-rendered panel with nothing to show) used to still emit a full
+	// card shell (header + empty body div), leaving a blank ~500px dead zone
+	// below "Page details" every session. Render nothing for that group
+	// instead of an empty card.
+	if core.WorkbenchNodeEmpty(body) {
+		return gosx.Fragment()
+	}
 	children := []gosx.Node{
 		gosx.El("header", nil,
 			gosx.El("h3", nil, gosx.Text(core.WorkbenchViewString(group, "label"))),
@@ -255,7 +295,7 @@ func renderAdvancedPanelGroupSlot(group map[string]any, groupNodes map[string]go
 		gosx.El("div", gosx.Attrs(
 			gosx.Attr("class", "studio-advanced-panel__group-body"),
 			gosx.Attr("data-studio-advanced-group-body", key),
-		), renderAdvancedPanelGroupNode(key, groupNodes)),
+		), body),
 	}
 	return gosx.El("section", gosx.Attrs(advancedPanelGroupSlotAttrs(group)...), gosx.Fragment(children...))
 }

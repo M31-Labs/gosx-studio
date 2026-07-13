@@ -211,6 +211,98 @@ test.describe("@reference-apps canvas2d site-map WASM-free inline-edit loop", ()
       await server.stop();
     }
   });
+
+  // #5 (UX wave 2A) — Escape must cancel a canvas inline edit instead of
+  // silently persisting it on the next blur. Before the fix,
+  // inlineeditruntime/island_runtime.js's install() had no Escape handling at
+  // all, so nothing reverted the DOM and a later blur committed the typed
+  // text via a real POST — a silent-commit trust wound. This proves: (1) no
+  // authoring POST fires for the duration of the Escape press, (2) the
+  // surface text reverts to the pre-edit value, and (3) a reload still shows
+  // the ORIGINAL seeded headline, proving nothing reached the store.
+  test("Muddy/Noni wasm-free: Escape cancels an inline edit — reverts the value and never POSTs", async ({ page, request }) => {
+    const consoleErrors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(message.text());
+    });
+    page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
+
+    const marker = `M2 escape cancel ${Date.now()} ${Math.random().toString(36).slice(2, 10)}`;
+    let authoringPostSeen = false;
+
+    const server = await startMuddyCanvasHTMLSurface(request);
+    try {
+      await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await revealModeIfPresent(page, "advanced");
+
+      const canvas = page.locator(CANVAS_SELECTOR).first();
+      await expect(canvas).toBeAttached({ timeout: 30_000 });
+      await page.waitForFunction(() => {
+        const w = window as unknown as Record<string, unknown>;
+        const inlineEdit = w.GoSXStudioCanvasInlineEditRuntime as { install?: unknown } | undefined;
+        return !!inlineEdit && typeof inlineEdit.install === "function";
+      }, null, { timeout: 120_000 });
+
+      const overlayHero = page.locator(OVERLAY_HERO).first();
+      await expect(overlayHero).toBeAttached({ timeout: 60_000 });
+      const editable = page.locator(EDITABLE_HERO).first();
+      await expect(editable).toBeAttached({ timeout: 30_000 });
+      await expect(editable).toBeVisible({ timeout: 30_000 });
+
+      const seedText = (await editableText(page)).trim();
+      expect(marker, "the per-run marker must differ from the seeded headline").not.toBe(seedText);
+
+      // Any authoring POST during this test would prove the silent-commit
+      // regression; watch for the entire window the edit is in progress.
+      page.on("request", (req) => {
+        if (req.url().includes(AUTHORING_ROUTE) && req.method() === "POST") authoringPostSeen = true;
+      });
+
+      await editable.click();
+      await pollForSelectedNode(page, "page:home");
+      await editable.click();
+      await page.waitForFunction((sel) => {
+        const el = document.querySelector(sel);
+        return !!el && document.activeElement === el;
+      }, EDITABLE_HERO, { timeout: 10_000 });
+      await page.keyboard.press("ControlOrMeta+A");
+      await page.keyboard.type(marker, { delay: 8 });
+
+      const typed = await pollForEditableText(page, marker);
+      expect(typed, `typed marker must land before Escape; got=${JSON.stringify(typed)}`).toContain(marker);
+
+      await page.keyboard.press("Escape");
+      // Give any (incorrect) trailing commit a full beat to fire before
+      // asserting its absence — this must stay a negative result.
+      await page.waitForTimeout(500);
+
+      const reverted = await editableText(page);
+      expect(
+        reverted.trim(),
+        `Escape must revert the surface text to its pre-edit value; seed=${JSON.stringify(seedText)}, got=${JSON.stringify(reverted)}`,
+      ).toBe(seedText);
+
+      expect(authoringPostSeen, "Escape must never POST the cancelled value to the authoring route").toBe(false);
+
+      // Reload and confirm the store itself was never touched — the
+      // strongest possible proof no silent commit reached the server.
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
+      await revealModeIfPresent(page, "advanced");
+      const reloadedEditable = page.locator(EDITABLE_HERO).first();
+      await expect(reloadedEditable).toBeAttached({ timeout: 90_000 });
+      const afterReload = await pollForEditableText(page, seedText);
+      expect(
+        afterReload,
+        `reload must still show the original seeded headline, not the cancelled marker; got=${JSON.stringify(afterReload)}`,
+      ).toContain(seedText);
+      expect(afterReload).not.toContain(marker);
+
+      const clientErrors = consoleErrors.filter((line) => /canvas|sitemap|site-map|painter|wasm-free|inline-edit|GoSXStudioSiteMapRuntime/i.test(line) && !/relay\.js/i.test(line));
+      expect(clientErrors, `unexpected WASM-free client console errors: ${JSON.stringify(clientErrors)}`).toEqual([]);
+    } finally {
+      await server.stop();
+    }
+  });
 });
 
 async function readSelectedNode(page: Page): Promise<string | null> {

@@ -2471,6 +2471,359 @@ html[data-gosx-studio-preview-selectable] [data-gosx-studio-preview-tab-stop]:fo
 .studio-visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 @media (prefers-reduced-motion: reduce) { .studio-remote-cursor { transition: none; } }
 
+/* ---------------------------------------------------------------------- *
+ * UX wave 2A (studio-surface quick wins)
+ * ---------------------------------------------------------------------- */
+
+/* #1 — responsive layout inspector had zero CSS: it rendered as a raw stack
+   of native <select>/<button> block elements with no width constraint,
+   producing thousands of px of unstyled dead space below the canvas.
+   Matches the existing rail-card conventions (border/radius/background from
+   .studio-home-inspector__target etc.) and compacts each property control
+   into a couple of wrapped flex rows instead of 5-6 stacked block rows. */
+[data-studio-responsive-layout-inspector] {
+  display: grid;
+  gap: var(--space-xs);
+  width: 100%;
+  max-width: 56rem;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-canvas-soft) 78%, transparent);
+}
+
+[data-studio-responsive-layout-inspector] > header {
+  display: grid;
+  gap: 0.25rem;
+}
+
+[data-studio-responsive-layout-inspector] > header h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+
+[data-studio-responsive-layout-inspector] > header p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+[data-studio-responsive-layout-inspector] details {
+  border: 1px solid color-mix(in srgb, var(--color-line) 78%, transparent);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-canvas) 60%, transparent);
+  overflow: hidden;
+}
+
+[data-studio-responsive-layout-inspector] summary {
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+}
+
+[data-studio-responsive-layout-inspector] details > form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.5rem;
+  row-gap: 0.15rem;
+  padding: 0.3rem 0.75rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-line) 60%, transparent);
+  line-height: 1.2;
+}
+
+[data-studio-responsive-layout-inspector] details > form label {
+  flex: 0 1 auto;
+  min-width: 5.5rem;
+  font-size: var(--text-xs);
+  color: var(--color-ink-soft);
+  white-space: nowrap;
+}
+
+[data-studio-responsive-layout-inspector] details > form select {
+  flex: 0 0 auto;
+  min-width: 6rem;
+  min-height: 1.5rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  padding: 0.05rem 0.3rem;
+  font-size: var(--text-xs);
+}
+
+[data-studio-responsive-layout-inspector] details > form output {
+  flex: 0 1 auto;
+  min-width: 6rem;
+  font-size: 0.7rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+[data-studio-responsive-layout-inspector] details > form button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.35rem;
+  padding: 0 0.45rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink-soft);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+[data-studio-responsive-layout-inspector] details > form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+[data-studio-responsive-layout-inspector] [data-studio-layout-history] {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 0.3rem;
+}
+
+/* #1 — brand color token rows (LOOK panel swatches) rendered as raw inline
+   <span> chips with no size/gap CSS at all. */
+.theme-swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.theme-swatch {
+  display: inline-block;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-canvas) 60%, transparent) inset;
+}
+
+/* #1 — harden the HOME inspector's caller-supplied field-list wrapper so it
+   stays styled even when the host omits the "class" view key (the SSR
+   contract keeps class="" a valid empty-input state — see
+   TestRenderHomeInspectorPanelMinimalKeepsRootAndFields — so we key off the
+   stable data attribute instead of relying on the class string). */
+[data-studio-home-fields-panel] {
+  display: grid;
+  gap: 0.55rem;
+}
+
+/* #5/#12/#13 — one save indicator: the primary Save button is a real <form>
+   submit control (works with no JS), but once gosxstudio:state_runtime.js
+   binds it flips data-gosx-studio-save-button-state on every state change
+   (see hostruntime/assets/state_runtime.js setState()). Hide it once that
+   runtime confirms nothing is dirty so the top bar never shows a static
+   "Saved" indicator sitting next to an always-on "Save changes" button. */
+[data-gosx-studio-save-button][data-gosx-studio-save-button-state="saved"] {
+  display: none;
+}
+
+/* #15 — LOOK scope-card values ("SYSTEM muddy-no…", "DEFAU…") clipped with no
+   min-width/overflow handling. Give each cell room to breathe and truncate
+   politely instead of hard-wrapping/clipping mid-word; the title attribute
+   (see panels/look_panel.go renderLookScopeField) carries the full value. */
+.studio-style-scope__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: var(--space-xs);
+}
+
+.studio-style-scope__grid > span {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.studio-style-scope__grid output {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* #16 — "SHOW IN NAVIGATIONPOSITION": the visibility toggle and the position
+   number field ran together on one line with no separating structure. */
+.studio-navigation-panel__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  margin-top: 0.35rem;
+}
+
+.studio-navigation-panel__toggle,
+.studio-navigation-panel__order {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--text-xs);
+  color: var(--color-ink-soft);
+}
+
+.studio-navigation-panel__order input {
+  width: 4rem;
+}
+
+/* #1 — the brand color-palette/font editor (panels/style_panel.go
+   RenderStylePanel) is the "raw brand color token rows" the review called
+   out: one completely unstyled <div> per token (label + native color swatch
+   + hex mirror + Reset), each falling back to full block-level stacking. */
+[data-gosx-studio-style-panel] {
+  display: grid;
+  gap: 0.4rem;
+  max-width: 40rem;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-canvas-soft) 78%, transparent);
+}
+
+[data-gosx-studio-style-panel] form {
+  display: grid;
+  gap: 0.3rem;
+}
+
+[data-gosx-studio-style-color-row],
+[data-gosx-studio-style-font-row] {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+[data-gosx-studio-style-color-row] label,
+[data-gosx-studio-style-font-row] label {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  font-size: var(--text-xs);
+}
+
+[data-gosx-studio-style-color-row] label span,
+[data-gosx-studio-style-font-row] label span {
+  flex: 0 0 6.5rem;
+  color: var(--color-ink-soft);
+}
+
+[data-gosx-studio-style-color-row] input[type="color"] {
+  flex: 0 0 auto;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  background: none;
+}
+
+[data-gosx-studio-style-color-row] input[type="text"],
+[data-gosx-studio-style-font-row] input[type="text"],
+[data-gosx-studio-style-font-row] input[type="url"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  padding: 0.2rem 0.4rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+[data-gosx-studio-style-color-row] button,
+[data-gosx-studio-style-panel] > button {
+  flex: 0 0 auto;
+  min-height: 1.5rem;
+  padding: 0 0.55rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink-soft);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+[data-gosx-studio-style-fonts] {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.2rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-line);
+}
+
+/* #1 — the direct-edit fallback form (panels/direct_edit_panel.go) has no
+   class/host-stable data attribute on its own <form> root (its id is
+   caller-supplied and may repeat across selected targets), so key off the
+   one child every instance carries. Was raw block-stacked
+   label/textarea/readout/Save/Cancel/Undo/Redo — several of these render at
+   once (one per selected canvas target), compounding the HOME dead space. */
+form:has(> [data-studio-direct-edit-field]) {
+  display: grid;
+  gap: 0.4rem;
+  max-width: 40rem;
+  margin-bottom: var(--space-xs);
+  padding: var(--space-sm);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-canvas-soft) 78%, transparent);
+}
+
+[data-studio-direct-edit-field] {
+  display: grid;
+  gap: 0.25rem;
+}
+
+[data-studio-direct-edit-field] span {
+  color: var(--color-ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+[data-studio-direct-edit-field] textarea {
+  min-height: 3.2rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  padding: 0.5rem 0.6rem;
+  font: inherit;
+  resize: vertical;
+}
+
+[data-studio-style-readout] {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
+form:has(> [data-studio-direct-edit-field]) > button {
+  display: inline-flex;
+  min-height: 1.6rem;
+  margin-right: 0.35rem;
+  justify-self: start;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  padding: 0 0.6rem;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+[data-studio-durable-history] {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
 /* No-code interactions (reveal-on-scroll, hover-focus-state). These rules
    render on the published/preview page, driven only by the fixed
    data-gosx-interaction* attribute contract core.Interaction.RenderAttrs
@@ -2551,3 +2904,4 @@ html[data-gosx-studio-preview-selectable] [data-gosx-studio-preview-tab-stop]:fo
     transform: none;
   }
 }
+

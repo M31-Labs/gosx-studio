@@ -97,6 +97,34 @@ func TestInlineEditRuntimeCommitBehavior(t *testing.T) {
 	}
 }
 
+// TestInlineEditRuntimeEscapeCancelsWithoutCommit verifies the #5 fix: Escape
+// during a direct canvas-surface inline edit reverts the in-progress value to
+// its pre-edit baseline and ends editing WITHOUT going through commit() (no
+// POST), unlike Enter/blur which intentionally still commit.
+func TestInlineEditRuntimeEscapeCancelsWithoutCommit(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"function cancelEdit(el)",
+		`if (ev.key === "Escape") {`,
+		"cancelEdit(el);",
+		"var original = startOf(el);",
+		"if (original === undefined) return;",
+		"if (textOf(el) !== original) el.textContent = original;",
+		"clearStart(el);",
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() missing Escape-cancel fragment %q:\n%s", fragment, body)
+		}
+	}
+	// Escape must be handled ahead of the Enter-commit branch in the same
+	// keydown listener, and must return before falling into it.
+	escapeIndex := strings.Index(body, `if (ev.key === "Escape") {`)
+	enterIndex := strings.Index(body, `if (ev.key !== "Enter" || ev.shiftKey === true) return;`)
+	if escapeIndex < 0 || enterIndex < 0 || escapeIndex >= enterIndex {
+		t.Fatalf("InlineEditRuntimeScript() must check Escape before the Enter-commit guard in install()'s keydown listener:\n%s", body)
+	}
+}
+
 // TestInlineEditRuntimePOSTBody verifies the expected form field names that
 // mirror the server's AuthoringMutationFromForm contract.
 func TestInlineEditRuntimePOSTBody(t *testing.T) {

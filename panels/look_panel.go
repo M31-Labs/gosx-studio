@@ -172,6 +172,13 @@ func renderLookScopeField(label, value, attr string) gosx.Node {
 	if attr != "" {
 		attrs = append(attrs, gosx.Attr(attr, "true"))
 	}
+	// #15 — long scope values ("SYSTEM muddy-no…", "DEFAU…") clip under the
+	// grid's min-width + ellipsis truncation (see studio.css
+	// .studio-style-scope__grid output); a title tooltip keeps the full value
+	// discoverable on hover/focus without widening the card.
+	if value != "" {
+		attrs = append(attrs, gosx.Attr("title", value))
+	}
 	return gosx.El("span", nil,
 		gosx.El("small", nil, gosx.Text(label)),
 		gosx.El("output", gosx.Attrs(attrs...), gosx.Text(value)),

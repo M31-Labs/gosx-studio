@@ -11,6 +11,12 @@ type HomeInspectorPanelOptions struct {
 }
 
 func RenderHomeInspectorPanel(view map[string]any, contentFields map[string]any, options HomeInspectorPanelOptions) gosx.Node {
+	// #12/#13 — one save-state vocabulary: default to "Saved"/"Unsaved
+	// changes" (matching shell/workbench_toolbar.go's top-bar save status)
+	// rather than leaving this caller-supplied label blank when the host
+	// omits it, so the right rail never invents its own word (e.g. "Ready")
+	// for the same concept the top bar calls "Saved".
+	cleanLabel := core.FirstNonEmpty(core.WorkbenchViewString(view, "cleanLabel"), "Saved")
 	return gosx.El("section", gosx.Attrs(homeInspectorPanelRootAttrs(view, options.RootAttrs)...),
 		gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-home-inspector__head")),
 			gosx.El("div", nil,
@@ -19,8 +25,8 @@ func RenderHomeInspectorPanel(view map[string]any, contentFields map[string]any,
 			),
 			gosx.El("output", gosx.Attrs(
 				gosx.Attr("class", "studio-home-inspector__state"),
-				gosx.Attr("data-studio-inspector-state", core.WorkbenchViewString(view, "cleanLabel")),
-			), gosx.Text(core.WorkbenchViewString(view, "cleanLabel"))),
+				gosx.Attr("data-studio-inspector-state", cleanLabel),
+			), gosx.Text(cleanLabel)),
 			gosx.El("label", gosx.Attrs(
 				gosx.Attr("class", "studio-home-inspector__close"),
 				gosx.Attr("for", "studioSiteMapInspectorFocus"),
@@ -47,8 +53,8 @@ func homeInspectorPanelRootAttrs(view map[string]any, rootAttrs map[string]any) 
 		gosx.Attr("data-studio-engine-source", "gosx"),
 		gosx.Attr("data-studio-inspector-group-active", core.WorkbenchViewString(view, "defaultGroupKey")),
 		gosx.Attr("data-studio-inspector-dirty", "false"),
-		gosx.Attr("data-studio-inspector-clean-label", core.WorkbenchViewString(view, "cleanLabel")),
-		gosx.Attr("data-studio-inspector-dirty-label", core.WorkbenchViewString(view, "dirtyLabel")),
+		gosx.Attr("data-studio-inspector-clean-label", core.FirstNonEmpty(core.WorkbenchViewString(view, "cleanLabel"), "Saved")),
+		gosx.Attr("data-studio-inspector-dirty-label", core.FirstNonEmpty(core.WorkbenchViewString(view, "dirtyLabel"), "Unsaved changes")),
 		gosx.Attr("data-gosx-studio-home-inspector-panel-renderer", "gosx-studio"),
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, rootAttrs)

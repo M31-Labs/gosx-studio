@@ -541,6 +541,24 @@
       else if (fallbackEl === el) { fallbackEl = null; fallbackStart = ""; }
     }
 
+    // cancelEdit reverts el's in-progress text back to the value captured at
+    // focusin (a no-op if it was never focused) and ends the edit without
+    // committing. Escape must never persist a change (see #5: it silently
+    // committed via the trailing blur → commit() before this fix). Clearing
+    // the baseline before blur means the subsequent focusout's commit() sees
+    // "never focused / already committed" and is a guaranteed no-op even if a
+    // caller's own blur handling races this one. Blurring afterward exits
+    // edit mode and returns focus/selection to their pre-edit state without
+    // this module touching any host-owned "selected canvas object" state.
+    function cancelEdit(el) {
+      if (!el) return;
+      var original = startOf(el);
+      if (original === undefined) return; // never focused — nothing to cancel
+      if (textOf(el) !== original) el.textContent = original;
+      clearStart(el);
+      if (typeof el.blur === "function") el.blur();
+    }
+
     // commit persists el's current text if it differs from the captured start.
     // After a commit the new value becomes the baseline so the Enter→blur
     // sequence cannot double-POST the same value.
@@ -614,9 +632,18 @@
     });
 
     root.addEventListener("keydown", function (ev) {
-      if (ev.key !== "Enter" || ev.shiftKey === true) return;
       var el = editableField(ev.target, root);
       if (!el) return;
+      // #5 — Escape cancels the in-progress edit: revert to the pre-edit
+      // value and end editing WITHOUT committing (previously nothing handled
+      // Escape here, so the typed text silently persisted on the next blur —
+      // "Escape doesn't cancel an inline edit" / a silent-commit trust wound).
+      if (ev.key === "Escape") {
+        if (typeof ev.preventDefault === "function") ev.preventDefault();
+        cancelEdit(el);
+        return;
+      }
+      if (ev.key !== "Enter" || ev.shiftKey === true) return;
       // Single-line field: Enter commits rather than inserting a newline.
       if (typeof ev.preventDefault === "function") ev.preventDefault();
       if (typeof el.blur === "function") el.blur(); // blur → focusout → commit()

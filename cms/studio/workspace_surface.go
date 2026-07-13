@@ -30,7 +30,12 @@ type WorkspaceSurfaceOptions struct {
 
 func BuildWorkspaceSurface(workspace workbench.Workspace, options WorkspaceSurfaceOptions) WorkspaceSurface {
 	homeKey := normalizeKey(firstNonEmpty(options.HomeKey, "home"))
-	homeLabel := firstNonEmpty(strings.TrimSpace(options.HomeLabel), "Home")
+	// #17 — this nav item links out to the canvas editor (HomeHref defaults to
+	// "/admin/editor"), and it sits in the same backend admin nav as the
+	// Pages resource, whose own list can include an actual page record titled
+	// "Home page". A bare "Home" label next to "Home page" reads as two
+	// entries for the same thing; disambiguate the canvas-root shortcut.
+	homeLabel := firstNonEmpty(strings.TrimSpace(options.HomeLabel), "Home (canvas)")
 	homeHref := firstNonEmpty(strings.TrimSpace(options.HomeHref), "/admin/editor")
 	homeSummary := firstNonEmpty(strings.TrimSpace(options.HomeSummary), "Live canvas and site structure.")
 	surface := WorkspaceSurface{

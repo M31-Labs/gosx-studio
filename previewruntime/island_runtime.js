@@ -455,13 +455,22 @@
     return { handled: true, count: docks.length };
   }
 
-  function clearEditorPreviewSelections(form, host) {
+  // clearEditorPreviewSelections clears the preview dock's selection chrome
+  // and ends any in-progress inline text edit. options.commit defaults to
+  // true (moving to a NEW selection legitimately commits the edit you were
+  // just on, matching blur semantics), but the keyboard-Escape caller passes
+  // { commit: false } (#5) so cancelling a selection with Escape reverts the
+  // in-progress value instead of silently persisting it.
+  function clearEditorPreviewSelections(form, host, options) {
+    options = options || {};
+    var commit = options.commit !== false;
+    var reason = commit ? "clear-selection" : "escape";
     if (!form) return { handled: false, frames: 0, fieldMaps: 0, markers: 0, chrome: null, docks: null };
     var frames = editorPreviewFrames(form);
     var fieldMaps = 0;
     var markers = 0;
     frames.forEach(function (frame) {
-      editorPreviewHostCall(host, "finishInlineTextEdit", null, frame, true, "clear-selection");
+      editorPreviewHostCall(host, "finishInlineTextEdit", null, frame, commit, reason);
     });
     frames.forEach(function (frame) {
       var fieldMap = clearEditorPreviewFieldMap(frame);
@@ -1249,8 +1258,8 @@
   window.__gosx_preview_runtime_island_bindFrames = function (form, host) {
     return bindEditorPreviewFrames(form, host);
   };
-  window.__gosx_preview_runtime_island_clearSelections = function (form, host) {
-    return clearEditorPreviewSelections(form, host);
+  window.__gosx_preview_runtime_island_clearSelections = function (form, host, options) {
+    return clearEditorPreviewSelections(form, host, options);
   };
   window.__gosx_preview_runtime_island_applySelection = function (detail) {
     return applyEditorPreviewSelectionSync(detail, null);

@@ -974,6 +974,11 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 		`typeof window.__gosx_preview_runtime_island_clearSelections !== "function"`,
 		`return window.__gosx_preview_runtime_island_clearSelections(form, {`,
 		`finishInlineTextEdit: finishInlineTextEdit`,
+		// #5 — Escape cancels rather than commits: the keyboard-Escape caller
+		// passes { commit: false } through to clearEditorPreviewSelections
+		// (previewruntime/island_runtime.js) instead of the bare call that
+		// used to silently commit whatever the user had just typed.
+		`clearPreviewSelections({ commit: false });`,
 		`dispatchPreviewSelectionClear("keyboard-escape");`,
 	} {
 		if !strings.Contains(script, check) {
