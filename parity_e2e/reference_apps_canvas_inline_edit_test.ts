@@ -36,9 +36,10 @@ import { revealModeIfPresent, startMuddyCanvasHTMLSurface, startMuddyCanvasHTMLS
 // POST above — the SAME "ONE path when durable, honest fallback when not"
 // discipline every other durable-history form already uses. The third test
 // below proves that path end-to-end (durable commit event, absence of the
-// legacy POST, Release Center change-set visibility — see that test's own
-// HONESTY NOTE on why a browser-driven undo assertion isn't included), and
-// the fourth proves the stale-write conflict path across two sessions. The
+// legacy POST, Release Center change-set visibility, AND — since
+// handoff-34's actor-identity-namespace unification — a live, browser-driven
+// Undo of that same collab-made edit through studioDirectEditForm), and the
+// fourth proves the stale-write conflict path across two sessions. The
 // first two tests above are UNCHANGED and keep proving the legacy-fallback
 // path (startMuddyCanvasHTMLSurface has no live collaboration transport, so
 // collaboration.available() stays false and commit() falls through to the
@@ -358,6 +359,10 @@ test.describe("@reference-apps canvas2d site-map WASM-free inline-edit loop", ()
       await expect(editable).toBeAttached({ timeout: 30_000 });
       await expect(editable).toBeVisible({ timeout: 30_000 });
       expect(await editable.getAttribute("data-gosx-studio-durable-history")).toBe("true");
+      // Captured BEFORE the marker overwrite below so the undo-reverts
+      // assertion (handoff-34) has a real baseline to compare against,
+      // rather than a hardcoded seed string.
+      const preEditHeadline = (await editable.textContent())?.trim() ?? "";
 
       // Arm the durable-commit event listener BEFORE the blur that fires it,
       // and watch for the LEGACY save-control POST too — this is the
@@ -406,40 +411,56 @@ test.describe("@reference-apps canvas2d site-map WASM-free inline-edit loop", ()
         "the canvas-committed hero.headline edit must appear as a Content change-set row",
       ).toBeAttached();
 
-      // Consequence (b), durable undo — HONESTY NOTE instead of a browser
-      // assertion here: studioDirectEditForm's Undo button targets the SAME
-      // (route "/", page:home, hero.headline, home:hero) target the canvas
-      // surface just committed to, and clicking it DOES reach the durable
-      // ledger's undo path -- but this investigation surfaced a real,
-      // PRE-EXISTING, separate bug that blocks it in exactly this
-      // browser-driven scenario: editorHistoryIDs (page.server.go) computes
-      // the Undo button's historyOperationId by filtering
-      // store.StudioAuthoringSnapshot().Operations to records whose ActorID
-      // matches editorActorIDFromRequest's plain HTTP-session actor id
-      // (auth.User.ID, e.g. "test:author-a"), but a record accepted through
-      // the LIVE COLLABORATION transport carries
+      // Consequence (b), durable undo (handoff-34): studioDirectEditForm's
+      // Undo button targets the SAME (route "/", page:home, hero.headline,
+      // home:hero) target the canvas surface just committed to. Before
+      // handoff-34 this button rendered enabled with a BLANK
+      // historyOperationId here — muddy's editorHistoryIDs filtered
+      // store.StudioAuthoringSnapshot().Operations by
+      // editorActorIDFromRequest's plain HTTP-session actor id
+      // (auth.User.ID, e.g. "test:author-a"), but the record the LIVE
+      // COLLABORATION transport just accepted above carries
       // internal/studiohost.CollaborationPrincipal's hashed, namespaced
-      // ActorID ("noni:<sha256(...)>") for the SAME real user -- two
-      // different identity namespaces for one person. The button renders
-      // enabled (collabruntime's capability gate doesn't know about this
-      // mismatch) but with a BLANK historyOperationId, so clicking it
-      // submits an empty gosx_studio_history_operation_id and the ledger
-      // correctly rejects it as a conflict. This is unrelated to the durable
-      // DISPATCH wiring this file proves (the commit above is genuinely
-      // durable, in the change-set, with a real accepted OperationRecord);
-      // it is an actor-identity-namespacing gap in Undo/Redo button
-      // rendering that predates this slice and reaches every durable kind's
-      // Undo button once an edit arrives via live collaboration, not just
-      // this one. Durable undo/redo for this EXACT target
-      // (hero.headline/page:home/home:hero) is proven instead at the
-      // operation-ledger layer, where actor identity is a plain, consistent
-      // string with no HTTP-vs-WS mismatch to trip over: gosx-studio's own
-      // TestStudioOperationDraftIsolationIdempotencyAndUndo
-      // (muddy-noni-commerce/internal/cms/studio_operations_test.go) drives
-      // this exact target end to end (set -> undo -> redo). Flagged as a
-      // residual risk for the actor-identity-namespacing owner to fix
-      // (reconcile editorHistoryIDs's actor match against BOTH identity
-      // forms, or stop hashing/namespacing the collaboration ActorID).
+      // ActorID ("noni:<sha256(...)>") for the SAME real user — two
+      // different identity strings for one person, so the button could never
+      // find its own history. handoff-34 unified both paths onto
+      // studiohost.ActorID's single derivation (see
+      // internal/studiohost/collaboration.go and app/admin/editor's
+      // authoringAction/editorHistoryIDs/editorActorIdentitiesFromRequest in
+      // muddy-noni-commerce) — this is the live, browser-driven proof that
+      // the fix actually closes the gap for a real signed-in user's own
+      // collab-made edit, not just at the Go/ledger layer (see
+      // TestActorScopedUndoMatchesRecordsAcrossCollaborationAndHTTPActionIdentityNamespaces
+      // in both hosts for the lower-layer, actor-isolation-focused proof).
+      await revealModeIfPresent(page, "home");
+      const directEditForm = page.locator("#studioDirectEditForm");
+      const undoButton = directEditForm.locator("[data-gosx-studio-operation-kind='undo']");
+      await expect(undoButton, "the Undo button must render enabled for the SAME actor who made the collab commit").toBeEnabled({ timeout: 20_000 });
+      await expect
+        .poll(async () => (await undoButton.getAttribute("data-gosx-studio-history-operation-id")) ?? "", {
+          timeout: 20_000,
+          message: "the Undo button must carry a real historyOperationId, not the blank cursor the pre-fix identity mismatch left it with",
+        })
+        .not.toBe("");
+
+      const undoOutcome = page.evaluate(
+        () => new Promise<{ kind: "committed" | "error"; detail: unknown }>((resolve) => {
+          document.addEventListener("gosxstudio:operation-committed", (event) => resolve({ kind: "committed", detail: (event as CustomEvent).detail }), { once: true });
+          document.addEventListener("gosxstudio:operation-error", (event) => resolve({ kind: "error", detail: (event as CustomEvent).detail }), { once: true });
+        }),
+      );
+      await undoButton.click();
+      const undone = await undoOutcome;
+      expect(undone.kind, `undo of the collab-made edit must succeed for the SAME actor; got ${JSON.stringify(undone)}`).toBe("committed");
+
+      // The revert reaches the SAME durable store the canvas surface reads
+      // from — a full reload re-serves the pre-marker headline, not the
+      // collab-committed marker.
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
+      await revealModeIfPresent(page, "advanced");
+      const revertedEditable = page.locator(EDITABLE_HERO).first();
+      await expect(revertedEditable).toBeVisible({ timeout: 30_000 });
+      await expect(revertedEditable, "undo must revert the canvas-rendered headline back to its pre-collab-edit value").toHaveText(preEditHeadline, { timeout: 20_000 });
     } finally {
       await server.stop();
     }
