@@ -190,8 +190,8 @@
       if (isOwnPending) { pending[operationID].resolve(ack); clearTimeout(pending[operationID].timer); delete pending[operationID]; }
     }
     function rejected(error) {
-      if (conflict) { conflict.hidden = false; conflict.textContent = (error && error.message) || "The shared edit was rejected."; }
-      announce((error && error.message) || "The shared edit was rejected.");
+      if (conflict) { conflict.hidden = false; conflict.textContent = (error && error.message) || "Someone else changed this before you. Reload to see their version, then make your edit again."; }
+      announce((error && error.message) || "Someone else changed this before you. Reload to see their version, then make your edit again.");
       document.dispatchEvent(new CustomEvent("gosxstudio:collaboration-operation-rejected", { detail: error || {} }));
       var operationID = error && error.operationId;
       if (operationID && pending[operationID]) { if (error.currentHead !== undefined && pending[operationID].request) { heads[targetKey(pending[operationID].request.target)] = error.currentHead || ""; storeHeads(); } var failure = new Error(error.message || "Shared edit rejected"); failure.collaborationError = error; pending[operationID].reject(failure); clearTimeout(pending[operationID].timer); delete pending[operationID]; }

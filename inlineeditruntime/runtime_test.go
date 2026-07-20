@@ -347,7 +347,7 @@ func TestInlineEditRuntimeOwnsPreviewTextSessionAdapter(t *testing.T) {
 		`form.getAttribute("data-studio-selection")`,
 		`form.getAttribute("data-studio-selection-kind")`,
 		"selection: selection || edit.blockKey || edit.field || \"\"",
-		`host.setStatus("dirty", "Draft changed", reason || "inline-text")`,
+		`host.setStatus("dirty", "Unsaved edit", reason || "inline-text")`,
 		"host.setDirty(reason || \"inline-text\")",
 		"typeof host.emitOperation === \"function\"",
 		"host.emitOperation(type, operation)",

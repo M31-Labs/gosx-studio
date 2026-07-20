@@ -232,7 +232,7 @@
       },
       setDirty: function (reason) {
         if (typeof host.setStatus === "function") {
-          try { host.setStatus("dirty", "Draft changed", reason || "inline-text"); } catch (error) { /* tolerate */ }
+          try { host.setStatus("dirty", "Unsaved edit", reason || "inline-text"); } catch (error) { /* tolerate */ }
         }
         if (typeof host.setDirty === "function") {
           try { host.setDirty(reason || "inline-text"); } catch (error) { /* tolerate */ }

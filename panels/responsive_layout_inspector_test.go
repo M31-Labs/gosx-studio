@@ -108,3 +108,28 @@ func TestResponsiveLayoutInspectorMobileInheritsTabletBeforeBase(t *testing.T) {
 		t.Fatalf("mobile got %q from %q", value, inherited)
 	}
 }
+
+// TestResponsiveLayoutInspectorHiddenOptionControlsInitialVisibility guards the
+// multi-target composition contract: a host rendering more than one target's
+// inspector marks every non-default instance Hidden so a user without working
+// JS never sees two phone-only panels at once; scopeResponsiveLayoutInspectors
+// (hostruntime/assets/workbench_runtime.js) toggles [hidden] on selection.
+func TestResponsiveLayoutInspectorHiddenOptionControlsInitialVisibility(t *testing.T) {
+	options := ResponsiveLayoutInspectorOptions{
+		ID: "layout", Action: "/authoring",
+		Target: authoring.OperationTarget{Route: "/about", PageID: "page:about", ComponentKey: "about:content"},
+	}
+	visible := gosx.RenderHTML(RenderResponsiveLayoutInspector(options))
+	if strings.Contains(visible, "hidden=\"hidden\"") {
+		t.Fatal("default (non-Hidden) inspector must render without a hidden attribute")
+	}
+	options.Hidden = true
+	hiddenHTML := gosx.RenderHTML(RenderResponsiveLayoutInspector(options))
+	section := hiddenHTML[:strings.Index(hiddenHTML, ">")+1]
+	if !strings.Contains(section, "hidden=\"hidden\"") {
+		t.Fatalf("Hidden inspector must carry the hidden attribute on its outer section, got %q", section)
+	}
+	if !strings.Contains(section, "data-studio-responsive-layout-inspector=\"true\"") {
+		t.Fatal("hidden attribute must live on the [data-studio-responsive-layout-inspector] element the runtime toggles")
+	}
+}

@@ -21,12 +21,16 @@ type ResponsiveLayoutValue struct {
 }
 
 // ResponsiveLayoutInspectorOptions describes the selected canvas component.
-// Values are keyed by "breakpoint/property".
+// Values are keyed by "breakpoint/property". Hidden marks a non-default
+// instance in a multi-target composition: it renders with the hidden
+// attribute so only the default-selected target's inspector is visible
+// before the workbench runtime takes over [hidden] toggling on selection.
 type ResponsiveLayoutInspectorOptions struct {
 	ID, Action, CSRFToken string
 	Target                authoring.OperationTarget
 	DocumentRevision      uint64
 	Values                map[string]ResponsiveLayoutValue
+	Hidden                bool
 }
 
 // RenderResponsiveLayoutInspector renders real property controls for the
@@ -37,15 +41,13 @@ type ResponsiveLayoutInspectorOptions struct {
 // one closed-by-default <details> disclosure (fix (c) — collapsed-by-default
 // sections). The "Responsive layout" heading and a one-line summary (target +
 // override count) stay outside the disclosure so the panel is still
-// scannable collapsed. A host that composes more than one target's inspector
-// on the same page (muddy-noni-commerce's editorDirectEditPanels always
-// renders both home:hero's and about:content's panel together, regardless of
-// which one is actually selected — the respLayoutCount=2 defect) is expected
-// to hide every instance except the one matching the live canvas selection;
-// hostruntime/assets/workbench_runtime.js's scopeResponsiveLayoutInspectors
-// is the studio-side idempotence guard that does this at runtime by toggling
-// [hidden] (see that file), so double-inclusion still renders once even if
-// the host keeps composing every target unconditionally.
+// scannable collapsed.
+//
+// Contract: a host that composes more than one target's inspector on the
+// same page renders at most the default-selected target's inspector
+// visible; every other instance is `hidden`. hostruntime/assets/
+// workbench_runtime.js's scopeResponsiveLayoutInspectors toggles [hidden] on
+// selection change.
 func RenderResponsiveLayoutInspector(options ResponsiveLayoutInspectorOptions) gosx.Node {
 	if options.ID == "" {
 		options.ID = "studio-responsive-layout"
@@ -69,12 +71,16 @@ func RenderResponsiveLayoutInspector(options ResponsiveLayoutInspectorOptions) g
 			gosx.Fragment(controls...),
 		))
 	}
-	return gosx.El("section", gosx.Attrs(
+	sectionAttrs := []any{
 		gosx.Attr("id", options.ID),
 		gosx.Attr("data-studio-responsive-layout-inspector", "true"),
 		gosx.Attr("data-studio-selected-route", target.Route),
 		gosx.Attr("data-studio-selected-component", target.ComponentKey),
-	),
+	}
+	if options.Hidden {
+		sectionAttrs = append(sectionAttrs, gosx.Attr("hidden", "hidden"))
+	}
+	return gosx.El("section", gosx.Attrs(sectionAttrs...),
 		gosx.El("header", gosx.Attrs(gosx.Attr("class", "studio-responsive-layout__head")),
 			gosx.El("h3", nil, gosx.Text("Responsive layout")),
 			gosx.El("span", gosx.Attrs(

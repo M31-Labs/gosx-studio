@@ -1201,7 +1201,7 @@
 
     form.addEventListener("gosxstudio:save-state", function (event) {
       var detail = event.detail || {};
-      if (detail.state === "dirty") setPreviewStatus("dirty", "Draft changed", detail.reason || "dirty");
+      if (detail.state === "dirty") setPreviewStatus("dirty", "Unsaved edit", detail.reason || "dirty");
       else if (detail.state === "autosaving" || detail.state === "saving") setPreviewStatus("syncing", "Syncing preview", detail.reason || "saving");
       else if (detail.state === "saved") schedulePreviewRefresh(detail.reason || "saved", "");
       else if (detail.state === "error") setPreviewStatus("error", "Preview waiting on save", detail.reason || "error");
