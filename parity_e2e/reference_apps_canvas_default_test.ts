@@ -153,7 +153,7 @@ test.describe("@reference-apps canvas-default (no-signal) canvas", () => {
       await gotoEditor(page, server.baseURL);
       await revealModeIfPresent(page, "advanced");
       const createResult = await applyCompositionIntentInPlace(page, "create-page:landing", {
-        expectedMessage: "Landing created.",
+        expectedMessage: "Landing page created with 3 starter sections.",
         expectedChangeKind: "page",
         requireSelection: false,
         requirePreview: false,

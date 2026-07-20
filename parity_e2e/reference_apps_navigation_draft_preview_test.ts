@@ -131,7 +131,7 @@ test.describe("@reference-apps muddy edit-revert regression: navigation draft mu
 async function openEditorNavigationPanel(page: Page, baseURL: string) {
   await page.goto(`${baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await expect(page.locator("[data-studio-workbench='true']").first(), "the editor workbench must render").toBeAttached({ timeout: 30_000 });
-  await revealModeIfPresent(page, "advanced");
+  await revealModeIfPresent(page, "home");
   await expect(page.locator(NAV_PANEL).first(), "the editor Navigation panel must render").toBeAttached({ timeout: 30_000 });
   await expect(page.locator(NAV_ROW).first(), "the Navigation panel must render at least one editable nav row").toBeAttached({ timeout: 30_000 });
 }

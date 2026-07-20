@@ -129,7 +129,7 @@ test.describe("@reference-apps canvas2d authoring parity", () => {
       await expect(page.locator(CANVAS_SELECTOR).first()).toBeAttached({ timeout: 30_000 });
 
       const createResult = await applyCompositionIntentInPlace(page, "create-page:landing", {
-        expectedMessage: "Landing created.",
+        expectedMessage: "Landing page created with 3 starter sections.",
         expectedChangeKind: "page",
         requireSelection: false,
       });

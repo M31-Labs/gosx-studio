@@ -41,7 +41,7 @@ test.describe("@reference-apps browser authoring workflows", () => {
       });
 
       await applyCompositionIntentInPlace(page, "create-page:landing", {
-        expectedMessage: "Landing created.",
+        expectedMessage: "Landing page created with 3 starter sections.",
         expectedChangeKind: "page",
         requireSelection: false,
       });

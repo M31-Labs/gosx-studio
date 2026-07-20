@@ -36,6 +36,10 @@ test.describe("@reference-apps Muddy/Noni editor declutter", () => {
       await expect(page.locator("[data-gosx-studio-page-canvas='true']").first()).toBeVisible();
       // Zone 3 (right): the Home contextual inspector is visible.
       await expect(page.locator("[data-studio-home-inspector-panel='true']").first()).toBeVisible();
+      // Site navigation is the one deliberate Home-mode exception: editing
+      // the storefront menu is routine owner work (handoff step 2), so it
+      // must be reachable without visiting the support-only Advanced tab.
+      await expect(page.locator("[data-studio-navigation-panel='true']").first()).toBeVisible();
 
       // Everything that is NOT part of the default Home composition must
       // actually be hidden, not merely mode-tagged in markup — this is the
@@ -45,7 +49,6 @@ test.describe("@reference-apps Muddy/Noni editor declutter", () => {
         "[data-studio-brand-panel='true']", // folds into Look; hidden by default too
         "[data-studio-publish-panel='true']",
         "[data-studio-advanced-panel='true']",
-        "[data-studio-navigation-panel='true']",
         "[data-studio-checkout-panel='true']",
         "[data-studio-flow-field-editor='true']",
         "[data-studio-shared-components-panel='true']",
@@ -60,11 +63,12 @@ test.describe("@reference-apps Muddy/Noni editor declutter", () => {
       // No separate "Brand" mode tab.
       await expect(page.locator('[data-studio-mode-control="brand"]')).toHaveCount(0);
 
-      // Switching to Advanced reveals Advanced-homed panels (navigation,
-      // checkout, flow field editor, shared components) and hides Home's.
+      // Switching to Advanced reveals Advanced-homed panels (checkout,
+      // flow field editor, shared components) and hides Home's — including
+      // the navigation panel, which is homed to Home, not Advanced.
       await page.locator('[data-studio-mode-control="advanced"]').first().click();
       await expect(form).toHaveAttribute("data-studio-mode", "advanced");
-      await expect(page.locator("[data-studio-navigation-panel='true']").first()).toBeVisible();
+      await expect(page.locator("[data-studio-navigation-panel='true']").first()).toBeHidden();
       await expect(page.locator("[data-studio-checkout-panel='true']").first()).toBeVisible();
       await expect(page.locator("[data-studio-home-inspector-panel='true']").first()).toBeHidden();
       // The shared-component companion detail panel and the composition
@@ -94,8 +98,8 @@ test.describe("@reference-apps Muddy/Noni editor declutter", () => {
       // Switch to a non-default mode/panel.
       await page.locator('[data-studio-mode-control="advanced"]').first().click();
       await expect(form).toHaveAttribute("data-studio-mode", "advanced");
-      const navigationPanel = page.locator("[data-studio-navigation-panel='true']").first();
-      await expect(navigationPanel).toBeVisible();
+      const checkoutPanel = page.locator("[data-studio-checkout-panel='true']").first();
+      await expect(checkoutPanel).toBeVisible();
 
       // Select an object. Canvas click-to-select (selectionruntime) is a
       // separate, not-yet-wired concern (see this slice's report) — this
@@ -111,9 +115,9 @@ test.describe("@reference-apps Muddy/Noni editor declutter", () => {
       // button — a synthetic data-studio-selection attribute alone (above)
       // does not dirty the form, so type into a real, visible Advanced-mode
       // field first, exactly like an operator would before saving.
-      const navigationField = navigationPanel.locator("input[type='text']").first();
-      await expect(navigationField).toBeVisible();
-      await navigationField.fill("Shop the collection");
+      const checkoutField = checkoutPanel.locator("input[type='text']").first();
+      await expect(checkoutField).toBeVisible();
+      await checkoutField.fill("Shop the collection");
       await expect(page.locator("[data-gosx-studio-save-button]").first()).toBeVisible();
 
       // Save an edit: the toolbar's primary Save button submits the whole
@@ -137,7 +141,7 @@ test.describe("@reference-apps Muddy/Noni editor declutter", () => {
       const reloadedForm = page.locator("[data-studio-workbench='true']").first();
       await page.waitForFunction(() => "GoSXStudioWorkbenchRuntime" in window, null, { timeout: 20_000 });
       await expect(reloadedForm).toHaveAttribute("data-studio-mode", "advanced");
-      await expect(page.locator("[data-studio-navigation-panel='true']").first()).toBeVisible();
+      await expect(page.locator("[data-studio-checkout-panel='true']").first()).toBeVisible();
       await expect(page.locator("[data-studio-home-inspector-panel='true']").first()).toBeHidden();
       await expect(reloadedForm).toHaveAttribute("data-studio-selection", "home:hero");
     } finally {
