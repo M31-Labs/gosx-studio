@@ -421,6 +421,51 @@ button.button {
   font-weight: 700;
 }
 
+/* Verified bug: .editor-toolbar (the top toolbar row -- see
+   shell.renderBackendEditorWorkbenchToolbar) packs the title, the mode
+   tabs (.studio-modebar), the metric strip (.studio-context-strip), and
+   the command launcher (.studio-command-palette > .studio-command-launcher)
+   into one row. None of those children carried min-width: 0, so at
+   ~1000-1200px wide (e.g. an 1100x700 viewport) the command launcher's
+   intrinsic content width didn't shrink with the row -- it overflowed its
+   track and painted on top of (hit-blocking clicks on) the Publish and
+   Advanced mode tabs, which sit earlier in DOM order and so stack
+   underneath it. min-width: 0 lets each toolbar child shrink to fit its
+   row instead of bleeding into a neighbor's space -- the same fix already
+   applied above for the site-map board/engine/frame/rail-resizer
+   renderers (see the min-width: 0 rule keyed off
+   [data-gosx-studio-*-renderer="gosx-studio"] earlier in this file). */
+.gosx-studio-toolbar__title,
+.studio-modebar,
+.studio-context-strip,
+.studio-command-palette {
+  min-width: 0;
+}
+
+@media (max-width: 1200px) {
+  .editor-toolbar {
+    flex-wrap: wrap;
+  }
+
+  /* Give the mode tabs the row space they need to stay fully visible and
+     clickable down to ~1000px by dropping the launcher's visible "Find"
+     label below this breakpoint. The text stays in the accessible name
+     (this is a visually-hidden clip, not display: none/visibility:
+     hidden), so the button keeps announcing "Find Ctrl K" to assistive
+     tech; only the sighted footprint shrinks. */
+  .studio-command-launcher span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
 .studio-nav-panel,
 .editor-panel {
   align-content: start;

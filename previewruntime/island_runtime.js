@@ -1218,6 +1218,77 @@
     return { handled: true };
   }
 
+  // ── Inline-edit session guard for preview refresh ──────────────────────
+  // Reassigning a frame's `src` is a full navigation: it destroys whatever
+  // live document state that frame currently holds. inlineeditruntime/
+  // island_runtime.js's startPreviewTextEdit/finishPreviewTextEdit already
+  // track an open contenteditable session on frame.__gosxStudioInlineEdit
+  // (set on start, cleared on commit OR cancel — see
+  // editorPreviewInlineEditContains above, which reads the same flag). But
+  // nothing consulted that flag here: on EVERY keystroke, inlineeditruntime's
+  // syncPreviewTextEdit fires a gosxstudio:editor-operation "set_text" event;
+  // hostruntime/assets/state_runtime.js always recomputes and dispatches
+  // gosxstudio:save-state "saved" on that event whenever the tracked form
+  // isn't otherwise dirty (its own update()/updateFrame()) — true on
+  // essentially every keystroke for a field with no live mirrored form
+  // control — and separately, once a field IS mirrored, its own autosave
+  // debounce (scheduleAutosave, reset every keystroke) eventually completes
+  // and dispatches its own "saved"/"autosave". Either way,
+  // hostruntime/assets/workbench_runtime.js's listener on gosxstudio:save-state
+  // turns EVERY "saved" dispatch into schedulePreviewRefresh(...)
+  // unconditionally, and this function's caller only debounced that for
+  // 180ms before reassigning frame.setAttribute("src", ...) — reloading the
+  // preview iframe on essentially any inter-keystroke gap over ~180ms
+  // (trivially common at a natural typing cadence) and silently discarding
+  // whatever the user had just typed. Contract: NEVER reload/replace the
+  // preview document while an inline-edit session is active on it; queue
+  // the refresh and apply it once the session ends (commit or cancel).
+  function editorPreviewFrameSessionActive(frame) {
+    return !!(frame && frame.__gosxStudioInlineEdit);
+  }
+
+  var editorPreviewPendingRefreshes = typeof WeakMap !== "undefined" ? new WeakMap() : null;
+  function editorPreviewPendingRefresh(frame) {
+    return editorPreviewPendingRefreshes ? editorPreviewPendingRefreshes.get(frame) : frame.__gosxStudioPreviewPendingRefresh;
+  }
+  function setEditorPreviewPendingRefresh(frame, pending) {
+    if (editorPreviewPendingRefreshes) editorPreviewPendingRefreshes.set(frame, pending);
+    else frame.__gosxStudioPreviewPendingRefresh = pending;
+  }
+
+  function applyEditorPreviewFrameRefresh(form, frame, reason, route) {
+    setEditorPreviewStatus(form, "loading", "Refreshing preview", reason);
+    var base = route || editorPreviewURL(frame) || frame.getAttribute("src") || "/";
+    frame.setAttribute("src", cacheBustPreviewURL(base, reason));
+    emitEditorPreview(form, "gosxstudio:preview-refresh", { route: route, reason: reason });
+  }
+
+  // A bounded poll (not an event hook): inlineeditruntime and previewruntime
+  // are separate modules with no direct "session ended" callback wired
+  // between them, and every session-ending path (commit via blur/Enter,
+  // cancel via Escape) already clears frame.__gosxStudioInlineEdit
+  // synchronously in finishPreviewTextEdit, so a short poll observes the
+  // transition promptly without new cross-module plumbing. The attempt
+  // ceiling is a defensive fallback only, so the preview eventually catches
+  // up even if some future caller ever left the session flag stuck.
+  var EDITOR_PREVIEW_SESSION_POLL_MS = 150;
+  var EDITOR_PREVIEW_SESSION_POLL_LIMIT = 800; // ~120s ceiling
+  function queueEditorPreviewRefresh(form, frame, reason, route) {
+    setEditorPreviewPendingRefresh(frame, { reason: reason, route: route });
+    if (frame.__gosxStudioPreviewSessionPoll) return;
+    var attempts = 0;
+    frame.__gosxStudioPreviewSessionPoll = window.setInterval(function () {
+      attempts += 1;
+      if (editorPreviewFrameSessionActive(frame) && attempts < EDITOR_PREVIEW_SESSION_POLL_LIMIT) return;
+      window.clearInterval(frame.__gosxStudioPreviewSessionPoll);
+      frame.__gosxStudioPreviewSessionPoll = null;
+      var pending = editorPreviewPendingRefresh(frame);
+      setEditorPreviewPendingRefresh(frame, null);
+      if (!pending) return;
+      applyEditorPreviewFrameRefresh(form, frame, pending.reason, pending.route);
+    }, EDITOR_PREVIEW_SESSION_POLL_MS);
+  }
+
   function refreshEditorPreviewNow(form, reason, route) {
     if (!form) return { handled: false };
     reason = reason || "refresh";
@@ -1225,13 +1296,18 @@
     if (route) syncEditorPreviewRoute(form, route, reason);
     var frames = editorPreviewFrames(form);
     if (!frames.length) return { handled: false };
-    setEditorPreviewStatus(form, "loading", "Refreshing preview", reason);
+    var applied = false;
+    var deferred = false;
     frames.forEach(function (frame) {
-      var base = route || editorPreviewURL(frame) || frame.getAttribute("src") || "/";
-      frame.setAttribute("src", cacheBustPreviewURL(base, reason));
+      if (editorPreviewFrameSessionActive(frame)) {
+        queueEditorPreviewRefresh(form, frame, reason, route);
+        deferred = true;
+        return;
+      }
+      applied = true;
+      applyEditorPreviewFrameRefresh(form, frame, reason, route);
     });
-    emitEditorPreview(form, "gosxstudio:preview-refresh", { route: route, reason: reason });
-    return { handled: true };
+    return { handled: true, applied: applied, deferred: deferred };
   }
 
   var editorPreviewRefreshTimers = typeof WeakMap !== "undefined" ? new WeakMap() : null;

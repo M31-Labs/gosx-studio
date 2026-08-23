@@ -59,7 +59,7 @@ func TestRenderBackendEditorPagePreservesEditorShellContract(t *testing.T) {
 		`<p class="form-status form-status--ok">Published.</p>`,
 		`<p class="form-status form-status--error">Flow failed.</p>`,
 		`<p class="form-status form-status--error">Restore failed.</p>`,
-		`<p class="form-status form-status--ok">Editor settings restored.</p>`,
+		`<p class="form-status form-status--ok" role="status" tabindex="-1">Editor settings restored.</p>`,
 		`<section data-workbench="true">workbench</section>`,
 		`<form data-site-map-authoring="true"></form>`,
 		`<form data-style-palette="true"></form>`,
@@ -86,6 +86,30 @@ func TestRenderBackendEditorPagePreservesEditorShellContract(t *testing.T) {
 		`data-gosx-studio-state-runtime="true"`,
 		`data-gosx-studio-engine-runtime="true"`,
 	)
+}
+
+// TestRenderBackendEditorStatusesRestoredBannerIsFocusableStatus proves the
+// post-restore confirmation ("Editor settings restored.") carries
+// role="status" (so assistive tech announces it without a page-level
+// aria-live region) and tabindex="-1" (so the runtime can move focus onto
+// it after an async restore, when nothing else naturally has focus) -- and
+// that the other action-status banners (which are not tied to a background
+// restore completing) are left as plain <p> elements, unaffected.
+func TestRenderBackendEditorStatusesRestoredBannerIsFocusableStatus(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendEditorStatuses(BackendEditorPageProps{
+		SaveStatus: BackendEditorActionStatus{
+			OK:      true,
+			Message: "Saved.",
+		},
+		RevisionRestored: true,
+	}))
+
+	if !strings.Contains(html, `<p class="form-status form-status--ok" role="status" tabindex="-1">Editor settings restored.</p>`) {
+		t.Fatalf("restored banner missing role/tabindex accessibility attrs:\n%s", html)
+	}
+	if !strings.Contains(html, `<p class="form-status form-status--ok">Saved.</p>`) {
+		t.Fatalf("save status should render without role/tabindex:\n%s", html)
+	}
 }
 
 func TestRenderBackendEditorPageDefaultsAndSplitNodes(t *testing.T) {

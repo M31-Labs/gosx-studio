@@ -87,38 +87,18 @@ func RenderFlowDesignerGraph(flow map[string]any) gosx.Node {
 	), gosx.Fragment(children...))
 }
 
+// flowDesignerPlacementNote is the honest caption shown under the Public
+// page / Appears in placement facts: these are set up alongside routing and
+// embed wiring elsewhere in the platform, not edited in-panel, so the panel
+// must not present them as editable fields (they used to render as
+// `<input readonly>`, which visually implies "editable, just locked" rather
+// than "not an edit surface here at all").
+const flowDesignerPlacementNote = "Set with support during flow setup."
+
 func RenderFlowDesignerRoute(flow map[string]any, formID string) gosx.Node {
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-flow-editor__route")),
-		gosx.El("label", gosx.Attrs(
-			gosx.Attr("class", "field"),
-			gosx.Attr("for", core.WorkbenchViewString(flow, "routeInputID")),
-		),
-			gosx.El("span", nil, gosx.Text("Public page")),
-			gosx.El("input", gosx.Attrs(
-				gosx.Attr("id", core.WorkbenchViewString(flow, "routeInputID")),
-				gosx.Attr("name", core.WorkbenchViewString(flow, "routeInputName")),
-				gosx.Attr("value", core.WorkbenchViewString(flow, "route")),
-				gosx.Attr("form", formID),
-				gosx.Attr("data-studio-field-source", "flow."+core.WorkbenchViewString(flow, "key")+".route"),
-				gosx.Attr("data-studio-field-editable", "routing"),
-				gosx.Attr("readonly", true),
-			)),
-		),
-		gosx.El("label", gosx.Attrs(
-			gosx.Attr("class", "field"),
-			gosx.Attr("for", core.WorkbenchViewString(flow, "embedInputID")),
-		),
-			gosx.El("span", nil, gosx.Text("Appears in")),
-			gosx.El("input", gosx.Attrs(
-				gosx.Attr("id", core.WorkbenchViewString(flow, "embedInputID")),
-				gosx.Attr("name", core.WorkbenchViewString(flow, "embedInputName")),
-				gosx.Attr("value", core.WorkbenchViewString(flow, "embedTarget")),
-				gosx.Attr("form", formID),
-				gosx.Attr("data-studio-field-source", "flow."+core.WorkbenchViewString(flow, "key")+".embedTarget"),
-				gosx.Attr("data-studio-field-editable", "routing"),
-				gosx.Attr("readonly", true),
-			)),
-		),
+		renderFlowDesignerPlacementField("Public page", core.WorkbenchViewString(flow, "route"), "data-studio-flow-route-value"),
+		renderFlowDesignerPlacementField("Appears in", core.WorkbenchViewString(flow, "embedTarget"), "data-studio-flow-embed-value"),
 		gosx.El("input", gosx.Attrs(
 			gosx.Attr("id", core.WorkbenchViewString(flow, "handlerInputID")),
 			gosx.Attr("name", core.WorkbenchViewString(flow, "handlerInputName")),
@@ -136,6 +116,27 @@ func RenderFlowDesignerRoute(flow map[string]any, formID string) gosx.Node {
 			gosx.El("strong", nil, gosx.Text(core.WorkbenchViewString(flow, "handlerStatusLabel"))),
 			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(flow, "handlerDetail"))),
 		),
+	)
+}
+
+// renderFlowDesignerPlacementField renders one placement fact ("Public
+// page" / "Appears in") as a non-input definition-style row: a label, the
+// current value (an em dash when unset -- never a fabricated placeholder
+// that reads as a value), and a muted note explaining how it's actually
+// set. valueAttr is the stable data-* hook a future e2e test or the host's
+// own styling can key off of.
+func renderFlowDesignerPlacementField(label, value, valueAttr string) gosx.Node {
+	display := value
+	if display == "" {
+		display = "—"
+	}
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "field field--static studio-flow-editor__placement")),
+		gosx.El("span", gosx.Attrs(gosx.Attr("class", "field__label")), gosx.Text(label)),
+		gosx.El("strong", gosx.Attrs(
+			gosx.Attr("class", "field__value"),
+			gosx.Attr(valueAttr, "true"),
+		), gosx.Text(display)),
+		gosx.El("small", gosx.Attrs(gosx.Attr("class", "field__note")), gosx.Text(flowDesignerPlacementNote)),
 	)
 }
 

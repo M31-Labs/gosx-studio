@@ -175,7 +175,7 @@ func RenderBackendEditorStatuses(props BackendEditorPageProps) gosx.Node {
 		nodes = append(nodes, renderBackendEditorStatus("form-status form-status--error", props.RestoreStatus.Message))
 	}
 	if props.RevisionRestored {
-		nodes = append(nodes, renderBackendEditorStatus("form-status form-status--ok", "Editor settings restored."))
+		nodes = append(nodes, renderBackendEditorRestoredStatus("Editor settings restored."))
 	}
 	return gosx.Fragment(nodes...)
 }
@@ -217,4 +217,20 @@ func renderBackendEditorActionStatus(status BackendEditorActionStatus) []gosx.No
 
 func renderBackendEditorStatus(className, message string) gosx.Node {
 	return gosx.El("p", gosx.Attrs(gosx.Attr("class", className)), gosx.Text(message))
+}
+
+// renderBackendEditorRestoredStatus renders the post-restore confirmation
+// banner ("Editor settings restored.") as an assertive, focusable landmark:
+// role="status" (implicit aria-live="polite") makes screen readers announce
+// it without the page needing a manual aria-live wrapper, and tabindex="-1"
+// lets the runtime move keyboard/AT focus onto the banner right after a
+// restore completes -- a background revision restore otherwise leaves focus
+// wherever it was (often nowhere useful), so neither sighted-but-not-looking
+// nor screen-reader users would notice the confirmation landed.
+func renderBackendEditorRestoredStatus(message string) gosx.Node {
+	return gosx.El("p", gosx.Attrs(
+		gosx.Attr("class", "form-status form-status--ok"),
+		gosx.Attr("role", "status"),
+		gosx.Attr("tabindex", "-1"),
+	), gosx.Text(message))
 }

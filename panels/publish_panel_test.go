@@ -241,6 +241,170 @@ func TestRenderPublishPanelChangeSetAbsentWhenNotSupplied(t *testing.T) {
 	}
 }
 
+// TestRenderPublishPanelActionsRenderAfterSummaryAndHeadline proves the
+// decision-legibility reorder: the Publish/Discard actions block used to
+// render before everything else in the panel (a bare button with no
+// context above it). It must now render AFTER the ready/watch/next summary
+// triple and the one-line decision headline, so a non-technical owner reads
+// "why" before they reach the button.
+func TestRenderPublishPanelActionsRenderAfterSummaryAndHeadline(t *testing.T) {
+	view := publishPanelTestView()
+	html := gosx.RenderHTML(RenderPublishPanel(view, PublishPanelOptions{}))
+
+	assertPublishOrder(t, html,
+		`<div class="studio-publish-review__summary" aria-label="Publish review summary">`,
+		`<p class="studio-publish-panel__decision-headline" data-studio-publish-decision-headline="true">`,
+		`<div class="studio-publish-panel__actions" aria-label="Publish actions"`,
+		`<div class="studio-publish-panel__checks" aria-label="Publish checks">`,
+	)
+}
+
+// TestRenderPublishPanelDecisionHeadlineAllReady proves the one-line,
+// plain-English headline reads "All N checks ready." when every check is
+// Ready, and that Publish is never disabled even though the headline is
+// upbeat (publishing always stays the owner's call).
+func TestRenderPublishPanelDecisionHeadlineAllReady(t *testing.T) {
+	view := publishPanelTestView()
+	view["checks"] = []map[string]any{
+		{"key": "media", "class": "studio-publish-review__card studio-publish-review__card--ready", "label": "Media alt text", "scope": "Media", "status": "ready", "statusLabel": "Ready", "summary": "All clear", "detail": "Every image has alt text."},
+		{"key": "seo", "class": "studio-publish-review__card studio-publish-review__card--ready", "label": "SEO", "scope": "Search", "status": "ready", "statusLabel": "Ready", "summary": "All clear", "detail": "Meta description set."},
+	}
+
+	html := gosx.RenderHTML(RenderPublishPanel(view, PublishPanelOptions{}))
+
+	if !strings.Contains(html, `<p class="studio-publish-panel__decision-headline" data-studio-publish-decision-headline="true">All 2 checks ready.</p>`) {
+		t.Fatalf("publish panel missing all-ready decision headline:\n%s", html)
+	}
+	if strings.Contains(html, `data-studio-publish-attention`) {
+		t.Fatalf("publish panel must not carry an attention marker when every check is ready:\n%s", html)
+	}
+	if strings.Contains(html, `data-studio-publish-attention-note`) {
+		t.Fatalf("publish panel must not render an attention note when every check is ready:\n%s", html)
+	}
+	if !strings.Contains(html, `<button class="button button--primary" type="submit" form="websiteEditorForm" formaction="/publish" formmethod="post" formnovalidate="formnovalidate" data-admin-confirm="Publish this draft?" data-studio-submit-action="publish" data-studio-field-action-formaction="/publish">Publish</button>`) {
+		t.Fatalf("publish button must render exactly, with no disabled attribute:\n%s", html)
+	}
+}
+
+// TestRenderPublishPanelDecisionHeadlineNeedsAttention proves the headline
+// reads "M of N checks need attention." (or, singular, "needs attention")
+// when one or more checks aren't Ready, that the actions container and a
+// visible note both carry the same count, and that Publish is still not
+// disabled -- the attention note is information, not a gate.
+func TestRenderPublishPanelDecisionHeadlineNeedsAttention(t *testing.T) {
+	view := publishPanelTestView()
+	view["checks"] = []map[string]any{
+		{"key": "media", "class": "studio-publish-review__card studio-publish-review__card--watch", "label": "Media alt text", "scope": "Media", "status": "watch", "statusLabel": "Watch", "summary": "Needs review", "detail": "One image needs alt text."},
+		{"key": "seo", "class": "studio-publish-review__card studio-publish-review__card--ready", "label": "SEO", "scope": "Search", "status": "ready", "statusLabel": "Ready", "summary": "All clear", "detail": "Meta description set."},
+	}
+
+	html := gosx.RenderHTML(RenderPublishPanel(view, PublishPanelOptions{}))
+
+	for _, fragment := range []string{
+		`<p class="studio-publish-panel__decision-headline" data-studio-publish-decision-headline="true">1 of 2 checks need attention.</p>`,
+		`data-studio-publish-attention="1"`,
+		`<p class="studio-publish-panel__attention-note" data-studio-publish-attention-note="true">1 item needs attention — you can still publish.</p>`,
+		`data-studio-submit-action="publish"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("publish panel missing %q:\n%s", fragment, html)
+		}
+	}
+	if !strings.Contains(html, `<button class="button button--primary" type="submit" form="websiteEditorForm" formaction="/publish" formmethod="post" formnovalidate="formnovalidate" data-admin-confirm="Publish this draft?" data-studio-submit-action="publish" data-studio-field-action-formaction="/publish">Publish</button>`) {
+		t.Fatalf("Publish must never be disabled by attention checks:\n%s", html)
+	}
+
+	// The attention note must render inside the actions container, after the
+	// Publish button, so an owner reads the button first and the caveat
+	// immediately beside it.
+	assertPublishOrder(t, html,
+		`data-studio-submit-action="publish"`,
+		`data-studio-publish-attention-note="true"`,
+	)
+}
+
+// TestRenderPublishPanelChecksGroupAttentionFirst proves
+// renderPublishPanelChecks groups status-first: every non-Ready check
+// renders under a "Needs attention" heading BEFORE a "Ready" heading, so a
+// single red/yellow check doesn't get lost among a wall of green cards in
+// plain source order. Order within each group is stable.
+func TestRenderPublishPanelChecksGroupAttentionFirst(t *testing.T) {
+	view := publishPanelTestView()
+	view["checks"] = []map[string]any{
+		{"key": "seo", "class": "studio-publish-review__card studio-publish-review__card--ready", "label": "SEO", "scope": "Search", "status": "ready", "statusLabel": "Ready", "summary": "All clear", "detail": "Meta description set."},
+		{"key": "media", "class": "studio-publish-review__card studio-publish-review__card--watch", "label": "Media alt text", "scope": "Media", "status": "watch", "statusLabel": "Watch", "summary": "Needs review", "detail": "One image needs alt text."},
+		{"key": "links", "class": "studio-publish-review__card studio-publish-review__card--next", "label": "Broken links", "scope": "Content", "status": "next", "statusLabel": "Next", "summary": "Fix before publish", "detail": "One link 404s."},
+	}
+
+	html := gosx.RenderHTML(RenderPublishPanel(view, PublishPanelOptions{}))
+
+	for _, fragment := range []string{
+		`<div class="studio-publish-panel__checks-group studio-publish-panel__checks-group--attention" data-studio-publish-checks-group="attention"><h3 class="studio-publish-panel__checks-heading">Needs attention</h3>`,
+		`<div class="studio-publish-panel__checks-group studio-publish-panel__checks-group--ready" data-studio-publish-checks-group="ready"><h3 class="studio-publish-panel__checks-heading">Ready</h3>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("publish panel missing %q:\n%s", fragment, html)
+		}
+	}
+
+	// Attention-first: the "Needs attention" group (and both non-ready
+	// checks within it, in their original source order) must render before
+	// the "Ready" group.
+	assertPublishOrder(t, html,
+		`data-studio-publish-checks-group="attention"`,
+		`data-studio-publish-check="media"`,
+		`data-studio-publish-check="links"`,
+		`data-studio-publish-checks-group="ready"`,
+		`data-studio-publish-check="seo"`,
+	)
+}
+
+// TestRenderPublishPanelChecksAllReadyOmitsGroupHeadings proves the happy
+// path -- every check Ready -- renders with no "Needs attention"/"Ready"
+// group headings at all (no noise for the common case): the check cards
+// render directly, matching the pre-grouping markup.
+func TestRenderPublishPanelChecksAllReadyOmitsGroupHeadings(t *testing.T) {
+	view := publishPanelTestView()
+	view["checks"] = []map[string]any{
+		{"key": "media", "class": "studio-publish-review__card studio-publish-review__card--ready", "label": "Media alt text", "scope": "Media", "status": "ready", "statusLabel": "Ready", "summary": "All clear", "detail": "Every image has alt text."},
+	}
+
+	html := gosx.RenderHTML(RenderPublishPanel(view, PublishPanelOptions{}))
+
+	for _, notWant := range []string{
+		"studio-publish-panel__checks-group",
+		"studio-publish-panel__checks-heading",
+		"data-studio-publish-checks-group",
+		"Needs attention",
+	} {
+		if strings.Contains(html, notWant) {
+			t.Fatalf("all-ready publish panel must not render group headings, found %q:\n%s", notWant, html)
+		}
+	}
+	if !strings.Contains(html, `<div class="studio-publish-panel__checks" aria-label="Publish checks"><article class="studio-publish-review__card studio-publish-review__card--ready" data-studio-publish-check="media">`) {
+		t.Fatalf("all-ready publish panel must render the check card directly under the checks wrapper:\n%s", html)
+	}
+}
+
+// assertPublishOrder fails the test unless every fragment appears in html,
+// each strictly after the previous one (matching shell.assertOrder's
+// contract, duplicated here since panels has no shared test helper
+// package).
+func assertPublishOrder(t *testing.T, html string, fragments ...string) {
+	t.Helper()
+	last := -1
+	for _, fragment := range fragments {
+		next := strings.Index(html, fragment)
+		if next < 0 {
+			t.Fatalf("missing ordered fragment %q:\n%s", fragment, html)
+		}
+		if next <= last {
+			t.Fatalf("fragment %q rendered out of order:\n%s", fragment, html)
+		}
+		last = next
+	}
+}
+
 func publishPanelTestView() map[string]any {
 	return map[string]any{
 		"status":             "draft",

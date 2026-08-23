@@ -1,6 +1,7 @@
 package panels
 
 import (
+	"fmt"
 	"strings"
 
 	"m31labs.dev/gosx"
@@ -27,10 +28,17 @@ func RenderPublishPanel(view map[string]any, options PublishPanelOptions) gosx.N
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, options.RootAttrs)
 
+	// Render order (adversarial-review decision-legibility fix): reassurance
+	// (counts, then a plain-English headline) precedes the Publish/Discard
+	// actions, which in turn precede the detailed per-check cards -- a
+	// non-technical owner reads "why" before they see the button, rather than
+	// meeting the button cold at the top of the panel. See
+	// renderPublishPanelChecks for the "Needs attention" / "Ready" grouping
+	// that keeps a single red check from reading the same size/weight as a
+	// wall of green ones.
 	children := []gosx.Node{
 		renderPublishPanelHead(view),
 		renderPublishPanelDraftStatus(view),
-		renderPublishPanelActions(view),
 	}
 	if core.WorkbenchViewBool(view, "hasPendingChanges") || core.WorkbenchViewBool(view, "hasChangeSet") {
 		children = append(children, renderPublishPanelPendingChanges(view))
@@ -46,8 +54,18 @@ func RenderPublishPanel(view map[string]any, options PublishPanelOptions) gosx.N
 		renderPublishPanelDecision(view),
 		renderPublishPanelSummary(view),
 	)
-	if core.WorkbenchViewBool(view, "hasChecks") {
-		children = append(children, renderPublishPanelChecks(core.WorkbenchViewMapList(view, "checks")))
+	attentionCount := 0
+	hasChecks := core.WorkbenchViewBool(view, "hasChecks")
+	var checks []map[string]any
+	if hasChecks {
+		checks = core.WorkbenchViewMapList(view, "checks")
+		total := 0
+		attentionCount, total = publishCheckAttentionCounts(checks)
+		children = append(children, renderPublishPanelDecisionHeadline(attentionCount, total))
+	}
+	children = append(children, renderPublishPanelActions(view, attentionCount))
+	if hasChecks {
+		children = append(children, renderPublishPanelChecks(checks))
 	}
 	if core.WorkbenchViewBool(view, "hasImpacts") {
 		children = append(children, renderPublishPanelImpacts(core.WorkbenchViewMapList(view, "impacts")))
@@ -81,7 +99,16 @@ func renderPublishPanelDraftStatus(view map[string]any) gosx.Node {
 	), gosx.Text(core.WorkbenchViewString(view, "draftStatusLabel")))
 }
 
-func renderPublishPanelActions(view map[string]any) gosx.Node {
+// renderPublishPanelActions renders the Open preview / Publish / Discard
+// actions. attentionCount is the number of publish checks (out of the same
+// normalized set renderPublishPanelChecks groups) that are not Ready; it
+// never gates or disables Publish -- publishing stays the owner's call --
+// it only adds an honest heads-up next to the button
+// (data-studio-publish-attention + the visible note) so a non-technical
+// owner isn't surprised by what they already had reassurance about above
+// (see renderPublishPanelDecisionHeadline).
+func renderPublishPanelActions(view map[string]any, attentionCount int) gosx.Node {
+	hasPublishAction := core.WorkbenchViewBool(view, "hasPublishAction")
 	children := []gosx.Node{
 		gosx.El("a", gosx.Attrs(
 			gosx.Attr("class", "button button--secondary"),
@@ -89,7 +116,7 @@ func renderPublishPanelActions(view map[string]any) gosx.Node {
 			gosx.Attr("data-gosx-link", "true"),
 		), gosx.Text("Open preview")),
 	}
-	if core.WorkbenchViewBool(view, "hasPublishAction") {
+	if hasPublishAction {
 		children = append(children, gosx.El("button", gosx.Attrs(
 			gosx.Attr("class", "button button--primary"),
 			gosx.Attr("type", "submit"),
@@ -101,6 +128,12 @@ func renderPublishPanelActions(view map[string]any) gosx.Node {
 			gosx.Attr("data-studio-submit-action", "publish"),
 			gosx.Attr("data-studio-field-action-formaction", core.WorkbenchViewString(view, "publishAction")),
 		), gosx.Text("Publish")))
+		if attentionCount > 0 {
+			children = append(children, gosx.El("p", gosx.Attrs(
+				gosx.Attr("class", "studio-publish-panel__attention-note"),
+				gosx.Attr("data-studio-publish-attention-note", "true"),
+			), gosx.Text(publishAttentionNoteLabel(attentionCount))))
+		}
 	}
 	if core.WorkbenchViewBool(view, "hasDiscardAction") {
 		children = append(children, gosx.El("button", gosx.Attrs(
@@ -115,10 +148,26 @@ func renderPublishPanelActions(view map[string]any) gosx.Node {
 			gosx.Attr("data-studio-field-action-formaction", core.WorkbenchViewString(view, "discardAction")),
 		), gosx.Text("Discard changes")))
 	}
-	return gosx.El("div", gosx.Attrs(
+	attrs := []any{
 		gosx.Attr("class", "studio-publish-panel__actions"),
 		gosx.Attr("aria-label", "Publish actions"),
-	), gosx.Fragment(children...))
+	}
+	if attentionCount > 0 {
+		attrs = append(attrs, gosx.Attr("data-studio-publish-attention", fmt.Sprint(attentionCount)))
+	}
+	return gosx.El("div", gosx.Attrs(attrs...), gosx.Fragment(children...))
+}
+
+// publishAttentionNoteLabel is the plain-English heads-up shown next to
+// Publish when one or more checks need attention -- publishing is not
+// blocked, so this reads as information, not a warning that implies the
+// button won't work.
+func publishAttentionNoteLabel(attentionCount int) string {
+	verb := "need"
+	if attentionCount == 1 {
+		verb = "needs"
+	}
+	return fmt.Sprintf("%s %s attention — you can still publish.", core.CountLabel(attentionCount, "item", "items"), verb)
 }
 
 // renderPublishPanelPendingChanges renders the Release Center's "what will
@@ -469,7 +518,91 @@ func renderPublishPanelSummary(view map[string]any) gosx.Node {
 	)
 }
 
+// renderPublishPanelDecisionHeadline is the one-line, plain-English readout
+// of the same normalized checks renderPublishPanelChecks groups -- read
+// before the Publish button, "All N checks ready."/"M of N checks need
+// attention." gives a non-technical owner the decision in one sentence
+// instead of making them tally up per-check statuses themselves.
+func renderPublishPanelDecisionHeadline(attentionCount, total int) gosx.Node {
+	text := fmt.Sprintf("All %d checks ready.", total)
+	if attentionCount > 0 {
+		text = fmt.Sprintf("%d of %d checks need attention.", attentionCount, total)
+	}
+	return gosx.El("p", gosx.Attrs(
+		gosx.Attr("class", "studio-publish-panel__decision-headline"),
+		gosx.Attr("data-studio-publish-decision-headline", "true"),
+	), gosx.Text(text))
+}
+
+// publishCheckNeedsAttention reports whether a rendered check view is
+// anything other than Ready. It prefers the normalized "status" key
+// (cms/studio.publishCheckViews always sets "ready"/"watch"/"next"), falling
+// back to "statusLabel" so a minimal host-supplied view (only a display
+// label, no raw status) still groups correctly.
+func publishCheckNeedsAttention(check map[string]any) bool {
+	if status := core.WorkbenchViewString(check, "status"); status != "" {
+		return status != "ready"
+	}
+	return !strings.EqualFold(core.WorkbenchViewString(check, "statusLabel"), "ready")
+}
+
+// publishCheckAttentionCounts splits checks the same way
+// renderPublishPanelChecks groups them, so the decision headline and the
+// actions block's attention note always agree with what the checks list
+// itself shows.
+func publishCheckAttentionCounts(checks []map[string]any) (attention, total int) {
+	total = len(checks)
+	for _, check := range checks {
+		if publishCheckNeedsAttention(check) {
+			attention++
+		}
+	}
+	return attention, total
+}
+
+// renderPublishPanelChecks groups checks status-first: anything that isn't
+// Ready renders under a "Needs attention" heading BEFORE the Ready group, so
+// a single red/yellow check reads as a distinct, prioritized item instead of
+// being visually the same weight as -- and lost among -- a wall of green
+// cards in source order. When every check is Ready, the happy path renders
+// with no group headings at all (no noise for the common case). Order
+// within each group is stable (preserves the input slice's order).
 func renderPublishPanelChecks(checks []map[string]any) gosx.Node {
+	attention := make([]map[string]any, 0, len(checks))
+	ready := make([]map[string]any, 0, len(checks))
+	for _, check := range checks {
+		if publishCheckNeedsAttention(check) {
+			attention = append(attention, check)
+		} else {
+			ready = append(ready, check)
+		}
+	}
+	var groups []gosx.Node
+	if len(attention) == 0 {
+		groups = publishPanelCheckCards(checks)
+	} else {
+		groups = append(groups, renderPublishPanelChecksGroup("attention", "Needs attention", attention))
+		if len(ready) > 0 {
+			groups = append(groups, renderPublishPanelChecksGroup("ready", "Ready", ready))
+		}
+	}
+	return gosx.El("div", gosx.Attrs(
+		gosx.Attr("class", "studio-publish-panel__checks"),
+		gosx.Attr("aria-label", "Publish checks"),
+	), gosx.Fragment(groups...))
+}
+
+func renderPublishPanelChecksGroup(key, heading string, checks []map[string]any) gosx.Node {
+	return gosx.El("div", gosx.Attrs(
+		gosx.Attr("class", "studio-publish-panel__checks-group studio-publish-panel__checks-group--"+key),
+		gosx.Attr("data-studio-publish-checks-group", key),
+	),
+		gosx.El("h3", gosx.Attrs(gosx.Attr("class", "studio-publish-panel__checks-heading")), gosx.Text(heading)),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-publish-panel__checks-list")), gosx.Fragment(publishPanelCheckCards(checks)...)),
+	)
+}
+
+func publishPanelCheckCards(checks []map[string]any) []gosx.Node {
 	nodes := make([]gosx.Node, 0, len(checks))
 	for _, check := range checks {
 		children := []gosx.Node{
@@ -494,10 +627,7 @@ func renderPublishPanelChecks(checks []map[string]any) gosx.Node {
 			gosx.Attr("data-studio-publish-check", core.WorkbenchViewString(check, "key")),
 		), gosx.Fragment(children...)))
 	}
-	return gosx.El("div", gosx.Attrs(
-		gosx.Attr("class", "studio-publish-panel__checks"),
-		gosx.Attr("aria-label", "Publish checks"),
-	), gosx.Fragment(nodes...))
+	return nodes
 }
 
 func renderPublishPanelImpacts(impacts []map[string]any) gosx.Node {
