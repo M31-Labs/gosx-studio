@@ -1230,6 +1230,10 @@
         state.searchQuery = input.value;
         render(state);
       });
+      input.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+      });
       clear.addEventListener("click", function () {
         input.value = "";
         state.searchQuery = "";

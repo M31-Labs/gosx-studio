@@ -173,6 +173,87 @@ test.describe("@smoke GoSXStudioContentEditorRuntime", () => {
     await expect(page.locator("[data-content-editor]")).toHaveAttribute("data-content-editor-dirty", "false");
   });
 
+  test("keeps Search blocks Enter view-only without blocking Save or Ctrl/Cmd+S", async ({ page }) => {
+    const source = JSON.stringify({
+      version: 1,
+      blocks: [
+        { id: "heading", type: "heading", text: "Heading" },
+        { id: "paragraph", type: "paragraph", text: "Paragraph" },
+      ],
+    });
+    await mountAtURL(page, enhancedEditorHTML(source));
+    await page.evaluate(() => {
+      const win = window as unknown as { saveCount?: number; submitCount?: number };
+      win.saveCount = 0;
+      win.submitCount = 0;
+      window.fetch = async () => {
+        win.saveCount = (win.saveCount || 0) + 1;
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      };
+      document.querySelector("form")?.addEventListener("submit", () => {
+        win.submitCount = (win.submitCount || 0) + 1;
+      }, true);
+    });
+
+    const root = page.locator("[data-content-editor]");
+    const search = page.locator("[data-content-editor-search]");
+    const save = page.getByRole("button", { name: "Save page" });
+    await search.click();
+    await search.fill("heading");
+    await expect(search).toBeFocused();
+    await expect(search).toHaveValue("heading");
+    await expect(page.locator("[data-content-block-id]")).toHaveCount(1);
+    await expect(root).toHaveAttribute("data-content-editor-search-query", "heading");
+    await expect(root).toHaveAttribute("data-content-editor-search-visible-count", "1");
+    await expect(root).toHaveAttribute("data-content-editor-dirty", "false");
+    await expect(root).toHaveAttribute("data-content-editor-save-state", "idle");
+
+    const composingEnterPrevented = await search.evaluate((node) => {
+      const event = new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        isComposing: true,
+        key: "Enter",
+      });
+      node.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+    expect(composingEnterPrevented).toBe(true);
+    await search.press("Enter");
+    await expect(search).toBeFocused();
+    await expect(search).toHaveValue("heading");
+    await expect(page.locator("[data-content-block-id]")).toHaveCount(1);
+    await expect(root).toHaveAttribute("data-content-editor-dirty", "false");
+    await expect(root).toHaveAttribute("data-content-editor-save-state", "idle");
+    expect(await page.evaluate(() => (window as unknown as { saveCount?: number }).saveCount)).toBe(0);
+    expect(await page.evaluate(() => (window as unknown as { submitCount?: number }).submitCount)).toBe(0);
+
+    const heading = page.locator("[data-content-block-id='heading'] input");
+    await heading.fill("Changed heading");
+    await expect(root).toHaveAttribute("data-content-editor-dirty", "true");
+    await search.click();
+    await search.press("Enter");
+    await expect(search).toBeFocused();
+    await expect(search).toHaveValue("heading");
+    await expect(page.locator("[data-content-block-id]")).toHaveCount(1);
+    await expect(root).toHaveAttribute("data-content-editor-search-query", "heading");
+    await expect(root).toHaveAttribute("data-content-editor-dirty", "true");
+    await expect(root).toHaveAttribute("data-content-editor-save-state", "dirty");
+    expect(await page.evaluate(() => (window as unknown as { saveCount?: number }).saveCount)).toBe(0);
+    expect(await page.evaluate(() => (window as unknown as { submitCount?: number }).submitCount)).toBe(0);
+
+    await save.click();
+    await expect(root).toHaveAttribute("data-content-editor-save-state", "saved");
+    expect(await page.evaluate(() => (window as unknown as { saveCount?: number }).saveCount)).toBe(1);
+
+    await heading.fill("Changed heading again");
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+S" : "Control+S");
+    await expect(root).toHaveAttribute("data-content-editor-save-state", "saved");
+    expect(await page.evaluate(() => (window as unknown as { saveCount?: number }).saveCount)).toBe(2);
+  });
+
   test("collapses blocks as view state and retains an accessible focus target", async ({ page }) => {
     const source = JSON.stringify(initialBlocks);
     await mount(page, editorHTML(source));
