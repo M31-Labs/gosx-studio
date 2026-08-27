@@ -2,13 +2,11 @@
 
 Date: 2026-08-27
 
-Status: final local candidate evidence is complete and the Studio checkpoint is
-pushed; the known exact-pin Noni integration passed locally with no replacement.
-TEST18's bounded integration-test-only correction/rerun is complete, and the
-CONFIG24 opt-in three-engine standalone gate passed 267/267 after the WEBKIT21
-test-input investigation completed. The candidate is local/not deployed,
-staging approval is pending, and this is not enterprise certification,
-all-browser support, or a zero-warning claim.
+Status: the exact-pin Noni release is deployed to staging and the local Studio
+and Noni verification gates are complete. The current image, data receipt, and
+browser evidence are recorded below. This remains a bounded polish record, not
+enterprise certification, all-browser support, owner acceptance, or a
+zero-warning claim.
 
 This slice carries the visual and interaction quality contract for the shared
 Studio editor surfaces. It preserves the existing Paper & Ink territory and
@@ -17,17 +15,23 @@ renderer markup and the existing content/media browser runtimes.
 
 ## Baseline and ownership
 
-- Studio baseline: clean `35f0ef2`.
-- Noni baseline: `0ff2f9b`, exact-pinned to Studio `35f0ef2`.
-- Current Studio candidate: pushed commit
-  `8a4c9b8de3560111bfc3fdf915e0b39988a8c0b8`.
-- Current Noni candidate: `m31labs.dev/gosx-studio`
-  `v0.6.2-0.20260827190001-8a4c9b8de356`; final `go list -m` reported
-  `Replace: null` with no development overlay.
-- Noni source checkpoint: CP-NONI20 reports pushed commit
-  `813b474337d6e55be89b2522b59d34e3a1061157`; its exact eight-file CAS/pin
-  checkpoint retains the Studio pin above and no replacement.
-- Existing staging: `3eb` digest unchanged; resolved user emails unchanged.
+- Historical Studio baseline: clean `35f0ef2`; historical Noni baseline:
+  `0ff2f9b`, exact-pinned to that Studio baseline.
+- Current deployed Noni source: clean commit
+  `6e605dc60c75cb4b380940f9df29a9ed2c652ac1`.
+- Current deployed Studio source: `1f6fee87439c347a5d76e4d420ce4b2bd8002a03`;
+  the deployed module is
+  `v0.6.2-0.20260827212051-1f6fee87439c` with `Replace: null` and no
+  development overlay.
+- Historical CP-NONI20 source checkpoint:
+  `813b474337d6e55be89b2522b59d34e3a1061157`; it is an ancestor of the
+  deployed source, not the deployed image identity.
+- Current staging image: `sha256:2d3f7d5c8a449a4026910d5b38d78e75647d78b9263295fbb9731e2f9624da72`,
+  tag `20260827-145730-6e605dc-staging`, generation/observedGeneration
+  `174/174`, one pod Ready. The earlier `3eb` and `3d60` images remain
+  historical deployment evidence, not the current release.
+- Resolved user emails remain unchanged; actual owner walkthrough and
+  acceptance are unverified.
 - Email configuration remains settled and unchanged; actual owner walkthrough
   and acceptance are unverified.
 - Quality owner: `POLISH-QUALITY-04`, Luna max, local-only execution.
@@ -66,8 +70,8 @@ Current execution board:
 
 - `POLISH-QUALITY-04`: local complete, 6/6 focused browser tests; component
   geometry only. Actual Noni Chromium screenshots are recorded by Integration08;
-  the six-case portability subgate is now 18/18 across Chromium, Firefox, and
-  WebKit with an explicit WebKit property limitation.
+  the final QA07/CONFIG24 standalone matrix is 270/270 (90 per engine) with an
+  explicit WebKit property limitation.
 - `POLISH-STATUS-11`: local complete; explicit error/recovery placement and
   narrow stacked save-status rows are covered by the CSS contract and 409/
   422/create-link fixture evidence. Root accepted the final Noni desktop/mobile
@@ -83,31 +87,33 @@ Current execution board:
   If-Range follow-up; no deployed claim.
 - `POLISH-CAS-06`: local Noni normal/race passed under the development overlay;
   final released exact pin is verified by Integration08 with no replacement.
-- `POLISH-INTEGRATION-08`: final no-overlay exact-pin gate complete: 10/10
-  real-host Chromium tests, 67 Noni Go packages, two-package race gate, module
-  verification, production GoSX build, and normal server build passed. Root
-  accepted desktop/mobile conflict viewport geometry. TEST18's bounded
-  correction now records 303 transport proof separately from DOM readback and
-  confirms media URL/alt persistence after remount; its corrected rerun and
+- `POLISH-INTEGRATION-08`: final no-overlay exact-pin gate complete: 12/12
+  real-host Chromium tests, full Noni Go and full-race verification, module
+  verification, TypeScript, production GoSX build, and normal server build
+  passed. Root accepted desktop/mobile conflict viewport geometry. TEST18's
+  bounded correction records 303 transport proof separately from DOM readback
+  and confirms media URL/alt persistence after remount; its corrected rerun and
   production regeneration passed.
 - `POLISH-BOOK-09`: this status/spec reconciliation is complete; it does not
   certify the overall polish or deployment.
-- `POLISH-GATE-10`: final local Studio run is complete: 47 test-bearing Go
-  packages passed (49 discovered including two no-test packages), focused race
-  passed, TypeScript passed, and standalone Chromium was 125/126 with one
-  intentional skip and zero failures; source fingerprint was unchanged.
+- `POLISH-GATE-10`: historical pre-UX06 local Studio run recorded 47
+  test-bearing Go packages, focused race, TypeScript, and standalone Chromium
+  125/126 with one intentional skip. It is superseded for current standalone
+  counts by QA07's frozen 270/270 three-engine matrix.
 - `POLISH-TEST-18`: complete integration-test-only closeout correction owned by
   Integration08; the exact Studio pin/runtime stayed frozen, and the corrected
   10-case no-overlay Chromium run, TypeScript rerun, and production regeneration
-  passed.
+  passed as a separate historical test-only result.
 - `POLISH-CROSSBROWSER-19`: historical independent Firefox/WebKit evidence is
   recorded; its quality-fixture subset passed 18/18 across Chromium, Firefox,
-  and WebKit. CONFIG24 now supplies the reproducible 267/267 nine-file matrix;
-  no all-browser support claim is made.
+  and WebKit. Its original CONFIG24 result was 267/267 before UX06; the final
+  QA07/CONFIG24 rerun is 270/270 across the same nine files. No all-browser
+  support claim is made.
 - `POLISH-CROSS-CONFIG24`: complete reproducible opt-in gate; exactly nine
   standalone files ran serially in explicit Chromium, Firefox, and WebKit
-  projects (89/89/89, 267/267 total), with per-run/per-project artifacts and
-  no reference-app or harness boot.
+  projects. The final QA07 rerun is authoritative at 90/90/90 (**270/270**
+  total) after the Search Enter regression case was added, with per-run/
+  per-project artifacts and no reference-app or harness boot.
 - `POLISH-WEBKIT-22`: complete quality-test portability subgate, 6/6 per
   engine. Chromium and Firefox support `forced-color-adjust` and activate
   forced-colors; WebKit activates the media query but reports the CSS property
@@ -117,17 +123,19 @@ Current execution board:
   documented second real endpoint move makes the pointer test pass 2/2 in
   Chromium, Firefox, and WebKit. No runtime workaround or general WebKit DnD
   claim is made.
-- `POLISH-CP-NONI-20`: Noni source checkpoint
+- `POLISH-CP-NONI-20`: historical Noni source checkpoint
   `813b474337d6e55be89b2522b59d34e3a1061157` is pushed with the exact Studio
-  pin and no replacement; local docs record the completed TEST18/WEBKIT21
-  follow-up and remain local/not deployed.
+  pin and no replacement; it remains separate from the deployed source
+  `6e605dc60c75cb4b380940f9df29a9ed2c652ac1`.
 
-## Gate10 local verification packet
+## Historical Gate10 local verification packet (pre-UX06)
 
-`POLISH-GATE-10` is a final Studio-only QA pass after SAVE07 source freeze and
-an explicit root GO. It does not build or boot Noni. Its unique artifact root
-is `.tiller/scratch/codex/enterprise-polish-20260827/gate10/`; the generated
-`.canopy/index.json` remains an excluded tooling artifact.
+`POLISH-GATE-10` was the Studio-only QA pass after SAVE07 source freeze and an
+explicit root GO. It did not build or boot Noni. Its unique artifact root was
+`.tiller/scratch/codex/enterprise-polish-20260827/gate10/`; the generated
+`.canopy/index.json` remains an excluded tooling artifact. The pre-UX06
+Chromium count below is historical; QA07's 270/270 matrix is authoritative for
+the current standalone evidence.
 
 The standalone Chromium fixture set is exactly:
 
@@ -198,8 +206,8 @@ The final local command was:
   ./node_modules/.bin/playwright test --config=playwright.enterprise.config.ts)
 ```
 
-Inventory was 89 tests per project, 9 unique files, and zero forbidden
-reference/harness entries. The authoritative result was **267/267 passed**
+The historical CONFIG24 inventory was 89 tests per project, 9 unique files,
+and zero forbidden reference/harness entries. Its result was **267/267 passed**
 (89 Chromium, 89 Firefox, 89 WebKit), one worker, zero skips/failures. The
 quality fixture captured initial/interaction 1600/1280/390 screenshots,
 forced-colors/reduced-motion evidence, dense/empty media states, structured
@@ -214,46 +222,90 @@ The exact counts, capability JSON, artifact roots, and unchanged source
 fingerprint are recorded in
 `.tiller/scratch/codex/enterprise-polish-20260827/crossbrowser24/config24-report.md`.
 
-## Current local candidate and final-gate evidence
+### QA07 current three-engine rerun
 
-The current candidate is local/not deployed. Studio commit
-`8a4c9b8de3560111bfc3fdf915e0b39988a8c0b8` is pushed. Noni resolves
+QA07 reran the same nine standalone files after UX06 added the Search Enter
+zero-POST case. It used the tracked config with a unique artifact root:
+
+```text
+cd /home/draco/work/gosx-studio/parity_e2e
+env -u QUALITY_ARTIFACT_ROOT GOSX_STUDIO_ENTERPRISE_ARTIFACT_ROOT=/home/draco/work/gosx-studio/.tiller/scratch/codex/staging-polish-20260827/quality/qa07/parity PLAYWRIGHT_BROWSERS_PATH=/home/draco/.cache/ms-playwright ./node_modules/.bin/playwright test --config=playwright.enterprise.config.ts
+```
+
+The inventory was **270 tests in 9 files** and the matrix passed **270/270**
+(90 Chromium, 90 Firefox, 90 WebKit), with zero skips/failures. The QA07
+report is `.tiller/scratch/codex/staging-polish-20260827/quality/qa07/report.md`;
+its per-project runner and quality directories are isolated under that parity
+artifact root.
+
+## Current deployed release and final-gate evidence
+
+The exact-pin release is deployed to staging. Studio source
+`1f6fee87439c347a5d76e4d420ce4b2bd8002a03` resolves through
 `m31labs.dev/gosx-studio` at
-`v0.6.2-0.20260827190001-8a4c9b8de356` with `GOWORK=off`, empty `GOFLAGS`,
-and `Replace: null`; no development replacement was used for the known final
-gate. CP-NONI20 reports the Noni source checkpoint pushed at
-`813b474337d6e55be89b2522b59d34e3a1061157`, retaining that exact dependency
-pin with no replacement. Staging approval remains pending, and the settled
-email configuration is unchanged. Actual owner walkthrough/acceptance is
-unverified.
+`v0.6.2-0.20260827212051-1f6fee87439c` with `GOWORK=off`, empty `GOFLAGS`,
+and `Replace: null`; no development replacement was used for the released
+runtime. The deployed Noni source is
+`6e605dc60c75cb4b380940f9df29a9ed2c652ac1`. The immutable staging image is
+`sha256:2d3f7d5c8a449a4026910d5b38d78e75647d78b9263295fbb9731e2f9624da72`
+with tag `20260827-145730-6e605dc-staging` and generation/observedGeneration
+`174/174`; one pod is Ready. A later documentation HEAD is distinct from both
+source identities.
 
-Final Integration08 evidence from the no-overlay exact-pin run:
+STAGE16 versioned module JavaScript, deployment CSS/outer-media assets, two
+versioned aliases, and all six manifest runtime checks passed. BROWSER17 passed
+10/10 public routes, 2/2 keyboard cases, and 2/2 unauthenticated
+admin-boundary cases with no reported asset/request/console/page errors. STAGE12
+completed its read-only post-deploy comparison at `2026-08-27T22:08:26Z`; the
+receipt SHA-256 is
+`c4ed8559ca195bb9fb791c11fced5f267804d1f86f001edb8a66932e027ae1fb`, against
+the STAGE06 pre-deploy baseline. The manifest
+`82529b5ecd4ef7b73e6b949a4349c3e7ce48fb555d80cabb6fad88a4bce51256` matched
+(4 files, 289,303 B, media 0), file comparisons and both SQLite checks passed,
+and final live identity passed.
 
-- Noni Go: 67 packages discovered, including no-test and generated packages;
-  all passed.
-- Noni race: `internal/cms` and `app/admin/pages` passed.
-- `go mod verify` and exact module resolution passed with no replacement.
-- Real-host Chromium: 10/10 passed, one worker, zero skips/failures in the
-  known run; root accepted desktop/mobile conflict viewport geometry.
-- Production GoSX build and normal Go server build passed. The production
-  build emitted 89 warnings; this record does not assert whether they are
-  pre-existing without comparative warning evidence.
-- Studio Gate10: 47 test-bearing Go packages passed (49 discovered including
-  two no-test packages), focused race and TypeScript passed, and standalone
-  Chromium was 125 passed, 1 intentional skip, 0 failures.
-- Additional engines: the quality fixture is verified 6/6 in Chromium, Firefox,
-  and WebKit, and CONFIG24's exact nine-file matrix is 267/267 (89 per engine).
-  Firefox and Chromium report the forced-color property supported; WebKit
+The current 12-case host result belongs to INTEGRATION08B/TEST11B. TEST11B's
+test-only checkpoint is `457cdd7acbd4829b7f5519b46709a233ea6adc22`, with source
+hash `69791a92e2007c163aeb5b8ddcd5d6101f52b66987388d7dfafa107087ef179c`; its
+report is `.tiller/scratch/codex/enterprise-polish-20260827/integration08b/integration-report.md`.
+The fixture includes the current UX06 Search Enter case and verifies that
+Enter does not issue a POST while Search is focused. It models the separate
+outer deployment tag and shared Page CMS module release keys; no application
+fix was made for the earlier fixture-only mismatch.
+
+CACHE10's current release-key evidence is recorded in
+`.tiller/scratch/codex/enterprise-polish-20260827/cache10/report.md`: the
+shared Page CMS module URL and outer CSS/media deployment URLs are versioned
+from their respective release keys. This is the accepted rollout path; it does
+not make the bare CDN cache residual a pass.
+
+Final Integration08B evidence from the no-overlay exact-pin run:
+
+- Full no-overlay Noni Go and full-race verification passed, as did module
+  verification, TypeScript, the production GoSX build, and the normal server
+  build.
+- Real-host Chromium: **12/12** passed with zero failures/skips; root accepted
+  desktop/mobile conflict viewport geometry. This is actual host evidence, not
+  an all-browser or enterprise certification claim.
+- Studio QA07's standalone matrix passed **270/270** cases (**90 each** in
+  Chromium, Firefox, and WebKit), distinct from the 12/12 real-host Chromium
+  cases. The production build observed **89** static warnings; no comparative
+  baseline is asserted.
+- Chromium and Firefox report the forced-color property supported; WebKit
   reports `CSS.supports('forced-color-adjust', 'auto') === false` while
   `matchMedia('(forced-colors: active)').matches === true` after emulation. The
-  evidence is not generalized to all-browser support.
+  evidence is explicit capability coverage, not generalized all-browser
+  support.
 
-`POLISH-TEST-18` was a bounded correction to
+`POLISH-TEST-18` was a historical bounded correction against the earlier Studio
+runtime `v0.6.2-0.20260827190001-8a4c9b8de356` to
 `parity_e2e/reference_apps_enterprise_polish_test.ts`: actual HTTP 303 proof is
 recorded separately from DOM readback (no synthesized JSON payload), and media
 URL/alt persistence is asserted after remount. Its corrected TypeScript/
 10-case no-overlay rerun and production regeneration passed; the Studio/Noni
-runtime pin remains frozen.
+runtime under test was the earlier `8a4c9b8de3560111bfc3fdf915e0b39988a8c0b8`
+pin, not the current deployed `1f6fee87439c347a5d76e4d420ce4b2bd8002a03`
+source recorded above.
 
 `POLISH-CROSSBROWSER-19` is intentionally separate from the real-host Noni
 gate. Its historical report covers nine standalone Studio fixtures in Firefox
@@ -399,15 +451,18 @@ suites cannot overwrite its runner artifacts.
   closeout; peer owners' reports and tests remain the source evidence for those
   gates. SAVE07, CAS06, TEST18, WEBKIT21, and the known Integration08 exact-pin
   run are frozen or complete as reported.
-- CP13 Studio commit `8a4c9b8de3560111bfc3fdf915e0b39988a8c0b8` and CP-NONI20
-  Noni commit `813b474337d6e55be89b2522b59d34e3a1061157` are checkpoint
-  candidates. The released Studio module resolves at the exact pin
-  `v0.6.2-0.20260827190001-8a4c9b8de356` with no replacement in the known
-  Integration08 run; TEST18 and CONFIG24 are complete local evidence.
-- No deployment, staging re-seed, DNS operation, auth/email work, live data
-  access, or production performance certification is included. The production
-  build recorded 89 warnings; without comparative evidence this spec does not
-  label them pre-existing and does not claim zero warnings.
+- CP13 Studio CSS checkpoint `8a4c9b8de3560111bfc3fdf915e0b39988a8c0b8` and
+  the CP-NONI20 source checkpoint `813b474337d6e55be89b2522b59d34e3a1061157`
+  remain historical evidence. The released Studio module resolves at the
+  exact pin `v0.6.2-0.20260827212051-1f6fee87439c` with no replacement; the
+  deployed Noni source and image are recorded above. TEST18 and CONFIG24 are
+  complete test evidence.
+- No production re-seed, DNS operation, auth/email work, live-data mutation, or
+  production performance certification is included in this polish record.
+  STAGE16 staging deployment and STAGE12 read-only verification are recorded
+  above. The production build recorded 89 warnings; without comparative
+  evidence this spec does not label them pre-existing and does not claim zero
+  warnings.
 - Standalone screenshots do not certify the full Noni-mounted workbench,
   server actions, persistence, publish boundary, or navigation lifecycle.
 - STATUS11's long-message geometry and recovery-link evidence is standalone
@@ -416,30 +471,35 @@ suites cannot overwrite its runner artifacts.
 - The media list CSS is proven against runtime-generated markup; host-specific
   wrappers have known Integration08 host screenshots, but those captures do not
   establish broad visual signoff beyond the recorded scenarios.
-- Chromium, Firefox, and WebKit quality fixtures are verified, and CONFIG24
-  passes 267/267 across the three engines. WebKit does not support the
+- Chromium, Firefox, and WebKit quality fixtures are verified, and QA07/CONFIG24
+  passes 270/270 across the three engines (90 per engine); 267/267 is retained
+  as historical pre-UX06 evidence. WebKit does not support the
   `forced-color-adjust` property according to `CSS.supports`, while forced-
   colors emulation is active; this is explicit capability evidence, not a
   product failure or an all-browser certification claim. WEBKIT21 completed as
   a bounded test-input investigation with no runtime workaround retained.
 - The old four-hour fresh-cache policy cannot be retroactively evicted for
-  already-fresh browser/CDN responses; rollout may require a hard refresh or
-  the existing versioned-URL mechanism.
-- Staging approval and actual owner walkthrough/acceptance remain unverified;
-  the current candidate is local/not deployed. Any runtime worker change during
-  testing must be re-run by root before a checkpoint is accepted.
+  already-fresh browser/CDN responses. The current bare CSS stale-HIT residual
+  remains a technical follow-up; the accepted rollout path uses versioned URLs
+  after a full refresh. The latest future IMS probe returned current HTTP 200;
+  the false IMS 304 result is historical STAGE04 evidence. Save or reconcile
+  unsaved drafts before refreshing.
+- STAGE16 and STAGE12 staging gates are complete. Actual owner walkthrough,
+  sign-in, and acceptance remain unverified; this record makes no enterprise or
+  all-browser certification claim. Any runtime worker change during testing
+  must be re-run before a checkpoint is accepted.
 
-Checkpoint candidate: CP13 Studio, CP-NONI20 Noni, the clean Gate10 run,
-CONFIG24's 267/267 three-engine run, the no-overlay exact-pin Integration08
-evidence, and WEBKIT22's quality-test portability slice are local checkpoint
-candidates. TEST18 and WEBKIT21 are complete bounded follow-ups, and this spec
-is ready for root's local documentation/checkpoint review. Staging approval and
-owner walkthrough are external next gates, not blockers to freezing accurate
-local documentation; no deployment or enterprise certification is claimed.
+Checkpoint records: CP13 Studio, CP-NONI20 Noni, the frozen QA07/CONFIG24
+270/270 three-engine run, the no-overlay exact-pin Integration08B evidence,
+WEBKIT22's portability slice, STAGE16, and STAGE12 are complete evidence.
+TEST18 and WEBKIT21 are complete bounded follow-ups. The current staging
+release is available for the owner walkthrough; owner sign-in and acceptance
+remain external next gates, and no deployment or enterprise certification is
+claimed here.
 
-Arbiter next action: root reviews the six-file Studio checkpoint (`studio.css`,
-the CSS Go contract, the quality fixture, the pointer fixture, CONFIG24's
-tracked config, and README), preserves all ignored reports/evidence, and
-records the local docs checkpoint. Integration08/CP-NONI20 exact-pin evidence
-remains separately owned; root decides staging approval and owner walkthrough.
-Nothing here is enterprise/deployment certified.
+Arbiter next action: root reviews the five DOC13 documentation edits and
+preserves all ignored reports/evidence, then records the final documentation
+checkpoint without conflating the later docs HEAD with the deployed source.
+Integration08B/CP-NONI20, STAGE16, and STAGE12 evidence remain separately
+identified; root schedules the authenticated owner walkthrough. Nothing here
+is enterprise/deployment certified.
