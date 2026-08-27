@@ -111,6 +111,86 @@ test.describe("@smoke shared content editor focus continuity", () => {
     expect(JSON.parse(await page.locator("#focus-source").inputValue()).blocks).toEqual([]);
   });
 
+  test("keeps focus on an enabled editor control when undo restores an empty snapshot", async ({ page }) => {
+    await mount(page, editorHTML(sourceFor([])));
+
+    await page.locator("[data-content-add='paragraph']").click();
+    await expect(page.locator("[data-content-editor-selected='true'] [data-content-drag-handle]")).toBeFocused();
+
+    const undo = page.locator("[data-content-editor-action='undo']");
+    await expect(undo).toBeEnabled();
+    await undo.click();
+    await expect(page.locator("[data-content-block-id]")).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => {
+      const active = document.activeElement;
+      return !!active
+        && (active.matches("[data-content-editor-action='redo'], [data-content-add]")
+          || active.matches("[data-content-editor-action='undo']"))
+        && !(active as HTMLButtonElement).disabled
+        && !(active as HTMLElement).hidden;
+    })).toBe(true);
+
+    const redo = page.locator("[data-content-editor-action='redo']");
+    await expect(redo).toBeEnabled();
+    await redo.click();
+    await expect(page.locator("[data-content-block-id]")).toHaveCount(1);
+    await expect(page.locator("[data-content-editor-selected='true'] [data-content-drag-handle]")).toBeFocused();
+  });
+
+  test("keeps focus valid when redo removes the final block after undo restores it", async ({ page }) => {
+    await mount(page, editorHTML(sourceFor([{ id: "only", type: "paragraph", text: "Only" }])));
+
+    const root = page.locator("[data-content-editor]");
+    await root.locator("[data-content-block-id='only'] [data-content-editor-action='delete']").click();
+    await expect(root.locator("[data-content-block-id]")).toHaveCount(0);
+
+    const undo = root.locator("[data-content-editor-action='undo']");
+    await expect(undo).toBeVisible();
+    await expect(undo).toBeEnabled();
+    await expect(undo).toBeFocused();
+
+    await undo.click();
+    await expect(root.locator("[data-content-block-id='only']")).toHaveCount(1);
+    await expect(root.locator("[data-content-editor-selected='true'] [data-content-drag-handle]")).toBeFocused();
+
+    const redo = root.locator("[data-content-editor-action='redo']");
+    await expect(redo).toBeEnabled();
+    await redo.click();
+    await expect(root.locator("[data-content-block-id]")).toHaveCount(0);
+    await expect(undo).toBeVisible();
+    await expect(undo).toBeEnabled();
+    await expect(undo).toBeFocused();
+    expect(JSON.parse(await page.locator("#focus-source").inputValue()).blocks).toEqual([]);
+  });
+
+  test("keeps history focus scoped to the editor instance being restored", async ({ page }) => {
+    await mount(page, editorHTML(sourceFor([]), "first", "media-first") + editorHTML(
+      sourceFor([{ id: "second-only", type: "paragraph", text: "Second" }]),
+      "second",
+      "media-second",
+    ));
+
+    const first = page.locator("[data-content-editor]").nth(0);
+    const second = page.locator("[data-content-editor]").nth(1);
+    await first.locator("[data-content-add='paragraph']").click();
+    await expect(first.locator("[data-content-editor-selected='true'] [data-content-drag-handle]")).toBeFocused();
+
+    await first.locator("[data-content-editor-action='undo']").click();
+    await expect(first.locator("[data-content-block-id]")).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => {
+      const active = document.activeElement;
+      const editors = Array.from(document.querySelectorAll("[data-content-editor]"));
+      return !!active
+        && !!editors[0]?.contains(active)
+        && active.matches("[data-content-editor-action='undo'], [data-content-editor-action='redo'], [data-content-add]")
+        && !(active as HTMLButtonElement).disabled
+        && !(active as HTMLElement).hidden;
+    })).toBe(true);
+    await expect(second.locator("[data-content-block-id='second-only']")).toHaveCount(1);
+    await expect(second).toHaveAttribute("data-content-editor-history-can-undo", "false");
+    await expect(second).toHaveAttribute("data-content-editor-history-can-redo", "false");
+  });
+
   test("reveals and focuses selected results for filtered insert, duplicate, and remove", async ({ page }) => {
     await mount(page, editorHTML(sourceFor([
       { id: "alpha", type: "paragraph", text: "Alpha" },

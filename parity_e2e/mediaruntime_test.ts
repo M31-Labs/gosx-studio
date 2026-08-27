@@ -255,6 +255,116 @@ test.describe("GoSXStudioMediaRuntime", () => {
     await expect(page.locator("#dynamicHero + .media-picker")).toHaveCount(1);
   });
 
+  test("filter Enter stays view-only for single and gallery pickers while asset Enter still activates", async ({ page }) => {
+    await installMediaRuntime(page);
+
+    await page.locator("#media-form").evaluate((form) => {
+      const mediaForm = form as HTMLFormElement;
+      const win = window as unknown as { mediaSubmitCount?: number };
+      win.mediaSubmitCount = 0;
+      mediaForm.method = "post";
+      mediaForm.action = "https://example.test/media-submit";
+      const save = document.createElement("button");
+      save.id = "media-save";
+      save.type = "submit";
+      save.textContent = "Save media";
+      mediaForm.appendChild(save);
+      mediaForm.dataset.dirty = "true";
+      mediaForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        win.mediaSubmitCount = (win.mediaSubmitCount ?? 0) + 1;
+      }, true);
+    });
+
+    const singlePicker = page.locator("#hero + .media-picker");
+    const singleTrigger = singlePicker.locator(".media-picker__trigger");
+    const singleSearch = singlePicker.locator(".media-picker__search");
+    const singlePanel = singlePicker.locator(".media-picker__panel");
+    await singleTrigger.click();
+    await singleSearch.fill("cup");
+    const singleBefore = await page.evaluate(() => ({
+      value: (document.querySelector("#hero") as HTMLInputElement).value,
+      alt: (document.querySelector("#heroAlt") as HTMLInputElement).value,
+      dirty: document.querySelector("#media-form")?.getAttribute("data-dirty"),
+      query: (document.querySelector("#hero + .media-picker .media-picker__search") as HTMLInputElement).value,
+    }));
+    await singleSearch.press("Enter");
+    await expect(singleSearch).toBeFocused();
+    await expect(singlePanel).not.toBeHidden();
+    expect(await page.evaluate(() => ({
+      value: (document.querySelector("#hero") as HTMLInputElement).value,
+      alt: (document.querySelector("#heroAlt") as HTMLInputElement).value,
+      dirty: document.querySelector("#media-form")?.getAttribute("data-dirty"),
+      query: (document.querySelector("#hero + .media-picker .media-picker__search") as HTMLInputElement).value,
+      submits: (window as unknown as { mediaSubmitCount?: number }).mediaSubmitCount ?? 0,
+    }))).toEqual({
+      value: singleBefore.value,
+      alt: singleBefore.alt,
+      dirty: singleBefore.dirty,
+      query: "cup",
+      submits: 0,
+    });
+    const composingEnterPrevented = await singleSearch.evaluate((node) => {
+      const event = new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        isComposing: true,
+        key: "Enter",
+      });
+      node.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+    expect(composingEnterPrevented).toBe(true);
+
+    await singlePicker.locator(".media-picker__asset").first().press("Enter");
+    await expect(page.locator("#hero")).toHaveValue("/media/cup.jpg");
+    await expect(page.locator("#heroAlt")).toHaveValue("Cup alt");
+    await expect(singlePanel).toBeHidden();
+    await expect(page.locator("#hero")).toBeFocused();
+
+    await page.locator("#imagesText").evaluate((node) => {
+      const textarea = node as HTMLTextAreaElement;
+      textarea.value = "/media/vase.webp | Vase entry";
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const gallery = page.locator("#imagesText + .media-list-editor");
+    const galleryTrigger = gallery.locator(".media-picker__trigger");
+    const gallerySearch = gallery.locator(".media-picker__search");
+    const galleryPanel = gallery.locator(".media-picker__panel");
+    await galleryTrigger.click();
+    await gallerySearch.fill("cup");
+    const galleryBefore = await page.evaluate(() => ({
+      value: (document.querySelector("#imagesText") as HTMLTextAreaElement).value,
+      dirty: document.querySelector("#media-form")?.getAttribute("data-dirty"),
+      query: (document.querySelector("#imagesText + .media-list-editor .media-picker__search") as HTMLInputElement).value,
+    }));
+    await gallerySearch.press("Enter");
+    await expect(gallerySearch).toBeFocused();
+    await expect(galleryPanel).not.toBeHidden();
+    expect(await page.evaluate(() => ({
+      value: (document.querySelector("#imagesText") as HTMLTextAreaElement).value,
+      dirty: document.querySelector("#media-form")?.getAttribute("data-dirty"),
+      query: (document.querySelector("#imagesText + .media-list-editor .media-picker__search") as HTMLInputElement).value,
+      submits: (window as unknown as { mediaSubmitCount?: number }).mediaSubmitCount ?? 0,
+    }))).toEqual({
+      value: galleryBefore.value,
+      dirty: galleryBefore.dirty,
+      query: "cup",
+      submits: 0,
+    });
+
+    await gallery.locator(".media-picker__asset").first().press("Enter");
+    await expect(page.locator("#imagesText")).toHaveValue(/\/media\/cup\.jpg \| Cup alt/);
+    await expect(galleryPanel).toBeHidden();
+    await expect(galleryTrigger).toBeFocused();
+    await galleryTrigger.click();
+    await gallerySearch.fill("no match");
+    await expect(gallery.locator("[data-media-picker-status]")).toHaveText('No matching media for "no match".');
+    await gallerySearch.press("Escape");
+    await expect(galleryPanel).toBeHidden();
+    await expect(galleryTrigger).toBeFocused();
+  });
+
   test("media gallery preserves focus and duplicate entries through boundary edits and removal", async ({ page }) => {
     await installMediaRuntime(page);
 

@@ -1530,7 +1530,7 @@
     state.source.dispatchEvent(new Event("input", { bubbles: true }));
     render(state);
     syncStatus(state);
-    focusHandle(state, state.selectedID);
+    if (!focusHandle(state, state.selectedID)) focusMutationTarget(state, "");
   }
 
   function undo(state) {
@@ -1587,32 +1587,32 @@
   }
 
   function focusHandle(state, id) {
-    if (!id) return;
+    if (!id) return false;
     var row = state.list.querySelector('[data-content-block-id="' + cssEscape(id) + '"]');
     var handle = row && row.querySelector("[data-content-drag-handle]");
-    if (handle) handle.focus();
+    if (!handle || handle.disabled || handle.hidden) return false;
+    handle.focus();
+    return document.activeElement === handle;
   }
 
   function focusMutationTarget(state, id) {
-    if (id) {
-      var row = state.list.querySelector('[data-content-block-id="' + cssEscape(id) + '"]');
-      var handle = row && row.querySelector("[data-content-drag-handle]");
-      if (handle) {
-        handle.focus();
-        return true;
-      }
-    }
+    if (focusHandle(state, id)) return true;
     var undoButton = state.list.querySelector("[data-content-editor-action='undo']");
-    if (undoButton && !undoButton.disabled) {
+    if (undoButton && !undoButton.disabled && !undoButton.hidden) {
       undoButton.focus();
-      return true;
+      if (document.activeElement === undoButton) return true;
+    }
+    var redoButton = state.list.querySelector("[data-content-editor-action='redo']");
+    if (redoButton && !redoButton.disabled && !redoButton.hidden) {
+      redoButton.focus();
+      if (document.activeElement === redoButton) return true;
     }
     var addButton = state.toolbar && state.toolbar.querySelector("[data-content-add]");
     if (addButton && !addButton.disabled && !addButton.hidden) {
       addButton.focus();
       return true;
     }
-    if (state.source && !state.source.hidden && typeof state.source.focus === "function") {
+    if (state.source && !state.source.hidden && !state.source.disabled && typeof state.source.focus === "function") {
       state.source.focus();
       return true;
     }

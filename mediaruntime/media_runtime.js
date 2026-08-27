@@ -198,6 +198,11 @@
     return "Showing " + count + " media " + (count === 1 ? "result" : "results") + (query ? " for \"" + query + "\"" : "") + ".";
   }
 
+  function preventFilterSubmit(event) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+  }
+
   function upgradeInput(input) {
     if (!input || input.dataset.mediaPickerBound === "true") return;
     var list = mediaListFor(input);
@@ -308,6 +313,7 @@
       }
     });
     search.addEventListener("input", renderGrid);
+    search.addEventListener("keydown", preventFilterSubmit);
     panel.addEventListener("keydown", function (event) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -524,6 +530,7 @@
       renderItems();
     });
     search.addEventListener("input", renderGrid);
+    search.addEventListener("keydown", preventFilterSubmit);
     panel.addEventListener("keydown", function (event) {
       if (event.key === "Escape") {
         event.preventDefault();
