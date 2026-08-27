@@ -26,11 +26,11 @@ import {
 // The two authoring paths assert DIFFERENT, HONEST persistence facts:
 //
 //   create-page (from a blueprint): persists a draft CMS page. Muddy's editor
-//   site-map page list is a fixed topology, so a created CMS page does NOT add a
-//   new site-map/canvas node — therefore we prove persistence the truthful way:
-//   the draft page's public route (404 before) serves 200 after the visible
-//   "Create page" control submits. We do NOT claim it surfaces in the canvas
-//   graph, because for Muddy it does not.
+//   site-map page cards remain the canonical topology, while the refreshed
+//   site-navigator rail surfaces the new CMS page as a direct Content › Pages
+//   link. This parity test keeps the persistence proof on the canonical CMS
+//   pages list; the dedicated page-CMS lifecycle spec covers rail discovery,
+//   draft preview, and publishing end-to-end.
 //
 //   add-component (a home section whose base is already enabled): genuinely adds
 //   a NEW workspace node (hero is DefaultOn, so "Add hero" inserts a
@@ -129,7 +129,7 @@ test.describe("@reference-apps canvas2d authoring parity", () => {
       await expect(page.locator(CANVAS_SELECTOR).first()).toBeAttached({ timeout: 30_000 });
 
       const createResult = await applyCompositionIntentInPlace(page, "create-page:landing", {
-        expectedMessage: "Landing page created with 3 starter sections.",
+        expectedMessage: "Landing page created with 3 starter sections. Edit its sections in Content › Pages.",
         expectedChangeKind: "page",
         requireSelection: false,
       });
@@ -137,9 +137,9 @@ test.describe("@reference-apps canvas2d authoring parity", () => {
       expect(createResult.detail?.result?.previewURL ?? "", "create-page should report the persisted draft preview URL").toMatch(/\/pages\/.+preview=1/);
 
       // Persistence proof: the created draft now appears in the canonical CMS
-      // pages list (title + slug). (Muddy's editor site-map page list is a fixed
-      // topology, so a created CMS page does not add a site-map/canvas node — we
-      // assert what is actually true: the draft persisted as a real CMS page.)
+      // pages list (title + slug). The page-CMS lifecycle test owns the
+      // refreshed rail-link proof; here we keep this canvas authoring parity
+      // assertion focused on persistence while the canvas board remains active.
       await page.goto(`${server.baseURL}/admin/pages`, { waitUntil: "domcontentloaded", timeout: 60_000 });
       const landingRow = page.locator("tr", { has: page.locator("td:has-text('new-page')") });
       await expect(landingRow, "created landing draft should persist in the CMS pages list after the canvas-active create-page").toHaveCount(1);
