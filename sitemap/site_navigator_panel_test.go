@@ -70,12 +70,15 @@ func TestRenderSiteNavigatorPanelUsesTypedProps(t *testing.T) {
 	for _, fragment := range []string{
 		`<section class="studio-nav-panel" data-studio-site-navigator-panel="true" data-studio-mode-panel="site" data-studio-engine-source="gosx" data-studio-site-filter="all" data-gosx-studio-site-navigator-renderer="gosx-studio" data-studio-rail-group="site-navigator">`,
 		`<div class="studio-page-filter" role="toolbar" aria-label="Site area filter">`,
-		`<button type="button" aria-pressed>All</button>`,
 		`<a href="/admin/products" class="is-active" data-gosx-link="true" data-studio-site-page="products" data-studio-site-group="store" title="Manage product catalog"><span>Products</span></a>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("site navigator panel render missing %q:\n%s", fragment, html)
 		}
+	}
+	if !strings.Contains(html, `<button type="button" aria-pressed>All</button>`) &&
+		!strings.Contains(html, `<button type="button" aria-pressed="true">All</button>`) {
+		t.Fatalf("site navigator panel render missing pressed All filter:\n%s", html)
 	}
 }
 
