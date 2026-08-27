@@ -108,6 +108,17 @@ test.describe("@reference-apps Muddy/Noni page CMS lifecycle", () => {
       const publicHTML = await publicAfterPublish.text();
       expect(publicHTML).toContain(marker);
       expect(publicHTML).toContain(title);
+
+      await page.goto(`${server.baseURL}/admin/pages/${pageID}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await restoreBeforeDraftPagePublishRevision(page, pageID);
+      await expect(page).toHaveURL(new RegExp(`/admin/pages/${pageID}\\?restored=1$`));
+      await expect(page.locator(".form-status--ok")).toContainText("Version restored.");
+      await expect(page.locator("input[name='title']")).toHaveValue("Landing");
+      await expect(page.locator("textarea[name='body']")).toHaveValue(/"text": "Landing"/);
+      await expect(page.locator("textarea[name='body']")).not.toHaveValue(new RegExp(marker));
+
+      const publicAfterRestore = await request.get(publicURL);
+      expect(publicAfterRestore.status(), "restoring the prepublish page snapshot should make the public route unpublished again").toBe(404);
     } finally {
       await server.stop();
     }
@@ -125,6 +136,26 @@ async function addVisibleHeadingBlock(page: Page, marker: string) {
   await headingInput.fill(marker);
   await expect(block.locator(".content-block__preview h3"), "the visible block preview should update as the owner types").toHaveText(marker);
   await expect(page.locator("textarea[name='body']")).toHaveValue(new RegExp(marker));
+}
+
+async function restoreBeforeDraftPagePublishRevision(page: Page, pageID: string) {
+  const history = page.locator("[data-studio-revision-history='true']").first();
+  await expect(history, "Page CMS Version history should render after publish").toBeVisible({ timeout: 30_000 });
+  const prepublishRevision = history.locator("li[data-studio-revision]", {
+    has: page.locator("p", { hasText: "Before draft page publish" }),
+  }).filter({
+    has: page.locator("span", { hasText: /^published$/ }),
+  }).first();
+  await expect(prepublishRevision, "Version history should include the page.published prepublish snapshot").toBeVisible();
+
+  const restoreResponsePromise = page.waitForResponse((response) =>
+    response.url().includes(`/admin/pages/${pageID}/__actions/restoreRevision`) &&
+    response.request().method() === "POST",
+  { timeout: 30_000 });
+  await prepublishRevision.locator("button", { hasText: "Restore this version" }).click();
+  const restoreResponse = await restoreResponsePromise;
+  expect([200, 303].includes(restoreResponse.status()), `Restore this version should be accepted/redirected; got ${restoreResponse.status()}`).toBe(true);
+  await page.waitForURL(new RegExp(`/admin/pages/${pageID}\\?restored=1$`), { timeout: 30_000 });
 }
 
 async function triggerPublish(page: Page): Promise<number> {
