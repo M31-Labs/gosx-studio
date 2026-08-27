@@ -2,6 +2,7 @@ package authoring
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -140,6 +141,7 @@ const (
 	AuthoringFieldOperationID          = "gosx_studio_operation_id"
 	AuthoringFieldExpectedRevision     = "gosx_studio_expected_revision"
 	AuthoringFieldExpectedTargetHead   = "gosx_studio_expected_target_head"
+	AuthoringFieldExpectedTargetValue  = "gosx_studio_expected_target_value"
 	AuthoringFieldHistoryOperationID   = "gosx_studio_history_operation_id"
 	// Interaction fields (set-interaction / remove-interaction).
 	AuthoringFieldInteractionKey        = "gosx_studio_interaction_key"
@@ -220,7 +222,10 @@ type AuthoringMutation struct {
 	OperationID        string
 	ExpectedRevision   uint64
 	ExpectedTargetHead string
-	HistoryOperationID string
+	// ExpectedTargetValue is carried as JSON in AuthoringFieldExpectedTargetValue.
+	// A nil pointer means the value-level precondition was omitted.
+	ExpectedTargetValue *OperationValue
+	HistoryOperationID  string
 }
 
 type AuthoringValidation struct {
@@ -617,6 +622,15 @@ func AuthoringMutationFromForm(form map[string]string) (AuthoringMutation, Autho
 		FlowFieldName:        formValue(form, AuthoringFieldFlowFieldName),
 		FlowFieldLabel:       formValue(form, AuthoringFieldFlowFieldLabel),
 	}
+	if raw, present := form[AuthoringFieldExpectedTargetValue]; present {
+		raw = strings.TrimSpace(raw)
+		var expected OperationValue
+		if raw == "" || raw == "null" || !strings.HasPrefix(raw, "{") || json.Unmarshal([]byte(raw), &expected) != nil {
+			validation.AddFieldError(AuthoringFieldExpectedTargetValue, "Enter a valid expected target value.")
+		} else {
+			mutation.ExpectedTargetValue = &expected
+		}
+	}
 	if revision, ok, valid := parseAuthoringInt(formValue(form, AuthoringFieldExpectedRevision)); ok {
 		if valid && revision >= 0 {
 			mutation.ExpectedRevision = uint64(revision)
@@ -712,6 +726,7 @@ func (mutation AuthoringMutation) Normalize() AuthoringMutation {
 	mutation.State = strings.TrimSpace(mutation.State)
 	mutation.OperationID = strings.TrimSpace(mutation.OperationID)
 	mutation.ExpectedTargetHead = strings.TrimSpace(mutation.ExpectedTargetHead)
+	mutation.ExpectedTargetValue = cloneOperationValue(mutation.ExpectedTargetValue)
 	mutation.HistoryOperationID = strings.TrimSpace(mutation.HistoryOperationID)
 	if mutation.Kind == AuthoringOperationSetStyle {
 		mutation.Breakpoint = normalizeStyleBreakpoint(mutation.Breakpoint)
@@ -792,10 +807,7 @@ func (mutation AuthoringMutation) Validate() AuthoringValidation {
 	case AuthoringOperationSetStyle:
 		validateStyleMutation(&validation, mutation)
 	case AuthoringOperationSetField:
-		requirePageComponent(&validation, mutation)
-		if mutation.Binding == "" && mutation.ControlKey == "" {
-			validation.AddFieldError(AuthoringFieldBinding, "Choose a field target.")
-		}
+		requirePageFieldTarget(&validation, mutation)
 	case AuthoringOperationResetStyle:
 		validateStyleTarget(&validation, mutation)
 	case AuthoringOperationUndo, AuthoringOperationRedo:
@@ -879,6 +891,11 @@ func (mutation AuthoringMutation) FormValues() map[string]string {
 		values[AuthoringFieldExpectedRevision] = strconv.FormatUint(mutation.ExpectedRevision, 10)
 	}
 	setFormValue(values, AuthoringFieldExpectedTargetHead, mutation.ExpectedTargetHead)
+	if mutation.ExpectedTargetValue != nil {
+		if raw, err := json.Marshal(mutation.ExpectedTargetValue); err == nil {
+			values[AuthoringFieldExpectedTargetValue] = string(raw)
+		}
+	}
 	setFormValue(values, AuthoringFieldHistoryOperationID, mutation.HistoryOperationID)
 	if mutation.HasPosition {
 		values[AuthoringFieldPosition] = strconv.Itoa(mutation.Position)
@@ -936,6 +953,7 @@ func AuthoringMutationFormInputViews(mutation AuthoringMutation) []map[string]st
 		AuthoringFieldOperationID,
 		AuthoringFieldExpectedRevision,
 		AuthoringFieldExpectedTargetHead,
+		AuthoringFieldExpectedTargetValue,
 		AuthoringFieldHistoryOperationID,
 		AuthoringFieldInteractionKey,
 		AuthoringFieldInteractionKind,
@@ -993,6 +1011,7 @@ func AuthoringMutationView(mutation AuthoringMutation) map[string]any {
 		"operationID":           mutation.OperationID,
 		"expectedRevision":      mutation.ExpectedRevision,
 		"expectedTargetHead":    mutation.ExpectedTargetHead,
+		"expectedTargetValue":   mutation.ExpectedTargetValue,
 		"historyOperationID":    mutation.HistoryOperationID,
 		"interactionKey":        mutation.InteractionKey,
 		"interactionKind":       string(mutation.InteractionKind),
@@ -1039,6 +1058,7 @@ func AuthoringFieldNamesView() map[string]string {
 		"operationID":           AuthoringFieldOperationID,
 		"expectedRevision":      AuthoringFieldExpectedRevision,
 		"expectedTargetHead":    AuthoringFieldExpectedTargetHead,
+		"expectedTargetValue":   AuthoringFieldExpectedTargetValue,
 		"historyOperationID":    AuthoringFieldHistoryOperationID,
 		"interactionKey":        AuthoringFieldInteractionKey,
 		"interactionKind":       AuthoringFieldInteractionKind,
@@ -1238,6 +1258,26 @@ func requirePageComponent(validation *AuthoringValidation, mutation AuthoringMut
 	}
 	if mutation.ComponentKey == "" {
 		validation.AddFieldError(AuthoringFieldComponentKey, "Choose a component.")
+	}
+}
+
+// requirePageFieldTarget validates the two supported SetField addressing
+// shapes: an explicitly bound page-level field (page + binding), or a
+// component-relative control (page + component + control). The latter keeps
+// the existing component requirement for ControlKey-only writes while the
+// former deliberately permits an empty ComponentKey for page-level fields.
+func requirePageFieldTarget(validation *AuthoringValidation, mutation AuthoringMutation) {
+	if mutation.PageKey == "" {
+		validation.AddFieldError(AuthoringFieldPageKey, "Choose a target page.")
+	}
+	if mutation.Binding != "" {
+		return
+	}
+	if mutation.ComponentKey == "" {
+		validation.AddFieldError(AuthoringFieldComponentKey, "Choose a component.")
+	}
+	if mutation.ControlKey == "" {
+		validation.AddFieldError(AuthoringFieldBinding, "Choose a field target.")
 	}
 }
 

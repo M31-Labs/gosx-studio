@@ -60,8 +60,9 @@ func TestRenderBackendBlogIndexPagePreservesCreateFormContract(t *testing.T) {
 		`<p class="form-status form-status--error">Please correct the highlighted fields.</p>`,
 		`<datalist id="blog-media-urls"><option value="/media/noni.jpg" label="noni.jpg" data-media-alt="Noni fruit">noni.jpg</option></datalist>`,
 		`<datalist id="blog-tags"><option value="Care">care</option></datalist>`,
-		`<form class="admin-form" method="post" action="/admin/blog/__actions/create">`,
+		`<form class="admin-form" method="post" action="/admin/blog/__actions/create" data-content-editor-enhanced-submit="true">`,
 		`<input type="hidden" name="csrf_token" value="csrf-token" />`,
+		`<div class="button-row admin-form__primary-actions" data-content-editor-primary-actions="true">`,
 		`<input id="title" name="title" value="Care &lt;Guide&gt;" />`,
 		`<p class="form-error">Title is required.</p>`,
 		`<input id="slug" name="slug" value="care-guide" />`,
@@ -91,11 +92,14 @@ func TestRenderBackendBlogIndexPagePreservesCreateFormContract(t *testing.T) {
 		`<input type="checkbox" name="published" checked="checked" /> Published`,
 		`<input type="checkbox" name="featured" /> Featured`,
 		`<button class="button button--primary" type="submit">Create post</button>`,
-		`<script src="/content-editor.js" defer></script><script src="/media-picker.js" defer></script>`,
+		`<script src="/_gosx/studio/content-editor.js" data-gosx-script="managed" data-gosx-script-load="dom" data-gosx-script-loaded="pending" defer></script><script src="/_gosx/studio/media-runtime.js" data-gosx-script="managed" data-gosx-script-load="dom" data-gosx-script-loaded="pending" defer></script>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("blog index page missing %q:\n%s", fragment, html)
 		}
+	}
+	if got := strings.Count(html, `>Create post<`); got != 1 {
+		t.Fatalf("blog index renderer must expose one canonical Create post action, got %d:\n%s", got, html)
 	}
 
 	assertFragmentOrder(t, html,
@@ -104,8 +108,10 @@ func TestRenderBackendBlogIndexPagePreservesCreateFormContract(t *testing.T) {
 		`<datalist id="blog-media-urls">`,
 		`<datalist id="blog-tags">`,
 		`<form class="admin-form"`,
-		`<script src="/content-editor.js"`,
-		`<script src="/media-picker.js"`,
+		`<div class="button-row admin-form__primary-actions" data-content-editor-primary-actions="true">`,
+		`<input id="title" name="title"`,
+		`<script src="/_gosx/studio/content-editor.js"`,
+		`<script src="/_gosx/studio/media-runtime.js"`,
 	)
 }
 
@@ -117,8 +123,9 @@ func TestRenderBackendBlogIndexPageDefaultsAreEmptySafe(t *testing.T) {
 		`<section class="panel"><div class="panel__header"><h2>Add post</h2></div>`,
 		`<datalist id="blog-media-urls"></datalist>`,
 		`<datalist id="blog-tags"></datalist>`,
-		`<form class="admin-form" method="post" action="">`,
+		`<form class="admin-form" method="post" action="" data-content-editor-enhanced-submit="true">`,
 		`<input type="hidden" name="csrf_token" value="" />`,
+		`<div class="button-row admin-form__primary-actions" data-content-editor-primary-actions="true">`,
 		`<input id="title" name="title" value="" />`,
 		`<p class="form-error"></p>`,
 		`<textarea class="content-editor__source" id="body" name="body" rows="9" data-content-editor-source="true"></textarea>`,
@@ -130,6 +137,9 @@ func TestRenderBackendBlogIndexPageDefaultsAreEmptySafe(t *testing.T) {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("empty-safe blog index page missing %q:\n%s", fragment, html)
 		}
+	}
+	if got := strings.Count(html, `>Create post<`); got != 1 {
+		t.Fatalf("empty blog index renderer must expose one canonical Create post action, got %d:\n%s", got, html)
 	}
 	for _, notWant := range []string{
 		`form-status form-status--error`,

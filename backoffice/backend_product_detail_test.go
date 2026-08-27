@@ -107,7 +107,7 @@ func TestRenderBackendProductDetailPagePreservesFormContract(t *testing.T) {
 		`<button class="button button--secondary" type="submit" formaction="/admin/products/prod_1/__actions/archive" data-admin-confirm="Archive this product? It will be hidden from the storefront.">Archive</button>`,
 		`<a class="button button--secondary" href="/shop/mug-special?preview=1" data-gosx-link="true">Preview</a>`,
 		`<a class="button button--secondary" href="/admin/products" data-gosx-link="true">Back to products</a>`,
-		`<script src="/media-picker.js" defer></script>`,
+		`<script src="/_gosx/studio/media-runtime.js" data-gosx-script="managed" data-gosx-script-load="dom" data-gosx-script-loaded="pending" defer></script>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("product detail renderer missing %q:\n%s", fragment, html)
@@ -121,7 +121,7 @@ func TestRenderBackendProductDetailPagePreservesFormContract(t *testing.T) {
 		`<div class="edit-preview">preview</div>`,
 		`<div class="media-strip media-strip--compact">`,
 		`<button class="button button--primary"`,
-		`<script src="/media-picker.js"`,
+		`<script src="/_gosx/studio/media-runtime.js"`,
 	)
 }
 
@@ -140,7 +140,7 @@ func TestRenderBackendProductDetailPageDefaultsAreEmptySafe(t *testing.T) {
 		`<div class="check-row"><label><input type="checkbox" name="published" /> Published</label><label><input type="checkbox" name="featured" /> Featured</label><label><input type="checkbox" name="requiresShipping" /> Requires shipping</label></div>`,
 		`<button class="button button--primary" type="submit">Save product</button>`,
 		`<a class="button button--secondary" href="" data-gosx-link="true">Preview</a>`,
-		`<script src="/media-picker.js" defer></script>`,
+		`<script src="/_gosx/studio/media-runtime.js" data-gosx-script="managed" data-gosx-script-load="dom" data-gosx-script-loaded="pending" defer></script>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("empty product detail renderer missing %q:\n%s", fragment, html)

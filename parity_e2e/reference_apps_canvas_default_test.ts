@@ -15,7 +15,7 @@ import { DEFAULT_CANVAS_SELECTOR, WASM_FREE_CANVAS_SELECTOR } from "./canvas_ren
 // static WebGPU/Canvas2D-fallback ("wasm-free") path. That premise is stale.
 // Per M1 slice 4 (muddy-noni-commerce app/admin/editor/page.server.go,
 // editorSiteMapCanvasMode), the no-signal default is now "canvas-default": the
-// REAL gosx CanvasBoard (the full-WASM, WebGPU-backed site-map engine) is the
+// REAL gosx CanvasBoard (the runtime/engine-WASM, WebGPU-backed site-map engine) is the
 // SOLE site-map graph visual. The DOM board's graph sub-tree
 // (.studio-site-map-workspace__surface) stays in the markup as the
 // selection/authoring sink but is hidden via gated CSS, since the canvas is the
@@ -24,8 +24,9 @@ import { DEFAULT_CANVAS_SELECTOR, WASM_FREE_CANVAS_SELECTOR } from "./canvas_ren
 //
 // This file now asserts the canvas-default reality: a real CanvasBoard surface
 // (data-gosx-surface-kind="canvas2d", WebGPU backend, the actual
-// gosx-runtime.<hash>.wasm fetched — proving this is genuinely the full-WASM
-// path, not merely the right DOM attribute) with the wasm-free marker ABSENT,
+// gosx-runtime.<hash>.wasm or gosx-runtime-engine.<hash>.wasm fetched — proving
+// a real runtime artifact was selected, not merely the right DOM attribute) with
+// the wasm-free marker ABSENT,
 // plus the preserved editing basics (a canvas pick drives the inspector,
 // create-page, add-component) and a parity check against explicit co-render
 // mode (MUDDY_SITEMAP_CANVAS=1).
@@ -37,7 +38,7 @@ import { DEFAULT_CANVAS_SELECTOR, WASM_FREE_CANVAS_SELECTOR } from "./canvas_ren
 //
 // NOTE: this file deliberately does NOT gate on full 2D/WebGPU paint-pixel
 // evidence (canvas_render_evidence.ts's waitForCanvasBoardRenderEvidence). That
-// assertion is where the independently-tracked defect #1 (full-WASM CanvasBoard
+// assertion is where the independently-tracked defect #1 (WASM CanvasBoard
 // stuck at a 1x1 backing store when hydrated while hidden behind "Advanced")
 // lives — out of scope here and being fixed separately. This file's contract is
 // the STRUCTURAL canvas-default reality (surface identity/attributes + real
@@ -54,7 +55,7 @@ test.describe("@reference-apps canvas-default (no-signal) canvas", () => {
   test.describe.configure({ timeout: 300_000 });
   test.skip(process.env.GOSX_STUDIO_REFERENCE_APP_E2E !== "1", "set GOSX_STUDIO_REFERENCE_APP_E2E=1 to boot sibling reference apps");
 
-  test("Muddy/Noni no-env default uses the real full-WASM CanvasBoard and preserves editing basics", async ({ page, request }, testInfo) => {
+  test("Muddy/Noni no-env default uses the real runtime-WASM CanvasBoard and preserves editing basics", async ({ page, request }, testInfo) => {
     const consoleErrors: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(message.text());
@@ -78,7 +79,7 @@ test.describe("@reference-apps canvas-default (no-signal) canvas", () => {
       await expect(page.locator(BOARD_SELECTOR).first(), "DOM site-map board element must stay in the markup").toBeAttached();
       await expect(page.locator(FORMS_SELECTOR), "managed authoring forms must stay present").toBeAttached();
 
-      // ── canvas-default reality: the REAL full-WASM CanvasBoard, not wasm-free ──
+      // ── canvas-default reality: the REAL runtime-WASM CanvasBoard, not wasm-free ──
       const canvas = page.locator(CANVAS_SELECTOR).first();
       await expect(canvas, "no-env default must emit the real gosx CanvasBoard surface").toBeAttached({ timeout: 30_000 });
       await expect(canvas, "no-env default canvas must carry the canvas2d surface-kind").toHaveAttribute("data-gosx-surface-kind", "canvas2d");
@@ -135,16 +136,16 @@ test.describe("@reference-apps canvas-default (no-signal) canvas", () => {
       expect(picked.boardSelected, `click should set board ${SELECTED_NODE_ATTR}=${target!.id}`).toBe(target!.id);
       expect(picked.label, `click should drive inspector label to ${JSON.stringify(target!.expectedLabel)}`).toBe(target!.expectedLabel);
 
-      // ── real WASM footprint: prove the genuine full-WASM path was taken ───────
+      // ── real WASM footprint: prove a genuine full-runtime/engine artifact was fetched ──
       await page.waitForTimeout(250);
-      const fullWasm = wasmRequests.filter(isFullRuntimeWasm);
+      const runtimeWasm = wasmRequests.filter(isRealRuntimeWasm);
       await testInfo.attach("canvas-default-wasm-footprint-evidence.json", {
         contentType: "application/json",
-        body: JSON.stringify({ wasmRequests, fullWasm }, null, 2),
+        body: JSON.stringify({ wasmRequests, runtimeWasm }, null, 2),
       });
       expect(
-        fullWasm.length,
-        `the no-env default must genuinely fetch the full gosx-runtime.<hash>.wasm (not just carry the right DOM attribute); requests=${JSON.stringify(wasmRequests)}`,
+        runtimeWasm.length,
+        `the no-env default must genuinely fetch a gosx-runtime.<hash>.wasm or gosx-runtime-engine.<hash>.wasm artifact (not just carry the right DOM attribute); requests=${JSON.stringify(wasmRequests)}`,
       ).toBeGreaterThan(0);
 
       // ── preserved editing basics: create-page + add-component ─────────────────
@@ -153,7 +154,7 @@ test.describe("@reference-apps canvas-default (no-signal) canvas", () => {
       await gotoEditor(page, server.baseURL);
       await revealModeIfPresent(page, "advanced");
       const createResult = await applyCompositionIntentInPlace(page, "create-page:landing", {
-        expectedMessage: "Landing page created with 3 starter sections.",
+        expectedMessage: "Landing page created with 3 starter sections. Edit its sections in Content › Pages.",
         expectedChangeKind: "page",
         requireSelection: false,
         requirePreview: false,
@@ -322,6 +323,6 @@ async function clickAndPollForSelection(
   return last;
 }
 
-function isFullRuntimeWasm(url: string): boolean {
-  return /gosx-runtime\.[0-9a-f]+\.wasm/i.test(url) || /\/gosx\/runtime\.wasm/i.test(url);
+function isRealRuntimeWasm(url: string): boolean {
+  return /(?:^|\/)gosx-runtime(?:-engine)?\.[0-9a-f]+\.wasm(?:\?|$)/i.test(url) || /\/gosx\/runtime\.wasm(?:\?|$)/i.test(url);
 }

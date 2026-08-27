@@ -139,7 +139,13 @@ func TestRenderBackendMediaLibraryPagePreservesActionFormContract(t *testing.T) 
 		`<section class="admin-grid">`,
 		`<div class="panel"><div class="panel__header"><h2>Upload file</h2></div><form class="admin-form admin-form--single" method="post" action="/admin/media/upload" enctype="multipart/form-data">`,
 		`<input type="hidden" name="csrf_token" value="csrf-token" />`,
-		`<input id="file" name="file" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/x-icon,.ico,.woff,.woff2,.ttf,.otf" />`,
+		`<div class="field-row" data-media-upload="true"><label for="file">File</label><button class="media-picker__drop-zone" type="button" data-media-upload-dropzone="true" data-media-upload-drop-zone="true" data-studio-media-upload-drop-zone="true" aria-describedby="mediaUploadHelp mediaUploadStatus"><strong>Drop one file here</strong><span>or choose a file before pressing Upload file.</span></button>`,
+		`<input id="file" name="file" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/x-icon,.ico,.woff,.woff2,.ttf,.otf" data-media-upload-input="true" />`,
+		`<p class="field-help" id="mediaUploadHelp">Accepted: images, icons, and font files. Dropping a file only selects it; Upload file saves it.</p>`,
+		`<output class="form-status media-picker__filename" id="mediaUploadStatus" data-media-upload-status="true" data-media-picker-filename="true" aria-live="polite">No file selected.</output>`,
+		`<p class="media-picker__error" data-media-upload-error="true" hidden></p>`,
+		`<img class="media-upload-preview" data-media-upload-preview="true" hidden />`,
+		`<button class="button button--secondary media-picker__clear" type="button" data-media-upload-clear="true" data-media-picker-clear="true" hidden>Clear file</button>`,
 		`<input id="uploadAlt" name="alt" />`,
 		`<button class="button button--primary" type="submit">Upload file</button>`,
 		`<div class="panel"><div class="panel__header"><h2>Add remote asset</h2></div><p class="form-status form-status--error">Please correct the highlighted fields.</p><form class="admin-form admin-form--single" method="post" action="/admin/media/__actions/create">`,
@@ -148,6 +154,7 @@ func TestRenderBackendMediaLibraryPagePreservesActionFormContract(t *testing.T) 
 		`<input id="alt" name="alt" value="Remote &lt;cup&gt;" />`,
 		`<input id="filename" name="filename" value="cup.jpg" />`,
 		`<button class="button button--primary" type="submit">Add asset</button>`,
+		`<script src="/_gosx/studio/media-runtime.js" data-gosx-script="managed" data-gosx-script-load="dom" data-gosx-script-loaded="pending" defer></script>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("media library page missing %q:\n%s", fragment, html)
@@ -162,6 +169,7 @@ func TestRenderBackendMediaLibraryPagePreservesActionFormContract(t *testing.T) 
 		`<section class="admin-grid">`,
 		`<h2>Upload file</h2>`,
 		`<h2>Add remote asset</h2>`,
+		`<script src="/_gosx/studio/media-runtime.js"`,
 	)
 }
 
@@ -174,12 +182,15 @@ func TestRenderBackendMediaLibraryPageDefaultsAreEmptySafe(t *testing.T) {
 		`<section class="panel"><div class="panel__header"><h2>Assets</h2></div><div class="media-grid"></div><p class="empty">No media assets yet.</p></section>`,
 		`<form class="admin-form admin-form--single" method="post" action="/admin/media/upload" enctype="multipart/form-data">`,
 		`<input type="hidden" name="csrf_token" value="" />`,
-		`<input id="file" name="file" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/x-icon,.ico,.woff,.woff2,.ttf,.otf" />`,
+		`data-media-upload-drop-zone="true"`,
+		`data-media-upload-error="true"`,
+		`<input id="file" name="file" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/x-icon,.ico,.woff,.woff2,.ttf,.otf" data-media-upload-input="true" />`,
 		`<form class="admin-form admin-form--single" method="post" action="">`,
 		`<input id="url" name="url" value="" />`,
 		`<p class="form-error"></p>`,
 		`<input id="alt" name="alt" value="" />`,
 		`<input id="filename" name="filename" value="" />`,
+		`<script src="/_gosx/studio/media-runtime.js" data-gosx-script="managed" data-gosx-script-load="dom" data-gosx-script-loaded="pending" defer></script>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("empty-safe media library page missing %q:\n%s", fragment, html)

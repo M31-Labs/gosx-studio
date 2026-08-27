@@ -35,6 +35,7 @@ test.describe("@reference-apps Muddy/Noni page CMS lifecycle", () => {
       });
       const pageID = createResult.detail?.change?.pageKey;
       expect(pageID, "create-page should report the new CMS page id as change.pageKey").toBeTruthy();
+      if (!pageID) throw new Error("create-page should report the new CMS page id as change.pageKey");
 
       const railLink = page.locator(`${SITE_NAVIGATOR} a[href="/admin/pages/${pageID}"]`).first();
       await expect(railLink, "the refreshed editor rail should expose the new CMS page as a direct Content > Pages link").toBeAttached({ timeout: 30_000 });

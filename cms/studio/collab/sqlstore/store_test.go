@@ -100,6 +100,177 @@ func TestDifferentFieldsAcceptAndSameFieldStaleIsRecoverable(t *testing.T) {
 	}
 }
 
+func TestExpectedTargetValueCASRejectsSeedDriftWithoutAdvancingLedger(t *testing.T) {
+	s, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	target := field("seed", "title", "", "").Target
+	current := authoring.PresentValue("seed")
+	if err := s.SeedHeads(context.Background(), resource(), []collab.SeedHead{{Target: target, Value: current}}); err != nil {
+		t.Fatal(err)
+	}
+	request := field("drift", "title", "client", "")
+	wrongExpected := authoring.PresentValue("old")
+	request.ExpectedTargetValue = &wrongExpected
+	_, pe := apply(t, s, principal("a"), request)
+	if pe == nil || pe.Code != collab.ErrorStaleField || pe.CurrentHead != "" || pe.CurrentValue == nil || *pe.CurrentValue != current || pe.SubmittedValue == nil || !pe.SubmittedValue.Present || pe.SubmittedValue.Value != "client" {
+		t.Fatalf("seed drift=%#v", pe)
+	}
+	if tail, err := s.Tail(context.Background(), resource(), 0, 10); err != nil {
+		t.Fatal(err)
+	} else if len(tail) != 0 {
+		t.Fatalf("value conflict must not create accepted history: %#v", tail)
+	}
+	attempts, err := s.Attempts(context.Background(), resource())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(attempts) != 1 || attempts[0].Accepted || attempts[0].ErrorCode != collab.ErrorStaleField || attempts[0].CurrentHead != "" || attempts[0].CurrentValue != current {
+		t.Fatalf("value conflict attempt=%#v", attempts)
+	}
+	var sequence uint64
+	if err := s.DB().QueryRow(`SELECT accepted_sequence FROM studio_resources WHERE resource_key=?`, resource().StableKey()).Scan(&sequence); err != nil {
+		t.Fatal(err)
+	}
+	if sequence != 0 {
+		t.Fatalf("value conflict advanced document revision to %d", sequence)
+	}
+	var head string
+	var present int
+	var value string
+	if err := s.DB().QueryRow(`SELECT head_operation_id,value_present,value FROM studio_field_heads WHERE resource_key=? AND target_key=?`, resource().StableKey(), target.Key(authoring.OperationSetField)).Scan(&head, &present, &value); err != nil {
+		t.Fatal(err)
+	}
+	if head != "" || present != 1 || value != "seed" {
+		t.Fatalf("value conflict changed seeded head: head=%q present=%d value=%q", head, present, value)
+	}
+
+	// Once the client supplies the actual seeded value, the empty head is a
+	// valid optimistic base and the first accepted operation advances normally.
+	request.ID = "accepted"
+	request.ExpectedTargetValue = &current
+	ack, pe := apply(t, s, principal("a"), request)
+	if pe != nil || ack.Sequence != 1 || ack.Record.Before != current {
+		t.Fatalf("matching seeded value should accept: ack=%#v err=%v", ack, pe)
+	}
+}
+
+func TestExpectedTargetValueCASDefaultRemainsOptional(t *testing.T) {
+	s, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	target := field("seed-default", "arbitrary.value", "", "").Target
+	current := authoring.PresentValue("seed")
+	if err := s.SeedHeads(context.Background(), resource(), []collab.SeedHead{{Target: target, Value: current}}); err != nil {
+		t.Fatal(err)
+	}
+	// Open without Options preserves the generic Studio behavior: an omitted
+	// value precondition does not reject an empty-head write, even if a host
+	// seed populated the target value outside the operation ledger.
+	request := field("default-optional", "arbitrary.value", "client", "")
+	ack, pe := apply(t, s, principal("a"), request)
+	if pe != nil || ack.Sequence != 1 || ack.Record.Before != current {
+		t.Fatalf("default optional value precondition should accept: ack=%#v err=%v", ack, pe)
+	}
+}
+
+func TestExpectedTargetValueCASMatchesPresenceAndAcceptedRetryIgnoresIt(t *testing.T) {
+	cases := []struct {
+		name  string
+		seed  authoring.OperationValue
+		other authoring.OperationValue
+	}{
+		{name: "absent", seed: authoring.OperationValue{}, other: authoring.PresentValue("unexpected")},
+		{name: "empty", seed: authoring.PresentValue(""), other: authoring.PresentValue("different")},
+		{name: "string", seed: authoring.PresentValue("seed"), other: authoring.OperationValue{}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s, err := Open(":memory:")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer s.Close()
+			target := field("seed-"+tc.name, "title", "", "").Target
+			if err := s.SeedHeads(context.Background(), resource(), []collab.SeedHead{{Target: target, Value: tc.seed}}); err != nil {
+				t.Fatal(err)
+			}
+			request := field("accepted-"+tc.name, "title", "next", "")
+			request.Target = target
+			request.ExpectedTargetValue = &tc.seed
+			first, pe := apply(t, s, principal("a"), request)
+			if pe != nil || first.Sequence != 1 || first.Record.Before != tc.seed {
+				t.Fatalf("matching %s value should accept: ack=%#v err=%v", tc.name, first, pe)
+			}
+			retry := request
+			retry.ExpectedTargetValue = &tc.other
+			replayed, pe := apply(t, s, principal("a"), retry)
+			if pe != nil || !replayed.Idempotent || replayed.Sequence != first.Sequence {
+				t.Fatalf("retry with changed expected %s value should remain idempotent: ack=%#v err=%v", tc.name, replayed, pe)
+			}
+			if tail, err := s.Tail(context.Background(), resource(), 0, 10); err != nil {
+				t.Fatal(err)
+			} else if len(tail) != 1 || tail[0].Sequence != 1 {
+				t.Fatalf("retry advanced history for %s value: %#v", tc.name, tail)
+			}
+		})
+	}
+}
+
+func TestExpectedTargetValueCASPolicyRequiresValueButAcceptedRetryMayOmitIt(t *testing.T) {
+	requiredField := "configured.required"
+	s, err := Open(":memory:", Options{RequireExpectedTargetValue: func(request authoring.OperationRequest) bool {
+		return request.Kind == authoring.OperationSetField && request.Target.Field == requiredField
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	target := field("seed-required", requiredField, "", "").Target
+	current := authoring.PresentValue("seed")
+	if err := s.SeedHeads(context.Background(), resource(), []collab.SeedHead{{Target: target, Value: current}}); err != nil {
+		t.Fatal(err)
+	}
+	missing := field("required-missing-token", requiredField, "client", "")
+	_, pe := apply(t, s, principal("a"), missing)
+	if pe == nil || pe.Code != collab.ErrorStaleField || pe.CurrentHead != "" || pe.CurrentValue == nil || *pe.CurrentValue != current || pe.SubmittedValue == nil || pe.SubmittedValue.Value != missing.Value {
+		t.Fatalf("configured policy missing token=%#v", pe)
+	}
+	if sequence := acceptedSequence(t, s); sequence != 0 {
+		t.Fatalf("configured policy missing token advanced document revision to %d", sequence)
+	}
+
+	accepted := missing
+	accepted.ID = "required-accepted"
+	accepted.ExpectedTargetValue = &current
+	ack, pe := apply(t, s, principal("a"), accepted)
+	if pe != nil || ack.Sequence != 1 {
+		t.Fatalf("matching configured value should accept: ack=%#v err=%v", ack, pe)
+	}
+	acceptedRetry := accepted
+	acceptedRetry.ExpectedTargetValue = nil
+	replayed, pe := apply(t, s, principal("a"), acceptedRetry)
+	if pe != nil || !replayed.Idempotent || replayed.Sequence != ack.Sequence {
+		t.Fatalf("accepted retry without token should remain idempotent: ack=%#v err=%v", replayed, pe)
+	}
+}
+
+func acceptedSequence(t *testing.T, s *Store) uint64 {
+	t.Helper()
+	var sequence uint64
+	if err := s.DB().QueryRow(`SELECT accepted_sequence FROM studio_resources WHERE resource_key=?`, resource().StableKey()).Scan(&sequence); err != nil {
+		t.Fatal(err)
+	}
+	return sequence
+}
+
 func TestConcurrentDifferentFieldsAcceptAndSameFieldHasOneWinner(t *testing.T) {
 	s, err := Open(":memory:")
 	if err != nil {

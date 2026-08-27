@@ -442,11 +442,93 @@ button.button {
   min-width: 0;
 }
 
-@media (max-width: 1200px) {
+.gosx-studio-toolbar__title {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.gosx-studio-toolbar__title [data-studio-selection-label] {
+  display: inline-block;
+  max-width: min(14rem, 32vw);
+  margin-inline-start: var(--space-chip-x);
+  border-inline-start: 1px solid var(--color-line-strong);
+  padding-inline-start: var(--space-chip-x);
+  overflow: hidden;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
+/* At laptop widths the complete shared toolbar cannot stay on one flex row:
+   wrapping keeps all mode tabs and action controls reachable instead of
+   letting the modebar paint underneath the title/command controls. */
+@media (max-width: 1360px) {
   .editor-toolbar {
     flex-wrap: wrap;
   }
+}
 
+/* The shared Studio toolbar is mounted inside Noni's editor-page shell. Noni
+   gives that shell a single-row grid and a horizontally scrolling modebar;
+   keep the Studio owner modes visible and hit-testable on desktop/laptop
+   surfaces by overriding those shell defaults at a stronger, renderer-scoped
+   specificity. The modebar may occupy a second internal row when needed. */
+@media (min-width: 821px) {
+  .admin-page.editor-page[data-gosx-studio-backend-editor-renderer="gosx-studio"] .editor-toolbar {
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto auto;
+    grid-template-areas: "title modes command actions";
+  }
+
+  .admin-page.editor-page[data-gosx-studio-backend-editor-renderer="gosx-studio"] .studio-modebar {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-self: stretch;
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
+}
+
+/* At bounded desktop/laptop widths, give the owner modes their own full
+   toolbar row. The title, metrics, command launcher, and action group stay
+   together above it, so the modebar never gets stranded in the narrow track
+   left over by the save/history chrome. */
+@media (min-width: 821px) and (max-width: 1360px) {
+  .admin-page.editor-page[data-gosx-studio-backend-editor-renderer="gosx-studio"] .editor-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    grid-template-rows: auto auto;
+    grid-template-areas:
+      "title metrics command actions"
+      "modes modes modes modes";
+  }
+
+  .admin-page.editor-page[data-gosx-studio-backend-editor-renderer="gosx-studio"] .gosx-studio-toolbar__title {
+    grid-area: title;
+  }
+
+  .admin-page.editor-page[data-gosx-studio-backend-editor-renderer="gosx-studio"] .studio-modebar {
+    grid-area: modes;
+  }
+
+  .admin-page.editor-page[data-gosx-studio-backend-editor-renderer="gosx-studio"] .studio-context-strip {
+    grid-area: metrics;
+  }
+
+  .admin-page.editor-page[data-gosx-studio-backend-editor-renderer="gosx-studio"] .studio-command-palette {
+    grid-area: command;
+  }
+
+  .admin-page.editor-page[data-gosx-studio-backend-editor-renderer="gosx-studio"] .editor-toolbar > .button-row {
+    grid-area: actions;
+  }
+}
+
+@media (max-width: 1200px) {
   /* Give the mode tabs the row space they need to stay fully visible and
      clickable down to ~1000px by dropping the launcher's visible "Find"
      label below this breakpoint. The text stays in the accessible name
@@ -2164,11 +2246,1742 @@ button.button {
   border-color: var(--color-accent-strong);
 }
 
+/* CMS authoring forms are long by design, but their identity and primary
+   actions must remain in the first working viewport. Keep this correction
+   scoped to the shared Page/Blog renderers and their enhanced submit hook so
+   unrelated admin forms retain their existing cadence. The renderer places
+   one canonical action bar before the fields; this CSS keeps it visible while
+   editing and leaves archive/restore actions in a separate secondary band. */
+.admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"],
+.admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"],
+.admin-page[data-gosx-studio-backend-page-index-renderer="gosx-studio"],
+.admin-page[data-gosx-studio-backend-blog-index-renderer="gosx-studio"] {
+  gap: var(--space-sm);
+}
+
+.admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] > .admin-heading,
+.admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] > .admin-heading,
+.admin-page[data-gosx-studio-backend-page-index-renderer="gosx-studio"] > .admin-heading,
+.admin-page[data-gosx-studio-backend-blog-index-renderer="gosx-studio"] > .admin-heading {
+  max-width: 100%;
+  margin-bottom: 0;
+  gap: var(--space-chip-y);
+}
+
+.admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] > .admin-heading h1,
+.admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] > .admin-heading h1,
+.admin-page[data-gosx-studio-backend-page-index-renderer="gosx-studio"] > .admin-heading h1,
+.admin-page[data-gosx-studio-backend-blog-index-renderer="gosx-studio"] > .admin-heading h1 {
+  max-width: none;
+  font-size: var(--text-xl);
+  line-height: 1.05;
+}
+
+.admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] > .admin-heading p:not(.kicker),
+.admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] > .admin-heading p:not(.kicker),
+.admin-page[data-gosx-studio-backend-page-index-renderer="gosx-studio"] > .admin-heading p:not(.kicker),
+.admin-page[data-gosx-studio-backend-blog-index-renderer="gosx-studio"] > .admin-heading p:not(.kicker) {
+  line-height: 1.3;
+}
+
+/* The shared site shell gives every admin main a spacious page-intro offset.
+   Authoring forms need that space for fields and the selected first block, so
+   tighten only the Page/Blog CMS routes that carry the scoped renderer hooks. */
+.site-shell--admin:has(.admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"]) .site-main,
+.site-shell--admin:has(.admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"]) .site-main,
+.site-shell--admin:has(.admin-page[data-gosx-studio-backend-page-index-renderer="gosx-studio"]) .site-main,
+.site-shell--admin:has(.admin-page[data-gosx-studio-backend-blog-index-renderer="gosx-studio"]) .site-main {
+  padding-top: var(--space-sm);
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] {
+  align-content: start;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-xs) var(--space-sm);
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .field-row:has(> [data-content-editor-format]) {
+  grid-column: auto;
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] .form-error:empty {
+  display: none;
+  min-height: 0;
+}
+
+/* On the desktop authoring surface, keep view-only search beside the save
+   feedback so the first selected block can enter the working viewport. The
+   editor's runtime owns this child order (search, save status, body label,
+   source, toolbar, list); the mobile override below returns to one readable
+   column. */
+.admin-page .admin-form[data-content-editor-enhanced-submit] .content-editor {
+  grid-template-columns: minmax(0, 1fr) minmax(9rem, min(32%, 20rem));
+  column-gap: var(--space-xs);
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] .content-editor
+  > :where(.content-editor__search-controls, [data-content-editor-search-controls]) {
+  grid-column: 1;
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] .content-editor
+  > :where(.content-editor__save-status, [data-content-editor-save-status]) {
+  grid-column: 2;
+  align-self: end;
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] .content-editor
+  > :where(label, .content-editor__source, .content-editor__toolbar, .content-block-list, [data-content-editor-list]) {
+  grid-column: 1 / -1;
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .admin-form__primary-actions {
+  position: sticky;
+  z-index: 20;
+  top: var(--space-xs);
+  display: flex;
+  min-width: 0;
+  max-width: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-chip-y) var(--space-xs);
+  grid-column: 1 / -1;
+  margin: calc(var(--space-sm) * -1) calc(var(--space-sm) * -1) var(--space-chip-y);
+  padding: var(--space-chip-y) var(--space-sm);
+  border-bottom: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-panel) 94%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--color-ink) 8%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .admin-form__primary-actions > .button {
+  min-width: 0;
+  min-height: var(--space-md);
+  margin: 0;
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .admin-form__secondary-actions {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-chip-y) var(--space-xs);
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--color-line);
+  padding-top: var(--space-chip-y);
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .edit-preview {
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .edit-preview.edit-preview--text {
+  display: flex;
+  min-height: 0;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .edit-preview.edit-preview--text > div {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-chip-y) var(--space-xs);
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .edit-preview.edit-preview--text strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .admin-form__secondary-actions[data-content-editor-danger-actions="true"] {
+  color: var(--color-danger);
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .admin-form__primary-actions > .button--primary {
+  border-color: var(--color-accent-strong);
+  background: var(--color-accent-strong);
+  color: var(--color-canvas-soft);
+}
+
+/* Laptop detail fit: preserve control sizes while tightening only the
+   inter-row rhythm above the first editable block. The index forms keep their
+   established spacing, and mobile keeps its readable single-column cadence. */
+@media (min-width: 821px) {
+  .admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"],
+  .admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] {
+    gap: var(--space-xs);
+  }
+
+  .admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] .admin-form[data-content-editor-enhanced-submit],
+  .admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] .admin-form[data-content-editor-enhanced-submit],
+  .admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] .content-editor,
+  .admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] .content-editor,
+  .admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] .content-block-list,
+  .admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] .content-block-list,
+  .admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] [data-content-editor-list],
+  .admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] [data-content-editor-list] {
+    row-gap: 0.5rem;
+  }
+}
+
+@media (max-width: 820px) {
+  .admin-page .admin-form[data-content-editor-enhanced-submit] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-page .admin-form[data-content-editor-enhanced-submit] .content-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-page .admin-form[data-content-editor-enhanced-submit] .content-editor
+    > :where(.content-editor__search-controls, [data-content-editor-search-controls], .content-editor__save-status, [data-content-editor-save-status]) {
+    grid-column: 1;
+  }
+
+  .admin-page .admin-form[data-content-editor-enhanced-submit] > .admin-form__primary-actions {
+    top: 0;
+    margin-inline: calc(var(--space-sm) * -1);
+    padding-inline: var(--space-sm);
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .admin-page .admin-form[data-content-editor-enhanced-submit] > .admin-form__primary-actions > .button {
+    flex: 1 1 8rem;
+  }
+
+  .admin-page .admin-form[data-content-editor-enhanced-submit] > .admin-form__secondary-actions {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .admin-page .admin-form[data-content-editor-enhanced-submit] > .edit-preview.edit-preview--text {
+    align-items: flex-start;
+  }
+}
+
+/* Modern shared content editor primitives. These rules are intentionally
+   scoped to Studio/admin shells so host storefront rendering stays untouched
+   while Noni admin pages can inherit the shared editor surface after
+   hostruntime/assets/studio.css loads. */
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor * {
+  touch-action: manipulation;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor__toolbar,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__header,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-content-editor-toolbar],
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-content-block-toolbar] {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-chip-y) var(--space-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor__toolbar
+  > *,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-content-editor-toolbar]
+  > *,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__header
+  > *,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-content-block-toolbar]
+  > * {
+  min-width: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor__toolbar
+  :where(button, .button, input, select, output),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-content-editor-toolbar]
+  :where(button, .button, input, select, output),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__header
+  :where(button, .button, select, output),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-content-block-toolbar]
+  :where(button, .button, select, output) {
+  min-height: var(--space-md);
+  max-width: 100%;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor__toolbar
+  :where(output, [data-content-editor-count], [data-content-editor-save-state]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-content-editor-toolbar]
+  :where(output, [data-content-editor-count], [data-content-editor-save-state]) {
+  width: fit-content;
+  color: var(--color-accent-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__search, [data-content-editor-search]) {
+  flex: 1 1 calc(var(--space-3xl) + var(--space-lg));
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__search-controls, [data-content-editor-search-controls]) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  min-width: 0;
+  max-width: 100%;
+  align-items: end;
+  gap: var(--space-chip-y) var(--space-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor__search-label {
+  display: grid;
+  min-width: 0;
+  gap: 0.45rem;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__search-input, [data-content-editor-search]) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__search-clear, [data-content-editor-search-clear]) {
+  display: inline-flex;
+  min-width: var(--space-md);
+  min-height: var(--space-md);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-accent-strong);
+  cursor: pointer;
+  padding: var(--space-chip-y) var(--space-chip-x);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__search-clear, [data-content-editor-search-clear]):hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__search-clear, [data-content-editor-search-clear]):focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-canvas));
+  color: var(--color-ink);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 72%, transparent);
+  outline-offset: 2px;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__search-count, [data-content-editor-search-count]) {
+  display: inline-flex;
+  min-height: var(--space-md);
+  align-items: center;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor__source {
+  min-width: 0;
+  max-width: 100%;
+  min-height: calc(var(--space-3xl) + var(--space-lg));
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block-list,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-content-editor-list] {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block {
+  position: relative;
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  padding: var(--space-xs);
+  scroll-margin: var(--space-md);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block:hover {
+  border-color: var(--color-line-strong);
+  background: color-mix(in srgb, var(--color-panel) 78%, var(--color-canvas-soft));
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 26%, transparent);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block:is(
+    .is-selected,
+    [aria-selected="true"],
+    [data-selected="true"],
+    [data-content-block-selected="true"],
+    [data-content-editor-selected="true"]
+  ) {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-canvas-soft));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 24%, transparent),
+    var(--shadow-control);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block:is(
+    .is-dragging,
+    [data-content-block-dragging="true"],
+    [data-content-editor-drag-preview="true"],
+    [data-dragging="true"]
+  ) {
+  border-color: var(--color-accent);
+  opacity: 0.84;
+  box-shadow: var(--shadow-panel);
+  cursor: grabbing;
+  transform: scale(0.995);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block:is(
+    .is-drop-before,
+    .is-drop-after,
+    [data-drop-position="before"],
+    [data-drop-position="after"],
+    [data-content-editor-drop="before"],
+    [data-content-editor-drop="after"],
+    [data-content-editor-drop-before],
+    [data-content-editor-drop-after],
+    [data-content-block-drop="before"],
+    [data-content-block-drop="after"]
+  )::before {
+  position: absolute;
+  z-index: 1;
+  inset-inline: var(--space-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--space-sm);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-accent-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block:is(
+    .is-drop-before,
+    [data-drop-position="before"],
+    [data-content-editor-drop="before"],
+    [data-content-editor-drop-before],
+    [data-content-block-drop="before"]
+  )::before {
+  content: "Drop before";
+  top: calc(var(--space-xs) * -1);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block:is(
+    .is-drop-after,
+    [data-drop-position="after"],
+    [data-content-editor-drop="after"],
+    [data-content-editor-drop-after],
+    [data-content-block-drop="after"]
+  )::before {
+  content: "Drop after";
+  bottom: calc(var(--space-xs) * -1);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .content-block__drag-handle,
+    .content-block__move,
+    [data-content-drag-handle],
+    [data-content-editor-drag-handle],
+    [data-content-block-handle],
+    [data-content-editor-action],
+    [data-content-editor-move]
+  ) {
+  display: inline-flex;
+  min-width: var(--space-md);
+  min-height: var(--space-md);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-accent-strong);
+  cursor: grab;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  touch-action: none;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-spring);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .content-block__drag-handle,
+    .content-block__move,
+    [data-content-drag-handle],
+    [data-content-editor-drag-handle],
+    [data-content-block-handle],
+    [data-content-editor-action],
+    [data-content-editor-move]
+  ):hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .content-block__drag-handle,
+    .content-block__move,
+    [data-content-drag-handle],
+    [data-content-editor-drag-handle],
+    [data-content-block-handle],
+    [data-content-editor-action],
+    [data-content-editor-move]
+  ):focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-canvas));
+  color: var(--color-ink);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 72%, transparent);
+  outline-offset: 2px;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .content-block__drag-handle,
+    .content-block__move,
+    [data-content-drag-handle],
+    [data-content-editor-drag-handle],
+    [data-content-block-handle],
+    [data-content-editor-action],
+    [data-content-editor-move]
+  ):active,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .content-block__drag-handle,
+    .content-block__move,
+    [data-content-drag-handle],
+    [data-content-editor-drag-handle],
+    [data-content-block-handle],
+    [data-content-editor-action],
+    [data-content-editor-move]
+  )[aria-pressed="true"] {
+  cursor: grabbing;
+  transform: scale(0.96);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.45fr);
+  gap: var(--space-sm);
+  align-items: start;
+  min-width: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__fields,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__field {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__field
+  span {
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__field
+  :where(input, select, textarea) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__preview {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  min-height: calc(var(--space-xl) + var(--space-lg));
+  align-content: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  padding: var(--space-xs);
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__preview
+  :where(h1, h2, h3, p, blockquote, ul, ol, figure) {
+  margin: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__preview
+  :where(h1, h2, h3) {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  line-height: 1.1;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__preview
+  blockquote {
+  border-left: 3px solid var(--color-accent);
+  padding-left: var(--space-xs);
+  color: var(--color-ink-soft);
+  font-family: var(--font-display);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__preview
+  img {
+  width: 100%;
+  max-width: 100%;
+  max-height: calc(var(--space-3xl) + var(--space-lg));
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  object-fit: cover;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__preview-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block:is(.is-folded, [data-content-block-folded="true"])
+  .content-block__body {
+  display: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block
+  :where(details) {
+  min-width: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block
+  :where(summary) {
+  cursor: pointer;
+  color: var(--color-accent-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .content-editor__empty,
+    .content-editor__source-error,
+    [data-content-editor-empty],
+    [data-content-editor-source-error],
+    [data-content-editor-keyboard-help],
+    [data-content-editor-announcement],
+    [data-content-editor-status]
+  ) {
+  display: block;
+  max-width: 100%;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-panel) 80%, var(--color-canvas));
+  padding: var(--space-xs);
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__source-error, [data-content-editor-source-error]) {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+/* ContentEditor puts history controls beside the live block count inside the
+   rendered list, outside each block header. Keep that row a compact control
+   group so the count does not become a full-width panel and push the first
+   selected block below the authoring viewport. */
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__history, [data-content-editor-history]) {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-chip-y);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__history, [data-content-editor-history])
+  :where(button, [data-content-editor-action]) {
+  display: inline-flex;
+  min-width: var(--space-md);
+  min-height: var(--space-md);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-accent-strong);
+  cursor: pointer;
+  padding: var(--space-chip-y) var(--space-chip-x);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__history, [data-content-editor-history])
+  :where(button, [data-content-editor-action]):hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__history, [data-content-editor-history])
+  :where(button, [data-content-editor-action]):focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-canvas));
+  color: var(--color-ink);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 72%, transparent);
+  outline-offset: 2px;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__history, [data-content-editor-history])
+  :where(button, [data-content-editor-action]):disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__history, [data-content-editor-history])
+  :where(.content-editor__status, [data-content-editor-status]) {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.2;
+}
+
+/* Save feedback is part of the editor surface, not an implementation detail
+   hidden in the network layer. ContentEditor creates this node when a host
+   does not provide one, so style both the class and data hook. The explicit
+   two-column layout keeps the short state label distinct from the longer
+   explanation and leaves room for a retry action without the old
+   "ReadyReady" inline-text collision. */
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-status, [data-content-editor-save-status]) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-chip-y) var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-label, [data-content-editor-save-label]) {
+  display: inline-flex;
+  min-width: 0;
+  min-height: var(--space-md);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  padding: var(--space-chip-y) var(--space-chip-x);
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-detail, [data-content-editor-save-detail-text]) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-retry, [data-content-editor-save-retry]) {
+  display: inline-flex;
+  min-width: var(--space-md);
+  min-height: var(--space-md);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-soft);
+  color: var(--color-accent-strong);
+  cursor: pointer;
+  padding: var(--space-chip-y) var(--space-chip-x);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-retry, [data-content-editor-save-retry]):hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-retry, [data-content-editor-save-retry]):focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-canvas));
+  color: var(--color-ink);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 72%, transparent);
+  outline-offset: 2px;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-retry, [data-content-editor-save-retry]):disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Initial ContentEditor markup carries the same short "Ready" copy in its
+   label and detail slots. Keep the status truthful without repeating that
+   word; once dirty/saving/saved/error states are set, the detail remains
+   visible for its useful explanation. */
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="idle"]
+  :where(.content-editor__save-detail, [data-content-editor-save-detail-text]) {
+  display: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="saved"]
+  :where(.content-editor__save-label, [data-content-editor-save-label]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-save-state-value="saved"] {
+  border-color: color-mix(in srgb, var(--color-moss) 44%, var(--color-line));
+  color: var(--color-moss);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="saving"]
+  :where(.content-editor__save-label, [data-content-editor-save-label]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="dirty"]
+  :where(.content-editor__save-label, [data-content-editor-save-label]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="offline"]
+  :where(.content-editor__save-label, [data-content-editor-save-label]) {
+  border-color: color-mix(in srgb, var(--color-accent) 52%, var(--color-line));
+  color: var(--color-accent-strong);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="failed"]
+  :where(.content-editor__save-label, [data-content-editor-save-label]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="unconfirmed"]
+  :where(.content-editor__save-label, [data-content-editor-save-label]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="auth"]
+  :where(.content-editor__save-label, [data-content-editor-save-label]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="conflict"]
+  :where(.content-editor__save-label, [data-content-editor-save-label]) {
+  border-color: color-mix(in srgb, var(--color-danger) 52%, var(--color-line));
+  color: var(--color-danger);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="failed"]
+  :where(.content-editor__save-detail, [data-content-editor-save-detail-text]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="unconfirmed"]
+  :where(.content-editor__save-detail, [data-content-editor-save-detail-text]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="auth"]
+  :where(.content-editor__save-detail, [data-content-editor-save-detail-text]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="conflict"]
+  :where(.content-editor__save-detail, [data-content-editor-save-detail-text]) {
+  color: var(--color-danger);
+}
+
+@media (pointer: coarse) {
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(.content-editor__save-retry, [data-content-editor-save-retry]) {
+    min-width: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+    min-height: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+  }
+}
+
+/* Shared media picker and upload drop zone primitives. Kept separate from the
+   brand-media island classes above because resource forms, content blocks, and
+   host adapters also use the compact .media-picker* contract. */
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.media-picker, [data-media-picker]) {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__toolbar {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__toolbar
+  > * {
+  min-width: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__preview {
+  display: grid;
+  flex: 1 1 calc(var(--size-thumb-md) * 2);
+  grid-template-columns: var(--size-thumb-sm) minmax(0, 1fr);
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.media-picker__preview img, .media-picker__file) {
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  object-fit: cover;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__file {
+  display: grid;
+  place-items: center;
+  color: var(--color-accent-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.media-picker__filename, [data-media-picker-filename]) {
+  display: block;
+  min-width: 0;
+  color: var(--color-ink-soft);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.media-picker__empty, [data-media-picker-empty]) {
+  grid-column: 1 / -1;
+  margin: 0;
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-panel) 74%, var(--color-canvas));
+  padding: var(--space-xs);
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.media-picker__trigger, .media-picker__clear, [data-media-picker-clear]) {
+  width: auto;
+  min-height: var(--space-md);
+  border-radius: var(--radius-pill);
+  color: var(--color-accent-strong);
+  font-size: var(--text-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__panel {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  padding: var(--space-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__panel[hidden] {
+  display: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--size-thumb-md), 1fr));
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  max-height: min(calc(var(--size-thumb-md) * 4), 56vh);
+  overflow: auto;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__asset {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  padding: var(--space-xs);
+  text-align: left;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__asset:hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__asset:focus-visible,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__asset[aria-selected="true"] {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-canvas-soft));
+  color: var(--color-ink);
+  transform: translateY(calc(var(--space-chip-y) * -1));
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.media-picker__asset img, .media-picker__asset .media-picker__file) {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__asset
+  span:last-child {
+  color: var(--color-ink-soft);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .media-picker__drop-zone,
+    .media-picker__dropzone,
+    [data-media-picker-dropzone],
+    [data-media-upload-dropzone],
+    [data-media-upload-drop-zone],
+    [data-studio-media-upload-drop-zone]
+  ) {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  min-height: calc(var(--space-3xl) + var(--space-md));
+  align-content: center;
+  justify-items: center;
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-panel) 80%, var(--color-canvas));
+  padding: var(--space-sm);
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .media-picker__drop-zone,
+    .media-picker__dropzone,
+    [data-media-picker-dropzone],
+    [data-media-upload-dropzone],
+    [data-media-upload-drop-zone],
+    [data-studio-media-upload-drop-zone]
+  ):hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .media-picker__drop-zone,
+    .media-picker__dropzone,
+    [data-media-picker-dropzone],
+    [data-media-upload-dropzone],
+    [data-media-upload-drop-zone],
+    [data-studio-media-upload-drop-zone]
+  ):focus-within,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload][data-media-drop-active="true"]
+  :where([data-media-upload-drop-zone], [data-media-upload-dropzone]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .media-picker__drop-zone,
+    .media-picker__dropzone,
+    [data-media-picker-dropzone],
+    [data-media-upload-dropzone],
+    [data-media-upload-drop-zone],
+    [data-studio-media-upload-drop-zone]
+  ):is(.is-drag-over, [data-drag-over="true"], [data-media-drop-active="true"]) {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-panel));
+  color: var(--color-ink);
+  transform: translateY(calc(var(--space-chip-y) * -1));
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.media-picker__error, [data-media-picker-error], [data-media-upload-error]) {
+  margin: 0;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-canvas));
+  padding: var(--space-xs);
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload] {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload-preview] {
+  width: 100%;
+  max-width: calc(var(--size-thumb-md) * 2);
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  object-fit: cover;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload-preview][hidden],
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload-clear][hidden],
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload-error][hidden] {
+  display: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload-status] {
+  color: var(--color-ink-soft);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload-status][data-media-upload-status-kind="ok"] {
+  color: var(--color-moss);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload-status][data-media-upload-status-kind="error"] {
+  color: var(--color-danger);
+}
+
+/* SectionOrder sits between the preview toolbar and iframe. Keep it compact
+   and readable while preserving the real frame as the primary canvas. */
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order="true"] {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  border-block: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-panel) 78%, var(--color-canvas));
+  padding: var(--space-xs);
+}
+
+/* The lane is an optional second child of .studio-page-canvas. Its presence
+   must not steal the flexible track from the real preview stage: without
+   this selector, the base four-row canvas puts the lane in the 1fr row and
+   leaves the iframe in an auto row with no useful height. Keep the legacy
+   four-child canvas untouched when no lane is rendered. */
+.studio-page-canvas:has(> [data-gosx-studio-section-order="true"]) {
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+}
+
+.studio-page-canvas:has(> [data-gosx-studio-section-order="true"])
+  > [data-gosx-studio-section-order="true"] {
+  grid-row: 2;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.studio-page-canvas:has(> [data-gosx-studio-section-order="true"])
+  > .studio-page-canvas__stage {
+  grid-row: 3;
+}
+
+.studio-page-canvas:has(> [data-gosx-studio-section-order="true"])
+  > .studio-page-canvas__status {
+  grid-row: 4;
+}
+
+.studio-page-canvas:has(> [data-gosx-studio-section-order="true"])
+  > .studio-page-canvas__diagnostic {
+  grid-row: 5;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-enabled="false"] {
+  background: color-mix(in srgb, var(--color-stone) 12%, var(--color-canvas));
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .studio-page-canvas__section-order-header {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-chip-y) var(--space-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .studio-page-canvas__section-order-title {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  line-height: 1.1;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .studio-page-canvas__section-order-guidance {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  line-height: 1.3;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-status="true"] {
+  min-width: 0;
+  color: var(--color-accent-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-state="saving"]
+  [data-gosx-studio-section-order-status="true"] {
+  color: var(--color-accent-strong);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-state="saved"]
+  [data-gosx-studio-section-order-status="true"] {
+  color: var(--color-moss);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-state="error"]
+  [data-gosx-studio-section-order-status="true"] {
+  color: var(--color-danger);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-list="true"] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--space-3xl) + var(--space-xl))), 1fr));
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item] {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: var(--space-chip-y);
+  min-width: 0;
+  align-items: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  padding: var(--space-chip-y);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item]:hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item]:focus-within {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 7%, var(--color-canvas-soft));
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item][aria-selected="true"] {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 24%, transparent);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item][data-gosx-studio-section-order-dragging="true"] {
+  opacity: 0.86;
+  cursor: grabbing;
+  box-shadow: var(--shadow-control);
+  transform: scale(0.99);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item][data-gosx-studio-section-order-locked="true"] {
+  color: var(--color-muted);
+  background: color-mix(in srgb, var(--color-stone) 10%, var(--color-canvas-soft));
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-name="true"] {
+  min-width: 0;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    [data-gosx-studio-section-order-handle="true"],
+    [data-gosx-studio-section-order-move],
+    [data-gosx-studio-section-order-history],
+    [data-gosx-studio-section-order-preview-handle="true"]
+  ) {
+  display: inline-flex;
+  min-width: var(--space-md);
+  min-height: var(--space-md);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-accent-strong);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-spring);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where([data-gosx-studio-section-order-handle="true"], [data-gosx-studio-section-order-preview-handle="true"]) {
+  cursor: grab;
+  touch-action: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    [data-gosx-studio-section-order-handle="true"],
+    [data-gosx-studio-section-order-move],
+    [data-gosx-studio-section-order-history],
+    [data-gosx-studio-section-order-preview-handle="true"]
+  ):hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    [data-gosx-studio-section-order-handle="true"],
+    [data-gosx-studio-section-order-move],
+    [data-gosx-studio-section-order-history],
+    [data-gosx-studio-section-order-preview-handle="true"]
+  ):focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-canvas));
+  color: var(--color-ink);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 72%, transparent);
+  outline-offset: 2px;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    [data-gosx-studio-section-order-handle="true"],
+    [data-gosx-studio-section-order-move],
+    [data-gosx-studio-section-order-history],
+    [data-gosx-studio-section-order-preview-handle="true"]
+  ):active {
+  cursor: grabbing;
+  transform: scale(0.96);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    [data-gosx-studio-section-order-handle="true"],
+    [data-gosx-studio-section-order-move],
+    [data-gosx-studio-section-order-history]
+  ):disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  transform: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-controls="true"] {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-chip-y);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item][data-gosx-studio-section-order-drop]::before,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-preview-handle="true"][data-gosx-studio-section-order-drop]::before {
+  position: absolute;
+  z-index: 1;
+  inset-inline: var(--space-chip-y);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--space-sm);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-accent-strong);
+  content: "Drop here";
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item][data-gosx-studio-section-order-drop="before"]::before,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-preview-handle="true"][data-gosx-studio-section-order-drop="before"]::before {
+  content: "Drop before";
+  top: calc(var(--space-xs) * -1);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item][data-gosx-studio-section-order-drop="after"]::before,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-preview-handle="true"][data-gosx-studio-section-order-drop="after"]::before {
+  content: "Drop after";
+  bottom: calc(var(--space-xs) * -1);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-overlay="true"] {
+  color: var(--color-accent-strong);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-preview-handle="true"] {
+  box-shadow: var(--shadow-control);
+  opacity: 0.94;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-preview-handle="true"][data-gosx-studio-section-order-dragging="true"] {
+  border-color: var(--color-accent);
+  cursor: grabbing;
+  opacity: 1;
+  transform: scale(0.98);
+}
+
+@media (pointer: coarse) {
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-editor__toolbar
+    :where(button, .button, input, select),
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    [data-content-editor-toolbar]
+    :where(button, .button, input, select),
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(
+      .content-block__drag-handle,
+      .content-block__move,
+      [data-content-drag-handle],
+      [data-content-editor-drag-handle],
+      [data-content-block-handle],
+      [data-content-editor-action],
+      [data-content-editor-move]
+    ),
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(.content-editor__search-clear, [data-content-editor-search-clear]),
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(.media-picker__trigger, .media-picker__clear, [data-media-picker-clear]),
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(
+      [data-media-upload-drop-zone],
+      [data-media-upload-dropzone],
+      [data-media-upload-clear],
+      [data-gosx-studio-section-order-handle="true"],
+      [data-gosx-studio-section-order-move],
+      [data-gosx-studio-section-order-history],
+      [data-gosx-studio-section-order-preview-handle="true"]
+    ) {
+    min-width: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+    min-height: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+  }
+
+  .admin-page .admin-form[data-content-editor-enhanced-submit]
+    > :where(.admin-form__primary-actions, .admin-form__secondary-actions)
+    > .button {
+    min-height: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+  }
+}
+
+@media (max-width: 820px) {
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-block__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-editor__toolbar,
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    [data-content-editor-toolbar],
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-block__header,
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    [data-content-block-toolbar] {
+    align-items: stretch;
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-editor__toolbar
+    :where(button, .button, input, select),
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    [data-content-editor-toolbar]
+    :where(button, .button, input, select) {
+    flex: 1 1 calc(var(--space-3xl) + var(--space-lg));
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-picker__toolbar,
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-picker__preview {
+    align-items: stretch;
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-picker__preview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-picker__toolbar
+    :where(button, .button, input, select) {
+    flex: 1 1 calc(var(--space-3xl) + var(--space-lg));
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    [data-gosx-studio-section-order-list="true"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    [data-gosx-studio-section-order-item] {
+    /* Keep the optional ordering lane compact at phone widths. The controls
+       already receive 44px minimum targets under pointer:coarse; stacking
+       them as full-width rows makes five short section cards consume the
+       viewport before the real preview stage is reachable. */
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    [data-gosx-studio-section-order-item]
+    :where(
+      [data-gosx-studio-section-order-handle="true"],
+      [data-gosx-studio-section-order-move]
+    ) {
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-block,
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(
+      .content-block__drag-handle,
+      .content-block__move,
+      [data-content-drag-handle],
+      [data-content-editor-drag-handle],
+      [data-content-block-handle],
+      [data-content-editor-action],
+      [data-content-editor-move]
+    ),
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-picker__asset,
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(
+      .media-picker__drop-zone,
+      .media-picker__dropzone,
+      [data-media-picker-dropzone],
+      [data-media-upload-dropzone],
+      [data-media-upload-drop-zone],
+      [data-studio-media-upload-drop-zone]
+    ),
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    [data-gosx-studio-section-order-item],
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(
+      [data-gosx-studio-section-order-handle="true"],
+      [data-gosx-studio-section-order-move],
+      [data-gosx-studio-section-order-history],
+      [data-gosx-studio-section-order-preview-handle="true"]
+    ) {
+    transition: none;
+    transform: none;
+  }
+}
+
 @media (max-width: 820px) {
   .admin-page .panel__header,
   .admin-page .button-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  /* :where() intentionally carries zero specificity. The earlier desktop
+     .admin-page .form-section rule therefore wins unless this mobile
+     override keeps the same concrete selector, leaving SEO's Meta title and
+     Meta image fields cramped into two columns at phone widths. */
+  .admin-page .form-section {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .admin-page :where(.schema-columns, .admin-form, .form-section) {
@@ -3184,4 +4997,3 @@ form:has(> [data-studio-direct-edit-field]) > button {
     transform: none;
   }
 }
-

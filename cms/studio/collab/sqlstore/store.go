@@ -19,9 +19,21 @@ import (
 
 const schemaVersion = 1
 
-type Store struct{ db *sql.DB }
+// Options configures host-owned collaboration policies without changing the
+// generic Studio protocol. A nil RequireExpectedTargetValue preserves the
+// preexisting optional-precondition behavior for every operation family.
+// The function is captured when Open constructs a Store and is never mutated
+// by the store afterward.
+type Options struct {
+	RequireExpectedTargetValue func(authoring.OperationRequest) bool
+}
 
-func Open(path string) (*Store, error) {
+type Store struct {
+	db                         *sql.DB
+	requireExpectedTargetValue func(authoring.OperationRequest) bool
+}
+
+func Open(path string, options ...Options) (*Store, error) {
 	if strings.TrimSpace(path) == "" {
 		return nil, fmt.Errorf("studio collaboration database path is required")
 	}
@@ -32,7 +44,11 @@ func Open(path string) (*Store, error) {
 	// A single writer connection makes transaction ordering explicit and also
 	// keeps :memory: databases coherent in tests.
 	db.SetMaxOpenConns(1)
-	s := &Store{db: db}
+	var optionsValue Options
+	if len(options) > 0 {
+		optionsValue = options[0]
+	}
+	s := &Store{db: db, requireExpectedTargetValue: optionsValue.RequireExpectedTargetValue}
 	if err := s.migrate(context.Background()); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -234,7 +250,11 @@ func (s *Store) Apply(ctx context.Context, command collab.ApplyCommand) (collab.
 	if err != nil {
 		return collab.OperationAck{}, storeError(err)
 	}
-	if effective.ExpectedTargetHead != currentHead {
+	// Host-owned policies can require a complete-value CAS token for selected
+	// targets. Evaluate the immutable predicate only after operation-ID
+	// idempotency, and only when the request omitted its optional token.
+	requiresExpectedTargetValue := request.ExpectedTargetValue == nil && s.requireExpectedTargetValue != nil && s.requireExpectedTargetValue(request)
+	if effective.ExpectedTargetHead != currentHead || (effective.ExpectedTargetValue != nil && *effective.ExpectedTargetValue != currentValue) || requiresExpectedTargetValue {
 		protocolErr := collab.NewProtocolError(collab.ErrorStaleField, "field head changed; recover using the returned value and head")
 		protocolErr.OperationID, protocolErr.CurrentHead = request.ID, currentHead
 		valueCopy := currentValue

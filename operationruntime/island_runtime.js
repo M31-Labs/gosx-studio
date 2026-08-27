@@ -81,7 +81,7 @@
     if (!Number.isFinite(revision) || revision < 0) revision = 0;
     var kind = payload.gosx_studio_operation;
     var durableField = DURABLE_FIELD_BY_KIND[kind];
-    return {
+    var request = {
       schemaVersion: 1,
       id: payload.gosx_studio_operation_id,
       kind: kind,
@@ -101,6 +101,10 @@
       expectedTargetHead: payload.gosx_studio_expected_target_head || "",
       historyOperationId: payload.gosx_studio_history_operation_id || ""
     };
+    if (payload.gosx_studio_expected_target_value !== undefined) {
+      request.expectedTargetValue = JSON.parse(payload.gosx_studio_expected_target_value);
+    }
+    return request;
   }
   function collaborationResponse(ack) {
     var record = (ack && ack.record) || {}, after = record.after || {};
@@ -225,6 +229,9 @@
         gosx_studio_control_kind: extra.controlKind || "",
         gosx_studio_interaction_key: extra.interactionKey || "", gosx_studio_interaction_kind: extra.interactionKind || "", gosx_studio_interaction_effect: extra.interactionEffect || "",
         gosx_studio_interaction_duration_ms: extra.durationMs || "", gosx_studio_interaction_delay_ms: extra.delayMs || "", gosx_studio_interaction_once: extra.once ? "true" : "" };
+      if (extra.expectedTargetValue !== undefined && extra.expectedTargetValue !== null) {
+        payload.gosx_studio_expected_target_value = JSON.stringify(extra.expectedTargetValue);
+      }
       return submit(form, payload, target, extra).then(function (response) {
         if (!response.ok) throw new Error("Operation failed (" + response.status + ")");
         return response.clone().json().catch(function () { return {}; }).then(function (body) {

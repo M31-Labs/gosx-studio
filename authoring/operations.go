@@ -190,7 +190,11 @@ type OperationRequest struct {
 	Value                    string          `json:"value,omitempty"`
 	ExpectedDocumentRevision uint64          `json:"expectedDocumentRevision"`
 	ExpectedTargetHead       string          `json:"expectedTargetHead,omitempty"`
-	HistoryOperationID       string          `json:"historyOperationId,omitempty"`
+	// ExpectedTargetValue is an optional value-level optimistic precondition.
+	// A nil pointer omits the check; a non-nil OperationValue preserves both
+	// presence and content, including an explicitly-present empty string.
+	ExpectedTargetValue *OperationValue `json:"expectedTargetValue,omitempty"`
+	HistoryOperationID  string          `json:"historyOperationId,omitempty"`
 }
 
 func (r OperationRequest) Normalize() OperationRequest {
@@ -202,6 +206,7 @@ func (r OperationRequest) Normalize() OperationRequest {
 	// Values are content; preserve meaningful leading/trailing whitespace. Host
 	// validation decides whether a particular field permits it.
 	r.ExpectedTargetHead = strings.TrimSpace(r.ExpectedTargetHead)
+	r.ExpectedTargetValue = cloneOperationValue(r.ExpectedTargetValue)
 	r.HistoryOperationID = strings.TrimSpace(r.HistoryOperationID)
 	return r
 }
@@ -442,10 +447,19 @@ func RequestsEqual(a, b OperationRequest) bool {
 	a.ExpectedDocumentRevision = 0
 	b.ExpectedDocumentRevision = 0
 	a.ExpectedTargetHead, b.ExpectedTargetHead = "", ""
+	a.ExpectedTargetValue, b.ExpectedTargetValue = nil, nil
 	return canonicalJSON(a) == canonicalJSON(b)
 }
 
 func canonicalJSON(v any) string { b, _ := json.Marshal(v); return string(b) }
+
+func cloneOperationValue(value *OperationValue) *OperationValue {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
+}
 
 func normalizeRoute(route string) string {
 	route = strings.TrimSpace(route)

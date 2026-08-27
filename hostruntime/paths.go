@@ -14,6 +14,7 @@ const (
 	WorkbenchRuntimePath             = RuntimeRoot + "/workbench-runtime.js"
 	CommandRuntimePath               = RuntimeRoot + "/command-palette.js"
 	StateRuntimePath                 = RuntimeRoot + "/state-runtime.js"
+	ContentEditorRuntimePath         = RuntimeRoot + "/content-editor.js"
 	PreviewSubscriberPath            = RuntimeRoot + "/preview-subscriber.js"
 	CanvasSelectionBridgePath        = RuntimeRoot + "/canvas-selection-bridge.js"
 	CanvasInlineEditPath             = RuntimeRoot + "/canvas-inline-edit.js"

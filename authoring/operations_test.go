@@ -38,6 +38,25 @@ func TestOperationRequestsEqualPreservesContentWhitespace(t *testing.T) {
 	}
 }
 
+func TestOperationRequestsEqualIgnoresExpectedTargetValueWithoutMutatingIt(t *testing.T) {
+	expected := &OperationValue{Present: true, Value: "seed"}
+	a := OperationRequest{
+		ID: "a", Kind: OperationSetField,
+		Target:              OperationTarget{Field: "hero.headline"},
+		Value:               "next",
+		ExpectedTargetValue: expected,
+	}
+	b := a
+	b.ID = "b"
+	b.ExpectedTargetValue = &OperationValue{Present: false}
+	if !RequestsEqual(a, b) {
+		t.Fatal("expected target value is a concurrency precondition, not logical operation payload")
+	}
+	if expected.Present != true || expected.Value != "seed" {
+		t.Fatalf("RequestsEqual mutated the original expected value: %#v", expected)
+	}
+}
+
 func TestOperationTargetRootRouteNormalizationIsIdempotent(t *testing.T) {
 	target := OperationTarget{Route: "/", Field: "title"}.Normalize()
 	if target.Route != "/" || target.Normalize() != target {

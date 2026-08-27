@@ -80,7 +80,7 @@ func TestRenderBackendBlogDetailPagePreservesFormContract(t *testing.T) {
 		`<section class="admin-heading">heading</section>`,
 		`<datalist id="blog-media-urls"><option value="/media/noni.jpg" label="noni.jpg" data-media-alt="Noni alt">noni.jpg</option></datalist>`,
 		`<datalist id="blog-tags"><option value="Care">care</option></datalist>`,
-		`<form class="panel admin-form" method="post" action="/admin/blog/post_1/__actions/save">`,
+		`<form class="panel admin-form" method="post" action="/admin/blog/post_1/__actions/save" data-content-editor-enhanced-submit="true">`,
 		`<input type="hidden" name="csrf_token" value="csrf-token" />`,
 		`<input type="hidden" name="id" value="post_1" />`,
 		`<p class="form-status form-status--error">Please correct the highlighted fields.</p>`,
@@ -88,6 +88,7 @@ func TestRenderBackendBlogDetailPagePreservesFormContract(t *testing.T) {
 		`<p class="form-status form-status--error">Restore failed.</p>`,
 		`<p class="form-status form-status--error">Restore revision failed.</p>`,
 		`<p class="form-status form-status--ok">Version restored.</p>`,
+		`<div class="button-row admin-form__primary-actions" data-content-editor-primary-actions="true">`,
 		`<div class="edit-preview">preview</div>`,
 		`<input id="title" name="title" value="Care &lt;Guide&gt;" />`,
 		`<p class="form-error">Title is required.</p>`,
@@ -119,13 +120,20 @@ func TestRenderBackendBlogDetailPagePreservesFormContract(t *testing.T) {
 		`<button class="button button--primary" type="submit">Save post</button>`,
 		`<button class="button button--secondary" type="submit" formaction="/admin/blog/post_1/__actions/archive" data-admin-confirm="Archive this post? It will be unpublished and hidden from public blog routes.">Archive</button>`,
 		`<a class="button button--secondary" href="/blog/care-guide?preview=1" data-gosx-link="true">Preview</a>`,
-		`<a class="button button--secondary" href="/admin/blog" data-gosx-link="true">Back to blog</a>`,
+		`<a class="button button--secondary" href="/admin/blog" data-gosx-link="true" data-content-editor-discard="true">Back to blog</a>`,
+		`<div class="button-row admin-form__secondary-actions admin-form__danger-actions" data-content-editor-secondary-actions="true" data-content-editor-danger-actions="true">`,
 		`<section class="panel" data-studio-revision-history="true">history</section>`,
-		`<script src="/content-editor.js" defer></script><script src="/media-picker.js" defer></script>`,
+		`<script src="/_gosx/studio/content-editor.js" data-gosx-script="managed" data-gosx-script-load="dom" data-gosx-script-loaded="pending" defer></script><script src="/_gosx/studio/media-runtime.js" data-gosx-script="managed" data-gosx-script-load="dom" data-gosx-script-loaded="pending" defer></script>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("blog detail renderer missing %q:\n%s", fragment, html)
 		}
+	}
+	if got := strings.Count(html, `>Save post<`); got != 1 {
+		t.Fatalf("blog detail renderer must expose one canonical Save post action, got %d:\n%s", got, html)
+	}
+	if got := strings.Count(html, `>Preview<`); got != 1 {
+		t.Fatalf("blog detail renderer must expose one canonical Preview action, got %d:\n%s", got, html)
 	}
 
 	assertOrder(t, html,
@@ -133,10 +141,19 @@ func TestRenderBackendBlogDetailPagePreservesFormContract(t *testing.T) {
 		`<datalist id="blog-media-urls">`,
 		`<datalist id="blog-tags">`,
 		`<form class="panel admin-form"`,
+		`<div class="button-row admin-form__primary-actions" data-content-editor-primary-actions="true">`,
+		`<button class="button button--primary" type="submit">Save post</button>`,
+		`<a class="button button--secondary" href="/blog/care-guide?preview=1"`,
 		`<div class="edit-preview">preview</div>`,
+		`<div class="field-row field-row--wide content-editor"`,
+		`<legend>SEO</legend>`,
+		`<input type="checkbox" name="featured" checked /> Featured`,
+		`<div class="button-row admin-form__secondary-actions admin-form__danger-actions"`,
+		`formaction="/admin/blog/post_1/__actions/archive"`,
+		`<a class="button button--secondary" href="/admin/blog"`,
 		`<section class="panel" data-studio-revision-history="true">history</section>`,
-		`<script src="/content-editor.js"`,
-		`<script src="/media-picker.js"`,
+		`<script src="/_gosx/studio/content-editor.js"`,
+		`<script src="/_gosx/studio/media-runtime.js"`,
 	)
 }
 
@@ -147,7 +164,7 @@ func TestRenderBackendBlogDetailPageDefaultsAreEmptySafe(t *testing.T) {
 		`<div class="admin-page" data-gosx-studio-backend-detail-renderer="gosx-studio" data-gosx-studio-backend-blog-detail-renderer="gosx-studio">`,
 		`<datalist id="blog-media-urls"></datalist>`,
 		`<datalist id="blog-tags"></datalist>`,
-		`<form class="panel admin-form" method="post" action="">`,
+		`<form class="panel admin-form" method="post" action="" data-content-editor-enhanced-submit="true">`,
 		`<input type="hidden" name="csrf_token" value="" />`,
 		`<input type="hidden" name="id" value="" />`,
 		`<input id="publishedAt" name="publishedAt" value="" type="datetime-local" data-viewer-datetime-input="true" data-viewer-time-source="" />`,
@@ -157,11 +174,14 @@ func TestRenderBackendBlogDetailPageDefaultsAreEmptySafe(t *testing.T) {
 		`<div class="check-row"><label><input type="checkbox" name="published" /> Published</label><label><input type="checkbox" name="featured" /> Featured</label></div>`,
 		`<button class="button button--primary" type="submit">Save post</button>`,
 		`<a class="button button--secondary" href="" data-gosx-link="true">Preview</a>`,
-		`<script src="/content-editor.js" defer></script><script src="/media-picker.js" defer></script>`,
+		`<script src="/_gosx/studio/content-editor.js" data-gosx-script="managed" data-gosx-script-load="dom" data-gosx-script-loaded="pending" defer></script><script src="/_gosx/studio/media-runtime.js" data-gosx-script="managed" data-gosx-script-load="dom" data-gosx-script-loaded="pending" defer></script>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("empty blog detail renderer missing %q:\n%s", fragment, html)
 		}
+	}
+	if got := strings.Count(html, `>Save post<`); got != 1 {
+		t.Fatalf("empty blog detail renderer must expose one canonical Save post action, got %d:\n%s", got, html)
 	}
 
 	for _, notWant := range []string{

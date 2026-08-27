@@ -100,7 +100,7 @@ func RenderBackendGalleryIndexMediaDatalist(media []BackendGalleryIndexMediaAsse
 }
 
 func RenderBackendGalleryIndexScripts() gosx.Node {
-	return gosx.El("script", gosx.Attrs(gosx.Attr("src", "/media-picker.js"), gosx.Attr("defer", true)))
+	return renderBackendManagedStudioScript(backendMediaRuntimePath)
 }
 
 func renderBackendGalleryIndexStatus(status BackendGalleryIndexActionStatus) gosx.Node {

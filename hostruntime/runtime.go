@@ -26,6 +26,7 @@ import (
 	"m31labs.dev/gosx-studio/canvasselectionbridgeruntime"
 	"m31labs.dev/gosx-studio/canvaswasmfreeruntime"
 	"m31labs.dev/gosx-studio/collabruntime"
+	"m31labs.dev/gosx-studio/contenteditorruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/inlineeditruntime"
 	"m31labs.dev/gosx-studio/inspectorruntime"
@@ -89,6 +90,10 @@ func OperationRuntimeHandler() http.Handler { return operationruntime.Handler() 
 func CollaborationRuntimeScript() []byte { return collabruntime.Script() }
 
 func CollaborationRuntimeHandler() http.Handler { return collabruntime.Handler() }
+
+func ContentEditorRuntimeScript() []byte { return contenteditorruntime.Script() }
+
+func ContentEditorRuntimeHandler() http.Handler { return contenteditorruntime.Handler() }
 
 // concatRuntimeSlices joins non-empty island bundles, each terminated by a
 // newline (the historical engine-bundle framing).

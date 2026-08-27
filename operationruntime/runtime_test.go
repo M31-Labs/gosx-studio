@@ -142,3 +142,17 @@ func TestRuntimeLocalTargetKeyIncludesControlKey(t *testing.T) {
 		t.Fatalf("operationruntime's local targetKey() must include controlKey so distinct interaction/instance/flow targets on the same component never collide:\n%s", script)
 	}
 }
+
+func TestRuntimeCarriesOptionalExpectedTargetValue(t *testing.T) {
+	script := string(Script())
+	for _, want := range []string{
+		`extra.expectedTargetValue !== undefined && extra.expectedTargetValue !== null`,
+		`payload.gosx_studio_expected_target_value = JSON.stringify(extra.expectedTargetValue)`,
+		`payload.gosx_studio_expected_target_value !== undefined`,
+		`request.expectedTargetValue = JSON.parse(payload.gosx_studio_expected_target_value)`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("runtime missing optional expected target value bridge %q:\n%s", want, script)
+		}
+	}
+}

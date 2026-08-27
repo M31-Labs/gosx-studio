@@ -96,7 +96,7 @@ func TestRenderBackendSettingsPagePreservesSettingsFormContract(t *testing.T) {
 		`<input name="shippingOptionMax0" value="9999" type="number" min="0" placeholder="Max subtotal" />`,
 		`<button class="button button--primary" type="submit">Save settings</button>`,
 		`<section data-test-settings-revisions="true">Revision history</section>`,
-		`<script src="/media-picker.js" defer></script>`,
+		`<script src="/_gosx/studio/media-runtime.js" data-gosx-script="managed" data-gosx-script-load="dom" data-gosx-script-loaded="pending" defer></script>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("settings renderer missing %q:\n%s", fragment, html)

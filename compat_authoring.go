@@ -129,11 +129,12 @@ const (
 	// Deprecated: use authoring.AuthoringFieldPosition.
 	AuthoringFieldPosition = authoring.AuthoringFieldPosition
 	// Deprecated: use authoring.AuthoringFieldVisible.
-	AuthoringFieldVisible            = authoring.AuthoringFieldVisible
-	AuthoringFieldOperationID        = authoring.AuthoringFieldOperationID
-	AuthoringFieldExpectedRevision   = authoring.AuthoringFieldExpectedRevision
-	AuthoringFieldExpectedTargetHead = authoring.AuthoringFieldExpectedTargetHead
-	AuthoringFieldHistoryOperationID = authoring.AuthoringFieldHistoryOperationID
+	AuthoringFieldVisible             = authoring.AuthoringFieldVisible
+	AuthoringFieldOperationID         = authoring.AuthoringFieldOperationID
+	AuthoringFieldExpectedRevision    = authoring.AuthoringFieldExpectedRevision
+	AuthoringFieldExpectedTargetHead  = authoring.AuthoringFieldExpectedTargetHead
+	AuthoringFieldExpectedTargetValue = authoring.AuthoringFieldExpectedTargetValue
+	AuthoringFieldHistoryOperationID  = authoring.AuthoringFieldHistoryOperationID
 )
 
 // Deprecated: use authoring.AuthoringActionHandler.

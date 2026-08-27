@@ -209,6 +209,7 @@
 
   function saveDetail(state, options) {
     options = options || {};
+    if (options.message) return String(options.message);
     if (state === "dirty") {
       return options.dirtyCount === 1 ? "1 change waiting" : String(options.dirtyCount || 0) + " changes waiting";
     }
@@ -286,6 +287,21 @@
     return String(form.getAttribute("method") || "post").toUpperCase();
   }
 
+  function formCSRFToken(formData) {
+    if (!formData || typeof formData.get !== "function") return "";
+    var token = formData.get("csrf_token");
+    return typeof token === "string" ? token.trim() : "";
+  }
+
+  function sameOriginURL(value) {
+    try {
+      var url = new URL(String(value || ""), window.location.href);
+      return url.origin === window.location.origin ? url.href : "";
+    } catch (error) {
+      return "";
+    }
+  }
+
   function clientActionsEnabled(form) {
     return form.getAttribute("data-gosx-studio-client") === "true";
   }
@@ -317,7 +333,7 @@
     if (submitter) {
       var attr = submitter.getAttribute("formaction");
       if (attr) return attr;
-      if (submitter.formAction) return submitter.formAction;
+      if (submitter.hasAttribute && submitter.hasAttribute("formaction") && submitter.formAction) return submitter.formAction;
     }
     return form.getAttribute("action") || window.location.href;
   }
@@ -326,7 +342,7 @@
     if (submitter) {
       var attr = submitter.getAttribute("formmethod");
       if (attr) return String(attr).toUpperCase();
-      if (submitter.formMethod) return String(submitter.formMethod).toUpperCase();
+      if (submitter.hasAttribute && submitter.hasAttribute("formmethod") && submitter.formMethod) return String(submitter.formMethod).toUpperCase();
     }
     return String(form.getAttribute("method") || "post").toUpperCase();
   }
@@ -363,6 +379,79 @@
     return compactText(submitter.getAttribute("data-gosx-studio-action-label") || submitter.getAttribute("aria-label") || submitter.textContent) || "Action";
   }
 
+  function eventKey(event) {
+    return String(event.key || "").toLowerCase();
+  }
+
+  function shortcutModifier(event) {
+    return !!(event.metaKey || event.ctrlKey);
+  }
+
+  function editableShortcutTarget(target) {
+    if (!target || !target.closest) return false;
+    return !!target.closest("input, textarea, select, [contenteditable=''], [contenteditable='true'], [contenteditable='plaintext-only']");
+  }
+
+  function activeFormForEvent(event) {
+    var target = event && event.target && event.target.closest ? event.target : null;
+    if (target) {
+      var targetForm = target.closest("[data-gosx-studio-state]");
+      if (targetForm) return targetForm;
+    }
+    var active = document.activeElement;
+    if (active && active.closest) return active.closest("[data-gosx-studio-state]");
+    return null;
+  }
+
+  function saveShortcutSubmitter(form) {
+    var candidates = saveButtons(form).filter(function (button) {
+      if (!button || button.disabled) return false;
+      var type = String(button.type || "").toLowerCase();
+      return type === "submit" || type === "image" || button.matches("button:not([type]), input[type='submit'], input[type='image']");
+    });
+    return candidates.length ? candidates[0] : null;
+  }
+
+  function parseActionResponse(response) {
+    var contentType = response && response.headers && response.headers.get ? String(response.headers.get("content-type") || "").toLowerCase() : "";
+    if (contentType.indexOf("json") < 0) return Promise.resolve(null);
+    return response.json().catch(function () { return null; });
+  }
+
+  function structuredActionSuccess(response, result) {
+    if (!result || typeof result !== "object" || Array.isArray(result) || result.ok !== true) return false;
+    var status = Number(response && response.status);
+    return Number.isFinite(status) && status >= 200 && status < 400;
+  }
+
+  function responseLooksUnauthenticated(response) {
+    if (!response || !response.redirected || !response.url) return false;
+    try {
+      var url = new URL(response.url, window.location.href);
+      var path = url.pathname.toLowerCase();
+      return path === "/login" || path.indexOf("/login/") === 0 || path === "/signin" || path === "/sign-in" || path.indexOf("/auth/") === 0;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function redirectLooksUnauthenticated(redirect) {
+    try {
+      var url = new URL(String(redirect || ""), window.location.href);
+      if (url.origin !== window.location.origin) return false;
+      var path = url.pathname.toLowerCase();
+      return path === "/login" || path.indexOf("/login/") === 0 || path === "/signin" || path === "/sign-in" || path.indexOf("/auth/") === 0;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function actionFailureMessage(result, fallback) {
+    if (result && result.message) return String(result.message);
+    if (result && result.data && result.data.message) return String(result.data.message);
+    return fallback || "Studio action failed";
+  }
+
   function dispatchActionResult(form, detail) {
     form.dispatchEvent(new CustomEvent("gosxstudio:action-result", {
       bubbles: true,
@@ -375,6 +464,7 @@
     form.dataset.gosxStudioStateBound = "true";
     var saved = formSignature(form);
     var submitting = false;
+    var nativeNavigationPending = false;
     var autosaving = false;
     var autosaveTimer = 0;
     var lastSavedAt = "";
@@ -382,8 +472,30 @@
     var historyTimer = 0;
     var history = [];
     var historyIndex = -1;
+    var actionErrorSignature = "";
+    var disposed = false;
+    var intentionalNavigation = false;
+    var lastCommittedURL = String(window.location.href || "");
+    var lastCommittedHistoryState = window.history ? window.history.state : null;
     var historyLimit = Number(form.getAttribute("data-gosx-studio-history-limit") || 100);
     if (!Number.isFinite(historyLimit) || historyLimit < 2) historyLimit = 100;
+
+    function formActive() {
+      if (disposed || intentionalNavigation) return false;
+      if (!document.contains(form)) {
+        disposed = true;
+        window.clearTimeout(autosaveTimer);
+        window.clearTimeout(historyTimer);
+        return false;
+      }
+      return true;
+    }
+
+    function markNavigationIntent() {
+      intentionalNavigation = true;
+      window.clearTimeout(autosaveTimer);
+      window.clearTimeout(historyTimer);
+    }
 
     function isDirty() {
       return formSignature(form) !== saved;
@@ -405,8 +517,11 @@
     }
 
     function update(reason) {
-      if (submitting || autosaving) return;
-      setState(form, isDirty() ? "dirty" : "saved", reason, stateOptions());
+      if (!formActive() || submitting || autosaving) return;
+      var current = formSignature(form);
+      if (form.getAttribute("data-gosx-studio-save-state") === "error" && actionErrorSignature === current) return;
+      if (actionErrorSignature && actionErrorSignature !== current) actionErrorSignature = "";
+      setState(form, current !== saved ? "dirty" : "saved", reason, stateOptions());
     }
 
     var updateFrame = frameTask(function () {
@@ -524,22 +639,74 @@
     }
 
     function runAutosave() {
-      if (!autosaveEnabled(form) || submitting || autosaving || !isDirty()) return;
+      if (!formActive() || !autosaveEnabled(form) || submitting || autosaving || !isDirty()) return;
       var signature = formSignature(form);
+      var method = autosaveMethod(form);
       var target = autosaveURL(form);
+      var data;
+      try {
+        data = new FormData(form);
+      } catch (error) {
+        autosaving = false;
+        actionErrorSignature = formSignature(form);
+        setState(form, "error", "autosave", stateOptions({ message: "Autosave could not prepare this form. Your edits are still local; retry." }));
+        return;
+      }
       if (!target) return;
-      autosaving = true;
-      setState(form, "autosaving", "autosave", stateOptions());
-      window.fetch(target, {
-        method: autosaveMethod(form),
-        body: new FormData(form),
-        credentials: "same-origin",
-        headers: {
-          "X-GoSX-Studio-Autosave": "true"
+      var requestURL = target;
+      var requestHeaders = {
+        "Accept": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "X-GoSX-Studio-Autosave": "true"
+      };
+      if (methodHasBody(method)) {
+        requestURL = sameOriginURL(target);
+        if (!requestURL) {
+          actionErrorSignature = formSignature(form);
+          setState(form, "error", "autosave", stateOptions({ message: "Autosave target must stay on this site. Your edits are still local; retry." }));
+          return;
         }
-      }).then(function (response) {
-        if (!response.ok) throw new Error("Autosave failed");
+        var csrfToken = formCSRFToken(data);
+        if (!csrfToken) {
+          actionErrorSignature = formSignature(form);
+          setState(form, "error", "autosave", stateOptions({ message: "This form has no CSRF token. Refresh the page and retry; your edits are still local." }));
+          return;
+        }
+        requestHeaders["X-CSRF-Token"] = csrfToken;
+      } else {
+        try {
+          requestURL = actionURLWithData(target, data);
+        } catch (error) {
+          actionErrorSignature = formSignature(form);
+          setState(form, "error", "autosave", stateOptions({ message: "Autosave target is invalid. Your edits are still local; retry." }));
+          return;
+        }
+      }
+      autosaving = true;
+      actionErrorSignature = "";
+      setState(form, "autosaving", "autosave", stateOptions());
+      var request = {
+        method: method,
+        credentials: "same-origin",
+        headers: requestHeaders
+      };
+      if (methodHasBody(method)) request.body = data;
+      window.fetch(requestURL, request).then(function (response) {
+        return parseActionResponse(response).then(function (result) {
+          return { response: response, result: result };
+        });
+      }).then(function (payload) {
+        if (!formActive()) {
+          autosaving = false;
+          return;
+        }
+        var response = payload.response;
+        var result = payload.result;
+        if ((response && (response.status === 401 || response.status === 403)) || responseLooksUnauthenticated(response)) return Promise.reject(new Error("Autosave redirected to sign-in"));
+        if (!structuredActionSuccess(response, result)) return Promise.reject(new Error(actionFailureMessage(result, "Autosave failed; no structured success response")));
+        if (redirectLooksUnauthenticated(result && result.redirect)) return Promise.reject(new Error("Autosave redirected to sign-in"));
         saved = signature;
+        actionErrorSignature = "";
         lastSavedAt = new Date().toISOString();
         form.setAttribute("data-gosx-studio-last-saved-at", lastSavedAt);
         autosaving = false;
@@ -549,8 +716,13 @@
           return;
         }
         setState(form, "saved", "autosave", stateOptions({ dirtyCount: 0 }));
-      }, function () {
+      }).catch(function () {
+        if (!formActive()) {
+          autosaving = false;
+          return;
+        }
         autosaving = false;
+        actionErrorSignature = formSignature(form);
         setState(form, "error", "autosave", stateOptions());
       });
     }
@@ -612,32 +784,110 @@
       if (runHistory(detail.target || detail.key, "command")) event.preventDefault();
     });
     function runClientAction(pendingAction, submitter, pendingLabel) {
-      if (submitting) return;
+      if (!formActive() || submitting) return;
       var action = submitActionURL(form, submitter, pendingAction);
       var method = submitMethod(form, submitter);
       var label = actionLabel(submitter, pendingLabel);
       var data = actionFormData(form, submitter);
-      var requestURL = methodHasBody(method) ? action : actionURLWithData(action, data);
+      var requestURL = action;
+      var requestHeaders = {
+        "Accept": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "X-GoSX-Studio-Action": "true",
+        "X-GoSX-Studio-Client-Action": "true"
+      };
+      if (methodHasBody(method)) {
+        requestURL = sameOriginURL(action);
+        if (!requestURL) {
+          actionErrorSignature = formSignature(form);
+          setState(form, "error", "action", stateOptions({ actionLabel: label, message: "Save target must stay on this site. Your edits are still local; retry." }));
+          dispatchActionResult(form, {
+            ok: false,
+            action: action,
+            label: label,
+            method: method,
+            status: 0,
+            redirected: false,
+            url: "",
+            error: "Save target must stay on this site",
+            submitter: submitterDetail(submitter)
+          });
+          return;
+        }
+        var csrfToken = formCSRFToken(data);
+        if (!csrfToken) {
+          actionErrorSignature = formSignature(form);
+          setState(form, "error", "action", stateOptions({ actionLabel: label, message: "This form has no CSRF token. Refresh the page and retry; your edits are still local." }));
+          dispatchActionResult(form, {
+            ok: false,
+            action: action,
+            label: label,
+            method: method,
+            status: 0,
+            redirected: false,
+            url: "",
+            error: "This form has no CSRF token",
+            submitter: submitterDetail(submitter)
+          });
+          return;
+        }
+        requestHeaders["X-CSRF-Token"] = csrfToken;
+      } else {
+        try {
+          requestURL = actionURLWithData(action, data);
+        } catch (error) {
+          actionErrorSignature = formSignature(form);
+          setState(form, "error", "action", stateOptions({ actionLabel: label, message: "Save target is invalid. Your edits are still local; retry." }));
+          dispatchActionResult(form, {
+            ok: false,
+            action: action,
+            label: label,
+            method: method,
+            status: 0,
+            redirected: false,
+            url: "",
+            error: "Save target is invalid",
+            submitter: submitterDetail(submitter)
+          });
+          return;
+        }
+      }
       var request = {
         method: method,
         credentials: "same-origin",
-        headers: {
-          "X-GoSX-Studio-Action": "true",
-          "X-GoSX-Studio-Client-Action": "true"
-        }
+        headers: requestHeaders
       };
       if (methodHasBody(method)) request.body = data;
       var signature = formSignature(form);
       submitting = true;
+      actionErrorSignature = "";
       window.clearTimeout(autosaveTimer);
       setState(form, "saving", "action", stateOptions({ actionLabel: label }));
       window.fetch(requestURL, request).then(function (response) {
-        if (!response.ok) throw new Error("Studio action failed");
+        return parseActionResponse(response).then(function (result) {
+          return { response: response, result: result };
+        });
+      }).then(function (payload) {
+        if (!formActive()) {
+          submitting = false;
+          return;
+        }
+        var response = payload.response;
+        var result = payload.result;
+        if ((response && (response.status === 401 || response.status === 403)) || responseLooksUnauthenticated(response)) return Promise.reject(new Error("Studio action redirected to sign-in"));
+        if (!structuredActionSuccess(response, result)) return Promise.reject(new Error(actionFailureMessage(result, "Studio action failed; no structured success response")));
+        if (redirectLooksUnauthenticated(result && result.redirect)) return Promise.reject(new Error("Studio action redirected to sign-in"));
         saved = signature;
+        actionErrorSignature = "";
         lastSavedAt = new Date().toISOString();
         form.setAttribute("data-gosx-studio-last-saved-at", lastSavedAt);
         submitting = false;
-        setState(form, "saved", "action", stateOptions({ dirtyCount: 0, actionLabel: label }));
+        if (isDirty()) {
+          setState(form, "dirty", "action-stale", stateOptions({ actionLabel: label }));
+          scheduleAutosave();
+        } else {
+          setState(form, "saved", "action", stateOptions({ dirtyCount: 0, actionLabel: label }));
+        }
         dispatchActionResult(form, {
           ok: true,
           action: action,
@@ -646,10 +896,16 @@
           status: response.status,
           redirected: response.redirected,
           url: response.url || "",
+          result: result || null,
           submitter: submitterDetail(submitter)
         });
-      }, function (error) {
+      }).catch(function (error) {
+        if (!formActive()) {
+          submitting = false;
+          return;
+        }
         submitting = false;
+        actionErrorSignature = formSignature(form);
         setState(form, "error", "action", stateOptions({ actionLabel: label }));
         dispatchActionResult(form, {
           ok: false,
@@ -672,44 +928,93 @@
       if (pendingLabel) delete form.dataset.gosxStudioPendingActionLabel;
       if (clientActionsEnabled(form)) {
         event.preventDefault();
+        nativeNavigationPending = false;
         runClientAction(pendingAction, event.submitter || null, pendingLabel);
         return;
       }
+      nativeNavigationPending = true;
       submitting = true;
       window.clearTimeout(autosaveTimer);
       setState(form, "saving", "submit", stateOptions());
     });
 
+    document.addEventListener("gosx:navigate", function (event) {
+      if (!formActive()) return;
+      var detail = event && event.detail;
+      var next = detail && typeof detail === "object" ? detail.url : "";
+      try {
+        lastCommittedURL = new URL(String(next || window.location.href), window.location.href).href;
+      } catch (error) {
+        lastCommittedURL = String(window.location.href || "");
+      }
+      lastCommittedHistoryState = window.history ? window.history.state : null;
+    });
+
     document.addEventListener("keydown", function (event) {
-      if (event.defaultPrevented || !document.contains(form)) return;
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+      if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.__gosxStudioStateShortcutHandled || !document.contains(form)) return;
+      if (activeFormForEvent(event) !== form) return;
+      if (shortcutModifier(event) && eventKey(event) === "z") {
+        if (editableShortcutTarget(event.target)) return;
         event.preventDefault();
-        runHistory(event.shiftKey ? "redo" : "undo", "keyboard");
+        event.__gosxStudioStateShortcutHandled = true;
+        if (!runHistory(event.shiftKey ? "redo" : "undo", "keyboard")) event.__gosxStudioStateShortcutHandled = false;
         return;
       }
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "y") {
+      if (shortcutModifier(event) && eventKey(event) === "y") {
+        if (editableShortcutTarget(event.target)) return;
         event.preventDefault();
-        runHistory("redo", "keyboard");
+        event.__gosxStudioStateShortcutHandled = true;
+        if (!runHistory("redo", "keyboard")) event.__gosxStudioStateShortcutHandled = false;
         return;
       }
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "s") return;
+      if (!shortcutModifier(event) || eventKey(event) !== "s") return;
       event.preventDefault();
-      if (form.requestSubmit) form.requestSubmit();
+      event.__gosxStudioStateShortcutHandled = true;
+      var submitter = saveShortcutSubmitter(form);
+      if (form.requestSubmit) form.requestSubmit(submitter || undefined);
       else if (clientActionsEnabled(form)) runClientAction("", null, "");
       else form.submit();
     });
 
     document.addEventListener("click", function (event) {
       var link = event.target && event.target.closest && event.target.closest("a[href]");
-      if (!link || !document.contains(form) || !isDirty() || submitting) return;
+      if (!link || !formActive() || !isDirty() || nativeNavigationPending) return;
       if (link.target && link.target !== "_self") return;
       var next = new URL(link.href, window.location.href);
       if (next.origin === window.location.origin && next.pathname === window.location.pathname && next.search === window.location.search) return;
-      if (!window.confirm("Discard unsaved editor changes?")) event.preventDefault();
+      if (!window.confirm("Discard unsaved editor changes?")) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
+      markNavigationIntent();
+    }, true);
+
+    window.addEventListener("popstate", function (event) {
+      if (!formActive() || nativeNavigationPending) return;
+      var currentURL = String(window.location.href || "");
+      if (!isDirty() || currentURL === lastCommittedURL) {
+        lastCommittedURL = currentURL;
+        lastCommittedHistoryState = window.history ? window.history.state : null;
+        return;
+      }
+      if (window.confirm("Discard unsaved editor changes?")) {
+        lastCommittedURL = currentURL;
+        lastCommittedHistoryState = window.history ? window.history.state : null;
+        markNavigationIntent();
+        return;
+      }
+      if (event && event.preventDefault) event.preventDefault();
+      if (event && event.stopImmediatePropagation) event.stopImmediatePropagation();
+      try {
+        window.history.pushState(lastCommittedHistoryState, "", lastCommittedURL);
+      } catch (error) {
+        // The host may expose a non-standard history implementation.
+      }
     }, true);
 
     window.addEventListener("beforeunload", function (event) {
-      if (!document.contains(form) || !isDirty() || submitting) return;
+      if (!formActive() || !isDirty() || nativeNavigationPending) return;
       event.preventDefault();
       event.returnValue = "";
     });

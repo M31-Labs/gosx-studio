@@ -49,6 +49,8 @@ const (
 	CommandRuntimePath = hostruntime.CommandRuntimePath
 	// Deprecated: use hostruntime.StateRuntimePath.
 	StateRuntimePath = hostruntime.StateRuntimePath
+	// Deprecated: use hostruntime.ContentEditorRuntimePath.
+	ContentEditorRuntimePath = hostruntime.ContentEditorRuntimePath
 	// Deprecated: use hostruntime.PreviewSubscriberPath.
 	PreviewSubscriberPath = hostruntime.PreviewSubscriberPath
 	// Deprecated: use hostruntime.CanvasSelectionBridgePath.
@@ -159,6 +161,12 @@ func CommandRuntimeScript() []byte { return hostruntime.CommandRuntimeScript() }
 
 // Deprecated: use hostruntime.StateRuntimeScript.
 func StateRuntimeScript() []byte { return hostruntime.StateRuntimeScript() }
+
+// Deprecated: use hostruntime.ContentEditorRuntimeScript.
+func ContentEditorRuntimeScript() []byte { return hostruntime.ContentEditorRuntimeScript() }
+
+// Deprecated: use hostruntime.ContentEditorRuntimeHandler.
+func ContentEditorRuntimeHandler() http.Handler { return hostruntime.ContentEditorRuntimeHandler() }
 
 // Deprecated: use hostruntime.AuthoringRuntimeScript.
 func AuthoringRuntimeScript() []byte { return hostruntime.AuthoringRuntimeScript() }

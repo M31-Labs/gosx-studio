@@ -69,15 +69,16 @@ func RenderBackendPageCreatePanel(props BackendPageIndexPageProps) gosx.Node {
 			gosx.Attr("class", "admin-form"),
 			gosx.Attr("method", "post"),
 			gosx.Attr("action", props.CreateAction),
+			gosx.Attr("data-content-editor-enhanced-submit", "true"),
 		),
 			gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "csrf_token"), gosx.Attr("value", props.CSRFToken))),
+			renderBackendPageIndexButtons(),
 			renderBackendPageIndexInput("title", "Title", page.Title, "", renderBackendPageIndexFieldError(props.CreateStatus, "title")),
 			renderBackendPageIndexInput("slug", "Slug", page.Slug, "", nil),
 			renderBackendPageIndexBodyFormat(),
 			renderBackendPageIndexContentEditor(page.Body),
 			renderBackendPageIndexSEO(page),
 			renderBackendPageIndexChecks(),
-			gosx.El("button", gosx.Attrs(gosx.Attr("class", "button button--primary"), gosx.Attr("type", "submit")), gosx.Text("Create page")),
 		),
 	)
 }
@@ -95,10 +96,7 @@ func RenderBackendPageIndexMediaDatalist(media []BackendPageIndexMediaAsset) gos
 }
 
 func RenderBackendPageIndexScripts() gosx.Node {
-	return gosx.Fragment(
-		gosx.El("script", gosx.Attrs(gosx.Attr("src", "/content-editor.js"), gosx.Attr("defer", true))),
-		gosx.El("script", gosx.Attrs(gosx.Attr("src", "/media-picker.js"), gosx.Attr("defer", true))),
-	)
+	return renderBackendManagedStudioScripts()
 }
 
 func renderBackendPageIndexStatus(status BackendPageIndexActionStatus) gosx.Node {
@@ -195,4 +193,14 @@ func renderBackendPageIndexChecks() gosx.Node {
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "check-row")),
 		gosx.El("label", nil, gosx.El("input", gosx.Attrs(gosx.Attr("type", "checkbox"), gosx.Attr("name", "published"), gosx.Attr("checked", "checked"))), gosx.Text(" Published")),
 	)
+}
+
+func renderBackendPageIndexButtons() gosx.Node {
+	return gosx.El("div", gosx.Attrs(
+		gosx.Attr("class", "button-row admin-form__primary-actions"),
+		gosx.Attr("data-content-editor-primary-actions", "true"),
+	), gosx.El("button", gosx.Attrs(
+		gosx.Attr("class", "button button--primary"),
+		gosx.Attr("type", "submit"),
+	), gosx.Text("Create page")))
 }
