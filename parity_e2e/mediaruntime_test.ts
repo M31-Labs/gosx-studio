@@ -255,6 +255,145 @@ test.describe("GoSXStudioMediaRuntime", () => {
     await expect(page.locator("#dynamicHero + .media-picker")).toHaveCount(1);
   });
 
+  test("media gallery preserves focus and duplicate entries through boundary edits and removal", async ({ page }) => {
+    await installMediaRuntime(page);
+
+    await page.locator("#imagesText").evaluate((node) => {
+      const textarea = node as HTMLTextAreaElement;
+      textarea.value = [
+        "/media/cup.jpg | First cup",
+        "/media/vase.webp | Vase entry",
+        "/media/cup.jpg | Second cup",
+      ].join("\n");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const gallery = page.locator("#imagesText + .media-list-editor");
+    const items = gallery.locator(".media-list-editor__item");
+    await expect(items).toHaveCount(3);
+    const initialIDs = await items.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-media-item-id")));
+    expect(new Set(initialIDs).size).toBe(3);
+
+    const vaseAlt = items.nth(1).locator("input[type='text']");
+    await expect(vaseAlt).toHaveValue("Vase entry");
+    await vaseAlt.fill("Vase changed");
+    await vaseAlt.press("Control+Z");
+    await expect(vaseAlt, "native alt-text undo must stay inside the field").toHaveValue("Vase entry");
+    await expect(page.locator("#imagesText")).toHaveValue(/\/media\/vase\.webp \| Vase entry/);
+
+    const rawToggle = gallery.locator(".media-list-editor__raw-toggle");
+    await expect(rawToggle).toHaveAttribute("aria-controls", "imagesText");
+    await expect(rawToggle).toHaveAttribute("aria-expanded", "false");
+    await rawToggle.press("Enter");
+    await expect(rawToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#imagesText")).not.toBeHidden();
+    await expect(page.locator("#imagesText")).toBeFocused();
+    await rawToggle.click();
+    await expect(rawToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator("#imagesText")).toBeHidden();
+
+    const firstDown = items.nth(0).locator("button[data-media-list-action='down']");
+    await firstDown.press("Enter");
+    await expect.poll(() => items.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-media-item-id")))).toEqual([
+      initialIDs[1],
+      initialIDs[0],
+      initialIDs[2],
+    ]);
+    await expect.poll(() => page.evaluate(() => ({
+      itemID: document.activeElement?.closest("[data-media-item-id]")?.getAttribute("data-media-item-id"),
+      action: document.activeElement?.getAttribute("data-media-list-action"),
+    }))).toEqual({ itemID: initialIDs[0], action: "down" });
+
+    await items.nth(1).locator("button[data-media-list-action='up']").click();
+    await expect.poll(() => items.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-media-item-id")))).toEqual([
+      initialIDs[0],
+      initialIDs[1],
+      initialIDs[2],
+    ]);
+    await expect.poll(() => page.evaluate(() => ({
+      itemID: document.activeElement?.closest("[data-media-item-id]")?.getAttribute("data-media-item-id"),
+      tag: document.activeElement?.tagName,
+      action: document.activeElement?.getAttribute("data-media-list-action"),
+    }))).toEqual({ itemID: initialIDs[0], tag: "INPUT", action: null });
+
+    const addTrigger = gallery.locator(".media-list-editor__actions .media-picker__trigger");
+    const addSearch = gallery.locator(".media-picker__search");
+    const addStatus = gallery.locator("[data-media-picker-status]");
+    await addTrigger.click();
+    await addSearch.fill("cup");
+    await expect(addStatus).toHaveText('Showing 1 media result for "cup".');
+    const cupAsset = gallery.locator(".media-picker__asset").first();
+    await expect(cupAsset).toHaveAttribute("data-media-asset-selected", "true");
+    await expect(cupAsset).toHaveAttribute("aria-label", /already in gallery/);
+
+    await items.nth(0).locator("button[data-media-list-action='remove']").click();
+    await expect.poll(() => items.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-media-item-id")))).toEqual([
+      initialIDs[1],
+      initialIDs[2],
+    ]);
+    await expect.poll(() => page.evaluate(() => ({
+      itemID: document.activeElement?.closest("[data-media-item-id]")?.getAttribute("data-media-item-id"),
+      action: document.activeElement?.getAttribute("data-media-list-action"),
+    }))).toEqual({ itemID: initialIDs[1], action: "remove" });
+
+    await items.nth(0).locator("button[data-media-list-action='remove']").click();
+    await expect.poll(() => items.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-media-item-id")))).toEqual([
+      initialIDs[2],
+    ]);
+    await expect.poll(() => page.evaluate(() => ({
+      itemID: document.activeElement?.closest("[data-media-item-id]")?.getAttribute("data-media-item-id"),
+      action: document.activeElement?.getAttribute("data-media-list-action"),
+    }))).toEqual({ itemID: initialIDs[2], action: "remove" });
+
+    await items.nth(0).locator("button[data-media-list-action='remove']").click();
+    await expect(items).toHaveCount(0);
+    await expect(page.locator("#imagesText")).toHaveValue("");
+    await expect(addTrigger).toBeFocused();
+    await expect(cupAsset).toHaveAttribute("data-media-asset-selected", "false");
+    await expect(cupAsset).not.toHaveAttribute("aria-label", /already in gallery/);
+  });
+
+  test("single media picker exposes selection, announces results, and contains Escape", async ({ page }) => {
+    await installMediaRuntime(page);
+
+    const heroPicker = page.locator("#hero + .media-picker");
+    const heroTrigger = heroPicker.locator(".media-picker__trigger");
+    const heroSearch = heroPicker.locator(".media-picker__search");
+    const heroPanel = heroPicker.locator(".media-picker__panel");
+    const heroStatus = heroPicker.locator("[data-media-picker-status]");
+    await heroTrigger.click();
+    await expect(heroStatus).toHaveAttribute("role", "status");
+    await expect(heroStatus).toHaveAttribute("aria-live", "polite");
+    await expect(heroStatus).toContainText("Showing 2 media results");
+    await heroSearch.fill("vase");
+    await expect(heroStatus).toHaveText('Showing 1 media result for "vase".');
+
+    await page.locator("#media-form").evaluate((form) => {
+      form.addEventListener("keydown", (event) => {
+        const keyboardEvent = event as KeyboardEvent;
+        if (keyboardEvent.key === "Escape") {
+          (window as unknown as { mediaAncestorEscapeCount?: number }).mediaAncestorEscapeCount =
+            ((window as unknown as { mediaAncestorEscapeCount?: number }).mediaAncestorEscapeCount ?? 0) + 1;
+        }
+      });
+    });
+    await heroSearch.press("Escape");
+    await expect(heroPanel).toBeHidden();
+    await expect(heroTrigger).toBeFocused();
+    expect(await page.evaluate(() => (window as unknown as { mediaAncestorEscapeCount?: number }).mediaAncestorEscapeCount ?? 0)).toBe(0);
+
+    await heroTrigger.click();
+    await heroSearch.fill("cup");
+    const cupAsset = heroPicker.locator(".media-picker__asset").first();
+    await expect(cupAsset).toHaveAttribute("aria-current", "false");
+    await cupAsset.click();
+    await expect(page.locator("#hero")).toHaveValue("/media/cup.jpg");
+
+    await heroTrigger.click();
+    await heroSearch.fill("cup");
+    await expect(heroPicker.locator(".media-picker__asset").first()).toHaveAttribute("aria-current", "true");
+  });
+
   test("marks managed scripts loaded and keeps one media runtime across cleanup and new roots", async ({ page }) => {
     await installMediaRuntime(page, true);
     await expect(page.locator("#media-runtime-first")).toHaveAttribute("data-gosx-script-loaded", "true");

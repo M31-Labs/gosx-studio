@@ -15,6 +15,7 @@
   }
 
   var pickerID = 0;
+  var mediaItemID = 0;
   var mediaDragType = "application/x-gosx-studio-media";
   var uploadControllers = [];
 
@@ -167,10 +168,7 @@
   function parseMediaLines(value) {
     return String(value || "").split("\n").map(function (line) {
       var parts = line.split("|");
-      return {
-        url: String(parts[0] || "").trim(),
-        alt: String(parts.slice(1).join("|") || "").trim()
-      };
+      return mediaImage(parts[0], parts.slice(1).join("|"));
     }).filter(function (image) { return image.url; });
   }
 
@@ -180,6 +178,24 @@
       var alt = String((image && image.alt) || "").trim();
       return url + (alt ? " | " + alt : "");
     }).filter(Boolean).join("\n");
+  }
+
+  function mediaImage(url, alt) {
+    return {
+      id: "media-item-" + (++mediaItemID),
+      url: String(url || "").trim(),
+      alt: String(alt || "").trim()
+    };
+  }
+
+  function ensureMediaItemID(image) {
+    if (image && !image.id) image.id = "media-item-" + (++mediaItemID);
+    return image && image.id;
+  }
+
+  function mediaResultsMessage(count, query) {
+    if (!count) return query ? "No matching media for \"" + query + "\"." : "No media available.";
+    return "Showing " + count + " media " + (count === 1 ? "result" : "results") + (query ? " for \"" + query + "\"" : "") + ".";
   }
 
   function upgradeInput(input) {
@@ -205,15 +221,32 @@
       "aria-label": "Filter media",
       placeholder: "Filter media"
     });
+    var resultStatus = element("output", {
+      class: "media-picker__status",
+      "data-media-picker-status": "true",
+      role: "status",
+      "aria-live": "polite",
+      "aria-atomic": "true",
+      "aria-label": "Media search results"
+    });
     var grid = element("div", { class: "media-picker__grid" });
-    var panel = element("div", { class: "media-picker__panel", id: id, hidden: true }, search, grid);
+    var panel = element("div", { class: "media-picker__panel", id: id, hidden: true }, search, resultStatus, grid);
     var picker = element("div", { class: "media-picker" },
       element("div", { class: "media-picker__toolbar" }, preview, trigger),
       panel
     );
 
+    function syncGridSelection(value) {
+      toArray(grid.querySelectorAll(".media-picker__asset")).forEach(function (button) {
+        var current = button.getAttribute("data-media-asset-url") === value;
+        button.setAttribute("aria-current", current ? "true" : "false");
+        button.setAttribute("data-media-asset-selected", current ? "true" : "false");
+      });
+    }
+
     function updatePreview() {
       var value = String(input.value || "").trim();
+      syncGridSelection(value);
       preview.textContent = "";
       if (!value) {
         preview.appendChild(element("span", { class: "media-picker__empty", text: "No asset selected" }));
@@ -231,15 +264,21 @@
     }
 
     function renderGrid() {
-      var query = search.value.trim().toLowerCase();
+      var query = search.value.trim();
+      var normalizedQuery = query.toLowerCase();
+      var value = String(input.value || "").trim();
       grid.textContent = "";
-      assets.filter(function (asset) {
-        return !query || asset.label.toLowerCase().indexOf(query) >= 0 || asset.url.toLowerCase().indexOf(query) >= 0 || asset.alt.toLowerCase().indexOf(query) >= 0;
-      }).forEach(function (asset) {
+      var matches = assets.filter(function (asset) {
+        return !normalizedQuery || asset.label.toLowerCase().indexOf(normalizedQuery) >= 0 || asset.url.toLowerCase().indexOf(normalizedQuery) >= 0 || asset.alt.toLowerCase().indexOf(normalizedQuery) >= 0;
+      });
+      matches.forEach(function (asset) {
         var button = element("button", {
           type: "button",
           class: "media-picker__asset",
-          "aria-label": "Use " + asset.label
+          "aria-label": "Use " + asset.label,
+          "aria-current": asset.url === value ? "true" : "false",
+          "data-media-asset-selected": asset.url === value ? "true" : "false",
+          "data-media-asset-url": asset.url
         }, renderThumb(asset), element("span", { text: asset.label }));
         attachAssetDrag(button, asset);
         button.addEventListener("click", function () {
@@ -257,6 +296,7 @@
         grid.appendChild(button);
       });
       if (!grid.children.length) grid.appendChild(element("p", { class: "empty", text: "No matching media." }));
+      resultStatus.textContent = mediaResultsMessage(matches.length, query);
     }
 
     trigger.addEventListener("click", function () {
@@ -270,6 +310,8 @@
     search.addEventListener("input", renderGrid);
     panel.addEventListener("keydown", function (event) {
       if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
         setExpanded(trigger, panel, false);
         trigger.focus();
       }
@@ -291,6 +333,8 @@
     var id = "media-lines-" + (++pickerID);
     var images = parseMediaLines(textarea.value);
     var items = element("div", { class: "media-list-editor__items" });
+    var rawID = textarea.id || id + "-raw";
+    if (!textarea.id) textarea.id = rawID;
     var trigger = element("button", {
       type: "button",
       class: "button button--secondary media-picker__trigger",
@@ -301,6 +345,8 @@
     var rawToggle = element("button", {
       type: "button",
       class: "button button--ghost media-list-editor__raw-toggle",
+      "aria-controls": rawID,
+      "aria-expanded": "false",
       text: "Raw lines"
     });
     var search = element("input", {
@@ -309,8 +355,16 @@
       "aria-label": "Filter media",
       placeholder: "Filter media"
     });
+    var resultStatus = element("output", {
+      class: "media-picker__status",
+      "data-media-picker-status": "true",
+      role: "status",
+      "aria-live": "polite",
+      "aria-atomic": "true",
+      "aria-label": "Media search results"
+    });
     var grid = element("div", { class: "media-picker__grid" });
-    var panel = element("div", { class: "media-picker__panel", id: id, hidden: true }, search, grid);
+    var panel = element("div", { class: "media-picker__panel", id: id, hidden: true }, search, resultStatus, grid);
     var editor = element("div", { class: "media-list-editor" },
       items,
       element("div", { class: "media-list-editor__actions" }, trigger, rawToggle),
@@ -325,19 +379,45 @@
       syncing = false;
     }
 
-    function move(index, delta) {
+    function syncGridSelection() {
+      toArray(grid.querySelectorAll(".media-picker__asset")).forEach(function (button) {
+        var assetURL = button.getAttribute("data-media-asset-url");
+        var selected = images.some(function (image) { return image.url === assetURL; });
+        var label = button.getAttribute("data-media-asset-label") || "media";
+        button.setAttribute("data-media-asset-selected", selected ? "true" : "false");
+        button.setAttribute("aria-label", "Add " + label + (selected ? " (already in gallery)" : ""));
+      });
+    }
+
+    function focusItemControl(itemID, action) {
+      var item = toArray(items.querySelectorAll("[data-media-item-id]")).filter(function (candidate) {
+        return candidate.getAttribute("data-media-item-id") === itemID;
+      })[0];
+      if (!item) return;
+      var control = action ? item.querySelector('[data-media-list-action="' + action + '"]') : null;
+      if (!control || control.disabled) control = item.querySelector("input[type=\"text\"]");
+      if (control && typeof control.focus === "function") control.focus();
+    }
+
+    function move(index, delta, action) {
       var target = index + delta;
       if (target < 0 || target >= images.length) return;
+      var itemID = ensureMediaItemID(images[index]);
       var image = images.splice(index, 1)[0];
       images.splice(target, 0, image);
       syncTextarea();
       renderItems();
+      focusItemControl(itemID, action);
     }
 
     function remove(index) {
+      var nextImage = images[index + 1] || images[index - 1];
+      var nextItemID = nextImage && ensureMediaItemID(nextImage);
       images.splice(index, 1);
       syncTextarea();
       renderItems();
+      if (nextItemID) focusItemControl(nextItemID, "remove");
+      else trigger.focus();
     }
 
     function assetFor(image) {
@@ -354,27 +434,29 @@
       items.textContent = "";
       if (!images.length) {
         items.appendChild(element("p", { class: "empty", text: "No images selected." }));
+        syncGridSelection();
         return;
       }
       images.forEach(function (image, index) {
+        var itemID = ensureMediaItemID(image);
         var asset = assetFor(image);
         var altInput = element("input", {
           type: "text",
           value: image.alt || "",
           placeholder: "Alt text",
-          "aria-label": "Alt text for " + asset.label
+          "aria-label": "Alt text for " + asset.label + " (item " + (index + 1) + ")"
         });
         altInput.addEventListener("input", function () {
           images[index].alt = altInput.value;
           syncTextarea();
         });
-        var up = element("button", { type: "button", class: "home-section-move", text: "Up", "aria-label": "Move image up" });
-        var down = element("button", { type: "button", class: "home-section-move", text: "Down", "aria-label": "Move image down" });
-        var removeButton = element("button", { type: "button", class: "home-section-move", text: "Remove", "aria-label": "Remove image" });
+        var up = element("button", { type: "button", class: "home-section-move", text: "Up", "aria-label": "Move image " + (index + 1) + " up", "data-media-list-action": "up" });
+        var down = element("button", { type: "button", class: "home-section-move", text: "Down", "aria-label": "Move image " + (index + 1) + " down", "data-media-list-action": "down" });
+        var removeButton = element("button", { type: "button", class: "home-section-move", text: "Remove", "aria-label": "Remove image " + (index + 1), "data-media-list-action": "remove" });
         up.disabled = index === 0;
         down.disabled = index === images.length - 1;
-        up.addEventListener("click", function () { move(index, -1); });
-        down.addEventListener("click", function () { move(index, 1); });
+        up.addEventListener("click", function () { move(index, -1, "up"); });
+        down.addEventListener("click", function () { move(index, 1, "down"); });
         removeButton.addEventListener("click", function () { remove(index); });
         items.appendChild(element("article", { class: "media-list-editor__item" },
           renderThumb(asset),
@@ -385,23 +467,32 @@
           ),
           element("div", { class: "media-list-editor__item-actions" }, up, down, removeButton)
         ));
+        var item = items.lastElementChild;
+        item.setAttribute("data-media-item-id", itemID);
+        item.setAttribute("aria-label", asset.label + " media item " + (index + 1));
       });
+      syncGridSelection();
     }
 
     function renderGrid() {
-      var query = search.value.trim().toLowerCase();
+      var query = search.value.trim();
+      var normalizedQuery = query.toLowerCase();
       grid.textContent = "";
-      assets.filter(function (asset) {
-        return !query || asset.label.toLowerCase().indexOf(query) >= 0 || asset.url.toLowerCase().indexOf(query) >= 0 || asset.alt.toLowerCase().indexOf(query) >= 0;
-      }).forEach(function (asset) {
+      var matches = assets.filter(function (asset) {
+        return !normalizedQuery || asset.label.toLowerCase().indexOf(normalizedQuery) >= 0 || asset.url.toLowerCase().indexOf(normalizedQuery) >= 0 || asset.alt.toLowerCase().indexOf(normalizedQuery) >= 0;
+      });
+      matches.forEach(function (asset) {
         var button = element("button", {
           type: "button",
           class: "media-picker__asset",
-          "aria-label": "Add " + asset.label
+          "aria-label": "Add " + asset.label + (images.some(function (image) { return image.url === asset.url; }) ? " (already in gallery)" : ""),
+          "data-media-asset-selected": images.some(function (image) { return image.url === asset.url; }) ? "true" : "false",
+          "data-media-asset-label": asset.label,
+          "data-media-asset-url": asset.url
         }, renderThumb(asset), element("span", { text: asset.label }));
         attachAssetDrag(button, asset);
         button.addEventListener("click", function () {
-          images.push({ url: asset.url, alt: asset.alt || asset.label });
+          images.push(mediaImage(asset.url, asset.alt || asset.label));
           syncTextarea();
           renderItems();
           setExpanded(trigger, panel, false);
@@ -410,6 +501,7 @@
         grid.appendChild(button);
       });
       if (!grid.children.length) grid.appendChild(element("p", { class: "empty", text: "No matching media." }));
+      resultStatus.textContent = mediaResultsMessage(matches.length, query);
     }
 
     trigger.addEventListener("click", function () {
@@ -421,8 +513,10 @@
       }
     });
     rawToggle.addEventListener("click", function () {
-      textarea.hidden = !textarea.hidden;
-      if (!textarea.hidden) textarea.focus();
+      var expanded = textarea.hidden;
+      textarea.hidden = !expanded;
+      rawToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+      if (expanded) textarea.focus();
     });
     textarea.addEventListener("input", function () {
       if (syncing) return;
@@ -432,6 +526,8 @@
     search.addEventListener("input", renderGrid);
     panel.addEventListener("keydown", function (event) {
       if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
         setExpanded(trigger, panel, false);
         trigger.focus();
       }

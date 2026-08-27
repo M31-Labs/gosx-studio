@@ -5,6 +5,8 @@ package contenteditorruntime
 import (
 	"embed"
 	"net/http"
+
+	"m31labs.dev/gosx-studio/internal/runtimeasset"
 )
 
 //go:embed content_editor.js
@@ -18,10 +20,5 @@ func Script() []byte {
 
 // Handler serves Script as a browser JavaScript asset.
 func Handler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(Script())
-	})
+	return runtimeasset.Handler("content-editor.js", Script(), "text/javascript; charset=utf-8")
 }

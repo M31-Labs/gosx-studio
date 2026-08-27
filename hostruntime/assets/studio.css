@@ -2330,6 +2330,23 @@ button.button {
   align-self: end;
 }
 
+/* Error states carry a sentence, field diagnostics, and sometimes a recovery
+   link. Keep that message in the full editor track so the compact search /
+   status arrangement cannot collapse its detail column to zero width. Idle,
+   dirty, saving, and saved states retain the compact two-column placement. */
+.admin-page .admin-form[data-content-editor-enhanced-submit] .content-editor:is(
+    [data-content-editor-save-state="offline"],
+    [data-content-editor-save-state="failed"],
+    [data-content-editor-save-state="unconfirmed"],
+    [data-content-editor-save-state="auth"],
+    [data-content-editor-save-state="conflict"]
+  )
+  > :where(.content-editor__save-status, [data-content-editor-save-status]) {
+  grid-column: 1 / -1;
+  align-self: start;
+  justify-self: stretch;
+}
+
 .admin-page .admin-form[data-content-editor-enhanced-submit] .content-editor
   > :where(label, .content-editor__source, .content-editor__toolbar, .content-block-list, [data-content-editor-list]) {
   grid-column: 1 / -1;
@@ -3068,13 +3085,69 @@ button.button {
 :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
   :where(.content-editor__save-status, [data-content-editor-save-status]) {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
   align-items: center;
   gap: var(--space-chip-y) var(--space-xs);
   min-width: 0;
   max-width: 100%;
   color: var(--color-muted);
   font-size: var(--text-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-status, [data-content-editor-save-status])
+  > :where(.content-editor__save-errors, .content-editor__save-created-link, .content-editor__save-conflict-link) {
+  grid-column: 1 / -1;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-status, [data-content-editor-save-status])
+  > :where(.content-editor__save-errors) {
+  width: 100%;
+  margin: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-status, [data-content-editor-save-status])
+  > :where(.content-editor__save-errors) > ul {
+  max-width: 100%;
+  margin: 0;
+  padding-inline-start: var(--space-md);
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-status, [data-content-editor-save-status])
+  > :where(.content-editor__save-created-link, .content-editor__save-conflict-link) {
+  display: inline-flex;
+  min-width: var(--space-md);
+  min-height: var(--space-md);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-soft);
+  color: var(--color-accent-strong);
+  padding: var(--space-chip-y) var(--space-chip-x);
+  justify-self: start;
+  white-space: normal;
+  text-decoration: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-status, [data-content-editor-save-status])
+  > :where(.content-editor__save-created-link, .content-editor__save-conflict-link):hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-status, [data-content-editor-save-status])
+  > :where(.content-editor__save-created-link, .content-editor__save-conflict-link):focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-canvas));
+  color: var(--color-ink);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 72%, transparent);
+  outline-offset: 2px;
 }
 
 :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
@@ -3204,9 +3277,81 @@ button.button {
 
 @media (pointer: coarse) {
   :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
-    :where(.content-editor__save-retry, [data-content-editor-save-retry]) {
+    :where(
+      .content-editor__save-retry,
+      [data-content-editor-save-retry],
+      .content-editor__save-created-link,
+      .content-editor__save-conflict-link
+    ) {
     min-width: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
     min-height: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+  }
+}
+
+@media (max-width: 820px) {
+  /* On narrow screens, failure detail and its actions each receive a full
+     row. This keeps a visible Retry or recovery link from stealing the only
+     readable line from the error message. */
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-editor:is(
+      [data-content-editor-save-state="offline"],
+      [data-content-editor-save-state="failed"],
+      [data-content-editor-save-state="unconfirmed"],
+      [data-content-editor-save-state="auth"],
+      [data-content-editor-save-state="conflict"]
+    )
+    > :where(.content-editor__save-status, [data-content-editor-save-status]) {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-editor:is(
+      [data-content-editor-save-state="offline"],
+      [data-content-editor-save-state="failed"],
+      [data-content-editor-save-state="unconfirmed"],
+      [data-content-editor-save-state="auth"],
+      [data-content-editor-save-state="conflict"]
+    )
+    > :where(.content-editor__save-status, [data-content-editor-save-status])
+    > :where(
+      .content-editor__save-label,
+      [data-content-editor-save-label],
+      .content-editor__save-detail,
+      [data-content-editor-save-detail-text],
+      .content-editor__save-retry,
+      [data-content-editor-save-retry],
+      .content-editor__save-errors,
+      .content-editor__save-created-link,
+      .content-editor__save-conflict-link
+    ) {
+    grid-column: 1;
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-editor:is(
+      [data-content-editor-save-state="offline"],
+      [data-content-editor-save-state="failed"],
+      [data-content-editor-save-state="unconfirmed"],
+      [data-content-editor-save-state="auth"],
+      [data-content-editor-save-state="conflict"]
+    )
+    > :where(.content-editor__save-status, [data-content-editor-save-status])
+    > :where(.content-editor__save-detail, [data-content-editor-save-detail-text], .content-editor__save-errors) {
+    width: 100%;
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-editor:is(
+      [data-content-editor-save-state="offline"],
+      [data-content-editor-save-state="failed"],
+      [data-content-editor-save-state="unconfirmed"],
+      [data-content-editor-save-state="auth"],
+      [data-content-editor-save-state="conflict"]
+    )
+    > :where(.content-editor__save-status, [data-content-editor-save-status])
+    > :where(.content-editor__save-label, [data-content-editor-save-label]) {
+    justify-self: start;
   }
 }
 
@@ -3356,6 +3501,8 @@ button.button {
 :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
   .media-picker__asset:focus-visible,
 :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__asset[data-media-asset-selected="true"],
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
   .media-picker__asset[aria-selected="true"] {
   border-color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 8%, var(--color-canvas-soft));
@@ -3498,6 +3645,161 @@ button.button {
 :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
   [data-media-upload-status][data-media-upload-status-kind="error"] {
   color: var(--color-danger);
+}
+
+/* The media-lines control is emitted by mediaruntime for Page/Blog gallery
+   fields. Keep the generated list a bounded component: long asset names and
+   URLs may wrap, while the action cluster remains reachable at phone widths.
+   These rules intentionally use the existing media/editor tokens and do not
+   change the host workbench layout. */
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__items {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__item {
+  display: grid;
+  grid-template-columns: var(--size-thumb-sm) minmax(0, 1fr) auto;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  padding: var(--space-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__item
+  :where(img, .media-picker__file) {
+  width: var(--size-thumb-sm);
+  max-width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  object-fit: cover;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__fields {
+  display: grid;
+  gap: var(--space-chip-y);
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__fields
+  :where(strong, small) {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__fields
+  strong {
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__fields
+  small {
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__item-actions,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__actions {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-chip-y);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__item-actions
+  :where(button, .button),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__actions
+  :where(button, .button) {
+  min-width: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+  min-height: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__item-actions
+  button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__raw-toggle {
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.media-picker__search, .media-picker__status) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__search {
+  width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__status {
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 820px) {
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-list-editor__item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-list-editor__item
+    :where(img, .media-picker__file) {
+    width: var(--size-thumb-md);
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-list-editor__item-actions,
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-list-editor__actions {
+    justify-content: flex-start;
+  }
 }
 
 /* SectionOrder sits between the preview toolbar and iframe. Keep it compact
@@ -3964,6 +4266,17 @@ button.button {
       [data-gosx-studio-section-order-history],
       [data-gosx-studio-section-order-preview-handle="true"]
     ) {
+    transition: none;
+    transform: none;
+  }
+
+  /* .admin-page .button carries two class components of specificity in the
+     shared admin base. Repeat that scoped specificity here so the platform
+     guarantee wins over the normal hover transition. */
+  .gosx-studio .button,
+  .gosx-studio-workbench .button,
+  .editor-workbench .button,
+  .admin-page .button {
     transition: none;
     transform: none;
   }
@@ -4994,6 +5307,90 @@ form:has(> [data-studio-direct-edit-field]) > button {
   [data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="lift"]:focus-visible,
   [data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="scale"]:hover,
   [data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="scale"]:focus-visible {
+    transform: none;
+  }
+}
+
+/* Enterprise editor quality guards. These platform overrides keep the
+   existing Paper&Ink surfaces legible in forced-colors mode and ensure
+   reduced-motion users never receive movement or transition-only feedback.
+   The selectors are scoped to Studio/admin surfaces so storefront content is
+   unaffected. */
+@media (forced-colors: active) {
+  :is(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :is(
+      .button,
+      button,
+      input,
+      select,
+      textarea,
+      .content-block,
+      .media-picker__asset,
+      .media-picker__panel,
+      .media-picker__drop-zone,
+      .media-picker__dropzone,
+      [data-media-upload-drop-zone],
+      [data-media-upload-dropzone],
+      .media-list-editor__item,
+      .media-list-editor__raw-toggle,
+      .content-editor__empty,
+      [data-content-editor-empty]
+    ) {
+    forced-color-adjust: auto;
+    border-color: ButtonText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  :is(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :is(
+      button,
+      .button,
+      input,
+      select,
+      textarea,
+      [data-content-drag-handle],
+      [data-content-editor-action],
+      .media-picker__asset,
+      .media-list-editor__raw-toggle
+    ):focus-visible {
+    forced-color-adjust: auto;
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  :is(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :is(
+      .content-block:is(.is-selected, [aria-selected="true"], [data-content-editor-selected="true"]),
+      .media-picker__asset[aria-current="true"],
+      .media-picker__asset[aria-selected="true"],
+      .media-picker__asset[data-media-asset-selected="true"],
+      [data-content-editor-drop-before],
+      [data-content-editor-drop-after]
+    ) {
+    forced-color-adjust: auto;
+    border-color: Highlight;
+    background: Canvas;
+    color: CanvasText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(
+      .button,
+      button,
+      .content-block,
+      .media-picker__asset,
+      .media-picker__drop-zone,
+      .media-picker__dropzone,
+      [data-media-upload-drop-zone],
+      [data-media-upload-dropzone],
+      .media-list-editor__item,
+      .media-list-editor__item-actions button,
+      .media-list-editor__raw-toggle
+    ) {
+    transition: none;
     transform: none;
   }
 }

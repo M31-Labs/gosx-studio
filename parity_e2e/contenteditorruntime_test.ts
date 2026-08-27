@@ -616,7 +616,8 @@ test.describe("@smoke GoSXStudioContentEditorRuntime", () => {
     await save.click();
     await expect(page.locator("[data-content-editor]"))
       .toHaveAttribute("data-content-editor-save-state", "saving");
-    await save.click();
+    await expect(save).toBeDisabled();
+    await save.click({ force: true }).catch(() => undefined);
     await expect.poll(() => page.evaluate(() => (window as unknown as { saveCount?: number }).saveCount)).toBe(1);
     expect(page.url()).toBe("http://127.0.0.1:4173/editor");
 

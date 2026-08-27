@@ -27,6 +27,7 @@
   };
   var HISTORY_LIMIT = 80;
   var editorStates = new WeakMap();
+  var editorInstanceID = 0;
 
   function uid() {
     return "blk_" + Math.random().toString(36).slice(2, 9);
@@ -235,6 +236,16 @@
     return name === "csrf_token" || name === "_csrf" || name === "gorilla.csrf.Token";
   }
 
+  function markedRevisionFieldNames(form) {
+    var names = Object.create(null);
+    if (!form || !form.querySelectorAll) return names;
+    Array.prototype.forEach.call(form.querySelectorAll("[data-content-editor-revision='true'][name]"), function (control) {
+      var name = String(control.name || "");
+      if (name) names[name] = true;
+    });
+    return names;
+  }
+
   function formValueSignature(value) {
     if (value && typeof value === "object" && typeof value.name === "string" && typeof value.size === "number") {
       return "file:" + value.name + ":" + value.size + ":" + String(value.lastModified || 0) + ":" + String(value.type || "");
@@ -248,6 +259,28 @@
     return typeof token === "string" ? token.trim() : "";
   }
 
+  function isRevisionControl(control) {
+    return !!(control && control.getAttribute && control.getAttribute("data-content-editor-revision") === "true");
+  }
+
+  function markedRevisionControl(state) {
+    if (!state || !state.form || !state.form.querySelectorAll) return null;
+    var controls = state.form.querySelectorAll("[data-content-editor-revision='true']");
+    for (var index = 0; index < controls.length; index += 1) {
+      if (String(controls[index].name || "") === "expectedRevision") return controls[index];
+    }
+    return null;
+  }
+
+  function applyRevisionToken(state, payload) {
+    var control = markedRevisionControl(state);
+    if (!control || !isObject(payload) || !isObject(payload.values)) return false;
+    var token = payload.values.expectedRevision;
+    if (typeof token !== "string" || !token.trim() || !("value" in control)) return false;
+    control.value = token;
+    return true;
+  }
+
   function formSignature(form) {
     if (!form || typeof FormData !== "function") return "";
     var data;
@@ -257,8 +290,10 @@
       return "";
     }
     var parts = [];
+    var revisionNames = markedRevisionFieldNames(form);
     var append = function (value, name) {
       if (isEphemeralFormField(name)) return;
+      if (revisionNames[String(name || "")]) return;
       parts.push(encodeURIComponent(String(name)) + "=" + encodeURIComponent(formValueSignature(value)));
     };
     if (typeof data.forEach === "function") {
@@ -359,9 +394,13 @@
       keyboardDragPreviewIndex: -1,
       searchQuery: "",
       collapsedByID: Object.create(null),
-      collapseBodyPrefix: uid() + "-body-",
+      domIDPrefix: "content-editor-" + (++editorInstanceID) + "-",
       createFormLocked: false,
       createLockRecords: null,
+      pendingSubmitLockRecords: null,
+      pendingSaveUserEdited: false,
+      saveRequestID: 0,
+      revisionRecoveryRequired: false,
       saveErrorsNode: null,
       saveErrorsID: "",
       sourceDiagnosticNode: null
@@ -425,10 +464,12 @@
     });
 
     state.form.addEventListener("input", function (event) {
+      if (state.saveState === "saving" && !isRevisionControl(event.target)) state.pendingSaveUserEdited = true;
       if (event.target === state.source || event.target === state.format) return;
       syncStatus(state);
     });
     state.form.addEventListener("change", function (event) {
+      if (state.saveState === "saving" && !isRevisionControl(event.target)) state.pendingSaveUserEdited = true;
       if (event.target === state.source || event.target === state.format) return;
       syncStatus(state);
     });
@@ -531,22 +572,32 @@
     });
 
     state.root.addEventListener("click", function (event) {
-      var row = event.target.closest("[data-content-block-id]");
-      var collapse = event.target.closest("[data-content-editor-collapse]");
+      var target = event.target;
+      var row = target && target.closest ? target.closest("[data-content-block-id]") : null;
+      var collapse = target && target.closest ? target.closest("[data-content-editor-collapse]") : null;
       if (collapse && state.root.contains(collapse)) {
         event.preventDefault();
-        if (row) state.selectedID = row.getAttribute("data-content-block-id") || "";
+        if (row) selectBlock(state, row.getAttribute("data-content-block-id"), false);
         toggleCollapse(state, collapse.getAttribute("data-content-editor-block") || "");
         return;
       }
-      var action = event.target.closest("[data-content-editor-action]");
+      var action = target && target.closest ? target.closest("[data-content-editor-action]") : null;
       if (action && state.root.contains(action)) {
         event.preventDefault();
-        if (row) state.selectedID = row.getAttribute("data-content-block-id") || "";
+        if (row) selectBlock(state, row.getAttribute("data-content-block-id"), false);
         runAction(state, action);
         return;
       }
-      if (row && state.root.contains(row)) selectBlock(state, row.getAttribute("data-content-block-id"), false);
+      if (row && state.root.contains(row) && !isInteractiveTarget(target)) {
+        selectBlock(state, row.getAttribute("data-content-block-id"), false);
+      }
+    });
+
+    state.root.addEventListener("focusin", function (event) {
+      var target = event.target;
+      var row = target && target.closest ? target.closest("[data-content-block-id]") : null;
+      if (!row || !state.root.contains(row)) return;
+      selectBlock(state, row.getAttribute("data-content-block-id"), false);
     });
 
     state.root.addEventListener("keydown", function (event) {
@@ -591,6 +642,22 @@
       }
     });
 
+    // A native requestSubmit() still emits submit even when a different
+    // submitter (Archive/Restore) is chosen. Capture the event while an
+    // enhanced save owns the form so a competing mutation cannot slip through
+    // before the regular enhancement guard runs.
+    state.form.addEventListener("submit", function (event) {
+      if (state.saveState !== "saving") return;
+      event.preventDefault();
+      if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+    }, true);
+    siblingRestoreForms(state).forEach(function (form) {
+      form.addEventListener("submit", function (event) {
+        if (state.saveState !== "saving") return;
+        event.preventDefault();
+        if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+      }, true);
+    });
     state.form.addEventListener("submit", function (event) {
       handleSubmit(state, event);
     });
@@ -611,6 +678,11 @@
   function isTextEditingTarget(target) {
     if (!target || !target.matches) return false;
     return target.matches("input, textarea, select, [contenteditable], [contenteditable='true']");
+  }
+
+  function isInteractiveTarget(target) {
+    if (!target || !target.closest) return false;
+    return !!target.closest("input, textarea, select, button, a, [contenteditable], [contenteditable='true']");
   }
 
   function isSaveShortcut(event) {
@@ -708,6 +780,91 @@
     return null;
   }
 
+  function isSubmitMutationControl(control) {
+    if (!control || !control.tagName) return false;
+    var tagName = String(control.tagName || "").toLowerCase();
+    var type = String(control.getAttribute && control.getAttribute("type") || control.type || "").toLowerCase();
+    if (tagName === "button") return !type || type === "submit";
+    return tagName === "input" && (type === "submit" || type === "image");
+  }
+
+  function editorDetailScope(state) {
+    if (!state || !state.root || !state.root.closest) return null;
+    return state.root.closest("[data-gosx-studio-backend-detail-renderer]");
+  }
+
+  function isRestoreForm(form) {
+    if (!form) return false;
+    var action = String(form.getAttribute && form.getAttribute("action") || form.action || "");
+    if (/restore(?:revision)?/i.test(action)) return true;
+    if (!form.querySelectorAll) return false;
+    return Array.prototype.some.call(form.querySelectorAll("button, input"), function (control) {
+      return /restore/i.test(String(control.getAttribute && control.getAttribute("data-studio-submit-action") || ""));
+    });
+  }
+
+  function siblingRestoreForms(state) {
+    var scope = editorDetailScope(state);
+    if (!scope || !scope.querySelectorAll) return [];
+    return Array.prototype.filter.call(scope.querySelectorAll("form"), function (form) {
+      return form !== state.form && isRestoreForm(form);
+    });
+  }
+
+  function pendingSubmitControls(state) {
+    var controls = [];
+    var seen = [];
+    var add = function (control) {
+      if (!control || seen.indexOf(control) >= 0 || !isSubmitMutationControl(control)) return;
+      seen.push(control);
+      controls.push(control);
+    };
+    if (state && state.form && state.form.querySelectorAll) {
+      Array.prototype.forEach.call(state.form.querySelectorAll("button, input"), add);
+    }
+    // A submitter may be associated with this form while living elsewhere in
+    // the document. Include those controls when the browser exposes .form.
+    if (state && state.form && document.querySelectorAll) {
+      Array.prototype.forEach.call(document.querySelectorAll("button, input"), function (control) {
+        if (control.form === state.form) add(control);
+      });
+    }
+    siblingRestoreForms(state).forEach(function (form) {
+      Array.prototype.forEach.call(form.querySelectorAll("button, input"), add);
+    });
+    return controls;
+  }
+
+  function setPendingSubmitLock(state, locked) {
+    if (!state || !state.root) return;
+    if (locked) {
+      if (state.pendingSubmitLockRecords) return;
+      state.pendingSubmitLockRecords = [];
+      pendingSubmitControls(state).forEach(function (control) {
+        var record = {
+          control: control,
+          disabled: "disabled" in control ? control.disabled : null,
+          lockMarker: control.getAttribute("data-content-editor-submit-locked")
+        };
+        if ("disabled" in control) control.disabled = true;
+        control.setAttribute("data-content-editor-submit-locked", "true");
+        state.pendingSubmitLockRecords.push(record);
+      });
+      state.root.setAttribute("data-content-editor-submit-lock", "true");
+      return;
+    }
+    if (!state.pendingSubmitLockRecords) return;
+    state.pendingSubmitLockRecords.forEach(function (record) {
+      var control = record.control;
+      if (!control) return;
+      if (record.disabled !== null) control.disabled = record.disabled;
+      if (record.lockMarker == null) control.removeAttribute("data-content-editor-submit-locked");
+      else control.setAttribute("data-content-editor-submit-locked", record.lockMarker);
+    });
+    state.pendingSubmitLockRecords = null;
+    state.root.removeAttribute("data-content-editor-submit-lock");
+  }
+
   function actionIsCreate(action) {
     try {
       var url = new URL(String(action || ""), window.location.href);
@@ -785,6 +942,7 @@
         "data-content-editor-save-errors": "true",
         "aria-label": "Save errors",
         id: state.saveErrorsID,
+        tabindex: "-1",
         hidden: true
       });
       status.appendChild(errors);
@@ -792,6 +950,7 @@
       state.saveErrorsID = errors.id || uid() + "-save-errors";
       if (!errors.id) errors.id = state.saveErrorsID;
     }
+    if (!errors.hasAttribute("tabindex")) errors.setAttribute("tabindex", "-1");
     var createdLink = status.querySelector("[data-content-editor-save-created-link]");
     if (!createdLink) {
       createdLink = el("a", {
@@ -803,13 +962,26 @@
       });
       status.appendChild(createdLink);
     }
+    var conflictLink = status.querySelector("[data-content-editor-save-conflict-link]");
+    if (!conflictLink) {
+      conflictLink = el("a", {
+        class: "content-editor__save-conflict-link",
+        "data-content-editor-save-conflict-link": "true",
+        target: "_blank",
+        rel: "noopener",
+        hidden: true,
+        text: "Open current version in new tab"
+      });
+      status.appendChild(conflictLink);
+    }
     state.saveStatusNode = status;
     state.saveLabelNode = label;
     state.saveDetailNode = detail;
     state.saveRetryNode = retry;
     state.saveErrorsNode = errors;
     state.saveCreatedLinkNode = createdLink;
-    return { status: status, label: label, detail: detail, retry: retry, errors: errors, createdLink: createdLink };
+    state.saveConflictLinkNode = conflictLink;
+    return { status: status, label: label, detail: detail, retry: retry, errors: errors, createdLink: createdLink, conflictLink: conflictLink };
   }
 
   function clearFieldErrors(state) {
@@ -843,7 +1015,8 @@
     var nodes = ensureSaveStatus(state);
     var list = el("ul");
     entries.forEach(function (entry) {
-      list.appendChild(el("li", { text: entry.name + ": " + entry.message }));
+      var revisionError = entry.name === "expectedRevision" && !!markedRevisionControl(state);
+      list.appendChild(el("li", { text: revisionError ? entry.message : entry.name + ": " + entry.message }));
       Array.prototype.forEach.call(state.form.querySelectorAll ? state.form.querySelectorAll("[name]") : [], function (control) {
         if (String(control.name || "") !== entry.name) return;
         control.setAttribute("data-content-editor-field-error", "true");
@@ -855,6 +1028,76 @@
     });
     nodes.errors.appendChild(list);
     nodes.errors.hidden = false;
+  }
+
+  function isVisibleValidationControl(control) {
+    if (!control || typeof control.focus !== "function" || control.disabled || control.hidden) return false;
+    if (control.getAttribute && control.getAttribute("aria-hidden") === "true") return false;
+    if (control.getAttribute && String(control.getAttribute("type") || "").toLowerCase() === "hidden") return false;
+    if (window.getComputedStyle) {
+      try {
+        var style = window.getComputedStyle(control);
+        if (style.display === "none" || style.visibility === "hidden") return false;
+      } catch (error) {
+        return false;
+      }
+    }
+    if (typeof control.getClientRects === "function" && control.getClientRects().length === 0) return false;
+    return true;
+  }
+
+  function firstVisibleInvalidControl(state) {
+    if (!state || !state.form || !state.form.querySelectorAll) return null;
+    var controls;
+    try {
+      controls = state.form.querySelectorAll("[data-content-editor-field-error], :invalid");
+    } catch (error) {
+      controls = state.form.querySelectorAll("[data-content-editor-field-error]");
+    }
+    for (var index = 0; index < controls.length; index += 1) {
+      if (isVisibleValidationControl(controls[index])) return controls[index];
+    }
+    return null;
+  }
+
+  function focusValidationError(state) {
+    if (!editorStillActive(state)) return false;
+    var control = firstVisibleInvalidControl(state);
+    if (control) {
+      control.focus();
+      return true;
+    }
+    var nodes = ensureSaveStatus(state);
+    if (nodes.errors && !nodes.errors.hidden && typeof nodes.errors.focus === "function") {
+      nodes.errors.focus();
+      return true;
+    }
+    return false;
+  }
+
+  function isEnhancedSaveAttempt(state, event) {
+    if (!state || !state.form || state.form === document || state.form.getAttribute("data-content-editor-enhanced-submit") !== "true") return false;
+    var submitter = event && event.submitter;
+    if (submitter && submitter.getAttribute && submitter.getAttribute("data-admin-confirm")) return false;
+    if (submitter && submitter.getAttribute && submitter.getAttribute("data-content-editor-native-submit") === "true") return false;
+    if (submitter && submitter.hasAttribute && submitter.hasAttribute("formaction")) return false;
+    var method = String((submitter && submitter.getAttribute && submitter.getAttribute("formmethod")) || state.form.getAttribute("method") || "get").toLowerCase();
+    return method === "post";
+  }
+
+  function focusInvalidEnhancedSubmit(state, event) {
+    if (!isEnhancedSaveAttempt(state, event) || typeof state.form.checkValidity !== "function" || state.form.checkValidity()) return false;
+    if (event && typeof event.preventDefault === "function") event.preventDefault();
+    if (typeof state.form.reportValidity === "function") {
+      try {
+        state.form.reportValidity();
+      } catch (error) {
+        // Focusing the control below remains the useful fallback when a host
+        // supplies a non-standard form implementation.
+      }
+    }
+    focusValidationError(state);
+    return true;
   }
 
   function createLockExempt(state, control) {
@@ -1018,7 +1261,9 @@
   function syncSaveStatus(state) {
     var nodes = ensureSaveStatus(state);
     var failure = ["offline", "failed", "unconfirmed", "auth", "conflict"].indexOf(state.saveState) >= 0;
-    var retryable = (failure || state.saveState === "dirty") && !state.createCompleted;
+    var guardedConflict = state.saveState === "conflict" && !!markedRevisionControl(state);
+    var guardedRevisionRecovery = !!state.revisionRecoveryRequired;
+    var retryable = (failure || state.saveState === "dirty") && !state.createCompleted && !guardedConflict && !guardedRevisionRecovery;
     nodes.status.setAttribute("role", failure ? "alert" : "status");
     nodes.status.setAttribute("aria-live", failure ? "assertive" : "polite");
     nodes.label.textContent = saveStateLabel(state);
@@ -1040,12 +1285,39 @@
     } else {
       nodes.createdLink.removeAttribute("href");
     }
+    var conflictTarget = "";
+    if (guardedConflict || guardedRevisionRecovery) conflictTarget = currentEditorURL();
+    nodes.conflictLink.hidden = !conflictTarget;
+    if (conflictTarget) {
+      nodes.conflictLink.href = conflictTarget;
+      nodes.conflictLink.target = "_blank";
+      nodes.conflictLink.rel = "noopener";
+    } else {
+      nodes.conflictLink.removeAttribute("href");
+    }
+  }
+
+  function currentEditorURL() {
+    try {
+      var url = new URL(window.location.href, window.location.href);
+      return url.origin === window.location.origin ? url.href : "";
+    } catch (error) {
+      return "";
+    }
   }
 
   function handleSubmit(state, event) {
+    if (!editorStillActive(state)) return;
+    // Keep this guard before shouldEnhanceSubmit: a pending enhanced Save owns
+    // the form even when a caller tries to requestSubmit() with Archive,
+    // Restore, or another native submitter.
+    if (state.saveState === "saving") {
+      if (event && typeof event.preventDefault === "function") event.preventDefault();
+      return;
+    }
+    if (focusInvalidEnhancedSubmit(state, event)) return;
     if (!shouldEnhanceSubmit(state, event)) return;
-    event.preventDefault();
-    if (state.saveState === "saving") return;
+    if (event && typeof event.preventDefault === "function") event.preventDefault();
     if (state.createCompleted) {
       setSaveState(state, "dirty", "This new item was already created. Open the saved item before retrying newer edits.");
       return;
@@ -1074,7 +1346,10 @@
     var body;
     try {
       body = new FormData(state.form);
-      if (submitter && submitter.name && !body.has(submitter.name)) body.append(submitter.name, submitter.value || "");
+      // FormData(form) does not include the activated submitter. Native form
+      // semantics append it even when another control already uses the same
+      // name, so preserve both values in their existing order.
+      if (submitter && submitter.name) body.append(submitter.name, submitter.value == null ? "" : submitter.value);
     } catch (error) {
       setSaveState(state, "failed", "Could not prepare the save request. Your edits are still local; retry save.");
       return;
@@ -1087,6 +1362,9 @@
     var submittedSource = state.source.value;
     var submittedFormSignature = formSignature(state.form);
     clearFieldErrors(state);
+    state.pendingSaveUserEdited = false;
+    state.revisionRecoveryRequired = false;
+    var requestID = ++state.saveRequestID;
     if (actionIsCreate(action)) setCreateFormLocked(state, true);
     setSaveState(state, "saving", "Saving draft...");
     fetch(action, {
@@ -1099,7 +1377,7 @@
         "X-CSRF-Token": csrfToken
       }
     }).then(function (response) {
-      if (!editorStillActive(state)) return null;
+      if (!editorStillActive(state) || state.saveRequestID !== requestID) return null;
       var contentType = response.headers && response.headers.get ? (response.headers.get("Content-Type") || "") : "";
       if (response.status === 401 || response.status === 403 || responseLooksUnauthenticated(response)) {
         setSaveState(state, "auth", "Save needs a fresh session. Your edits are still local; sign in and retry.");
@@ -1107,7 +1385,7 @@
       }
       var payloadPromise = contentType.toLowerCase().indexOf("json") >= 0 && typeof response.json === "function" ? response.json().catch(function () { return null; }) : Promise.resolve(null);
       return payloadPromise.then(function (payload) {
-        if (!editorStillActive(state)) return;
+        if (!editorStillActive(state) || state.saveRequestID !== requestID) return;
         if (!payload) {
           setSaveState(state, response.ok ? "unconfirmed" : "failed", "Save was not confirmed by a structured action response. Your edits are still local; retry save.");
           return;
@@ -1115,8 +1393,17 @@
         var structuredSuccess = payload && typeof payload === "object" && !Array.isArray(payload) && payload.ok === true && response.status >= 200 && response.status < 400;
         if (!structuredSuccess) {
           if (payload.fieldErrors) syncFieldErrors(state, payload.fieldErrors);
+          var newerEditsOnFailure = formSignature(state.form) !== submittedFormSignature;
           var failureState = response.status === 409 || payload.conflict === true ? "conflict" : "failed";
-          setSaveState(state, failureState, payload && payload.message ? String(payload.message) + " Your edits are still local; retry save." : "Save was not confirmed. Your edits are still local; retry save.");
+          var guardedConflict = failureState === "conflict" && !!markedRevisionControl(state);
+          var failureDetail;
+          if (guardedConflict) {
+            failureDetail = (payload && payload.message ? String(payload.message) : "A newer version exists.") + " Your draft remains local. Compare and reconcile with the current version before saving again.";
+          } else {
+            failureDetail = payload && payload.message ? String(payload.message) + " Your edits are still local; retry save." : "Save was not confirmed. Your edits are still local; retry save.";
+          }
+          setSaveState(state, failureState, failureDetail);
+          if ((response.status === 422 || payload.fieldErrors) && !newerEditsOnFailure && !state.pendingSaveUserEdited) focusValidationError(state);
           return;
         }
         if (payload.redirect && redirectLooksUnauthenticated(payload.redirect)) {
@@ -1124,6 +1411,10 @@
           return;
         }
         var newerEdits = formSignature(state.form) !== submittedFormSignature;
+        var revisionControl = markedRevisionControl(state);
+        var revisionUpdated = applyRevisionToken(state, payload);
+        var missingRevisionToken = !!revisionControl && !revisionUpdated;
+        state.revisionRecoveryRequired = missingRevisionToken;
         state.initialSource = submittedSource;
         state.initialFormSignature = submittedFormSignature;
         if (newerEdits) {
@@ -1134,16 +1425,24 @@
           } else {
             setSaveState(state, "dirty", "Earlier edits saved. Newer edits remain local; retry save.");
           }
+          if (missingRevisionToken) {
+            setSaveState(state, "dirty", "Earlier edits saved. Newer edits remain local; the server did not return a new revision token. Open the current version to compare before saving again.");
+          }
           syncStatus(state);
           return;
         }
         if (actionIsCreate(action)) state.createCompleted = true;
+        if (missingRevisionToken) {
+          setSaveState(state, "unconfirmed", "Earlier edits were accepted, but the server did not return a new revision token. Open the current version to compare before saving again.");
+          syncStatus(state);
+          return;
+        }
         setSaveState(state, "saved", payload.message ? String(payload.message) : "Saved.");
         syncStatus(state);
         if (payload.redirect) navigateAfterSave(state, payload.redirect);
       });
     }).catch(function () {
-      if (!editorStillActive(state)) return;
+      if (!editorStillActive(state) || state.saveRequestID !== requestID) return;
       setSaveState(state, "failed", "Save failed. Your edits are still local; retry save.");
     });
   }
@@ -1188,7 +1487,11 @@
 
   function setSaveState(state, value, detail) {
     if (!editorStillActive(state)) return;
-    if (value !== "saving") setCreateFormLocked(state, false);
+    if (value === "saving") setPendingSubmitLock(state, true);
+    else {
+      setPendingSubmitLock(state, false);
+      setCreateFormLocked(state, false);
+    }
     state.saveState = value;
     state.saveDetail = detail || "";
     state.root.setAttribute("data-content-editor-save-state", value);
@@ -1216,6 +1519,7 @@
     state.blocks = clone(snap.blocks) || [];
     state.envelope = clone(snap.envelope) || { version: 1 };
     state.selectedID = snap.selectedID || "";
+    revealSelectedBlock(state);
     state.sourceState = "ready";
     state.sourceError = "";
     state.suppressHistory = false;
@@ -1252,9 +1556,15 @@
     return -1;
   }
 
+  function syncSelection(state, id) {
+    state.selectedID = id == null ? "" : String(id);
+    Array.prototype.forEach.call(state.list.querySelectorAll ? state.list.querySelectorAll("[data-content-block-id]") : [], function (row) {
+      row.setAttribute("data-content-editor-selected", row.getAttribute("data-content-block-id") === state.selectedID ? "true" : "false");
+    });
+  }
+
   function selectBlock(state, id, focus) {
-    state.selectedID = id || "";
-    render(state);
+    syncSelection(state, id);
     if (focus) focusHandle(state, id);
   }
 
@@ -1279,6 +1589,53 @@
     if (handle) handle.focus();
   }
 
+  function focusMutationTarget(state, id) {
+    if (id) {
+      var row = state.list.querySelector('[data-content-block-id="' + cssEscape(id) + '"]');
+      var handle = row && row.querySelector("[data-content-drag-handle]");
+      if (handle) {
+        handle.focus();
+        return true;
+      }
+    }
+    var undoButton = state.list.querySelector("[data-content-editor-action='undo']");
+    if (undoButton && !undoButton.disabled) {
+      undoButton.focus();
+      return true;
+    }
+    var addButton = state.toolbar && state.toolbar.querySelector("[data-content-add]");
+    if (addButton && !addButton.disabled && !addButton.hidden) {
+      addButton.focus();
+      return true;
+    }
+    if (state.source && !state.source.hidden && typeof state.source.focus === "function") {
+      state.source.focus();
+      return true;
+    }
+    return false;
+  }
+
+  function focusTypeSelect(state, id) {
+    if (!id) return false;
+    var row = state.list.querySelector('[data-content-block-id="' + cssEscape(id) + '"]');
+    var select = row && row.querySelector("select[aria-label='Block type']");
+    if (!select || select.disabled) return false;
+    select.focus();
+    return true;
+  }
+
+  function clearSearch(state) {
+    if (!String(state.searchQuery || "").trim()) return;
+    state.searchQuery = "";
+    if (state.searchInputNode) state.searchInputNode.value = "";
+  }
+
+  function revealSelectedBlock(state) {
+    if (!String(state.searchQuery || "").trim()) return;
+    var index = blockIndex(state, state.selectedID);
+    if (index < 0 || !blockMatchesSearch(state, state.blocks[index])) clearSearch(state);
+  }
+
   function replaceBlock(state, id, patch) {
     var index = blockIndex(state, id);
     if (index < 0) return;
@@ -1295,9 +1652,10 @@
     pushHistory(state);
     state.blocks.splice(index, 1);
     state.selectedID = state.blocks[Math.min(index, state.blocks.length - 1)] ? state.blocks[Math.min(index, state.blocks.length - 1)].id : "";
+    revealSelectedBlock(state);
     writeSource(state);
     render(state);
-    focusHandle(state, state.selectedID);
+    focusMutationTarget(state, state.selectedID);
   }
 
   function duplicateBlock(state, id) {
@@ -1308,9 +1666,10 @@
     copy.id = uid();
     state.blocks.splice(index + 1, 0, copy);
     state.selectedID = copy.id;
+    revealSelectedBlock(state);
     writeSource(state);
     render(state);
-    focusHandle(state, copy.id);
+    focusMutationTarget(state, copy.id);
   }
 
   function moveBlock(state, id, delta) {
@@ -1335,9 +1694,10 @@
     else if (position === "after") index += 1;
     state.blocks.splice(Math.max(0, index), 0, block);
     state.selectedID = block.id;
+    revealSelectedBlock(state);
     writeSource(state);
     render(state);
-    focusHandle(state, block.id);
+    focusMutationTarget(state, block.id);
   }
 
   function insertMediaBlock(state, media, targetID, position) {
@@ -1349,9 +1709,10 @@
     else if (position === "after") index += 1;
     state.blocks.splice(Math.max(0, index), 0, block);
     state.selectedID = block.id;
+    revealSelectedBlock(state);
     writeSource(state);
     render(state);
-    focusHandle(state, block.id);
+    focusMutationTarget(state, block.id);
   }
 
   function reorderBlock(state, id, targetID, position) {
@@ -1477,7 +1838,7 @@
     } else if (block.type === "quote") {
       fields.appendChild(control("Quote", textArea(block.text, "Quote text", function (value) { replaceBlock(state, block.id, { text: value }); }, 3)));
     } else if (block.type === "image") {
-      var altID = block.id + "-alt";
+      var altID = editorDOMID(state, "alt", block.id);
       fields.appendChild(control("Image URL", textInput(block.url, "/media/uploads/image.jpg", function (value) { replaceBlock(state, block.id, { url: value }); }, state.mediaList, { "data-media-alt-target": "#" + altID })));
       fields.appendChild(control("Alt text", textInput(block.alt, "Describe the image", function (value) { replaceBlock(state, block.id, { alt: value }); }, "", { id: altID })));
     } else if (block.type === "gallery") {
@@ -1581,15 +1942,17 @@
           typeSelect.appendChild(option);
         });
         typeSelect.addEventListener("change", function () {
+          var wasFocused = document.activeElement === typeSelect;
           var patch = { type: typeSelect.value };
           if (typeSelect.value === "heading") patch.level = normalizeHeadingLevel(block.level);
           replaceBlock(state, block.id, patch);
+          revealSelectedBlock(state);
           render(state);
-          focusHandle(state, block.id);
+          if (!wasFocused || !focusTypeSelect(state, block.id)) focusMutationTarget(state, block.id);
         });
       }
       var collapsed = state.collapsedByID[block.id] === true;
-      var bodyID = state.collapseBodyPrefix + String(block.id).replace(/[^A-Za-z0-9_-]/g, "_");
+      var bodyID = editorDOMID(state, "body", block.id);
       var collapseButton = el("button", { type: "button", class: "home-section-move", "aria-label": collapsed ? "Expand block" : "Collapse block", "aria-expanded": collapsed ? "false" : "true", "aria-controls": bodyID, "data-content-editor-collapse": "true", "data-content-editor-block": block.id, text: collapsed ? "Expand" : "Collapse" });
       var handle = el("button", { type: "button", class: "home-section-handle", "aria-label": "Move block", "aria-pressed": state.keyboardDragID === block.id ? "true" : "false", "data-content-drag-handle": "true", draggable: "true", text: "Drag" });
       bindKeyboardHandle(state, handle, block.id);
@@ -1627,17 +1990,36 @@
     return String(value).replace(/["\\]/g, "\\$&");
   }
 
-  function dirtyEditorStates() {
-    return Array.prototype.filter.call(document.querySelectorAll("[data-content-editor]"), function (root) {
-      var state = editorStates.get(root);
-      return state && !state.intentionalDiscard && formIsDirty(state);
-    });
+  function domIDPart(value) {
+    var text = String(value == null ? "" : value);
+    if (!text) return "empty";
+    var encoded = "";
+    for (var index = 0; index < text.length; index += 1) {
+      var code = text.charCodeAt(index).toString(16);
+      while (code.length < 4) code = "0" + code;
+      encoded += code;
+    }
+    return encoded;
   }
 
-  function confirmEditorNavigation() {
+  function editorDOMID(state, kind, id) {
+    return String(state.domIDPrefix || "content-editor-") + String(kind || "node") + "-" + domIDPart(id);
+  }
+
+  function dirtyEditorStates() {
+    return Array.prototype.map.call(document.querySelectorAll("[data-content-editor]"), function (root) {
+      var state = editorStates.get(root);
+      return state && !state.intentionalDiscard && (formIsDirty(state) || state.saveState === "saving") ? state : null;
+    }).filter(function (state) { return !!state; });
+  }
+
+  function confirmEditorNavigation(states) {
     if (typeof window.confirm !== "function") return false;
     try {
-      return window.confirm("You have unsaved editor changes. Leave this page?");
+      var pending = (states || []).some(function (state) { return state && state.saveState === "saving"; });
+      return window.confirm(pending
+        ? "A save is already in progress. Leaving will not cancel the save already sent. Leave this editor?"
+        : "You have unsaved editor changes. Leave this page?");
     } catch (error) {
       return false;
     }
@@ -1673,7 +2055,7 @@
     if (!sameOriginNavigationAnchor(anchor)) return;
     var dirty = dirtyEditorStates();
     if (!dirty.length) return;
-    if (confirmEditorNavigation()) {
+    if (confirmEditorNavigation(dirty)) {
       markEditorNavigationDiscard(dirty);
       return;
     }
@@ -1687,7 +2069,7 @@
     if (detail.intentionalDiscard === true || detail.discard === true) return;
     var dirty = dirtyEditorStates();
     if (!dirty.length) return;
-    if (confirmEditorNavigation()) {
+    if (confirmEditorNavigation(dirty)) {
       markEditorNavigationDiscard(dirty);
       return;
     }
@@ -1706,7 +2088,7 @@
     var dirty = dirtyEditorStates();
     var nextURL = String(window.location && window.location.href || "");
     if (!dirty.length || !nextURL || nextURL === lastCommittedNavigationURL) return;
-    if (confirmEditorNavigation()) {
+    if (confirmEditorNavigation(dirty)) {
       markEditorNavigationDiscard(dirty);
       lastCommittedNavigationURL = nextURL;
       return;

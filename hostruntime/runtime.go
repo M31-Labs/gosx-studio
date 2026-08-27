@@ -11,7 +11,6 @@
 package hostruntime
 
 import (
-	"bytes"
 	"embed"
 	"net/http"
 	"net/url"
@@ -30,6 +29,7 @@ import (
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/inlineeditruntime"
 	"m31labs.dev/gosx-studio/inspectorruntime"
+	"m31labs.dev/gosx-studio/internal/runtimeasset"
 	"m31labs.dev/gosx-studio/operationruntime"
 	"m31labs.dev/gosx-studio/previewruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
@@ -273,12 +273,7 @@ func ScriptHandler(name string, data []byte) http.Handler {
 }
 
 func AssetHandler(name string, data []byte, contentType string) http.Handler {
-	modtime := RuntimeAssetModTime()
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", contentType)
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		http.ServeContent(w, r, name, modtime, bytes.NewReader(data))
-	})
+	return runtimeasset.Handler(name, data, contentType)
 }
 
 func RuntimeAssetModTime() time.Time {

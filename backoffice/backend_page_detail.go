@@ -25,7 +25,12 @@ type BackendPageDetailPageProps struct {
 	RestoreStatus         BackendPageDetailActionStatus
 	RestoreRevisionStatus BackendPageDetailActionStatus
 	RevisionRestored      bool
-	Page                  BackendPageDetailValues
+	// ExpectedRevision is an optional optimistic-concurrency token supplied by
+	// a host that protects editor saves. nil keeps this shared form backward
+	// compatible for hosts without a revision contract; a non-nil empty value
+	// deliberately renders the marked field so a guarded host fails closed.
+	ExpectedRevision *string
+	Page             BackendPageDetailValues
 }
 
 type BackendPageDetailActionStatus struct {
@@ -104,6 +109,7 @@ func RenderBackendPageDetailForm(props BackendPageDetailPageProps) gosx.Node {
 	),
 		gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "csrf_token"), gosx.Attr("value", props.CSRFToken))),
 		gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "id"), gosx.Attr("value", page.ID))),
+		renderBackendPageDetailRevisionInput(props.ExpectedRevision),
 		gosx.Fragment(renderBackendPageDetailStatuses(props)...),
 		renderBackendPageDetailPrimaryButtons(props),
 		props.Preview,
@@ -115,6 +121,18 @@ func RenderBackendPageDetailForm(props BackendPageDetailPageProps) gosx.Node {
 		renderBackendPageDetailChecks(props),
 		renderBackendPageDetailSecondaryButtons(props),
 	)
+}
+
+func renderBackendPageDetailRevisionInput(expectedRevision *string) gosx.Node {
+	if expectedRevision == nil {
+		return gosx.Fragment()
+	}
+	return gosx.El("input", gosx.Attrs(
+		gosx.Attr("type", "hidden"),
+		gosx.Attr("name", "expectedRevision"),
+		gosx.Attr("value", *expectedRevision),
+		gosx.Attr("data-content-editor-revision", "true"),
+	))
 }
 
 func RenderBackendPageDetailScripts() gosx.Node {
