@@ -223,6 +223,11 @@ test.describe("@reference-apps enterprise polish acceptance", () => {
 
   test("managed Content navigation keeps Page CMS keyboard editing and media changes draft-only", async ({ page, request }) => {
     const server = await startMuddyCollaboration(request);
+    const saveRequests: string[] = [];
+    const onRequest = (browserRequest: { method: () => string; url: () => string }) => {
+      if (browserRequest.method() === "POST" && browserRequest.url().includes("/__actions/save")) saveRequests.push(browserRequest.url());
+    };
+    page.on("request", onRequest);
     try {
       await signIn(page, server.baseURL, "admin");
       const pageID = await createLandingPage(page, server.baseURL);
@@ -253,6 +258,35 @@ test.describe("@reference-apps enterprise polish acceptance", () => {
       await expect(revision).toHaveAttribute("data-content-editor-revision", "true");
       const initialRevision = await revision.inputValue();
       expect(initialRevision).toBeTruthy();
+
+      // The real Page CMS form is clean at first mount. Enter in its single
+      // URL media filter must remain view-only and leave the picker state
+      // untouched, including the focused Search control.
+      const mediaURL = detail.locator("input[name='metaImageUrl']").first();
+      const mediaPicker = detail.locator("input[name='metaImageUrl'] + .media-picker").first();
+      const mediaTrigger = mediaPicker.locator(".media-picker__trigger").first();
+      const mediaPanel = mediaPicker.locator(".media-picker__panel").first();
+      const mediaSearch = mediaPicker.locator(".media-picker__search").first();
+      const mediaStatus = mediaPicker.locator("[data-media-picker-status]").first();
+      const mediaAlt = detail.locator("input[name='metaImageAlt']").first();
+      await expect(mediaURL).toHaveAttribute("data-media-picker-bound", "true", { timeout: 30_000 });
+      const cleanMediaURL = await mediaURL.inputValue();
+      const cleanMediaAlt = await mediaAlt.inputValue();
+      const cleanSaveCount = saveRequests.length;
+      await mediaTrigger.click();
+      await mediaSearch.fill("moss");
+      await expect(mediaPicker.locator(".media-picker__asset")).toHaveCount(1);
+      const cleanMediaStatus = await mediaStatus.textContent();
+      await pressFilterEnterWithoutSubmit(page, mediaSearch, saveRequests, cleanSaveCount, "clean Page CMS media filter");
+      await expect(mediaPanel).not.toBeHidden();
+      await expect(mediaStatus).toHaveText(cleanMediaStatus ?? "");
+      await expect(mediaURL).toHaveValue(cleanMediaURL);
+      await expect(mediaAlt).toHaveValue(cleanMediaAlt);
+      await expect(editor).toHaveAttribute("data-content-editor-dirty", "false");
+      await expect(editor).toHaveAttribute("data-content-editor-save-state", "idle");
+      await mediaSearch.press("Escape");
+      await expect(mediaPanel).toBeHidden();
+      await expect(mediaTrigger).toBeFocused();
 
       const initialBlockCount = await editor.locator("[data-content-block-id]").count();
       const addHeading = editor.locator("button[data-content-add='heading']").first();
@@ -288,23 +322,29 @@ test.describe("@reference-apps enterprise polish acceptance", () => {
       // Exercise the media picker with keyboard interaction: open the real
       // picker, type a query into its search field, focus the result, and
       // activate it with Enter before editing the alt text by keyboard.
-      const mediaURL = detail.locator("input[name='metaImageUrl']").first();
-      const mediaPicker = detail.locator("input[name='metaImageUrl'] + .media-picker").first();
-      await expect(mediaURL).toHaveAttribute("data-media-picker-bound", "true", { timeout: 30_000 });
-      const mediaTrigger = mediaPicker.locator(".media-picker__trigger").first();
       await mediaTrigger.click();
       await expect(mediaTrigger).toHaveAttribute("aria-expanded", "true");
-      const mediaSearch = mediaPicker.locator(".media-picker__search").first();
       await expect(mediaSearch).toBeFocused();
-      await page.keyboard.type("moss");
+      await replaceWithKeyboard(page, mediaSearch, "moss");
       const mediaAsset = mediaPicker.locator(".media-picker__asset").first();
       await expect(mediaAsset).toHaveCount(1);
+      const dirtyMediaURL = await mediaURL.inputValue();
+      const dirtyMediaAlt = await mediaAlt.inputValue();
+      const dirtyDraftBeforeFilter = await readPageForm(page);
+      const dirtySaveCount = saveRequests.length;
+      const dirtyMediaStatus = await mediaStatus.textContent();
+      await pressFilterEnterWithoutSubmit(page, mediaSearch, saveRequests, dirtySaveCount, "dirty Page CMS media filter");
+      await expect(mediaPanel).not.toBeHidden();
+      await expect(mediaStatus).toHaveText(dirtyMediaStatus ?? "");
+      await expect(mediaURL).toHaveValue(dirtyMediaURL);
+      await expect(mediaAlt).toHaveValue(dirtyMediaAlt);
+      await expect(editor).toHaveAttribute("data-content-editor-dirty", "true");
+      expect(await readPageForm(page), "dirty media filter Enter must retain every Page CMS draft value").toEqual(dirtyDraftBeforeFilter);
       await mediaAsset.focus();
       await page.keyboard.press("Enter");
       await expect(mediaURL).toHaveValue(/photo-1565193566173-7a0ee3dbe261/);
       const expectedMediaURL = await mediaURL.inputValue();
 
-      const mediaAlt = detail.locator("input[name='metaImageAlt']").first();
       const mediaAltMarker = `keyboard-alt-${Date.now()}`;
       await replaceWithKeyboard(page, mediaAlt, mediaAltMarker);
       await expect(mediaAlt).toHaveValue(mediaAltMarker);
@@ -354,6 +394,238 @@ test.describe("@reference-apps enterprise polish acceptance", () => {
         screenshots,
       });
     } finally {
+      page.off("request", onRequest);
+      await server.stop();
+    }
+  });
+
+  test("real Page CMS history restores the final block and recovers focus through an empty snapshot", async ({ page, request }) => {
+    const server = await startMuddyCollaboration(request);
+    try {
+      await signIn(page, server.baseURL, "admin");
+      const pageID = await createLandingPage(page, server.baseURL);
+      await openPageDetail(page, `${server.baseURL}/admin/pages/${pageID}`);
+
+      const detail = page.locator(PAGE_DETAIL_RENDERER).first();
+      const editor = detail.locator("[data-content-editor='true']").first();
+      const blocks = editor.locator("[data-content-block-id]");
+      await expect(editor).toHaveAttribute("data-content-editor-bound", "true", { timeout: 30_000 });
+      const initialBlockCount = await blocks.count();
+      expect(initialBlockCount, "the real Page CMS blueprint must provide blocks for the empty-history transition").toBeGreaterThan(0);
+
+      // Use only visible Page CMS controls to remove every block. The final
+      // removal produces the empty current snapshot while retaining Undo.
+      while ((await blocks.count()) > 1) {
+        await blocks.first().locator("[data-content-editor-action='delete']").click();
+      }
+      const finalBlock = blocks.first();
+      const finalBlockID = await finalBlock.getAttribute("data-content-block-id");
+      expect(finalBlockID, "the final Page CMS block must have a stable identity before removal").toBeTruthy();
+      await finalBlock.locator("[data-content-editor-action='delete']").click();
+      await expect(blocks).toHaveCount(0);
+      await expect(editor).toHaveAttribute("data-content-editor-block-count", "0");
+      await expect(editor).toHaveAttribute("data-content-editor-history-can-undo", "true");
+      const emptyAfterRemove = JSON.parse(await detail.locator("textarea[name='body']").inputValue()) as { blocks?: unknown[] };
+      expect(emptyAfterRemove.blocks, "the final real remove must leave an empty current source snapshot").toEqual([]);
+      const removeFallbackFocus = await expectHistoryFallbackFocus(editor, "empty Page CMS after final remove");
+
+      const undo = editor.locator("[data-content-editor-action='undo']");
+      await expect(undo).toBeEnabled();
+      await undo.click();
+      await expect(blocks).toHaveCount(1);
+      const restoredBlock = blocks.first();
+      await expect(restoredBlock).toHaveAttribute("data-content-block-id", finalBlockID ?? "");
+      await expect(restoredBlock).toHaveAttribute("data-content-editor-selected", "true");
+      await expect(restoredBlock.locator("[data-content-drag-handle]")).toBeVisible();
+      await expect(restoredBlock.locator("[data-content-drag-handle]")).toBeEnabled();
+      await expect(restoredBlock.locator("[data-content-drag-handle]")).toBeFocused();
+      await expect(editor).toHaveAttribute("data-content-editor-history-can-redo", "true");
+      const restoredSource = JSON.parse(await detail.locator("textarea[name='body']").inputValue()) as { blocks?: Array<{ id?: string }> };
+      expect(restoredSource.blocks?.[0]?.id, "undo must restore the removed block rather than synthesize a new identity").toBe(finalBlockID);
+
+      const redo = editor.locator("[data-content-editor-action='redo']");
+      await expect(redo).toBeEnabled();
+      await redo.click();
+      await expect(blocks).toHaveCount(0);
+      await expect(editor).toHaveAttribute("data-content-editor-history-can-undo", "true");
+      await expect(editor).toHaveAttribute("data-content-editor-history-can-redo", "false");
+      const emptyAfterRedo = JSON.parse(await detail.locator("textarea[name='body']").inputValue()) as { blocks?: unknown[] };
+      expect(emptyAfterRedo.blocks, "redo must return the Page CMS to the empty snapshot").toEqual([]);
+      const redoFallbackFocus = await expectHistoryFallbackFocus(editor, "empty Page CMS after redo");
+
+      const screenshots = [
+        await captureScreenshot(page, "page-cms-history-empty-1600x900", 1600, 900),
+        await captureScreenshot(page, "page-cms-history-empty-390x844", 390, 844),
+      ];
+      await expectHistoryFallbackFocus(editor, "empty Page CMS after mobile capture");
+      writeEvidence("page-cms-history-focus", {
+        pageID,
+        initialBlockCount,
+        finalBlockID,
+        removeFallbackFocus,
+        restoredFocus: "selected-block-drag-handle",
+        redoFallbackFocus,
+        finalBlockCount: await blocks.count(),
+        screenshots,
+      });
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("real Gallery media filters stay view-only on clean and dirty forms", async ({ page, request }) => {
+    const server = await startMuddyCollaboration(request);
+    const postRequests: string[] = [];
+    const onRequest = (browserRequest: { method: () => string; url: () => string }) => {
+      if (browserRequest.method() === "POST") postRequests.push(browserRequest.url());
+    };
+    page.on("request", onRequest);
+
+    try {
+      await signIn(page, server.baseURL, "admin");
+      const uploadStem = `gallery-filter-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const uploadFilename = `${uploadStem}.png`;
+      const tinyPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
+      // Seed this isolated store through the real Media Library upload form.
+      // Gallery's media-lines editor intentionally ignores extensionless seed
+      // URLs, so this supported image upload is the real host fixture rather
+      // than a DOM/state injection or an API shortcut.
+      await page.goto(`${server.baseURL}/admin/media`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      const uploadForm = page.locator("form[action='/admin/media/upload']").first();
+      const uploadInput = uploadForm.locator("input[name='file'][type='file']").first();
+      await expect(uploadInput, "real Media Library must expose its file input").toHaveCount(1);
+      await uploadInput.setInputFiles({
+        name: uploadFilename,
+        mimeType: "image/png",
+        buffer: Buffer.from(tinyPNG, "base64"),
+      });
+      await expect(page.locator("[data-media-upload-status]").first()).toContainText(`${uploadFilename} selected`);
+      const uploadResponse = page.waitForResponse((response) => response.url().endsWith("/admin/media/upload") && response.request().method() === "POST");
+      await uploadForm.getByRole("button", { name: "Upload file", exact: true }).click();
+      const upload = await uploadResponse;
+      expect([200, 303], "the real image upload must be accepted by the Media Library action").toContain(upload.status());
+      await page.waitForURL(/\/admin\/media\?uploaded=/, { timeout: 30_000 });
+      await expect(page.locator("body")).toContainText("Upload saved to the media library.");
+      await expect(page.locator(".media-card", { hasText: uploadStem }), "the uploaded image must be visible in the real media library").toHaveCount(1);
+
+      await page.goto(`${server.baseURL}/admin/gallery`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      const gallery = page.locator("[data-gosx-studio-backend-gallery-index-renderer='gosx-studio']").first();
+      await expect(gallery, "real Gallery CMS must expose the Studio-owned index renderer").toBeVisible();
+      const form = gallery.locator("form.admin-form").first();
+      const mediaLines = form.locator("textarea[name='imagesText']").first();
+      const mediaLinesEditor = mediaLines.locator("xpath=following-sibling::*[1]");
+      await expect(mediaLinesEditor, "real Gallery CMS must bind the media-lines chooser").toHaveClass(/media-list-editor/);
+      const galleryTrigger = mediaLinesEditor.locator(".media-picker__trigger").first();
+      const galleryPanel = mediaLinesEditor.locator(".media-picker__panel").first();
+      const gallerySearch = mediaLinesEditor.locator(".media-picker__search").first();
+      const galleryStatus = mediaLinesEditor.locator("[data-media-picker-status]").first();
+      const mediaURL = form.locator("input[name='metaImageUrl']").first();
+      const mediaPicker = mediaURL.locator("xpath=following-sibling::*[1]");
+      const mediaTrigger = mediaPicker.locator(".media-picker__trigger").first();
+      const mediaPanel = mediaPicker.locator(".media-picker__panel").first();
+      const mediaSearch = mediaPicker.locator(".media-picker__search").first();
+      const mediaStatus = mediaPicker.locator("[data-media-picker-status]").first();
+      const mediaAlt = form.locator("input[name='metaImageAlt']").first();
+      const title = form.locator("input[name='title']").first();
+      await expect(mediaPicker, "real Gallery CMS must bind the single-URL chooser").toHaveClass(/media-picker/);
+
+      const cleanTitle = await title.inputValue();
+      const cleanLines = await mediaLines.inputValue();
+      const cleanURL = await mediaURL.inputValue();
+      const cleanAlt = await mediaAlt.inputValue();
+      const cleanPostCount = postRequests.length;
+
+      await mediaTrigger.click();
+      await mediaSearch.fill(uploadStem);
+      await expect(mediaPicker.locator(".media-picker__asset")).toHaveCount(1);
+      const cleanMediaStatus = await mediaStatus.textContent();
+      await pressFilterEnterWithoutSubmit(page, mediaSearch, postRequests, cleanPostCount, "clean single-URL media filter");
+      await expect(mediaPanel).not.toBeHidden();
+      await expect(mediaStatus).toHaveText(cleanMediaStatus ?? "");
+      await expect(mediaURL).toHaveValue(cleanURL);
+      await expect(mediaAlt).toHaveValue(cleanAlt);
+      await expect(title).toHaveValue(cleanTitle);
+
+      await mediaSearch.press("Escape");
+      await expect(mediaPanel).toBeHidden();
+      await expect(mediaTrigger).toBeFocused();
+
+      await galleryTrigger.click();
+      await gallerySearch.fill(uploadStem);
+      await expect(mediaLinesEditor.locator(".media-picker__asset")).toHaveCount(1);
+      const cleanGalleryStatus = await galleryStatus.textContent();
+      await pressFilterEnterWithoutSubmit(page, gallerySearch, postRequests, cleanPostCount, "clean gallery media filter");
+      await expect(galleryPanel).not.toBeHidden();
+      await expect(galleryStatus).toHaveText(cleanGalleryStatus ?? "");
+      await expect(mediaLines).toHaveValue(cleanLines);
+      await expect(title).toHaveValue(cleanTitle);
+
+      // The asset button remains an intentional mutator. Keep this positive
+      // control on the real gallery chooser before exercising dirty filters.
+      const galleryAsset = mediaLinesEditor.locator(".media-picker__asset").first();
+      const uploadedAssetURL = await galleryAsset.getAttribute("data-media-asset-url");
+      expect(uploadedAssetURL, "the filtered gallery result must expose the uploaded asset URL").toBeTruthy();
+      await galleryAsset.focus();
+      await galleryAsset.press("Enter");
+      await expect(galleryPanel).toBeHidden();
+      await expect(galleryTrigger).toBeFocused();
+      const selectedGalleryLines = await mediaLines.inputValue();
+      expect(selectedGalleryLines, "gallery asset Enter must add the selected uploaded media URL").toContain(uploadedAssetURL ?? "");
+
+      const dirtyTitle = `Gallery filter draft ${Date.now()}`;
+      await title.fill(dirtyTitle);
+      await expect(title).toHaveValue(dirtyTitle);
+      const dirtyPostCount = postRequests.length;
+
+      await mediaTrigger.click();
+      await mediaSearch.fill(uploadStem);
+      await expect(mediaPicker.locator(".media-picker__asset")).toHaveCount(1);
+      const dirtyMediaStatus = await mediaStatus.textContent();
+      await pressFilterEnterWithoutSubmit(page, mediaSearch, postRequests, dirtyPostCount, "dirty single-URL media filter");
+      await expect(mediaPanel).not.toBeHidden();
+      await expect(mediaStatus).toHaveText(dirtyMediaStatus ?? "");
+      await expect(mediaURL).toHaveValue(cleanURL);
+      await expect(mediaAlt).toHaveValue(cleanAlt);
+      await expect(title).toHaveValue(dirtyTitle);
+
+      await mediaSearch.press("Escape");
+      await expect(mediaPanel).toBeHidden();
+      await galleryTrigger.click();
+      await gallerySearch.fill(uploadStem);
+      await expect(mediaLinesEditor.locator(".media-picker__asset")).toHaveCount(1);
+      const dirtyGalleryStatus = await galleryStatus.textContent();
+      await pressFilterEnterWithoutSubmit(page, gallerySearch, postRequests, dirtyPostCount, "dirty gallery media filter");
+      await expect(galleryPanel).not.toBeHidden();
+      await expect(galleryStatus).toHaveText(dirtyGalleryStatus ?? "");
+      await expect(mediaLines).toHaveValue(selectedGalleryLines);
+      await expect(title).toHaveValue(dirtyTitle);
+      await expect(gallerySearch).toBeFocused();
+
+      const screenshots = [
+        await captureScreenshot(page, "page-cms-gallery-filter-dirty-1600x900", 1600, 900),
+        await captureScreenshot(page, "page-cms-gallery-filter-dirty-390x844", 390, 844),
+      ];
+      await expect(gallerySearch).toBeFocused();
+      writeEvidence("page-cms-gallery-filter-enter", {
+        clean: {
+          singleURL: cleanURL,
+          singleAlt: cleanAlt,
+          galleryLines: cleanLines,
+          postCount: cleanPostCount,
+        },
+        dirty: {
+          title: dirtyTitle,
+          singleURL: cleanURL,
+          singleAlt: cleanAlt,
+          galleryLines: selectedGalleryLines,
+          postCount: dirtyPostCount,
+        },
+        postRequests,
+        screenshots,
+      });
+    } finally {
+      page.off("request", onRequest);
       await server.stop();
     }
   });
@@ -754,6 +1026,36 @@ async function replaceWithKeyboard(page: Page, field: Locator, value: string): P
   await field.click();
   await field.press("ControlOrMeta+A");
   await page.keyboard.type(value);
+}
+
+async function expectHistoryFallbackFocus(editor: Locator, label: string): Promise<string> {
+  const focused = editor.locator(
+    "[data-content-editor-action='undo']:focus, " +
+    "[data-content-editor-action='redo']:focus, " +
+    "[data-content-add]:focus",
+  ).first();
+  await expect(focused, `${label} must leave focus on a visible history or Add control`).toBeVisible();
+  await expect(focused, `${label} fallback focus must remain enabled`).toBeEnabled();
+  const action = await focused.getAttribute("data-content-editor-action");
+  const addType = await focused.getAttribute("data-content-add");
+  const identity = action || (addType ? `add:${addType}` : "");
+  expect(identity, `${label} must identify the focused fallback control`).toBeTruthy();
+  return identity;
+}
+
+async function pressFilterEnterWithoutSubmit(
+  page: Page,
+  search: Locator,
+  postRequests: string[],
+  beforePostCount: number,
+  label: string,
+): Promise<void> {
+  await search.focus();
+  await expect(search, `${label} must begin with the filter focused`).toBeFocused();
+  await search.press("Enter");
+  await page.waitForTimeout(250);
+  await expect(search, `${label} must retain focus after Enter`).toBeFocused();
+  expect(postRequests.length, `${label} must not submit its ancestor form`).toBe(beforePostCount);
 }
 
 async function saveDraft(page: Page, pageID: string, trigger: SaveTrigger = "button", keyboardTarget?: Locator): Promise<SaveResult> {
