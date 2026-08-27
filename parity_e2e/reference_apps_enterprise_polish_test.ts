@@ -1,4 +1,4 @@
-import { expect, test, type Frame, type Locator, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Frame, type JSHandle, type Locator, type Page } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
@@ -11,7 +11,14 @@ import {
 const CREATE_MESSAGE = "Landing page created with 3 starter sections. Edit its sections in Content › Pages.";
 const PAGE_INDEX_RENDERER = "[data-gosx-studio-backend-page-index-renderer='gosx-studio']";
 const PAGE_DETAIL_RENDERER = "[data-gosx-studio-backend-page-detail-renderer='gosx-studio']";
-const INTEGRATION_ROOT = path.resolve(__dirname, "../.tiller/scratch/codex/enterprise-polish-20260827/integration08");
+const CONTENT_RUNTIME_PATH = "/_gosx/studio/content-editor.js";
+const MEDIA_RUNTIME_PATH = "/_gosx/studio/media-runtime.js";
+const DEFAULT_INTEGRATION_ROOT = path.resolve(__dirname, "../.tiller/scratch/codex/enterprise-polish-20260827/integration08");
+const INTEGRATION_ROOT = path.resolve(
+  process.env.GOSX_STUDIO_ENTERPRISE_ARTIFACT_ROOT?.trim() || DEFAULT_INTEGRATION_ROOT,
+);
+const EXPECTED_MODULE_VERSION = process.env.GOSX_STUDIO_EXPECTED_MODULE_VERSION?.trim() || "";
+const FIXTURE_DEPLOYMENT_VERSION = "test-deployment-20260827";
 const CONFLICT_LAYOUT_LIMITS = {
   desktop: { detailMinWidth: 240, maxHeight: 240 },
   mobile: { detailMinWidth: 180, maxHeight: 360 },
@@ -37,6 +44,26 @@ type SaveResult = {
   payload: ActionResponsePayload | null;
   revisionReadback: string | null;
   source: "structured-response" | "remounted-form" | "none";
+};
+
+type SaveTrigger = "button" | "keyboard";
+
+type ManagedScriptSnapshot = {
+  src: string;
+  href: string;
+  origin: string;
+  pathname: string;
+  releaseKey: string;
+  loadMode: string;
+  loaded: string;
+};
+
+type ManagedAssetEvidence = {
+  rendered: ManagedScriptSnapshot[];
+  fetched: Array<{ path: string; url: string; status: number; releaseKey: string }>;
+  capturedRequests: Array<{ path: string; url: string; releaseKey: string }>;
+  executed: Record<string, number>;
+  pending: Record<string, number>;
 };
 
 test.describe("@reference-apps enterprise polish acceptance", () => {
@@ -330,6 +357,201 @@ test.describe("@reference-apps enterprise polish acceptance", () => {
       await server.stop();
     }
   });
+
+  test("real Page CMS Search Enter stays view-only across clean and dirty drafts", async ({ page, request }) => {
+    const server = await startMuddyCollaboration(request);
+    const saveRequests: string[] = [];
+    const onRequest = (browserRequest: { method: () => string; url: () => string }) => {
+      if (browserRequest.method() === "POST" && browserRequest.url().includes("/__actions/save")) {
+        saveRequests.push(browserRequest.url());
+      }
+    };
+    page.on("request", onRequest);
+
+    try {
+      await signIn(page, server.baseURL, "admin");
+      const pageID = await createLandingPage(page, server.baseURL);
+      await openPageDetail(page, `${server.baseURL}/admin/pages/${pageID}`);
+
+      const detail = page.locator(PAGE_DETAIL_RENDERER).first();
+      const editor = detail.locator("[data-content-editor='true']").first();
+      const search = editor.locator("[data-content-editor-search='true']").first();
+      const title = detail.locator("input[name='title']").first();
+      await expect(search, "Page CMS must expose a real block Search field").toBeVisible();
+      await expect(editor).toHaveAttribute("data-content-editor-save-state", "idle");
+      await expect(editor).toHaveAttribute("data-content-editor-dirty", "false");
+
+      const cleanBefore = await readPageForm(page);
+      const cleanBody = cleanBefore.body;
+      await search.fill("paragraph");
+      await expect(search).toBeFocused();
+      await expect(search).toHaveValue("paragraph");
+      await expect(editor).toHaveAttribute("data-content-editor-search-query", "paragraph");
+      const cleanVisibleCount = await editor.getAttribute("data-content-editor-search-visible-count");
+      expect(Number(cleanVisibleCount), "Search should retain a real filtered result in the clean draft").toBeGreaterThan(0);
+
+      // This is a browser keyboard action on the real host control. The
+      // search field is view-only, so Enter must not invoke the form's Save
+      // submitter or mutate the clean draft.
+      await search.press("Enter");
+      await page.waitForTimeout(250);
+      await expect(search).toBeFocused();
+      await expect(search).toHaveValue("paragraph");
+      await expect(editor).toHaveAttribute("data-content-editor-search-query", "paragraph");
+      await expect(editor).toHaveAttribute("data-content-editor-search-visible-count", cleanVisibleCount ?? "0");
+      await expect(editor).toHaveAttribute("data-content-editor-dirty", "false");
+      await expect(editor).toHaveAttribute("data-content-editor-save-state", "idle");
+      expect(saveRequests, "clean Search Enter must not issue a save POST").toHaveLength(0);
+      expect((await readPageForm(page)).body, "clean Search Enter must not rewrite the draft body").toBe(cleanBody);
+
+      const dirtyTitle = `Search Enter draft ${Date.now()}`;
+      await replaceWithKeyboard(page, title, dirtyTitle);
+      await expect(editor).toHaveAttribute("data-content-editor-dirty", "true");
+      await expect(editor).toHaveAttribute("data-content-editor-save-state", "dirty");
+      const dirtyBefore = await readPageForm(page);
+      await search.focus();
+      await expect(search).toBeFocused();
+      await search.press("Enter");
+      await page.waitForTimeout(250);
+      await expect(search).toBeFocused();
+      await expect(search).toHaveValue("paragraph");
+      await expect(editor).toHaveAttribute("data-content-editor-search-query", "paragraph");
+      await expect(editor).toHaveAttribute("data-content-editor-search-visible-count", cleanVisibleCount ?? "0");
+      await expect(editor).toHaveAttribute("data-content-editor-dirty", "true");
+      await expect(editor).toHaveAttribute("data-content-editor-save-state", "dirty");
+      expect(saveRequests, "dirty Search Enter must not issue a save POST").toHaveLength(0);
+      expect(await readPageForm(page), "dirty Search Enter must retain all draft values").toEqual(dirtyBefore);
+
+      // Keep the explicit button path as a positive control: the Search
+      // guard must not block the actual Save draft submitter.
+      const explicitSave = await saveDraft(page, pageID, "button");
+      expect([200, 303], "the explicit Save draft control must still submit").toContain(explicitSave.status);
+      const explicitRevision = expectObservedSuccess(explicitSave, "Search Enter explicit save", dirtyBefore.expectedRevision);
+      await expect(page.locator(`${PAGE_DETAIL_RENDERER} [data-content-editor='true']`).first())
+        .toHaveAttribute("data-content-editor-dirty", "false");
+      const afterExplicitSave = await readPageForm(page);
+      expect(afterExplicitSave.title).toBe(dirtyTitle);
+      expect(afterExplicitSave.expectedRevision).toBe(explicitRevision);
+      const publicURL = `${server.baseURL}/pages/${afterExplicitSave.slug}`;
+      expect((await request.get(publicURL)).status(), "a draft Save must keep the public route unpublished").toBe(404);
+
+      // Make another real edit and invoke the enhanced save from a focused
+      // Search control. ControlOrMeta is Playwright's cross-platform native
+      // modifier alias; this run observes the Ctrl+S path on Linux while
+      // keeping the test portable to a macOS project.
+      const keyboardTitle = `${dirtyTitle} keyboard`;
+      await replaceWithKeyboard(page, title, keyboardTitle);
+      const keyboardEditor = page.locator(`${PAGE_DETAIL_RENDERER} [data-content-editor='true']`).first();
+      await expect(keyboardEditor).toHaveAttribute("data-content-editor-dirty", "true");
+      const keyboardBefore = await readPageForm(page);
+      const keyboardSearch = keyboardEditor.locator("[data-content-editor-search='true']").first();
+      await keyboardSearch.fill("heading");
+      await keyboardSearch.focus();
+      await expect(keyboardSearch).toBeFocused();
+      const keyboardSave = await saveDraft(page, pageID, "keyboard", keyboardSearch);
+      expect([200, 303], "ControlOrMeta+S from Search must still submit").toContain(keyboardSave.status);
+      const keyboardRevision = expectObservedSuccess(keyboardSave, "Search Enter keyboard save", keyboardBefore.expectedRevision);
+      await expect(page.locator(`${PAGE_DETAIL_RENDERER} [data-content-editor='true']`).first())
+        .toHaveAttribute("data-content-editor-dirty", "false");
+      const persisted = await readPageForm(page);
+      expect(persisted.title, "ControlOrMeta+S must persist the edited draft title after remount").toBe(keyboardTitle);
+      expect(persisted.expectedRevision).toBe(keyboardRevision);
+      expect((await request.get(`${server.baseURL}/pages/${persisted.slug}`)).status(), "keyboard Save must keep the draft route unpublished").toBe(404);
+
+      writeEvidence("page-cms-search-enter", {
+        pageID,
+        cleanSearch: "paragraph",
+        cleanVisibleCount,
+        dirtyTitle,
+        explicitSaveStatus: explicitSave.status,
+        explicitSaveSource: explicitSave.source,
+        explicitRevision,
+        keyboardTitle,
+        keyboardSaveStatus: keyboardSave.status,
+        keyboardSaveSource: keyboardSave.source,
+        keyboardRevision,
+        savePostCount: saveRequests.length,
+        publicStatus: 404,
+      });
+    } finally {
+      page.off("request", onRequest);
+      await server.stop();
+    }
+  });
+
+  test("fresh managed Content navigation loads versioned runtime assets once", async ({ page, request }) => {
+    const server = await startMuddyCollaboration(request, { MUDDY_ASSET_VERSION: FIXTURE_DEPLOYMENT_VERSION });
+    const capturedAssetRequests: string[] = [];
+    const onRequest = (browserRequest: { method: () => string; url: () => string }) => {
+      if (browserRequest.method() !== "GET") return;
+      const url = new URL(browserRequest.url());
+      if (url.origin !== new URL(server.baseURL).origin) return;
+      if (url.pathname === CONTENT_RUNTIME_PATH || url.pathname === MEDIA_RUNTIME_PATH) {
+        capturedAssetRequests.push(browserRequest.url());
+      }
+    };
+    page.on("request", onRequest);
+    let firstContentRuntime: JSHandle<unknown> | undefined;
+    let firstMediaRuntime: JSHandle<unknown> | undefined;
+
+    try {
+      // Keep the listener active through the signed-in fresh dashboard load,
+      // the managed Content > Pages transition, and the real Edit link. This
+      // records actual browser asset requests rather than reconstructing URLs.
+      expect(FIXTURE_DEPLOYMENT_VERSION).not.toBe(EXPECTED_MODULE_VERSION);
+      await signIn(page, server.baseURL, "admin");
+      const pageID = await createLandingPage(page, server.baseURL);
+      await page.goto(`${server.baseURL}/admin`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await page.waitForFunction(() => {
+        const runtime = (window as unknown as { GoSXStudioMediaRuntime?: unknown }).GoSXStudioMediaRuntime;
+        return !!runtime;
+      }, undefined, { timeout: 30_000 });
+      // Noni's shared admin layout intentionally preloads the plain head-tag
+      // media runtime with its deployment key. Capture that singleton before
+      // the Pages renderer introduces the separately module-keyed managed tag.
+      firstMediaRuntime = await page.evaluateHandle(() => (window as unknown as { GoSXStudioMediaRuntime?: unknown }).GoSXStudioMediaRuntime || null);
+      await clickManagedPages(page, server.baseURL);
+      // The Pages index is the first managed Content entry. Anchor the
+      // one-executable assertion and singleton handles here, before a later
+      // managed detail swap is allowed to clean up dynamic script nodes.
+      const indexRenderer = page.locator(PAGE_INDEX_RENDERER).first();
+      await expect(indexRenderer).toBeVisible();
+      await expect(indexRenderer.locator("[data-content-editor='true']")).toHaveCount(1);
+      await expect(indexRenderer.locator("[data-content-editor='true']"))
+        .toHaveAttribute("data-content-editor-bound", "true", { timeout: 30_000 });
+      await page.waitForFunction(() => {
+        const win = window as unknown as { GoSXStudioContentEditorRuntime?: unknown; GoSXStudioMediaRuntime?: unknown };
+        return !!win.GoSXStudioContentEditorRuntime && !!win.GoSXStudioMediaRuntime;
+      }, undefined, { timeout: 30_000 });
+      const firstAssets = await assertManagedAssetURLs(page, request, server.baseURL, capturedAssetRequests, true);
+      await expectRuntimeSingleton(page, undefined, firstMediaRuntime, "managed Pages index");
+      firstContentRuntime = await page.evaluateHandle(() => (window as unknown as { GoSXStudioContentEditorRuntime?: unknown }).GoSXStudioContentEditorRuntime || null);
+
+      await openManagedPageFromIndex(page, server.baseURL, pageID);
+      const detailAssets = await assertManagedAssetURLs(page, request, server.baseURL, capturedAssetRequests, false);
+      await expectRuntimeSingleton(page, firstContentRuntime, firstMediaRuntime, "managed Page detail");
+
+      await clickManagedPageIndex(page, server.baseURL);
+      await openManagedPageFromIndex(page, server.baseURL, pageID);
+      const revisitAssets = await assertManagedAssetURLs(page, request, server.baseURL, capturedAssetRequests, false);
+      await expectRuntimeSingleton(page, firstContentRuntime, firstMediaRuntime, "managed Page revisit");
+
+      writeEvidence("page-cms-managed-assets", {
+        pageID,
+        expectedModuleVersion: EXPECTED_MODULE_VERSION || null,
+        capturedAssetRequests,
+        firstAssets,
+        detailAssets,
+        revisitAssets,
+        singleton: true,
+      });
+    } finally {
+      await firstContentRuntime?.dispose();
+      await firstMediaRuntime?.dispose();
+      page.off("request", onRequest);
+      await server.stop();
+    }
+  });
 });
 
 async function signIn(page: Page, baseURL: string, identity: string): Promise<void> {
@@ -362,6 +584,152 @@ async function expectPageDetailReady(page: Page): Promise<void> {
   await expect(detail.locator("input[name='expectedRevision']")).toHaveAttribute("data-content-editor-revision", "true");
 }
 
+async function openManagedPageFromIndex(page: Page, baseURL: string, pageID: string): Promise<void> {
+  const indexRenderer = page.locator(PAGE_INDEX_RENDERER).first();
+  await expect(indexRenderer, "managed Pages navigation must render the Page index").toBeVisible();
+  const detailLink = indexRenderer.locator(`a[data-gosx-link='true'][href*='/admin/pages/${pageID}']`).first();
+  await expect(detailLink, "managed Pages index must expose the created page's Edit link").toBeVisible();
+  const href = await detailLink.getAttribute("href");
+  const detailURL = new URL(href ?? "", baseURL);
+  expect(detailURL.origin).toBe(new URL(baseURL).origin);
+  expect(detailURL.pathname).toBe(`/admin/pages/${pageID}`);
+  await Promise.all([
+    page.waitForURL((next) => next.origin === detailURL.origin && next.pathname === detailURL.pathname, { timeout: 30_000 }),
+    detailLink.click(),
+  ]);
+  await expectPageDetailReady(page);
+}
+
+async function clickManagedPageIndex(page: Page, baseURL: string): Promise<void> {
+  const detail = page.locator(PAGE_DETAIL_RENDERER).first();
+  const indexLink = detail.locator("a[data-gosx-link='true']").filter({ hasText: /Back to pages|Cancel/ }).first();
+  await expect(indexLink, "Page CMS detail must expose a managed link back to Pages").toBeVisible();
+  const href = await indexLink.getAttribute("href");
+  const indexURL = new URL(href ?? "", baseURL);
+  expect(indexURL.origin).toBe(new URL(baseURL).origin);
+  expect(indexURL.pathname).toBe("/admin/pages");
+  await Promise.all([
+    page.waitForURL((next) => next.origin === indexURL.origin && next.pathname === indexURL.pathname, { timeout: 30_000 }),
+    indexLink.click(),
+  ]);
+}
+
+async function assertManagedAssetURLs(
+  page: Page,
+  request: APIRequestContext,
+  baseURL: string,
+  capturedRequestURLs: string[],
+  requireFreshRequests: boolean,
+): Promise<ManagedAssetEvidence> {
+  const origin = new URL(baseURL).origin;
+  const rendered = await page.locator("script[data-gosx-script='managed']").evaluateAll((nodes, expectedBaseURL) => {
+    const base = new URL(String(expectedBaseURL));
+    return nodes.map((node) => {
+      const src = node.getAttribute("src") || "";
+      let url: URL | null = null;
+      try {
+        url = new URL(src, base);
+      } catch {
+        // Preserve malformed source details so the assertion below fails with
+        // the actual rendered value rather than hiding a bad script node.
+      }
+      return {
+        src,
+        href: url?.href || "",
+        origin: url?.origin || "",
+        pathname: url?.pathname || "",
+        releaseKey: url?.searchParams.get("v") || "",
+        loadMode: node.getAttribute("data-gosx-script-load") || "",
+        loaded: node.getAttribute("data-gosx-script-loaded") || "",
+      };
+    });
+  }, baseURL);
+  const paths = [CONTENT_RUNTIME_PATH, MEDIA_RUNTIME_PATH];
+  const selected: Record<string, ManagedScriptSnapshot[]> = {};
+  for (const assetPath of paths) {
+    const matches = rendered.filter((script) => script.origin === origin && script.pathname === assetPath);
+    expect(matches.length, `${assetPath} must render a same-origin canonical managed script`).toBeGreaterThan(0);
+    expect(matches.every((script) => script.loadMode === "dom"), `${assetPath} must retain the managed DOM loading marker`).toBe(true);
+    expect(matches.every((script) => script.loaded === "pending" || script.loaded === "true"), `${assetPath} must use pending/true executable markers`).toBe(true);
+    expect(matches.every((script) => script.releaseKey.length > 0), `${assetPath} must use a nonempty ?v= release key: ${JSON.stringify(rendered)}`).toBe(true);
+    if (EXPECTED_MODULE_VERSION) {
+      expect(matches.every((script) => script.releaseKey === EXPECTED_MODULE_VERSION), `${assetPath} must match GOSX_STUDIO_EXPECTED_MODULE_VERSION`).toBe(true);
+    }
+    const executed = matches.filter((script) => script.loaded === "true").length;
+    if (requireFreshRequests) {
+      expect(executed, `${assetPath} should have one actual executable managed script; pending SSR markers may coexist`).toBe(1);
+    } else {
+      expect(executed, `${assetPath} must not execute more than once on a managed revisit`).toBeLessThanOrEqual(1);
+    }
+    selected[assetPath] = matches;
+  }
+
+  const renderedKeys = paths.flatMap((assetPath) => selected[assetPath].map((script) => script.releaseKey));
+  expect(new Set(renderedKeys).size, "content and media managed scripts must share one release key").toBe(1);
+  const releaseKey = renderedKeys[0] || "";
+  expect(FIXTURE_DEPLOYMENT_VERSION).not.toBe(releaseKey);
+  const fetched: Array<{ path: string; url: string; status: number; releaseKey: string }> = [];
+  for (const assetPath of paths) {
+    const script = selected[assetPath][0];
+    const response = await request.get(script.href);
+    const responseURL = new URL(response.url(), baseURL);
+    expect(response.status(), `${assetPath} canonical managed asset should be fetchable`).toBe(200);
+    expect(responseURL.origin).toBe(origin);
+    expect(responseURL.pathname).toBe(assetPath);
+    expect(responseURL.searchParams.get("v"), `${assetPath} fetched URL must retain the release key`).toBe(releaseKey);
+    fetched.push({ path: assetPath, url: response.url(), status: response.status(), releaseKey: responseURL.searchParams.get("v") || "" });
+  }
+
+  const captured = capturedRequestURLs.map((raw) => {
+    const url = new URL(raw, baseURL);
+    return { path: url.pathname, url: raw, releaseKey: url.searchParams.get("v") || "" };
+  });
+  if (requireFreshRequests) {
+    const contentRequests = captured.filter((entry) => entry.path === CONTENT_RUNTIME_PATH && new URL(entry.url, baseURL).origin === origin);
+    expect(contentRequests.length, `${CONTENT_RUNTIME_PATH} must be requested during the fresh signed-in Content navigation`).toBeGreaterThan(0);
+    expect(contentRequests.every((entry) => entry.releaseKey.length > 0), `${CONTENT_RUNTIME_PATH} browser requests must not use an unversioned legacy URL`).toBe(true);
+    expect(contentRequests.every((entry) => entry.releaseKey === releaseKey), `${CONTENT_RUNTIME_PATH} browser requests must use the module release key`).toBe(true);
+    if (EXPECTED_MODULE_VERSION) expect(contentRequests.every((entry) => entry.releaseKey === EXPECTED_MODULE_VERSION)).toBe(true);
+
+    const mediaRequests = captured.filter((entry) => entry.path === MEDIA_RUNTIME_PATH && new URL(entry.url, baseURL).origin === origin);
+    const allowedMediaKeys = new Set([releaseKey, FIXTURE_DEPLOYMENT_VERSION]);
+    expect(mediaRequests.length, `${MEDIA_RUNTIME_PATH} must be requested during the fresh signed-in Content navigation`).toBeGreaterThan(0);
+    expect(mediaRequests.every((entry) => entry.releaseKey.length > 0), `${MEDIA_RUNTIME_PATH} browser requests must not use an unversioned legacy URL`).toBe(true);
+    expect(mediaRequests.every((entry) => allowedMediaKeys.has(entry.releaseKey)), `${MEDIA_RUNTIME_PATH} browser requests must use only the managed module or outer deployment release key`).toBe(true);
+    expect(mediaRequests.some((entry) => entry.releaseKey === releaseKey), `${MEDIA_RUNTIME_PATH} must request the module-keyed managed runtime on Pages`).toBe(true);
+    expect(mediaRequests.some((entry) => entry.releaseKey === FIXTURE_DEPLOYMENT_VERSION), `${MEDIA_RUNTIME_PATH} must request the outer admin deployment-keyed runtime`).toBe(true);
+    if (EXPECTED_MODULE_VERSION) expect(mediaRequests.some((entry) => entry.releaseKey === EXPECTED_MODULE_VERSION)).toBe(true);
+  }
+
+  return {
+    rendered,
+    fetched,
+    capturedRequests: captured,
+    executed: Object.fromEntries(paths.map((assetPath) => [assetPath, selected[assetPath].filter((script) => script.loaded === "true").length])),
+    pending: Object.fromEntries(paths.map((assetPath) => [assetPath, selected[assetPath].filter((script) => script.loaded === "pending").length])),
+  };
+}
+
+async function expectRuntimeSingleton(
+  page: Page,
+  firstContentRuntime: JSHandle<unknown> | undefined,
+  firstMediaRuntime: JSHandle<unknown> | undefined,
+  label: string,
+): Promise<void> {
+  if (firstContentRuntime) {
+    await expect.poll(
+      () => page.evaluate((initial) => (window as unknown as { GoSXStudioContentEditorRuntime?: unknown }).GoSXStudioContentEditorRuntime === initial, firstContentRuntime),
+      { timeout: 30_000, message: `${label} must retain the content editor runtime singleton` },
+    ).toBe(true);
+  }
+  if (firstMediaRuntime) {
+    await expect.poll(
+      () => page.evaluate((initial) => (window as unknown as { GoSXStudioMediaRuntime?: unknown }).GoSXStudioMediaRuntime === initial, firstMediaRuntime),
+      { timeout: 30_000, message: `${label} must retain the media runtime singleton` },
+    ).toBe(true);
+  }
+}
+
 async function readPageForm(page: Page): Promise<PageFormSnapshot> {
   const detail = page.locator(PAGE_DETAIL_RENDERER).first();
   return {
@@ -388,7 +756,7 @@ async function replaceWithKeyboard(page: Page, field: Locator, value: string): P
   await page.keyboard.type(value);
 }
 
-async function saveDraft(page: Page, pageID: string): Promise<SaveResult> {
+async function saveDraft(page: Page, pageID: string, trigger: SaveTrigger = "button", keyboardTarget?: Locator): Promise<SaveResult> {
   let mainFrameNavigated = false;
   const onNavigated = (frame: Frame) => {
     if (frame === page.mainFrame()) mainFrameNavigated = true;
@@ -399,7 +767,14 @@ async function saveDraft(page: Page, pageID: string): Promise<SaveResult> {
     response.request().method() === "POST",
   { timeout: 30_000 });
   try {
-    await page.getByRole("button", { name: "Save draft", exact: true }).first().click();
+    if (trigger === "keyboard") {
+      const target = keyboardTarget ?? page.locator("[data-content-editor-search='true']").first();
+      await expect(target, "the keyboard save trigger must be a visible focused control").toBeVisible();
+      await target.focus();
+      await page.keyboard.press("ControlOrMeta+S");
+    } else {
+      await page.getByRole("button", { name: "Save draft", exact: true }).first().click();
+    }
     const response = await responsePromise;
     let payload: ActionResponsePayload | null = null;
     try {
