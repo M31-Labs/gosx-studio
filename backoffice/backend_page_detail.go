@@ -12,6 +12,14 @@ type BackendPageDetailPageProps struct {
 	ArchiveAction         string
 	RestoreAction         string
 	CSRFToken             string
+	SaveLabel             string
+	PublishedLabel        string
+	PublishedHelp         string
+	CancelHref            string
+	CancelLabel           string
+	PublishHref           string
+	PublishLabel          string
+	PublishNotice         string
 	SaveStatus            BackendPageDetailActionStatus
 	ArchiveStatus         BackendPageDetailActionStatus
 	RestoreStatus         BackendPageDetailActionStatus
@@ -102,7 +110,7 @@ func RenderBackendPageDetailForm(props BackendPageDetailPageProps) gosx.Node {
 		renderBackendPageDetailBodyFormat(page),
 		renderBackendPageDetailContentEditor(page.Body),
 		renderBackendPageDetailSEO(page),
-		renderBackendPageDetailChecks(page),
+		renderBackendPageDetailChecks(props),
 		renderBackendPageDetailButtons(props),
 	)
 }
@@ -212,17 +220,34 @@ func renderBackendPageDetailSEO(page BackendPageDetailValues) gosx.Node {
 	)
 }
 
-func renderBackendPageDetailChecks(page BackendPageDetailValues) gosx.Node {
+func renderBackendPageDetailChecks(props BackendPageDetailPageProps) gosx.Node {
+	page := props.Page
+	label := firstNonEmptyPageDetail(props.PublishedLabel, "Published")
+	nodes := []gosx.Node{
+		gosx.El("label", nil, gosx.El("input", gosx.Attrs(gosx.Attr("type", "checkbox"), gosx.Attr("name", "published"), gosx.Attr("checked", page.Published))), gosx.Text(" "+label)),
+	}
+	if props.PublishedHelp != "" {
+		nodes = append(nodes, gosx.El("small", gosx.Attrs(gosx.Attr("class", "field-help")), gosx.Text(props.PublishedHelp)))
+	}
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "check-row")),
-		gosx.El("label", nil, gosx.El("input", gosx.Attrs(gosx.Attr("type", "checkbox"), gosx.Attr("name", "published"), gosx.Attr("checked", page.Published))), gosx.Text(" Published")),
+		gosx.Fragment(nodes...),
 	)
 }
 
 func renderBackendPageDetailButtons(props BackendPageDetailPageProps) gosx.Node {
 	page := props.Page
 	nodes := []gosx.Node{
-		gosx.El("button", gosx.Attrs(gosx.Attr("class", "button button--primary"), gosx.Attr("type", "submit")), gosx.Text("Save page")),
+		gosx.El("button", gosx.Attrs(gosx.Attr("class", "button button--primary"), gosx.Attr("type", "submit")), gosx.Text(firstNonEmptyPageDetail(props.SaveLabel, "Save page"))),
 		gosx.El("a", gosx.Attrs(gosx.Attr("class", "button button--secondary"), gosx.Attr("href", page.PreviewHref), gosx.Attr("data-gosx-link", "true")), gosx.Text("Preview")),
+	}
+	if props.CancelHref != "" {
+		nodes = append(nodes, gosx.El("a", gosx.Attrs(gosx.Attr("class", "button button--secondary"), gosx.Attr("href", props.CancelHref), gosx.Attr("data-gosx-link", "true")), gosx.Text(firstNonEmptyPageDetail(props.CancelLabel, "Cancel"))))
+	}
+	if props.PublishHref != "" {
+		nodes = append(nodes, gosx.El("a", gosx.Attrs(gosx.Attr("class", "button button--primary"), gosx.Attr("href", props.PublishHref), gosx.Attr("data-gosx-link", "true")), gosx.Text(firstNonEmptyPageDetail(props.PublishLabel, "Publish"))))
+	}
+	if props.PublishNotice != "" {
+		nodes = append(nodes, gosx.El("small", gosx.Attrs(gosx.Attr("class", "field-help")), gosx.Text(props.PublishNotice)))
 	}
 	if page.CanArchive {
 		nodes = append(nodes, gosx.El("button", gosx.Attrs(
@@ -244,4 +269,13 @@ func renderBackendPageDetailButtons(props BackendPageDetailPageProps) gosx.Node 
 		gosx.El("a", gosx.Attrs(gosx.Attr("class", "button button--secondary"), gosx.Attr("href", "/admin/pages"), gosx.Attr("data-gosx-link", "true")), gosx.Text("Back to pages")),
 	)
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "button-row")), gosx.Fragment(nodes...))
+}
+
+func firstNonEmptyPageDetail(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

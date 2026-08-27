@@ -136,6 +136,51 @@ func TestRenderWorkbenchScriptIncludesClientWorkbenchRuntime(t *testing.T) {
 	}
 }
 
+func TestWorkbenchScriptPreviewInlineTextRequiresBackingControl(t *testing.T) {
+	script := WorkbenchScript()
+	for _, want := range []string{
+		`function valueBearingTextControl(control)`,
+		`if (!control || !("value" in control) || control.disabled) return null;`,
+		`if (tag === "input" && type === "hidden") return null;`,
+		`function inlineTextControlForDetail(detail)`,
+		`return textControlForField(detail.field);`,
+		`function previewFieldActionLabel(detail)`,
+		`return inlineTextControlForDetail(detail) ? "Edit text" : "Open field";`,
+		`function setWorkbenchHomeMode(reason)`,
+		`runtime.setMode(form, "home", true);`,
+		`setMode("home", { scroll: true, reason: reason || "preview-field" });`,
+		`function revealPreviewField(detail, reason)`,
+		`setWorkbenchHomeMode(reason || "preview-field");`,
+		`var control = textControlForField(detail.field);`,
+		`if (!control) {`,
+		`revealPreviewField(detail, startReason);`,
+		`return false;`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("expected CMS workbench runtime to include inline safety fragment %q", want)
+		}
+	}
+	start := strings.Index(script, `var control = textControlForField(detail.field);`)
+	setEditable := strings.Index(script, `target.setAttribute("contenteditable", "plaintext-only");`)
+	if start < 0 || setEditable < 0 || start > setEditable {
+		t.Fatalf("CMS workbench runtime must prove a backing control before setting contenteditable")
+	}
+}
+
+func TestWorkbenchScriptPreviewInlineTextActionCopyReflectsBackingControl(t *testing.T) {
+	script := WorkbenchScript()
+	for _, want := range []string{
+		`var fieldActionLabel = detail.action || previewFieldActionLabel(detail);`,
+		`dock.setAttribute("data-gosx-studio-preview-action-label", fieldActionLabel || "");`,
+		`action.textContent = fieldActionLabel || (detail.editable === "media" || detail.editable === "image" ? "Media" : detail.editable === "flow" ? "Flow" : detail.editable === "source" ? "Source" : "Open");`,
+		`action.disabled = !detail.field && !fieldActionLabel && !detail.actionHref && !detail.actionFormAction;`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("expected CMS workbench runtime to include preview action copy fragment %q", want)
+		}
+	}
+}
+
 func TestRenderFlowEditorScriptIncludesClientFlowRuntime(t *testing.T) {
 	html := gosx.RenderHTML(RenderFlowEditorScript())
 	if !strings.Contains(html, `data-gosx-studio-flow-editor-runtime="true"`) || !strings.Contains(html, `data-studio-flow-card`) {

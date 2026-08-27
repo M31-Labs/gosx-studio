@@ -337,6 +337,30 @@ func TestInlineEditRuntimePreviewTextCallbacks(t *testing.T) {
 	}
 }
 
+func TestInlineEditRuntimePreviewTextRequiresBackingControl(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"function valueBearingPreviewTextControl(control)",
+		`if (!control || !("value" in control) || control.disabled) return null;`,
+		`if (tag === "input" && type === "hidden") return null;`,
+		`return valueBearingPreviewTextControl(control);`,
+		`var control = previewTextControl(detail.field, opts);`,
+		`if (!control) return false;`,
+		`target.setAttribute("contenteditable", "plaintext-only");`,
+		`target.setAttribute("data-gosx-studio-inline-editing", "true");`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() missing preview text backing-control fragment %q:\n%s", fragment, body)
+		}
+	}
+	controlIdx := strings.Index(body, `var control = previewTextControl(detail.field, opts);`)
+	gateIdx := strings.Index(body, `if (!control) return false;`)
+	contentEditableIdx := strings.Index(body, `target.setAttribute("contenteditable", "plaintext-only");`)
+	if controlIdx < 0 || gateIdx < 0 || contentEditableIdx < 0 || !(controlIdx < gateIdx && gateIdx < contentEditableIdx) {
+		t.Fatalf("InlineEditRuntimeScript() must reject unbacked preview text before setting contenteditable:\n%s", body)
+	}
+}
+
 func TestInlineEditRuntimeOwnsPreviewTextSessionAdapter(t *testing.T) {
 	body := string(InlineEditRuntimeScript())
 	for _, fragment := range []string{

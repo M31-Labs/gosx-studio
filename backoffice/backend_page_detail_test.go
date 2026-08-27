@@ -145,3 +145,52 @@ func TestRenderBackendPageDetailPageDefaultsAreEmptySafe(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderBackendPageDetailPageSupportsDraftWorkflowAffordances(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendPageDetailPage(BackendPageDetailPageProps{
+		SaveLabel:      "Save draft",
+		PublishedLabel: "Mark page as ready",
+		PublishedHelp:  "Saved page changes stay in draft until they are published from the Release Center.",
+		CancelHref:     "/admin/pages",
+		CancelLabel:    "Cancel",
+		PublishHref:    "/admin/editor?mode=publish",
+		PublishLabel:   "Publish changes",
+		PublishNotice:  "Publishing happens from the Release Center.",
+		Page: BackendPageDetailValues{
+			ID:          "page_1",
+			PreviewHref: "/about-noni?preview=1",
+		},
+	}))
+
+	for _, fragment := range []string{
+		`<div class="check-row"><label><input type="checkbox" name="published" /> Mark page as ready</label><small class="field-help">Saved page changes stay in draft until they are published from the Release Center.</small></div>`,
+		`<button class="button button--primary" type="submit">Save draft</button>`,
+		`<a class="button button--secondary" href="/about-noni?preview=1" data-gosx-link="true">Preview</a>`,
+		`<a class="button button--secondary" href="/admin/pages" data-gosx-link="true">Cancel</a>`,
+		`<a class="button button--primary" href="/admin/editor?mode=publish" data-gosx-link="true">Publish changes</a>`,
+		`<small class="field-help">Publishing happens from the Release Center.</small>`,
+		`<a class="button button--secondary" href="/admin/pages" data-gosx-link="true">Back to pages</a>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("draft workflow renderer missing %q:\n%s", fragment, html)
+		}
+	}
+
+	for _, notWant := range []string{
+		`<button class="button button--primary" type="submit">Save page</button>`,
+		` /> Published</label>`,
+	} {
+		if strings.Contains(html, notWant) {
+			t.Fatalf("draft workflow renderer should not contain %q:\n%s", notWant, html)
+		}
+	}
+
+	assertOrder(t, html,
+		`<button class="button button--primary" type="submit">Save draft</button>`,
+		`<a class="button button--secondary" href="/about-noni?preview=1"`,
+		`<a class="button button--secondary" href="/admin/pages" data-gosx-link="true">Cancel</a>`,
+		`<a class="button button--primary" href="/admin/editor?mode=publish"`,
+		`Publishing happens from the Release Center.`,
+		`<a class="button button--secondary" href="/admin/pages" data-gosx-link="true">Back to pages</a>`,
+	)
+}

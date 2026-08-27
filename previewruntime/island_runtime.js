@@ -752,6 +752,8 @@
     var shell = dockLookup.shell;
     if (!dock || !target) return { handled: false, dock: dock || null, state: null, bound: false, positioned: false };
     var normalizedSelection = editorPreviewDockSelection(selection);
+    var hostActionLabel = editorPreviewHostCall(host, "previewFieldActionLabel", "", normalizedSelection);
+    if (hostActionLabel) normalizedSelection.action = hostActionLabel;
     var bindResult = bindEditorPreviewDock(form, frame, dock, host);
     frame.__gosxStudioPreviewDock = dock;
     frame.__gosxStudioPreviewDockTarget = target;

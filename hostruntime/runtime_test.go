@@ -513,6 +513,70 @@ func TestWorkbenchRuntimeDelegatesPreviewInlineTextToInlineEditRuntime(t *testin
 	}
 }
 
+func TestWorkbenchRuntimePreviewInlineTextRequiresBackingControl(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	body := jsFunctionBody(t, script, "startInlineTextFromDetail")
+	for _, check := range []string{
+		`var control = inlineTextControlForDetail(detail);`,
+		`if (!control) {`,
+		`revealPreviewField(detail, reason || "preview-dock");`,
+		`return false;`,
+		`previewInlineTextHostWithControl(frame, detail.field || "", control)`,
+		`emitPreviewDockAction("field-action", detail);`,
+	} {
+		if !strings.Contains(body, check) {
+			t.Fatalf("startInlineTextFromDetail missing fail-safe inline-text gate fragment %q in:\n%s", check, body)
+		}
+	}
+	fallback := strings.Index(body, `if (!control) {`)
+	start := strings.Index(body, `startInlineTextEdit(frame, detail`)
+	emitAction := strings.Index(body, `emitPreviewDockAction("field-action", detail);`)
+	if fallback < 0 || start < 0 || emitAction < 0 || fallback > start || fallback > emitAction {
+		t.Fatalf("unbacked inline text fallback must run before contenteditable start/action emission:\n%s", body)
+	}
+	if strings.Contains(body, `setPreviewStatus("dirty"`) || strings.Contains(body, `emitEditorOperation("set_text"`) || strings.Contains(body, `inline_text_start`) {
+		t.Fatalf("unbacked inline text fallback must not dirty or emit inline operations itself:\n%s", body)
+	}
+}
+
+func TestWorkbenchRuntimePreviewInlineTextControlIsReusedForBackedStart(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`function valueBearingTextControl(control)`,
+		`if (!control || !("value" in control) || control.disabled) return null;`,
+		`if (tag === "input" && type === "hidden") return null;`,
+		`function inlineTextControlForDetail(detail)`,
+		`return textControlForField(detail.field);`,
+		`function previewInlineTextHostWithControl(frame, field, control)`,
+		`host.controlForField = function (candidate) {`,
+		`return candidate === field ? control : textControlForField(candidate);`,
+		`function startInlineTextEdit(frame, detail, reason, host)`,
+		`host || previewInlineTextHost(frame)`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing backed inline text control fragment %q", check)
+		}
+	}
+}
+
+func TestWorkbenchRuntimePreviewInlineTextActionCopyReflectsBackingControl(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	body := jsFunctionBody(t, script, "previewFieldActionLabel")
+	for _, check := range []string{
+		`if (!detail || detail.editable !== "text" || detail.action) return "";`,
+		`return inlineTextControlForDetail(detail) ? "Edit text" : "Open field";`,
+	} {
+		if !strings.Contains(body, check) {
+			t.Fatalf("previewFieldActionLabel missing honest action-copy fragment %q in:\n%s", check, body)
+		}
+	}
+
+	hostBody := jsFunctionBody(t, script, "previewDockActionHost")
+	if !strings.Contains(hostBody, "previewFieldActionLabel: previewFieldActionLabel") {
+		t.Fatalf("previewDockActionHost must expose the host-specific inline text action label:\n%s", hostBody)
+	}
+}
+
 func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
@@ -535,6 +599,9 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`finishInlineTextEdit: finishInlineTextEdit,`,
 		`if (!result || !result.handled || !result.applied) return false;`,
 		`function revealPreviewField(detail, reason)`,
+		`function setWorkbenchHomeMode(reason)`,
+		`runtime.setMode(form, "home", true);`,
+		`setMode("home", { scroll: true, reason: reason || "preview-select" });`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-reveal", { bubbles: true, detail: payload }))`,
 		`if (payload.result) return !!payload.result.revealed;`,
 		`if (options.reveal) revealPreviewField(detail, options.reason || "preview-select");`,
@@ -626,12 +693,17 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldTargetRevealToSelectionRuntime(t *
 		`bindSelectionRuntime()`,
 		`return { field: detail.field || "", source: null, control: null, found: false };`,
 		`function revealPreviewField(detail, reason)`,
-		`setMode("content", { reason: reason || "preview-select" });`,
+		`function setWorkbenchHomeMode(reason)`,
+		`runtime.setMode(form, "home", true);`,
+		`setMode("home", { scroll: true, reason: reason || "preview-select" });`,
+		`setWorkbenchHomeMode(reason || "preview-select");`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-reveal", { bubbles: true, detail: payload }))`,
 		`if (payload.result) return !!payload.result.revealed;`,
 		`var target = previewFieldTarget(field);`,
-		`if (target.control && "value" in target.control) return target.control;`,
-		`if (target.source && "value" in target.source) return target.source;`,
+		`var control = valueBearingTextControl(target.control);`,
+		`if (control) return control;`,
+		`var source = valueBearingTextControl(target.source);`,
+		`if (source) return source;`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing preview field target/reveal delegation fragment %q", check)
@@ -944,6 +1016,7 @@ func TestWorkbenchRuntimeCallsPreviewDockActionRunHelper(t *testing.T) {
 		`applyPreviewSelection: applyPreviewSelection`,
 		`dispatchPreviewFieldNavigation: dispatchPreviewFieldNavigation`,
 		`dispatchPreviewFieldActionResolve: dispatchPreviewFieldActionResolve`,
+		`previewFieldActionLabel: previewFieldActionLabel`,
 		`startInlineTextFromDetail: startInlineTextFromDetail`,
 		`submitPreviewFieldAction: submitPreviewFieldAction`,
 		`navigateToHref: navigatePreviewDockHref`,

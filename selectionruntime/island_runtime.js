@@ -520,7 +520,7 @@
           editable === "source" ? "Manage source" :
           editable === "flow" ? "Configure flow" :
           editable === "url" || editable === "link" ? "Edit URL" :
-          editable === "text" ? "Edit text" : "Open field");
+          editable === "text" ? (inlineTextControlForField(field) ? "Edit text" : "Open field") : "Open field");
       });
     }
 
@@ -545,6 +545,19 @@
         if (link) href = link.getAttribute("href") || "";
       }
       return { source: source, control: control, href: href };
+    }
+
+    function valueBearingFieldControl(control) {
+      if (!control || !("value" in control) || control.disabled) return null;
+      var tag = String(control.tagName || "").toLowerCase();
+      var type = String(control.type || "").toLowerCase();
+      if (tag === "input" && type === "hidden") return null;
+      return control;
+    }
+
+    function inlineTextControlForField(field) {
+      var target = fieldActionTarget(field);
+      return valueBearingFieldControl(target.control) || valueBearingFieldControl(target.source);
     }
 
     function inferEditableKind(source, control) {
@@ -1252,6 +1265,11 @@
         selectRow(row);
         var field = form.getAttribute("data-studio-field-selection") || "";
         var editable = form.getAttribute("data-studio-field-editable") || "";
+        var fieldActionLabel = compactText(form.getAttribute("data-studio-field-action-label") || "");
+        if (field && editable === "text" && (fieldActionLabel === "Open field" || !inlineTextControlForField(field))) {
+          runSelectedFieldAction(field, editable);
+          return;
+        }
         if (field && editable && editable !== "text") {
           if (runSelectedFieldAction(field, editable)) return;
           setFieldFocus({ field: field, editable: editable }, true);

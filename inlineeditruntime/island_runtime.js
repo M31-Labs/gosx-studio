@@ -205,10 +205,18 @@
     if (!opts || typeof opts.controlForField !== "function") return null;
     try {
       var control = opts.controlForField(field);
-      return control && "value" in control ? control : null;
+      return valueBearingPreviewTextControl(control);
     } catch (error) {
       return null;
     }
+  }
+
+  function valueBearingPreviewTextControl(control) {
+    if (!control || !("value" in control) || control.disabled) return null;
+    var tag = String(control.tagName || "").toLowerCase();
+    var type = String(control.type || "").toLowerCase();
+    if (tag === "input" && type === "hidden") return null;
+    return control;
   }
 
   function previewTextSessionOptions(frame, host) {
@@ -335,6 +343,7 @@
     if (!doc) return false;
     var startReason = reason || "preview-dock";
     var control = previewTextControl(detail.field, opts);
+    if (!control) return false;
     var text = textOf(target);
     var edit = {
       target: target,

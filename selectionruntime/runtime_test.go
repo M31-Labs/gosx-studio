@@ -518,6 +518,11 @@ func TestSelectionRuntimeIslandOwnsPreviewFieldTargetReveal(t *testing.T) {
 		`var control = fieldControl(source);`,
 		`found: !!source`,
 		`function revealPreviewFieldTarget(target)`,
+		`function valueBearingFieldControl(control)`,
+		`if (!control || !("value" in control) || control.disabled) return null;`,
+		`if (tag === "input" && type === "hidden") return null;`,
+		`function inlineTextControlForField(field)`,
+		`return valueBearingFieldControl(target.control) || valueBearingFieldControl(target.source);`,
 		`var row = target.source.closest ? target.source.closest(".field-row, [data-studio-field-row]") : null;`,
 		`var scrollTarget = row || target.source;`,
 		`scrollTarget.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });`,
@@ -529,6 +534,10 @@ func TestSelectionRuntimeIslandOwnsPreviewFieldTargetReveal(t *testing.T) {
 		`var target = previewFieldTarget(envelope.detail || envelope);`,
 		`revealed: revealPreviewFieldTarget(target),`,
 		`field: target.field`,
+		`editable === "text" ? (inlineTextControlForField(field) ? "Edit text" : "Open field") : "Open field"`,
+		`var fieldActionLabel = compactText(form.getAttribute("data-studio-field-action-label") || "");`,
+		`if (field && editable === "text" && (fieldActionLabel === "Open field" || !inlineTextControlForField(field)))`,
+		`runSelectedFieldAction(field, editable);`,
 	} {
 		if !strings.Contains(body, contract) {
 			t.Fatalf("IslandRuntimeJS() missing preview field target/reveal contract %q", contract)

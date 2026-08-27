@@ -503,12 +503,24 @@
       return { field: detail.field || "", source: null, control: null, found: false };
     }
 
+    function setWorkbenchHomeMode(reason) {
+      var runtime = window.GoSXStudioWorkbenchRuntime;
+      if (runtime && typeof runtime.setMode === "function") {
+        try {
+          runtime.setMode(form, "home", true);
+          return true;
+        } catch (error) {
+          // Fall back to this legacy host-local setter below.
+        }
+      }
+      setMode("home", { scroll: true, reason: reason || "preview-select" });
+      return false;
+    }
+
     function revealPreviewField(detail, reason) {
       detail = detail || {};
       if (!detail.field) return false;
-      if (form.querySelector('[data-studio-mode-control="content"], [data-studio-mode-panel="content"]')) {
-        setMode("content", { reason: reason || "preview-select" });
-      }
+      setWorkbenchHomeMode(reason || "preview-select");
       var payload = {
         detail: detail,
         reason: reason || ""
@@ -582,6 +594,7 @@
         applyPreviewSelection: applyPreviewSelection,
         dispatchPreviewFieldNavigation: dispatchPreviewFieldNavigation,
         dispatchPreviewFieldActionResolve: dispatchPreviewFieldActionResolve,
+        previewFieldActionLabel: previewFieldActionLabel,
         startInlineTextFromDetail: startInlineTextFromDetail,
         submitPreviewFieldAction: submitPreviewFieldAction,
         navigateToHref: navigatePreviewDockHref
@@ -749,11 +762,31 @@
       return emitEditorOperation("set_field", envelope);
     }
 
+    function valueBearingTextControl(control) {
+      if (!control || !("value" in control) || control.disabled) return null;
+      var tag = String(control.tagName || "").toLowerCase();
+      var type = String(control.type || "").toLowerCase();
+      if (tag === "input" && type === "hidden") return null;
+      return control;
+    }
+
     function textControlForField(field) {
       var target = previewFieldTarget(field);
-      if (target.control && "value" in target.control) return target.control;
-      if (target.source && "value" in target.source) return target.source;
+      var control = valueBearingTextControl(target.control);
+      if (control) return control;
+      var source = valueBearingTextControl(target.source);
+      if (source) return source;
       return null;
+    }
+
+    function inlineTextControlForDetail(detail) {
+      if (!detail || detail.editable !== "text" || !detail.field) return null;
+      return textControlForField(detail.field);
+    }
+
+    function previewFieldActionLabel(detail) {
+      if (!detail || detail.editable !== "text" || detail.action) return "";
+      return inlineTextControlForDetail(detail) ? "Edit text" : "Open field";
     }
 
     function previewInlineTextRuntime(method) {
@@ -780,21 +813,34 @@
       };
     }
 
+    function previewInlineTextHostWithControl(frame, field, control) {
+      var host = previewInlineTextHost(frame);
+      host.controlForField = function (candidate) {
+        return candidate === field ? control : textControlForField(candidate);
+      };
+      return host;
+    }
+
     function syncInlineTextEdit(frame, reason) {
       var runtime = previewInlineTextRuntime("syncPreviewTextSession");
       if (!runtime) return false;
       return runtime.syncPreviewTextSession(frame, reason, previewInlineTextHost(frame));
     }
 
-    function startInlineTextEdit(frame, detail, reason) {
+    function startInlineTextEdit(frame, detail, reason, host) {
       var runtime = previewInlineTextRuntime("startPreviewTextSession");
       if (!runtime) return false;
-      return runtime.startPreviewTextSession(frame, detail, reason || "preview-dock", previewInlineTextHost(frame));
+      return runtime.startPreviewTextSession(frame, detail, reason || "preview-dock", host || previewInlineTextHost(frame));
     }
 
     function startInlineTextFromDetail(frame, detail, reason) {
       if (!detail || detail.editable !== "text") return false;
-      if (!startInlineTextEdit(frame, detail, reason || "preview-dock")) return false;
+      var control = inlineTextControlForDetail(detail);
+      if (!control) {
+        revealPreviewField(detail, reason || "preview-dock");
+        return false;
+      }
+      if (!startInlineTextEdit(frame, detail, reason || "preview-dock", previewInlineTextHostWithControl(frame, detail.field || "", control))) return false;
       emitPreviewDockAction("field-action", detail);
       return true;
     }
