@@ -2,6 +2,10 @@
 
 Date: 2026-08-27
 
+> Historical scope: this document preserves the prior STAGE16 release and its
+> evidence. The current round-2 identity and delta are in the [Editor Polish
+> Round 2 proof record](./2026-08-27-editor-polish-round2.md).
+
 Status: the exact-pin Noni release is deployed to staging and the local Studio
 and Noni verification gates are complete. The current image, data receipt, and
 browser evidence are recorded below. This remains a bounded polish record, not
