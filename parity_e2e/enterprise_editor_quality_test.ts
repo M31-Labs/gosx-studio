@@ -20,11 +20,16 @@ const mediaRuntimeJS = readFileSync(
   "utf8",
 );
 // Keep quality04 artifacts separate from other polish owners and put them in
-// the ignored shared handoff tree requested by the orchestrator.
-const qualityArtifactRoot = path.resolve(
+// the ignored shared handoff tree requested by the orchestrator. The default
+// root preserves the canonical quality04 paths; the opt-in cross-browser
+// config supplies a root whose project subdirectory is selected at test time.
+const defaultQualityArtifactRoot = path.resolve(
   __dirname,
   "../.tiller/scratch/codex/enterprise-polish-20260827/qa/quality04",
 );
+const configuredQualityArtifactRoot = process.env.QUALITY_ARTIFACT_ROOT
+  ? path.resolve(process.env.QUALITY_ARTIFACT_ROOT)
+  : undefined;
 
 type QualityViewport = {
   name: "1600" | "1280" | "390";
@@ -233,8 +238,11 @@ async function mountFixtureAtURL(page: Page, blocks = fixtureBlocks(), options: 
 }
 
 function artifactPath(name: string): string {
-  mkdirSync(qualityArtifactRoot, { recursive: true });
-  return path.join(qualityArtifactRoot, name);
+  const root = configuredQualityArtifactRoot
+    ? path.join(configuredQualityArtifactRoot, test.info().project.name)
+    : defaultQualityArtifactRoot;
+  mkdirSync(root, { recursive: true });
+  return path.join(root, name);
 }
 
 async function capture(page: Page, name: string): Promise<string> {
@@ -342,6 +350,14 @@ test.describe("@quality enterprise Page CMS editor polish", () => {
 
     const primary = page.locator("[data-content-editor-primary-actions] .button").first();
     await primary.focus();
+    const forcedColorCapabilities = await page.evaluate(() => {
+      const forcedColorsMedia = window.matchMedia("(forced-colors: active)");
+      return {
+        forcedColorAdjustSupported: CSS.supports("forced-color-adjust", "auto"),
+        forcedColorsMediaQuery: forcedColorsMedia.media,
+        forcedColorsMediaMatches: forcedColorsMedia.matches,
+      };
+    });
     const forcedColorState = await page.evaluate(() => {
       const primary = document.querySelector("[data-content-editor-primary-actions] .button");
       const selected = document.querySelector("[data-content-block-id='hero-heading']");
@@ -359,9 +375,32 @@ test.describe("@quality enterprise Page CMS editor polish", () => {
         focusOutlineWidth: focusStyle.outlineWidth,
       };
     });
+    const engine = testInfo.project.name;
+    const unsupportedForcedColorFeatures = [
+      ...(!forcedColorCapabilities.forcedColorAdjustSupported
+        ? ["forced-color-adjust CSS property is unsupported"]
+        : []),
+      ...(!forcedColorCapabilities.forcedColorsMediaMatches
+        ? ["forced-colors active media emulation was not observed after request"]
+        : []),
+    ];
+    await writeEvidence(`forced-colors-capability-${engine}.json`, {
+      test: testInfo.title,
+      engine,
+      requested: { forcedColors: "active", reducedMotion: "reduce" },
+      forcedColorCapabilities,
+      unsupportedForcedColorFeatures,
+      note: "A missing WebKit capability is recorded explicitly; it does not skip the rest of this quality test.",
+    });
     expect(forcedColorState).toBeTruthy();
-    expect(forcedColorState!.primaryForcedColorAdjust).toBe("auto");
-    expect(forcedColorState!.selectedForcedColorAdjust).toBe("auto");
+    if (engine !== "webkit") {
+      expect(forcedColorCapabilities.forcedColorAdjustSupported, `${engine} should support forced-color-adjust`).toBe(true);
+      expect(forcedColorCapabilities.forcedColorsMediaMatches, `${engine} should activate forced-colors emulation`).toBe(true);
+    }
+    if (forcedColorCapabilities.forcedColorAdjustSupported) {
+      expect(forcedColorState!.primaryForcedColorAdjust).toBe("auto");
+      expect(forcedColorState!.selectedForcedColorAdjust).toBe("auto");
+    }
     expect(forcedColorState!.focusOutlineStyle).not.toBe("none");
     expect(parseFloat(forcedColorState!.focusOutlineWidth)).toBeGreaterThanOrEqual(2);
 
@@ -384,6 +423,9 @@ test.describe("@quality enterprise Page CMS editor polish", () => {
     await writeEvidence("accessibility-evidence.json", {
       test: testInfo.title,
       screenshot,
+      engine,
+      forcedColorCapabilities,
+      unsupportedForcedColorFeatures,
       forcedColorState,
       transitionState,
     });

@@ -23,10 +23,17 @@ const initialDocument = {
 
 type DragTelemetryEvent = {
   type: string;
+  phase: string;
   targetID: string;
+  rawTargetTag: string;
+  rawTargetID: string;
+  rawTargetClass: string;
   defaultPrevented: boolean;
   clientX: number;
   clientY: number;
+  effectAllowed: string;
+  dropEffect: string;
+  dataTransferTypes: string[];
 };
 
 type DragPoint = { x: number; y: number };
@@ -129,21 +136,33 @@ async function installTelemetry(page: Page): Promise<void> {
   await page.evaluate(() => {
     const browserWindow = window as unknown as PhysicalWindow;
     const events: DragTelemetryEvent[] = [];
-    const eventNames = ["dragstart", "dragover", "dragleave", "drop", "dragend"];
-    const record = (event: Event) => {
-      const target = event.target instanceof Element
-        ? event.target.closest("[data-content-block-id]")
+    const eventNames = ["dragstart", "dragenter", "dragover", "dragleave", "drop", "dragend"];
+    const record = (event: Event, phase: string) => {
+      const rawTarget = event.target instanceof Element ? event.target : null;
+      const target = rawTarget
+        ? rawTarget.closest("[data-content-block-id]")
         : null;
       const pointerEvent = event as DragEvent;
+      const dataTransfer = pointerEvent.dataTransfer;
       events.push({
         type: event.type,
+        phase,
         targetID: target?.getAttribute("data-content-block-id") ?? "",
+        rawTargetTag: rawTarget?.tagName.toLowerCase() ?? "",
+        rawTargetID: rawTarget?.id ?? "",
+        rawTargetClass: typeof rawTarget?.className === "string" ? rawTarget.className : "",
         defaultPrevented: event.defaultPrevented,
         clientX: pointerEvent.clientX ?? 0,
         clientY: pointerEvent.clientY ?? 0,
+        effectAllowed: dataTransfer?.effectAllowed ?? "",
+        dropEffect: dataTransfer?.dropEffect ?? "",
+        dataTransferTypes: dataTransfer ? Array.from(dataTransfer.types ?? []) : [],
       });
     };
-    eventNames.forEach((name) => document.addEventListener(name, record, true));
+    eventNames.forEach((name) => {
+      document.addEventListener(name, (event) => record(event, "capture"), true);
+      document.addEventListener(name, (event) => record(event, "bubble"));
+    });
     browserWindow.__physicalContentDndEvents = events;
   });
 }
@@ -189,6 +208,10 @@ async function beginPhysicalDrag(
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await page.mouse.move(end.x, end.y, { steps: 12 });
+  // Keep the pointer over the actual drop target for a second native move.
+  // Playwright's manual-drag guidance uses two moves over the drop element so
+  // engines that retarget descendants during a path still dispatch drop.
+  await page.mouse.move(end.x, end.y);
 
   let markerContent = "";
   let ok = true;
@@ -238,8 +261,13 @@ test.describe("@smoke shared content editor physical mouse drag", () => {
       .toHaveAttribute("data-content-editor-drop-position", "before");
 
     await page.mouse.up();
-    await expect(page.locator("[data-content-block-id]").first())
-      .toHaveAttribute("data-content-block-id", "beta");
+    try {
+      await expect(page.locator("[data-content-block-id]").first())
+        .toHaveAttribute("data-content-block-id", "beta");
+    } catch (error) {
+      const postReleaseTelemetry = await readTelemetry(page);
+      throw new Error(`physical drop geometry=${JSON.stringify(drag.geometry)} pre-release telemetry=${JSON.stringify(drag.telemetry)} post-release telemetry=${JSON.stringify(postReleaseTelemetry)}: ${String(error)}`);
+    }
     await expect(page.locator("[data-content-block-id='beta']"))
       .not.toHaveAttribute("data-content-editor-drag-preview");
     await expect(page.locator("[data-content-block-id='alpha']"))
