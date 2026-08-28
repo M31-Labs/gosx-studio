@@ -28,13 +28,25 @@ go get m31labs.dev/gosx-studio@<pseudo-version-or-tag>
 go get m31labs.dev/gosx@<pseudo-version-or-tag>   # gosx-studio's own runtime dependency
 ```
 
-- No `replace` directive, no `go.work`. Both reference hosts consume a plain
-  versioned (pseudo-version) dependency; `go.mod`/`go.sum` bumps are the only
-  diff a Studio upgrade should produce in a host repo.
-- Pin the exact commit both reference hosts currently pin, unless you have a
-  reason to track a newer commit:
-  `m31labs.dev/gosx-studio v0.6.2-0.20260712025550-fcf3957aebcc` and
-  `m31labs.dev/gosx v0.29.6-0.20260711234809-cac23fe9ead5`.
+- A normal consumer resolves the published modules without a `replace`
+  directive or `go.work`. For a reproducible module-graph check, disable
+  workspace discovery and inherited module flags explicitly:
+
+  ```text
+  env GOWORK=off GOFLAGS= go list -m -json m31labs.dev/gosx-studio
+  ```
+
+  Candidate replacements stay in the isolated host source copy described in
+  §5; an inherited `GOFLAGS=-modfile=...` is insufficient for the GoSX CLI,
+  which reconstructs `GOFLAGS` internally.
+- **Verified Noni pair (2026-08-28):** Noni uses
+  `m31labs.dev/gosx-studio v0.6.2-0.20260828060955-cb313609fb1d`, from Studio
+  source commit `cb313609fb1d28937a110dab97698491a05e5030`, with GoSX runtime
+  `v0.53.8`, at Noni checkpoint `532f8e4`. This is dated Noni evidence; do
+  not infer a current Pajaritos pin or a latest release from it.
+- A Studio upgrade may legitimately require exact rendered-markup golden
+  updates and adapter changes. Review each diff against the intended contract;
+  never blindly auto-accept changed goldens.
 - `GOPRIVATE`/vanity-import redirect: `go get` fetches
   `m31labs.dev/gosx-studio` from `github.com/M31-Labs/gosx-studio` directly;
   no special `--build-context` or Docker vendoring is needed.
@@ -259,27 +271,48 @@ See the package's own `doc.go` for the fixture wiring pattern and
 ## 5. E2E patterns to adopt
 
 The reference-app browser matrix lives in `gosx-studio/parity_e2e/
-reference_apps_*_test.ts`, run against a real booted host process (Noni,
-Pajaritos) pinned by `.github/reference-app-refs.json`, via
-`npm run test:reference-apps` (`.github/workflows/reference-apps.yml`, job
-"Muddy/Noni + Pajaritos editor workflows"). To add your host to this matrix:
+reference_apps_*_test.ts`, runs against real booted hosts selected by
+`.github/reference-app-refs.json`, and is invoked by the explicit file list in
+`parity_e2e/package.json`'s `test:reference-apps` script. That current list
+includes the collaboration, interactions, and media-asset fixtures, as well
+as `reference_apps_enterprise_polish_test.ts`,
+`reference_apps_modern_editor_test.ts`, and
+`reference_apps_page_cms_lifecycle_test.ts`, among the other reference-app
+contracts. Treat that script and the checked-in workflow as the coverage
+source of truth; do not use obsolete omission counts.
+
+To add your host to this matrix:
 
 1. Add a `GOSX_STUDIO_<HOST>_REPO` env var + host-boot wiring to
    `parity_e2e/reference_apps_harness.ts` (follow the existing
    `GOSX_STUDIO_MUDDY_REPO`/`GOSX_STUDIO_PAJARITOS_REPO` pattern).
 2. Add your host's ref to `.github/reference-app-refs.json`.
-3. Each `reference_apps_*_test.ts` file already loops over every registered
-   host — no per-host test files are needed, only harness wiring.
-4. **Caveat found during this audit**: `parity_e2e/package.json`'s
-   `test:reference-apps` script (the exact command CI runs) passes an
-   explicit file list to `playwright test`, which does **not** currently
-   include `reference_apps_collaboration_test.ts`,
-   `reference_apps_interactions_test.ts`, or
-   `reference_apps_media_asset_test.ts` even though all three exist and are
-   committed. Confirm whether these were intentionally held back or are a
-   simple oversight before treating "24/24 green" as the full test-file
-   inventory; either way, add your host to every file you expect to actually
-   run in CI, not just to the ones already in that npm script.
+3. Review every current fixture in the `test:reference-apps` list for host
+   setup; no per-host test files are needed when the shared harness is enough.
+
+Validation distinguishes two module identities. In the candidate lane,
+`.github/workflows/reference-apps.yml` checks out Studio and exports
+`GOSX_STUDIO_CANDIDATE_REPO` plus `GOSX_STUDIO_CANDIDATE_SHA`. The harness makes
+an isolated sibling source copy of each host, adds a candidate-only
+`replace` to that copy's `go.mod`, and requires Go's `Module.Replace.Dir` to
+resolve to the checked-out candidate while the checkout SHA matches the
+expected SHA. The untouched host checkout is not the candidate module graph.
+That proof must remain distinct from a separately verified normal consumer
+lane using the published Studio pseudo-version with no `replace` and no
+`go.work`.
+
+The `npm run test:shared-runtime` lane uses
+`playwright.enterprise.config.ts` and its three explicit browser projects
+(Chromium, Firefox, WebKit) for standalone shared-runtime fixtures; it does
+not boot a reference host. The `npm run test:reference-apps` host lane uses
+the normal Playwright configuration, boots the registered real hosts, and
+currently runs the host Chromium project. A three-engine shared-runtime pass
+is therefore not three-engine real-host coverage.
+
+Remote CI has not been run for this documentation refresh, and an automatic
+published-module/no-overlay host lane is still missing. Keep candidate
+source-copy results, normal published-pin proof, shared-runtime results, and
+host-browser results reported separately.
 
 ## 6. Version/migration notes for this release line
 
