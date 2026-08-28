@@ -538,11 +538,13 @@
   //   - pointermove (any target): locate the nearest other row by midpoint
   //     Y; insertBefore-swap the dragged row above or below it based on
   //     whether the cursor is in the top or bottom half of that row.
-  //   - pointerup / pointercancel: remove .is-dragging; call
+  //   - pointerup: remove .is-dragging; when the row order changed, call
   //     renumber(list, "engine-list") so [data-block-studio-order] /
   //     [data-block-studio-index] reflect the final ordering and the
   //     blockstudio:reorder event fires; selectRow(list, drag.key) so the
-  //     dropped row is the active selection.
+  //     dropped row is the active selection. A no-op release only cleans up.
+  //   - pointercancel / Escape: restore the exact pre-drag child order and
+  //     initiating row visual state without dispatching reorder/input/change/select events.
   //
   // IMPORTANT: the legacy implementation uses pointer events (not HTML5
   // native drag) and the handle selector is [data-block-studio-handle]
@@ -569,7 +571,61 @@
       if (list.dataset.gosxStudioBlockHandleDragIslandBound === "true") return;
       list.dataset.gosxStudioBlockHandleDragIslandBound = "true";
       var drag = null;
+      function sameRowOrder(initialRows) {
+        var currentRows = rowsIsland(list);
+        if (currentRows.length !== initialRows.length) return false;
+        for (var i = 0; i < initialRows.length; i++) {
+          if (currentRows[i] !== initialRows[i]) return false;
+        }
+        return true;
+      }
+      function restoreDragState(state) {
+        // The live drag only moves the initiating row with insertBefore.
+        // Restore that row against its original sibling anchor so separators
+        // and nodes inserted by another owner during the gesture stay put.
+        // If another owner detached or replaced the row, do not resurrect it
+        // or overwrite that owner's inputs/indexes during rollback.
+        if (!state.row || state.row.parentNode !== list) return;
+        if (state.initialNextSibling && state.initialNextSibling.parentNode === list) {
+          list.insertBefore(state.row, state.initialNextSibling);
+        } else if (state.initialPreviousSibling && state.initialPreviousSibling.parentNode === list) {
+          list.insertBefore(state.row, state.initialPreviousSibling.nextSibling);
+        }
+        state.row.classList.toggle("is-dragging", state.wasDragging);
+      }
+      function releaseDragPointer(state) {
+        var captureTarget = state && (state.pointerCaptureTarget || state.pointerHandle);
+        if (!captureTarget || !captureTarget.releasePointerCapture) return;
+        try { captureTarget.releasePointerCapture(state.pointerId); } catch (e) { /* ignore */ }
+      }
+      function clearDrag(state) {
+        if (!state) return;
+        if (drag === state) drag = null;
+        doc.removeEventListener("keydown", state.onEscape, true);
+        releaseDragPointer(state);
+      }
+      function cancelDrag(state) {
+        if (!state || drag !== state) return;
+        clearDrag(state);
+        restoreDragState(state);
+      }
+      function handleEscape(event) {
+        if (!drag || !event || event.key !== "Escape") return;
+        event.preventDefault();
+        if (event.stopPropagation) event.stopPropagation();
+        cancelDrag(drag);
+      }
+      function handleLostPointerCapture(event) {
+        if (!drag || !event || event.target !== drag.pointerCaptureTarget || event.pointerId !== drag.pointerId) return;
+        cancelDrag(drag);
+      }
       list.addEventListener("pointerdown", function (event) {
+        // A list owns at most one gesture. In particular, a second touch or
+        // stylus pointer must never replace the initiating pointer's snapshot.
+        if (drag) return;
+        // Only a primary mouse/pen button starts a reorder. Touch contacts use
+        // the primary pointer button value but should retain their old path.
+        if ((event.pointerType === "mouse" || event.pointerType === "pen") && event.button !== 0) return;
         var pointerHandle = event.target && event.target.closest
           ? event.target.closest("[data-block-studio-handle]")
           : null;
@@ -577,33 +633,68 @@
         var pointerRow = pointerHandle.closest("[data-block-studio-block]");
         if (!pointerRow) return;
         event.preventDefault();
-        drag = { row: pointerRow, key: rowKeyIsland(pointerRow), y: event.clientY };
+        var initialRows = rowsIsland(list);
+        var nextDrag = {
+          row: pointerRow,
+          key: rowKeyIsland(pointerRow),
+          wasDragging: pointerRow.classList.contains("is-dragging"),
+          pointerId: event.pointerId,
+          pointerHandle: pointerHandle,
+          // Capture on the stable list rather than the row's handle. Moving
+          // that row with insertBefore can otherwise make Chromium/WebKit
+          // emit lostpointercapture during a valid drag.
+          pointerCaptureTarget: list,
+          initialNextSibling: pointerRow.nextSibling,
+          initialPreviousSibling: pointerRow.previousSibling,
+          initialRows: initialRows,
+          onEscape: handleEscape,
+        };
+        drag = nextDrag;
         pointerRow.classList.add("is-dragging");
-        if (pointerHandle.setPointerCapture) {
-          try { pointerHandle.setPointerCapture(event.pointerId); } catch (e) { /* ignore */ }
+        doc.addEventListener("keydown", nextDrag.onEscape, true);
+        if (list.setPointerCapture) {
+          try { list.setPointerCapture(event.pointerId); } catch (e) { /* ignore */ }
         }
       });
       list.addEventListener("pointermove", function (event) {
-        if (!drag) return;
+        if (!drag || event.pointerId !== drag.pointerId) return;
+        if (drag.row.parentNode !== list) {
+          // An external owner removed the row while this pointer was down.
+          // End our gesture before insertBefore can accidentally resurrect it.
+          cancelDrag(drag);
+          return;
+        }
         event.preventDefault();
         var target = closestRowByYIsland(list, event.clientY, drag.row);
         if (!target) return;
         var rect = target.getBoundingClientRect();
         list.insertBefore(drag.row, event.clientY > rect.top + rect.height / 2 ? target.nextElementSibling : target);
       });
-      function finish() {
-        if (!drag) return;
-        drag.row.classList.remove("is-dragging");
+      function finish(event) {
+        if (!drag || !event || event.pointerId !== drag.pointerId) return;
+        if (event.type === "pointercancel") {
+          if (event.cancelable) event.preventDefault();
+          cancelDrag(drag);
+          return;
+        }
+        var state = drag;
+        var changed = !sameRowOrder(state.initialRows);
+        clearDrag(state);
+        // An external owner may have removed the row while the pointer was
+        // down. Do not mutate that detached node or publish a reorder for it.
+        if (state.row.parentNode !== list) return;
+        state.row.classList.toggle("is-dragging", state.wasDragging);
+        if (!changed) return;
         // Reorder source "engine-list" preserves the legacy
         // renumberBlockLayoutList(list, "engine-list") call so consumers
         // subscribing to blockstudio:reorder can distinguish drag-drop
         // reorders from button-move / preview-commit reorders.
         renumberIsland(list, "engine-list");
-        selectRowIsland(list, drag.key);
-        drag = null;
+        selectRowIsland(list, state.key);
       }
       list.addEventListener("pointerup", finish);
       list.addEventListener("pointercancel", finish);
+      list.addEventListener("lostpointercapture", handleLostPointerCapture);
     });
   }
 

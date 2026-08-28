@@ -19,6 +19,16 @@ type Component struct {
 	CanToggleVisibility bool
 	CanDelete           bool
 	Controls            []Control
+	// DefinitionKey, Overrides, and Detached implement the reusable
+	// component/instance model (core/instances.go). A non-empty DefinitionKey
+	// makes this placed component a shared instance: EffectiveComponentControls
+	// resolves its rendered/editable controls from the matching
+	// ComponentDefinition, layering any per-instance Overrides on top, unless
+	// Detached is true (in which case Controls is this instance's own frozen
+	// copy and it no longer follows the shared definition).
+	DefinitionKey string
+	Overrides     []ComponentOverride
+	Detached      bool
 }
 
 type Control struct {
@@ -46,6 +56,11 @@ type ControlOption struct {
 type CompositionLibrary struct {
 	PageBlueprints     []PageBlueprint
 	ComponentTemplates []ComponentTemplate
+	// ComponentDefinitions is the site-wide shared/reusable component library
+	// (core/instances.go). Placed Component values reference one of these by
+	// DefinitionKey to become a shared instance; PaletteEntries() surfaces both
+	// ComponentTemplates and ComponentDefinitions as one placeable palette.
+	ComponentDefinitions []ComponentDefinition
 }
 
 type PageBlueprint struct {
@@ -409,6 +424,8 @@ func (component Component) Normalize() Component {
 		component.Position = 0
 	}
 	component.Controls = normalizeControls(component.Controls)
+	component.DefinitionKey = strings.TrimSpace(component.DefinitionKey)
+	component.Overrides = normalizeComponentOverrides(component.Overrides)
 	return component
 }
 
@@ -505,8 +522,9 @@ func (library CompositionLibrary) BlueprintCount() int {
 
 func (library CompositionLibrary) Normalize() CompositionLibrary {
 	out := CompositionLibrary{
-		PageBlueprints:     make([]PageBlueprint, 0, len(library.PageBlueprints)),
-		ComponentTemplates: make([]ComponentTemplate, 0, len(library.ComponentTemplates)),
+		PageBlueprints:       make([]PageBlueprint, 0, len(library.PageBlueprints)),
+		ComponentTemplates:   make([]ComponentTemplate, 0, len(library.ComponentTemplates)),
+		ComponentDefinitions: normalizeComponentDefinitions(library.ComponentDefinitions),
 	}
 	for _, blueprint := range library.PageBlueprints {
 		blueprint = blueprint.Normalize()
@@ -523,6 +541,12 @@ func (library CompositionLibrary) Normalize() CompositionLibrary {
 		out.ComponentTemplates = append(out.ComponentTemplates, template)
 	}
 	return out
+}
+
+// DefinitionCount returns the number of reusable shared component definitions
+// in the library.
+func (library CompositionLibrary) DefinitionCount() int {
+	return len(library.ComponentDefinitions)
 }
 
 func (library CompositionLibrary) TemplateCount() int {

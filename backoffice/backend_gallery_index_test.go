@@ -60,7 +60,7 @@ func TestRenderBackendGalleryIndexPagePreservesCreateFormContract(t *testing.T) 
 		`<input type="checkbox" name="published" checked="checked" /> Published`,
 		`<input type="checkbox" name="featured" /> Featured`,
 		`<button class="button button--primary" type="submit">Create gallery work</button>`,
-		`<script src="/media-picker.js" defer></script>`,
+		`<script src="/_gosx/studio/media-runtime.js" data-gosx-script="managed" data-gosx-script-load="dom" data-gosx-script-loaded="pending" defer></script>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("gallery index page missing %q:\n%s", fragment, html)
@@ -72,7 +72,7 @@ func TestRenderBackendGalleryIndexPagePreservesCreateFormContract(t *testing.T) 
 		`<section class="panel"><div class="panel__header"><h2>Add gallery work</h2></div>`,
 		`<datalist id="gallery-media-urls">`,
 		`<form class="admin-form"`,
-		`<script src="/media-picker.js"`,
+		`<script src="/_gosx/studio/media-runtime.js"`,
 	)
 }
 

@@ -14,6 +14,7 @@ func RenderNavigationPanel(view map[string]any, options NavigationPanelOptions) 
 		gosx.Attr("class", core.WorkbenchViewString(view, "class")),
 		gosx.Attr("data-panel-key", core.WorkbenchViewString(view, "panelKey")),
 		gosx.Attr("data-studio-navigation-panel", "true"),
+		gosx.Attr("data-studio-mode-panel", core.WorkbenchViewString(view, "mode")),
 		gosx.Attr("data-gosx-studio-navigation-panel-renderer", "gosx-studio"),
 	}
 	attrs = appendBlockLibraryPanelAttrs(attrs, options.RootAttrs)
@@ -43,6 +44,23 @@ func RenderNavigationPanel(view map[string]any, options NavigationPanelOptions) 
 					gosx.Attr("form", core.WorkbenchViewString(view, "formID")),
 					gosx.Attr("formaction", core.WorkbenchViewString(view, "action")),
 					gosx.Attr("formmethod", "post"),
+					// This button submits the SHARED websiteEditorForm (every
+					// panel's fields, including ones currently hidden by
+					// mode-gating CSS, are "listed" constraint-validation
+					// candidates of that one form). Native HTML5 validation
+					// runs BEFORE the browser dispatches the form's "submit"
+					// event; if ANY control anywhere in the form is invalid,
+					// the browser silently cancels the submission with no
+					// submit event at all, regardless of which button was
+					// clicked. formnovalidate exempts THIS submission from
+					// that shared-form validation surface, mirroring every
+					// other workbench-form action button (Publish/Discard/
+					// Schedule in publish_panel.go, Restore in
+					// revision_history_panel.go) — Save navigation must
+					// behave the same way or it silently no-ops whenever an
+					// unrelated hidden panel happens to carry an invalid
+					// value.
+					gosx.Attr("formnovalidate", "formnovalidate"),
 					gosx.Attr("data-studio-submit-action", "navigation"),
 					gosx.Attr("data-studio-field-action-formaction", core.WorkbenchViewString(view, "action")),
 				), gosx.Text(core.WorkbenchViewString(view, "buttonLabel"))),

@@ -93,6 +93,70 @@ func TestRenderPageArtboardSurfaceMarkupEditableAndComponents(t *testing.T) {
 	}
 }
 
+// TestRenderHomePageSurfaceMarkupOmitsDurableAttrsByDefault guards handoff-31:
+// the durable opt-in is additive-only — a caller that never sets
+// DurableHeadlineField (every pre-existing caller) must render byte-for-byte
+// the same headline element it always did.
+func TestRenderHomePageSurfaceMarkupOmitsDurableAttrsByDefault(t *testing.T) {
+	markup := RenderHomePageSurfaceMarkup(HomePageSurfaceInput{Headline: "Hi"})
+	if strings.Contains(markup, "data-gosx-studio-durable-history") {
+		t.Fatalf("headline must not carry durable attrs when DurableHeadlineField is blank: %s", markup)
+	}
+}
+
+// TestRenderHomePageSurfaceMarkupHeadlineDurableOptIn proves the headline
+// surface renders the durable dispatch attributes inlineeditruntime's
+// island_runtime.js reads (DURABLE_ATTR/DURABLE_FIELD_ATTR/etc.) when a host
+// supplies DurableHeadlineField, and that the durable Field literal need not
+// match the canvas binding string (see the struct doc comment: "hero.headline"
+// vs "home.hero.headline").
+func TestRenderHomePageSurfaceMarkupHeadlineDurableOptIn(t *testing.T) {
+	markup := RenderHomePageSurfaceMarkup(HomePageSurfaceInput{
+		Headline:                 "Hi",
+		DurableHeadlineField:     "hero.headline",
+		DurableHeadlinePageID:    "page:home",
+		DurableHeadlineRoute:     "/",
+		DurableHeadlineComponent: "home:hero",
+	})
+	for _, want := range []string{
+		`data-studio-field="home.hero.headline"`,
+		`data-gosx-studio-durable-history="true"`,
+		`data-gosx-studio-durable-field="hero.headline"`,
+		`data-gosx-studio-durable-page-id="page:home"`,
+		`data-gosx-studio-durable-route="/"`,
+		`data-gosx-studio-durable-component="home:hero"`,
+	} {
+		if !strings.Contains(markup, want) {
+			t.Fatalf("missing %q in:\n%s", want, markup)
+		}
+	}
+}
+
+// TestRenderPageArtboardSurfaceMarkupTitleDurableOptIn proves an editable
+// page title surface renders the SAME durable dispatch attributes when a
+// host supplies DurableTitleField (e.g. the about page, which already has a
+// durable "pages.about.title" set-field ledger case) — additive alongside
+// the pre-existing data-studio-operation="update-page" fallback attributes.
+func TestRenderPageArtboardSurfaceMarkupTitleDurableOptIn(t *testing.T) {
+	markup := RenderPageArtboardSurfaceMarkup(PageArtboardSurfaceInput{
+		Key: "page:about", PageKey: "about", Title: "About", Route: "/about", EditableTitle: true,
+		DurableTitleField: "pages.about.title", DurableTitlePageID: "page:about", DurableTitleComponent: "about:content",
+	})
+	for _, want := range []string{
+		`data-studio-field="pages.about.title"`,
+		`data-studio-operation="update-page"`,
+		`data-gosx-studio-durable-history="true"`,
+		`data-gosx-studio-durable-field="pages.about.title"`,
+		`data-gosx-studio-durable-page-id="page:about"`,
+		`data-gosx-studio-durable-route="/about"`,
+		`data-gosx-studio-durable-component="about:content"`,
+	} {
+		if !strings.Contains(markup, want) {
+			t.Fatalf("missing %q in:\n%s", want, markup)
+		}
+	}
+}
+
 func TestRenderPageArtboardSurfaceMarkupPlainTitleFallbacks(t *testing.T) {
 	markup := RenderPageArtboardSurfaceMarkup(PageArtboardSurfaceInput{
 		Key:     "page:blank",

@@ -1,0 +1,1495 @@
+import { expect, test, type APIRequestContext, type Frame, type JSHandle, type Locator, type Page } from "@playwright/test";
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import {
+  applyCompositionIntentInPlace,
+  gotoEditor,
+  revealModeIfPresent,
+  startMuddyCollaboration,
+} from "./reference_apps_harness";
+
+const CREATE_MESSAGE = "Landing page created with 3 starter sections. Edit its sections in Content › Pages.";
+const PAGE_INDEX_RENDERER = "[data-gosx-studio-backend-page-index-renderer='gosx-studio']";
+const PAGE_DETAIL_RENDERER = "[data-gosx-studio-backend-page-detail-renderer='gosx-studio']";
+const CONTENT_RUNTIME_PATH = "/_gosx/studio/content-editor.js";
+const MEDIA_RUNTIME_PATH = "/_gosx/studio/media-runtime.js";
+const DEFAULT_INTEGRATION_ROOT = path.resolve(__dirname, "../.tiller/scratch/codex/enterprise-polish-20260827/integration08");
+const INTEGRATION_ROOT = path.resolve(
+  process.env.GOSX_STUDIO_ENTERPRISE_ARTIFACT_ROOT?.trim() || DEFAULT_INTEGRATION_ROOT,
+);
+const EXPECTED_MODULE_VERSION = process.env.GOSX_STUDIO_EXPECTED_MODULE_VERSION?.trim() || "";
+const FIXTURE_DEPLOYMENT_VERSION = "test-deployment-20260827";
+const CONFLICT_LAYOUT_LIMITS = {
+  desktop: { detailMinWidth: 240, maxHeight: 240 },
+  mobile: { detailMinWidth: 180, maxHeight: 360 },
+} as const;
+const GALLERY_INDEX_HEADERS = ["Work", "Year", "Visibility", "Updated", ""];
+const GALLERY_INDEX_LABELS = ["Work", "Year", "Visibility", "Updated", "Actions"];
+const SEEDED_GALLERY_TITLE = "Pressed wall tile study";
+const SEEDED_GALLERY_MATERIALS = "Stoneware, iron wash, clear glaze";
+const SEEDED_GALLERY_ROW_COUNT = 2;
+
+type GalleryIndexBox = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  width: number;
+  height: number;
+};
+
+type GalleryIndexGeometry = {
+  viewportWidth: number;
+  scrollWidth: number;
+  clientWidth: number;
+  bodyScrollWidth: number;
+  tableWidth: number;
+  panel: GalleryIndexBox;
+  table: GalleryIndexBox;
+  row: GalleryIndexBox;
+  workCell: GalleryIndexBox;
+  yearCell: GalleryIndexBox;
+  titleRect: GalleryIndexBox;
+  materialsRect: GalleryIndexBox;
+  titleLines: GalleryIndexBox[];
+  materialLines: GalleryIndexBox[];
+  titleOverlapsYear: boolean;
+  materialsOverlapsYear: boolean;
+  titleFitsWorkCell: boolean;
+  materialsFitWorkCell: boolean;
+  titleReadableWidth: boolean;
+  materialsReadableWidth: boolean;
+  readableWidth: number;
+  nativeTable: boolean;
+  tableDisplay: string;
+  rowDisplay: string;
+  labels: string[];
+  headers: string[];
+  headerScopes: string[];
+  thumbnailWidth: number;
+  editVisible: boolean;
+  editTabIndex: number;
+  editBox: GalleryIndexBox;
+  pageLevelOverflow: boolean;
+};
+
+type GalleryIndexResponsiveEvidence = {
+  originalViewport: { width: number; height: number };
+  samples: Array<{
+    viewport: { width: number; height: number };
+    screenshot: string;
+    geometry: GalleryIndexGeometry;
+  }>;
+};
+
+type PageFormSnapshot = {
+  title: string;
+  slug: string;
+  body: string;
+  expectedRevision: string;
+  published: boolean;
+};
+
+type ActionResponsePayload = {
+  ok?: boolean;
+  message?: string;
+  redirect?: string;
+  values?: Record<string, string>;
+};
+
+type SaveResult = {
+  status: number;
+  payload: ActionResponsePayload | null;
+  revisionReadback: string | null;
+  source: "structured-response" | "remounted-form" | "none";
+};
+
+type SaveTrigger = "button" | "keyboard";
+
+type ManagedScriptSnapshot = {
+  src: string;
+  href: string;
+  origin: string;
+  pathname: string;
+  releaseKey: string;
+  loadMode: string;
+  loaded: string;
+};
+
+type ManagedAssetEvidence = {
+  rendered: ManagedScriptSnapshot[];
+  fetched: Array<{ path: string; url: string; status: number; releaseKey: string }>;
+  capturedRequests: Array<{ path: string; url: string; releaseKey: string }>;
+  executed: Record<string, number>;
+  pending: Record<string, number>;
+};
+
+test.describe("@reference-apps enterprise polish acceptance", () => {
+  test.describe.configure({ timeout: 300_000 });
+  test.skip(process.env.GOSX_STUDIO_REFERENCE_APP_E2E !== "1", "set GOSX_STUDIO_REFERENCE_APP_E2E=1 to boot sibling reference apps");
+
+  test("Page CMS rejects a stale two-tab save without destroying the local draft", async ({ browser, page, request }) => {
+    const server = await startMuddyCollaboration(request);
+    const contextA = await browser.newContext();
+    const contextB = await browser.newContext();
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+
+    try {
+      await signIn(pageA, server.baseURL, "admin");
+      await signIn(pageB, server.baseURL, "admin");
+      const pageID = await createLandingPage(pageA, server.baseURL);
+      const detailURL = `${server.baseURL}/admin/pages/${pageID}`;
+
+      // Both browser contexts load the same draft before either one types.
+      // Keeping the original token in hand makes the CAS precondition
+      // explicit instead of relying on a hidden implementation detail.
+      await openPageDetail(pageA, detailURL);
+      await openPageDetail(pageB, detailURL);
+      const initialA = await readPageForm(pageA);
+      const initialB = await readPageForm(pageB);
+      expect(initialA.expectedRevision, "Page CMS must render a non-empty revision precondition").toBeTruthy();
+      expect(initialB).toEqual(initialA);
+      const oldRevision = initialA.expectedRevision;
+
+      const titleA = `Enterprise A ${Date.now()}`;
+      const bodyMarkerA = `enterprise-a-${Date.now()}`;
+      await replaceWithKeyboard(pageA, pageA.locator("input[name='title']").first(), titleA);
+      await replaceWithKeyboard(pageA, await firstContentField(pageA), bodyMarkerA);
+      const draftA = await readPageForm(pageA);
+      expect(draftA.title).toBe(titleA);
+      expect(draftA.body).toContain(bodyMarkerA);
+
+      const acceptedA = await saveDraft(pageA, pageID);
+      expect([200, 303], "the first tab's draft must be accepted").toContain(acceptedA.status);
+      const acceptedRevision = expectObservedSuccess(acceptedA, "first tab", oldRevision);
+      await expect(pageA.locator("[data-content-editor='true']")).toHaveAttribute("data-content-editor-dirty", "false");
+      const savedA = await readPageForm(pageA);
+      expect(savedA.expectedRevision, "the remounted first tab must keep the structured revision token").toBe(acceptedRevision);
+      expect(savedA.title).toBe(titleA);
+      expect(savedA.body).toContain(bodyMarkerA);
+
+      const titleB = `Enterprise B ${Date.now()}`;
+      const bodyMarkerB = `enterprise-b-${Date.now()}`;
+      await replaceWithKeyboard(pageB, pageB.locator("input[name='title']").first(), titleB);
+      await replaceWithKeyboard(pageB, await firstContentField(pageB), bodyMarkerB);
+      const draftB = await readPageForm(pageB);
+      expect(draftB.title).toBe(titleB);
+      expect(draftB.body).toContain(bodyMarkerB);
+      expect(draftB.expectedRevision, "the second tab must still submit its original precondition").toBe(oldRevision);
+
+      const staleB = await saveDraft(pageB, pageID);
+      expect(staleB.status, "a second save with the old revision must return HTTP 409").toBe(409);
+      const conflictEditor = pageB.locator("[data-content-editor='true']").first();
+      await expect(conflictEditor).toHaveAttribute("data-content-editor-save-state", "conflict");
+      const conflictStatus = conflictEditor.locator("[data-content-editor-save-status]");
+      await expect(conflictStatus, "the guarded conflict must be announced in the live editor status").toHaveAttribute("role", "alert");
+      await expect(conflictStatus).toContainText(/This page changed elsewhere/i);
+      const currentVersionLink = conflictEditor.locator("[data-content-editor-save-conflict-link]");
+      await expect(currentVersionLink, "guarded conflicts must expose a current-version comparison link").toBeVisible();
+
+      // Treat the conflict surface as a real-host layout gate at both target
+      // acceptance widths. The stale tab stays live throughout; resizing is
+      // the only viewport change and never reloads or discards its draft.
+      const desktopConflictLayout = await assertConflictLayout(pageB, 1280, 800);
+
+      // The failed action must not replace B's title, body, or token. Do not
+      // reload this stale tab: preserving its live controls is the behavior
+      // under test and avoids silently discarding the operator's draft.
+      const retainedB = await readPageForm(pageB);
+      expect(retainedB.title).toBe(titleB);
+      expect(retainedB.body).toContain(bodyMarkerB);
+      expect(retainedB.body).not.toContain(bodyMarkerA);
+      expect(retainedB.expectedRevision).toBe(oldRevision);
+
+      const publicURL = `${server.baseURL}/pages/${initialA.slug}`;
+      const publicAfterConflict = await request.get(publicURL);
+      expect(publicAfterConflict.status(), "a draft-only conflict must not mutate a public route").toBe(404);
+      const conflictScreenshot = await captureScreenshot(pageB, "page-cms-conflict-1280x800", 1280, 800, false);
+
+      const mobileConflictLayout = await assertConflictLayout(pageB, 390, 844);
+      const mobileConflictScreenshot = await captureScreenshot(pageB, "page-cms-conflict-390x844", 390, 844, false);
+      await pageB.setViewportSize({ width: 1280, height: 800 });
+
+      await expect(currentVersionLink).toHaveAttribute("target", "_blank");
+      await expect(currentVersionLink).toHaveText("Open current version in new tab");
+      const currentHref = await currentVersionLink.getAttribute("href");
+      expect(new URL(currentHref ?? "", server.baseURL).pathname).toBe(`/admin/pages/${pageID}`);
+
+      const currentVersionPromise = pageB.waitForEvent("popup");
+      await currentVersionLink.click();
+      const currentPage = await currentVersionPromise;
+      try {
+        await currentPage.waitForLoadState("domcontentloaded");
+        await expectPageDetailReady(currentPage);
+        const currentBeforeReconcile = await readPageForm(currentPage);
+        expect(currentBeforeReconcile.title, "the comparison tab must show A's accepted title").toBe(titleA);
+        expect(currentBeforeReconcile.body, "the comparison tab must show A's accepted body").toContain(bodyMarkerA);
+        expect(currentBeforeReconcile.body).not.toContain(bodyMarkerB);
+        expect(currentBeforeReconcile.expectedRevision).toBe(savedA.expectedRevision);
+
+        // Reconcile in the new tab. B remains open and untouched throughout,
+        // so this save proves the operator can merge without refreshing away
+        // the stale tab's local draft.
+        const mergedTitle = `${titleA} + ${titleB}`;
+        const mergedBodyMarker = `${bodyMarkerA}+${bodyMarkerB}`;
+        await replaceWithKeyboard(currentPage, currentPage.locator("input[name='title']").first(), mergedTitle);
+        await replaceWithKeyboard(currentPage, await firstContentField(currentPage), mergedBodyMarker);
+        const mergedSave = await saveDraft(currentPage, pageID);
+        expect([200, 303], "the reconciled current version must save").toContain(mergedSave.status);
+        const mergedRevision = expectObservedSuccess(mergedSave, "reconciled current version", currentBeforeReconcile.expectedRevision);
+        await expect(currentPage.locator("[data-content-editor='true']")).toHaveAttribute("data-content-editor-dirty", "false");
+        const currentAfterReconcile = await readPageForm(currentPage);
+        expect(currentAfterReconcile.title).toBe(mergedTitle);
+        expect(currentAfterReconcile.body).toContain(mergedBodyMarker);
+        expect(currentAfterReconcile.expectedRevision).toBe(mergedRevision);
+
+        const stillRetainedB = await readPageForm(pageB);
+        expect(stillRetainedB.title).toBe(titleB);
+        expect(stillRetainedB.body).toContain(bodyMarkerB);
+        expect(stillRetainedB.expectedRevision).toBe(oldRevision);
+
+        const publicAfterReconcile = await request.get(publicURL);
+        expect(publicAfterReconcile.status(), "reconciling a draft must not publish the page").toBe(404);
+        writeEvidence("page-cms-stale-save", {
+          pageID,
+          oldRevision,
+          acceptedRevision,
+          acceptedRevisionReadback: acceptedA.revisionReadback,
+          acceptedSource: acceptedA.source,
+          acceptedStatus: acceptedA.status,
+          reconciledRevision: mergedRevision,
+          reconciledRevisionReadback: mergedSave.revisionReadback,
+          reconciledSource: mergedSave.source,
+          reconciledStatus: mergedSave.status,
+          staleStatus: staleB.status,
+          publicStatuses: [publicAfterConflict.status(), publicAfterReconcile.status()],
+          screenshots: [conflictScreenshot, mobileConflictScreenshot],
+          conflictLayout: {
+            desktop: desktopConflictLayout,
+            mobile: mobileConflictLayout,
+          },
+        });
+      } finally {
+        await currentPage.close();
+      }
+    } finally {
+      await Promise.all([contextA.close(), contextB.close()]);
+      await server.stop();
+    }
+  });
+
+  test("managed Content navigation keeps Page CMS keyboard editing and media changes draft-only", async ({ page, request }) => {
+    const server = await startMuddyCollaboration(request);
+    const saveRequests: string[] = [];
+    const onRequest = (browserRequest: { method: () => string; url: () => string }) => {
+      if (browserRequest.method() === "POST" && browserRequest.url().includes("/__actions/save")) saveRequests.push(browserRequest.url());
+    };
+    page.on("request", onRequest);
+    try {
+      await signIn(page, server.baseURL, "admin");
+      const pageID = await createLandingPage(page, server.baseURL);
+
+      // Start from the dashboard and use the managed Content › Pages link,
+      // then the managed Edit link. This exercises the real route transition
+      // before touching the Page CMS editor controls.
+      await page.goto(`${server.baseURL}/admin`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await clickManagedPages(page, server.baseURL);
+      const indexRenderer = page.locator(PAGE_INDEX_RENDERER).first();
+      await expect(indexRenderer).toBeVisible();
+      const detailLink = indexRenderer.locator(`a[data-gosx-link='true'][href*='/admin/pages/${pageID}']`).first();
+      await expect(detailLink, "managed Pages index must expose the created page's Edit link").toBeVisible();
+      const detailHref = await detailLink.getAttribute("href");
+      const detailURL = new URL(detailHref ?? "", server.baseURL);
+      expect(detailURL.origin).toBe(new URL(server.baseURL).origin);
+      expect(detailURL.pathname).toBe(`/admin/pages/${pageID}`);
+      await Promise.all([
+        page.waitForURL((url) => url.origin === new URL(server.baseURL).origin && url.pathname === detailURL.pathname),
+        detailLink.click(),
+      ]);
+
+      const detail = page.locator(PAGE_DETAIL_RENDERER).first();
+      await expect(detail).toBeVisible();
+      const editor = detail.locator("[data-content-editor='true']").first();
+      await expect(editor).toHaveAttribute("data-content-editor-bound", "true", { timeout: 30_000 });
+      const revision = detail.locator("input[name='expectedRevision']").first();
+      await expect(revision).toHaveAttribute("data-content-editor-revision", "true");
+      const initialRevision = await revision.inputValue();
+      expect(initialRevision).toBeTruthy();
+
+      // The real Page CMS form is clean at first mount. Enter in its single
+      // URL media filter must remain view-only and leave the picker state
+      // untouched, including the focused Search control.
+      const mediaURL = detail.locator("input[name='metaImageUrl']").first();
+      const mediaPicker = detail.locator("input[name='metaImageUrl'] + .media-picker").first();
+      const mediaTrigger = mediaPicker.locator(".media-picker__trigger").first();
+      const mediaPanel = mediaPicker.locator(".media-picker__panel").first();
+      const mediaSearch = mediaPicker.locator(".media-picker__search").first();
+      const mediaStatus = mediaPicker.locator("[data-media-picker-status]").first();
+      const mediaAlt = detail.locator("input[name='metaImageAlt']").first();
+      await expect(mediaURL).toHaveAttribute("data-media-picker-bound", "true", { timeout: 30_000 });
+      const cleanMediaURL = await mediaURL.inputValue();
+      const cleanMediaAlt = await mediaAlt.inputValue();
+      const cleanSaveCount = saveRequests.length;
+      await mediaTrigger.click();
+      await mediaSearch.fill("moss");
+      await expect(mediaPicker.locator(".media-picker__asset")).toHaveCount(1);
+      const cleanMediaStatus = await mediaStatus.textContent();
+      await pressFilterEnterWithoutSubmit(page, mediaSearch, saveRequests, cleanSaveCount, "clean Page CMS media filter");
+      await expect(mediaPanel).not.toBeHidden();
+      await expect(mediaStatus).toHaveText(cleanMediaStatus ?? "");
+      await expect(mediaURL).toHaveValue(cleanMediaURL);
+      await expect(mediaAlt).toHaveValue(cleanMediaAlt);
+      await expect(editor).toHaveAttribute("data-content-editor-dirty", "false");
+      await expect(editor).toHaveAttribute("data-content-editor-save-state", "idle");
+      await mediaSearch.press("Escape");
+      await expect(mediaPanel).toBeHidden();
+      await expect(mediaTrigger).toBeFocused();
+
+      const initialBlockCount = await editor.locator("[data-content-block-id]").count();
+      const addHeading = editor.locator("button[data-content-add='heading']").first();
+      await expect(addHeading).toBeVisible();
+      await addHeading.click();
+      const addedBlock = editor.locator("[data-content-block-id]").last();
+      await expect(addedBlock, "Page CMS must add a real block through the visible toolbar").toBeVisible();
+      await expect(editor.locator("[data-content-block-id]")).toHaveCount(initialBlockCount + 1);
+      await expect(addedBlock).toHaveAttribute("data-content-block-type", "heading");
+      await expect(addedBlock).toHaveAttribute("data-content-editor-selected", "true");
+
+      // Click a real editable control, type through the browser keyboard,
+      // undo natively, then Tab to the next control. No synthetic pointer or
+      // DOM event dispatch is part of this acceptance path.
+      const addedHeading = addedBlock.locator(".content-block__fields label", { hasText: "Heading" }).locator("input").first();
+      const headingBefore = await addedHeading.inputValue();
+      await addedHeading.click();
+      await page.keyboard.press("ControlOrMeta+A");
+      // Keep this as one native edit transaction. Chromium may coalesce a
+      // multi-character `keyboard.type` sequence into several undo units;
+      // one character proves the browser's real select/type/undo path without
+      // making the assertion depend on that implementation detail.
+      await page.keyboard.type("x");
+      await expect(addedHeading).toHaveValue("x");
+      await page.keyboard.press("ControlOrMeta+Z");
+      await expect(addedHeading).toHaveValue(headingBefore);
+      await page.keyboard.press("Tab");
+      await expect(addedBlock.locator("select[aria-label='Heading level']")).toBeFocused();
+
+      const sourceAfterUndo = JSON.parse(await detail.locator("textarea[name='body']").inputValue()) as { blocks?: Array<{ type?: string; text?: string }> };
+      expect(sourceAfterUndo.blocks?.some((block) => block.type === "heading")).toBe(true);
+
+      // Exercise the media picker with keyboard interaction: open the real
+      // picker, type a query into its search field, focus the result, and
+      // activate it with Enter before editing the alt text by keyboard.
+      await mediaTrigger.click();
+      await expect(mediaTrigger).toHaveAttribute("aria-expanded", "true");
+      await expect(mediaSearch).toBeFocused();
+      await replaceWithKeyboard(page, mediaSearch, "moss");
+      const mediaAsset = mediaPicker.locator(".media-picker__asset").first();
+      await expect(mediaAsset).toHaveCount(1);
+      const dirtyMediaURL = await mediaURL.inputValue();
+      const dirtyMediaAlt = await mediaAlt.inputValue();
+      const dirtyDraftBeforeFilter = await readPageForm(page);
+      const dirtySaveCount = saveRequests.length;
+      const dirtyMediaStatus = await mediaStatus.textContent();
+      await pressFilterEnterWithoutSubmit(page, mediaSearch, saveRequests, dirtySaveCount, "dirty Page CMS media filter");
+      await expect(mediaPanel).not.toBeHidden();
+      await expect(mediaStatus).toHaveText(dirtyMediaStatus ?? "");
+      await expect(mediaURL).toHaveValue(dirtyMediaURL);
+      await expect(mediaAlt).toHaveValue(dirtyMediaAlt);
+      await expect(editor).toHaveAttribute("data-content-editor-dirty", "true");
+      expect(await readPageForm(page), "dirty media filter Enter must retain every Page CMS draft value").toEqual(dirtyDraftBeforeFilter);
+      await mediaAsset.focus();
+      await page.keyboard.press("Enter");
+      await expect(mediaURL).toHaveValue(/photo-1565193566173-7a0ee3dbe261/);
+      const expectedMediaURL = await mediaURL.inputValue();
+
+      const mediaAltMarker = `keyboard-alt-${Date.now()}`;
+      await replaceWithKeyboard(page, mediaAlt, mediaAltMarker);
+      await expect(mediaAlt).toHaveValue(mediaAltMarker);
+
+      const published = detail.locator("input[name='published']").first();
+      await expect(published, "the new Page CMS page must begin as a draft").not.toBeChecked();
+      const draftBeforeSave = await readPageForm(page);
+      const save = await saveDraft(page, pageID);
+      expect([200, 303], "content and media edits must save through the draft action").toContain(save.status);
+      const savedRevision = expectObservedSuccess(save, "keyboard/media draft", initialRevision);
+      await expect(editor).toHaveAttribute("data-content-editor-dirty", "false");
+      await expect(published).not.toBeChecked();
+      const persistedDraft = await readPageForm(page);
+      expect(persistedDraft.title, "the remounted Page CMS draft must retain its title").toBe(draftBeforeSave.title);
+      expect(persistedDraft.body, "the remounted Page CMS draft must retain its body").toBe(draftBeforeSave.body);
+      const persistedRevision = await revision.inputValue();
+      expect(persistedRevision, "the remounted draft must keep the observed revision token").toBe(savedRevision);
+      const persistedMediaURL = await mediaURL.inputValue();
+      const persistedMediaAlt = await mediaAlt.inputValue();
+      expect(persistedMediaURL, "the remounted draft must retain the selected media URL").toBe(expectedMediaURL);
+      expect(persistedMediaAlt, "the remounted draft must retain the edited media alt text").toBe(mediaAltMarker);
+
+      const slug = await detail.locator("input[name='slug']").inputValue();
+      const publicResponse = await request.get(`${server.baseURL}/pages/${slug}`);
+      expect(publicResponse.status(), "Save draft must not publish the new page").toBe(404);
+      const screenshots = [];
+      for (const viewport of [
+        { label: "1600x900", width: 1600, height: 900 },
+        { label: "1280x800", width: 1280, height: 800 },
+        { label: "390x844", width: 390, height: 844 },
+      ]) {
+        screenshots.push(await captureScreenshot(page, `page-cms-${viewport.label}`, viewport.width, viewport.height));
+      }
+      writeEvidence("page-cms-keyboard-media", {
+        pageID,
+        initialRevision,
+        saveStatus: save.status,
+        saveSource: save.source,
+        revisionReadback: save.revisionReadback,
+        savedRevision,
+        publicStatus: publicResponse.status(),
+        blockCount: await editor.locator("[data-content-block-id]").count(),
+        expectedMediaURL,
+        mediaURL: persistedMediaURL,
+        mediaAlt: persistedMediaAlt,
+        expectedMediaAlt: mediaAltMarker,
+        screenshots,
+      });
+    } finally {
+      page.off("request", onRequest);
+      await server.stop();
+    }
+  });
+
+  test("real Page CMS history restores the final block and recovers focus through an empty snapshot", async ({ page, request }) => {
+    const server = await startMuddyCollaboration(request);
+    try {
+      await signIn(page, server.baseURL, "admin");
+      const pageID = await createLandingPage(page, server.baseURL);
+      await openPageDetail(page, `${server.baseURL}/admin/pages/${pageID}`);
+
+      const detail = page.locator(PAGE_DETAIL_RENDERER).first();
+      const editor = detail.locator("[data-content-editor='true']").first();
+      const blocks = editor.locator("[data-content-block-id]");
+      await expect(editor).toHaveAttribute("data-content-editor-bound", "true", { timeout: 30_000 });
+      const initialBlockCount = await blocks.count();
+      expect(initialBlockCount, "the real Page CMS blueprint must provide blocks for the empty-history transition").toBeGreaterThan(0);
+
+      // Use only visible Page CMS controls to remove every block. The final
+      // removal produces the empty current snapshot while retaining Undo.
+      while ((await blocks.count()) > 1) {
+        await blocks.first().locator("[data-content-editor-action='delete']").click();
+      }
+      const finalBlock = blocks.first();
+      const finalBlockID = await finalBlock.getAttribute("data-content-block-id");
+      expect(finalBlockID, "the final Page CMS block must have a stable identity before removal").toBeTruthy();
+      await finalBlock.locator("[data-content-editor-action='delete']").click();
+      await expect(blocks).toHaveCount(0);
+      await expect(editor).toHaveAttribute("data-content-editor-block-count", "0");
+      await expect(editor).toHaveAttribute("data-content-editor-history-can-undo", "true");
+      const emptyAfterRemove = JSON.parse(await detail.locator("textarea[name='body']").inputValue()) as { blocks?: unknown[] };
+      expect(emptyAfterRemove.blocks, "the final real remove must leave an empty current source snapshot").toEqual([]);
+      const removeFallbackFocus = await expectHistoryFallbackFocus(editor, "empty Page CMS after final remove");
+
+      const undo = editor.locator("[data-content-editor-action='undo']");
+      await expect(undo).toBeEnabled();
+      await undo.click();
+      await expect(blocks).toHaveCount(1);
+      const restoredBlock = blocks.first();
+      await expect(restoredBlock).toHaveAttribute("data-content-block-id", finalBlockID ?? "");
+      await expect(restoredBlock).toHaveAttribute("data-content-editor-selected", "true");
+      await expect(restoredBlock.locator("[data-content-drag-handle]")).toBeVisible();
+      await expect(restoredBlock.locator("[data-content-drag-handle]")).toBeEnabled();
+      await expect(restoredBlock.locator("[data-content-drag-handle]")).toBeFocused();
+      await expect(editor).toHaveAttribute("data-content-editor-history-can-redo", "true");
+      const restoredSource = JSON.parse(await detail.locator("textarea[name='body']").inputValue()) as { blocks?: Array<{ id?: string }> };
+      expect(restoredSource.blocks?.[0]?.id, "undo must restore the removed block rather than synthesize a new identity").toBe(finalBlockID);
+
+      const redo = editor.locator("[data-content-editor-action='redo']");
+      await expect(redo).toBeEnabled();
+      await redo.click();
+      await expect(blocks).toHaveCount(0);
+      await expect(editor).toHaveAttribute("data-content-editor-history-can-undo", "true");
+      await expect(editor).toHaveAttribute("data-content-editor-history-can-redo", "false");
+      const emptyAfterRedo = JSON.parse(await detail.locator("textarea[name='body']").inputValue()) as { blocks?: unknown[] };
+      expect(emptyAfterRedo.blocks, "redo must return the Page CMS to the empty snapshot").toEqual([]);
+      const redoFallbackFocus = await expectHistoryFallbackFocus(editor, "empty Page CMS after redo");
+
+      const screenshots = [
+        await captureScreenshot(page, "page-cms-history-empty-1600x900", 1600, 900),
+        await captureScreenshot(page, "page-cms-history-empty-390x844", 390, 844),
+      ];
+      await expectHistoryFallbackFocus(editor, "empty Page CMS after mobile capture");
+      writeEvidence("page-cms-history-focus", {
+        pageID,
+        initialBlockCount,
+        finalBlockID,
+        removeFallbackFocus,
+        restoredFocus: "selected-block-drag-handle",
+        redoFallbackFocus,
+        finalBlockCount: await blocks.count(),
+        screenshots,
+      });
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("real Gallery media filters stay view-only on clean and dirty forms", async ({ page, request }) => {
+    const server = await startMuddyCollaboration(request);
+    const postRequests: string[] = [];
+    const onRequest = (browserRequest: { method: () => string; url: () => string }) => {
+      if (browserRequest.method() === "POST") postRequests.push(browserRequest.url());
+    };
+    page.on("request", onRequest);
+
+    try {
+      await signIn(page, server.baseURL, "admin");
+      const uploadStem = `gallery-filter-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const uploadFilename = `${uploadStem}.png`;
+      const tinyPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
+      // Seed this isolated store through the real Media Library upload form.
+      // Gallery's media-lines editor intentionally ignores extensionless seed
+      // URLs, so this supported image upload is the real host fixture rather
+      // than a DOM/state injection or an API shortcut.
+      await page.goto(`${server.baseURL}/admin/media`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      const uploadForm = page.locator("form[action='/admin/media/upload']").first();
+      const uploadInput = uploadForm.locator("input[name='file'][type='file']").first();
+      await expect(uploadInput, "real Media Library must expose its file input").toHaveCount(1);
+      await uploadInput.setInputFiles({
+        name: uploadFilename,
+        mimeType: "image/png",
+        buffer: Buffer.from(tinyPNG, "base64"),
+      });
+      await expect(page.locator("[data-media-upload-status]").first()).toContainText(`${uploadFilename} selected`);
+      const uploadResponse = page.waitForResponse((response) => response.url().endsWith("/admin/media/upload") && response.request().method() === "POST");
+      await uploadForm.getByRole("button", { name: "Upload file", exact: true }).click();
+      const upload = await uploadResponse;
+      expect([200, 303], "the real image upload must be accepted by the Media Library action").toContain(upload.status());
+      await page.waitForURL(/\/admin\/media\?uploaded=/, { timeout: 30_000 });
+      await expect(page.locator("body")).toContainText("Upload saved to the media library.");
+      await expect(page.locator(".media-card", { hasText: uploadStem }), "the uploaded image must be visible in the real media library").toHaveCount(1);
+
+      await page.goto(`${server.baseURL}/admin/gallery`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      const gallery = page.locator("[data-gosx-studio-backend-gallery-index-renderer='gosx-studio']").first();
+      await expect(gallery, "real Gallery CMS must expose the Studio-owned index renderer").toBeVisible();
+      const form = gallery.locator("form.admin-form").first();
+      const mediaLines = form.locator("textarea[name='imagesText']").first();
+      const mediaLinesEditor = mediaLines.locator("xpath=following-sibling::*[1]");
+      await expect(mediaLinesEditor, "real Gallery CMS must bind the media-lines chooser").toHaveClass(/media-list-editor/);
+      const galleryTrigger = mediaLinesEditor.locator(".media-picker__trigger").first();
+      const galleryPanel = mediaLinesEditor.locator(".media-picker__panel").first();
+      const gallerySearch = mediaLinesEditor.locator(".media-picker__search").first();
+      const galleryStatus = mediaLinesEditor.locator("[data-media-picker-status]").first();
+      const mediaURL = form.locator("input[name='metaImageUrl']").first();
+      const mediaPicker = mediaURL.locator("xpath=following-sibling::*[1]");
+      const mediaTrigger = mediaPicker.locator(".media-picker__trigger").first();
+      const mediaPanel = mediaPicker.locator(".media-picker__panel").first();
+      const mediaSearch = mediaPicker.locator(".media-picker__search").first();
+      const mediaStatus = mediaPicker.locator("[data-media-picker-status]").first();
+      const mediaAlt = form.locator("input[name='metaImageAlt']").first();
+      const title = form.locator("input[name='title']").first();
+      await expect(mediaPicker, "real Gallery CMS must bind the single-URL chooser").toHaveClass(/media-picker/);
+
+      // The index itself is a real host surface, so verify its responsive table
+      // against the seeded work before opening either media picker. The helper
+      // restores the configured viewport before this test's existing clean/
+      // dirty filter flow begins.
+      const galleryIndexResponsive = await assertGalleryIndexResponsive(page, gallery);
+
+      const cleanTitle = await title.inputValue();
+      const cleanLines = await mediaLines.inputValue();
+      const cleanURL = await mediaURL.inputValue();
+      const cleanAlt = await mediaAlt.inputValue();
+      const cleanPostCount = postRequests.length;
+
+      await mediaTrigger.click();
+      await mediaSearch.fill(uploadStem);
+      await expect(mediaPicker.locator(".media-picker__asset")).toHaveCount(1);
+      const cleanMediaStatus = await mediaStatus.textContent();
+      await pressFilterEnterWithoutSubmit(page, mediaSearch, postRequests, cleanPostCount, "clean single-URL media filter");
+      await expect(mediaPanel).not.toBeHidden();
+      await expect(mediaStatus).toHaveText(cleanMediaStatus ?? "");
+      await expect(mediaURL).toHaveValue(cleanURL);
+      await expect(mediaAlt).toHaveValue(cleanAlt);
+      await expect(title).toHaveValue(cleanTitle);
+
+      await mediaSearch.press("Escape");
+      await expect(mediaPanel).toBeHidden();
+      await expect(mediaTrigger).toBeFocused();
+
+      await galleryTrigger.click();
+      await gallerySearch.fill(uploadStem);
+      await expect(mediaLinesEditor.locator(".media-picker__asset")).toHaveCount(1);
+      const cleanGalleryStatus = await galleryStatus.textContent();
+      await pressFilterEnterWithoutSubmit(page, gallerySearch, postRequests, cleanPostCount, "clean gallery media filter");
+      await expect(galleryPanel).not.toBeHidden();
+      await expect(galleryStatus).toHaveText(cleanGalleryStatus ?? "");
+      await expect(mediaLines).toHaveValue(cleanLines);
+      await expect(title).toHaveValue(cleanTitle);
+
+      // The asset button remains an intentional mutator. Keep this positive
+      // control on the real gallery chooser before exercising dirty filters.
+      const galleryAsset = mediaLinesEditor.locator(".media-picker__asset").first();
+      const uploadedAssetURL = await galleryAsset.getAttribute("data-media-asset-url");
+      expect(uploadedAssetURL, "the filtered gallery result must expose the uploaded asset URL").toBeTruthy();
+      await galleryAsset.focus();
+      await galleryAsset.press("Enter");
+      await expect(galleryPanel).toBeHidden();
+      await expect(galleryTrigger).toBeFocused();
+      const selectedGalleryLines = await mediaLines.inputValue();
+      expect(selectedGalleryLines, "gallery asset Enter must add the selected uploaded media URL").toContain(uploadedAssetURL ?? "");
+
+      const dirtyTitle = `Gallery filter draft ${Date.now()}`;
+      await title.fill(dirtyTitle);
+      await expect(title).toHaveValue(dirtyTitle);
+      const dirtyPostCount = postRequests.length;
+
+      await mediaTrigger.click();
+      await mediaSearch.fill(uploadStem);
+      await expect(mediaPicker.locator(".media-picker__asset")).toHaveCount(1);
+      const dirtyMediaStatus = await mediaStatus.textContent();
+      await pressFilterEnterWithoutSubmit(page, mediaSearch, postRequests, dirtyPostCount, "dirty single-URL media filter");
+      await expect(mediaPanel).not.toBeHidden();
+      await expect(mediaStatus).toHaveText(dirtyMediaStatus ?? "");
+      await expect(mediaURL).toHaveValue(cleanURL);
+      await expect(mediaAlt).toHaveValue(cleanAlt);
+      await expect(title).toHaveValue(dirtyTitle);
+
+      await mediaSearch.press("Escape");
+      await expect(mediaPanel).toBeHidden();
+      await galleryTrigger.click();
+      await gallerySearch.fill(uploadStem);
+      await expect(mediaLinesEditor.locator(".media-picker__asset")).toHaveCount(1);
+      const dirtyGalleryStatus = await galleryStatus.textContent();
+      await pressFilterEnterWithoutSubmit(page, gallerySearch, postRequests, dirtyPostCount, "dirty gallery media filter");
+      await expect(galleryPanel).not.toBeHidden();
+      await expect(galleryStatus).toHaveText(dirtyGalleryStatus ?? "");
+      await expect(mediaLines).toHaveValue(selectedGalleryLines);
+      await expect(title).toHaveValue(dirtyTitle);
+      await expect(gallerySearch).toBeFocused();
+
+      const screenshots = [
+        await captureScreenshot(page, "page-cms-gallery-filter-dirty-1600x900", 1600, 900),
+        await captureScreenshot(page, "page-cms-gallery-filter-dirty-390x844", 390, 844),
+      ];
+      await expect(gallerySearch).toBeFocused();
+      writeEvidence("page-cms-gallery-filter-enter", {
+        clean: {
+          singleURL: cleanURL,
+          singleAlt: cleanAlt,
+          galleryLines: cleanLines,
+          postCount: cleanPostCount,
+        },
+        dirty: {
+          title: dirtyTitle,
+          singleURL: cleanURL,
+          singleAlt: cleanAlt,
+          galleryLines: selectedGalleryLines,
+          postCount: dirtyPostCount,
+        },
+        postRequests,
+        galleryIndexResponsive,
+        screenshots,
+      });
+    } finally {
+      page.off("request", onRequest);
+      await server.stop();
+    }
+  });
+
+  test("real Page CMS Search Enter stays view-only across clean and dirty drafts", async ({ page, request }) => {
+    const server = await startMuddyCollaboration(request);
+    const saveRequests: string[] = [];
+    const onRequest = (browserRequest: { method: () => string; url: () => string }) => {
+      if (browserRequest.method() === "POST" && browserRequest.url().includes("/__actions/save")) {
+        saveRequests.push(browserRequest.url());
+      }
+    };
+    page.on("request", onRequest);
+
+    try {
+      await signIn(page, server.baseURL, "admin");
+      const pageID = await createLandingPage(page, server.baseURL);
+      await openPageDetail(page, `${server.baseURL}/admin/pages/${pageID}`);
+
+      const detail = page.locator(PAGE_DETAIL_RENDERER).first();
+      const editor = detail.locator("[data-content-editor='true']").first();
+      const search = editor.locator("[data-content-editor-search='true']").first();
+      const title = detail.locator("input[name='title']").first();
+      await expect(search, "Page CMS must expose a real block Search field").toBeVisible();
+      await expect(editor).toHaveAttribute("data-content-editor-save-state", "idle");
+      await expect(editor).toHaveAttribute("data-content-editor-dirty", "false");
+
+      const cleanBefore = await readPageForm(page);
+      const cleanBody = cleanBefore.body;
+      await search.fill("paragraph");
+      await expect(search).toBeFocused();
+      await expect(search).toHaveValue("paragraph");
+      await expect(editor).toHaveAttribute("data-content-editor-search-query", "paragraph");
+      const cleanVisibleCount = await editor.getAttribute("data-content-editor-search-visible-count");
+      expect(Number(cleanVisibleCount), "Search should retain a real filtered result in the clean draft").toBeGreaterThan(0);
+
+      // This is a browser keyboard action on the real host control. The
+      // search field is view-only, so Enter must not invoke the form's Save
+      // submitter or mutate the clean draft.
+      await search.press("Enter");
+      await page.waitForTimeout(250);
+      await expect(search).toBeFocused();
+      await expect(search).toHaveValue("paragraph");
+      await expect(editor).toHaveAttribute("data-content-editor-search-query", "paragraph");
+      await expect(editor).toHaveAttribute("data-content-editor-search-visible-count", cleanVisibleCount ?? "0");
+      await expect(editor).toHaveAttribute("data-content-editor-dirty", "false");
+      await expect(editor).toHaveAttribute("data-content-editor-save-state", "idle");
+      expect(saveRequests, "clean Search Enter must not issue a save POST").toHaveLength(0);
+      expect((await readPageForm(page)).body, "clean Search Enter must not rewrite the draft body").toBe(cleanBody);
+
+      const dirtyTitle = `Search Enter draft ${Date.now()}`;
+      await replaceWithKeyboard(page, title, dirtyTitle);
+      await expect(editor).toHaveAttribute("data-content-editor-dirty", "true");
+      await expect(editor).toHaveAttribute("data-content-editor-save-state", "dirty");
+      const dirtyBefore = await readPageForm(page);
+      await search.focus();
+      await expect(search).toBeFocused();
+      await search.press("Enter");
+      await page.waitForTimeout(250);
+      await expect(search).toBeFocused();
+      await expect(search).toHaveValue("paragraph");
+      await expect(editor).toHaveAttribute("data-content-editor-search-query", "paragraph");
+      await expect(editor).toHaveAttribute("data-content-editor-search-visible-count", cleanVisibleCount ?? "0");
+      await expect(editor).toHaveAttribute("data-content-editor-dirty", "true");
+      await expect(editor).toHaveAttribute("data-content-editor-save-state", "dirty");
+      expect(saveRequests, "dirty Search Enter must not issue a save POST").toHaveLength(0);
+      expect(await readPageForm(page), "dirty Search Enter must retain all draft values").toEqual(dirtyBefore);
+
+      // Keep the explicit button path as a positive control: the Search
+      // guard must not block the actual Save draft submitter.
+      const explicitSave = await saveDraft(page, pageID, "button");
+      expect([200, 303], "the explicit Save draft control must still submit").toContain(explicitSave.status);
+      const explicitRevision = expectObservedSuccess(explicitSave, "Search Enter explicit save", dirtyBefore.expectedRevision);
+      await expect(page.locator(`${PAGE_DETAIL_RENDERER} [data-content-editor='true']`).first())
+        .toHaveAttribute("data-content-editor-dirty", "false");
+      const afterExplicitSave = await readPageForm(page);
+      expect(afterExplicitSave.title).toBe(dirtyTitle);
+      expect(afterExplicitSave.expectedRevision).toBe(explicitRevision);
+      const publicURL = `${server.baseURL}/pages/${afterExplicitSave.slug}`;
+      expect((await request.get(publicURL)).status(), "a draft Save must keep the public route unpublished").toBe(404);
+
+      // Make another real edit and invoke the enhanced save from a focused
+      // Search control. ControlOrMeta is Playwright's cross-platform native
+      // modifier alias; this run observes the Ctrl+S path on Linux while
+      // keeping the test portable to a macOS project.
+      const keyboardTitle = `${dirtyTitle} keyboard`;
+      await replaceWithKeyboard(page, title, keyboardTitle);
+      const keyboardEditor = page.locator(`${PAGE_DETAIL_RENDERER} [data-content-editor='true']`).first();
+      await expect(keyboardEditor).toHaveAttribute("data-content-editor-dirty", "true");
+      const keyboardBefore = await readPageForm(page);
+      const keyboardSearch = keyboardEditor.locator("[data-content-editor-search='true']").first();
+      await keyboardSearch.fill("heading");
+      await keyboardSearch.focus();
+      await expect(keyboardSearch).toBeFocused();
+      const keyboardSave = await saveDraft(page, pageID, "keyboard", keyboardSearch);
+      expect([200, 303], "ControlOrMeta+S from Search must still submit").toContain(keyboardSave.status);
+      const keyboardRevision = expectObservedSuccess(keyboardSave, "Search Enter keyboard save", keyboardBefore.expectedRevision);
+      await expect(page.locator(`${PAGE_DETAIL_RENDERER} [data-content-editor='true']`).first())
+        .toHaveAttribute("data-content-editor-dirty", "false");
+      const persisted = await readPageForm(page);
+      expect(persisted.title, "ControlOrMeta+S must persist the edited draft title after remount").toBe(keyboardTitle);
+      expect(persisted.expectedRevision).toBe(keyboardRevision);
+      expect((await request.get(`${server.baseURL}/pages/${persisted.slug}`)).status(), "keyboard Save must keep the draft route unpublished").toBe(404);
+
+      writeEvidence("page-cms-search-enter", {
+        pageID,
+        cleanSearch: "paragraph",
+        cleanVisibleCount,
+        dirtyTitle,
+        explicitSaveStatus: explicitSave.status,
+        explicitSaveSource: explicitSave.source,
+        explicitRevision,
+        keyboardTitle,
+        keyboardSaveStatus: keyboardSave.status,
+        keyboardSaveSource: keyboardSave.source,
+        keyboardRevision,
+        savePostCount: saveRequests.length,
+        publicStatus: 404,
+      });
+    } finally {
+      page.off("request", onRequest);
+      await server.stop();
+    }
+  });
+
+  test("fresh managed Content navigation loads versioned runtime assets once", async ({ page, request }) => {
+    const server = await startMuddyCollaboration(request, { MUDDY_ASSET_VERSION: FIXTURE_DEPLOYMENT_VERSION });
+    const capturedAssetRequests: string[] = [];
+    const onRequest = (browserRequest: { method: () => string; url: () => string }) => {
+      if (browserRequest.method() !== "GET") return;
+      const url = new URL(browserRequest.url());
+      if (url.origin !== new URL(server.baseURL).origin) return;
+      if (url.pathname === CONTENT_RUNTIME_PATH || url.pathname === MEDIA_RUNTIME_PATH) {
+        capturedAssetRequests.push(browserRequest.url());
+      }
+    };
+    page.on("request", onRequest);
+    let firstContentRuntime: JSHandle<unknown> | undefined;
+    let firstMediaRuntime: JSHandle<unknown> | undefined;
+
+    try {
+      // Keep the listener active through the signed-in fresh dashboard load,
+      // the managed Content > Pages transition, and the real Edit link. This
+      // records actual browser asset requests rather than reconstructing URLs.
+      expect(FIXTURE_DEPLOYMENT_VERSION).not.toBe(EXPECTED_MODULE_VERSION);
+      await signIn(page, server.baseURL, "admin");
+      const pageID = await createLandingPage(page, server.baseURL);
+      await page.goto(`${server.baseURL}/admin`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await page.waitForFunction(() => {
+        const runtime = (window as unknown as { GoSXStudioMediaRuntime?: unknown }).GoSXStudioMediaRuntime;
+        return !!runtime;
+      }, undefined, { timeout: 30_000 });
+      // Noni's shared admin layout intentionally preloads the plain head-tag
+      // media runtime with its deployment key. Capture that singleton before
+      // the Pages renderer introduces the separately module-keyed managed tag.
+      firstMediaRuntime = await page.evaluateHandle(() => (window as unknown as { GoSXStudioMediaRuntime?: unknown }).GoSXStudioMediaRuntime || null);
+      await clickManagedPages(page, server.baseURL);
+      // The Pages index is the first managed Content entry. Anchor the
+      // one-executable assertion and singleton handles here, before a later
+      // managed detail swap is allowed to clean up dynamic script nodes.
+      const indexRenderer = page.locator(PAGE_INDEX_RENDERER).first();
+      await expect(indexRenderer).toBeVisible();
+      await expect(indexRenderer.locator("[data-content-editor='true']")).toHaveCount(1);
+      await expect(indexRenderer.locator("[data-content-editor='true']"))
+        .toHaveAttribute("data-content-editor-bound", "true", { timeout: 30_000 });
+      await page.waitForFunction(() => {
+        const win = window as unknown as { GoSXStudioContentEditorRuntime?: unknown; GoSXStudioMediaRuntime?: unknown };
+        return !!win.GoSXStudioContentEditorRuntime && !!win.GoSXStudioMediaRuntime;
+      }, undefined, { timeout: 30_000 });
+      const firstAssets = await assertManagedAssetURLs(page, request, server.baseURL, capturedAssetRequests, true);
+      await expectRuntimeSingleton(page, undefined, firstMediaRuntime, "managed Pages index");
+      firstContentRuntime = await page.evaluateHandle(() => (window as unknown as { GoSXStudioContentEditorRuntime?: unknown }).GoSXStudioContentEditorRuntime || null);
+
+      await openManagedPageFromIndex(page, server.baseURL, pageID);
+      const detailAssets = await assertManagedAssetURLs(page, request, server.baseURL, capturedAssetRequests, false);
+      await expectRuntimeSingleton(page, firstContentRuntime, firstMediaRuntime, "managed Page detail");
+
+      await clickManagedPageIndex(page, server.baseURL);
+      await openManagedPageFromIndex(page, server.baseURL, pageID);
+      const revisitAssets = await assertManagedAssetURLs(page, request, server.baseURL, capturedAssetRequests, false);
+      await expectRuntimeSingleton(page, firstContentRuntime, firstMediaRuntime, "managed Page revisit");
+
+      writeEvidence("page-cms-managed-assets", {
+        pageID,
+        expectedModuleVersion: EXPECTED_MODULE_VERSION || null,
+        capturedAssetRequests,
+        firstAssets,
+        detailAssets,
+        revisitAssets,
+        singleton: true,
+      });
+    } finally {
+      await firstContentRuntime?.dispose();
+      await firstMediaRuntime?.dispose();
+      page.off("request", onRequest);
+      await server.stop();
+    }
+  });
+});
+
+async function signIn(page: Page, baseURL: string, identity: string): Promise<void> {
+  await page.goto(`${baseURL}/__test/collaboration/signin/${identity}`, { waitUntil: "networkidle", timeout: 60_000 });
+}
+
+async function createLandingPage(page: Page, baseURL: string): Promise<string> {
+  await gotoEditor(page, baseURL);
+  await revealModeIfPresent(page, "advanced");
+  const result = await applyCompositionIntentInPlace(page, "create-page:landing", {
+    expectedMessage: CREATE_MESSAGE,
+    expectedChangeKind: "page",
+    requireSelection: false,
+  });
+  const pageID = result.detail?.change?.pageKey;
+  expect(pageID, "create-page should report a concrete Page CMS id").toBeTruthy();
+  if (!pageID) throw new Error("create-page should report a concrete Page CMS id");
+  return pageID;
+}
+
+async function openPageDetail(page: Page, detailURL: string): Promise<void> {
+  await page.goto(detailURL, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await expectPageDetailReady(page);
+}
+
+async function expectPageDetailReady(page: Page): Promise<void> {
+  const detail = page.locator(PAGE_DETAIL_RENDERER).first();
+  await expect(detail).toBeVisible();
+  await expect(detail.locator("[data-content-editor='true']")).toHaveAttribute("data-content-editor-bound", "true", { timeout: 30_000 });
+  await expect(detail.locator("input[name='expectedRevision']")).toHaveAttribute("data-content-editor-revision", "true");
+}
+
+async function openManagedPageFromIndex(page: Page, baseURL: string, pageID: string): Promise<void> {
+  const indexRenderer = page.locator(PAGE_INDEX_RENDERER).first();
+  await expect(indexRenderer, "managed Pages navigation must render the Page index").toBeVisible();
+  const detailLink = indexRenderer.locator(`a[data-gosx-link='true'][href*='/admin/pages/${pageID}']`).first();
+  await expect(detailLink, "managed Pages index must expose the created page's Edit link").toBeVisible();
+  const href = await detailLink.getAttribute("href");
+  const detailURL = new URL(href ?? "", baseURL);
+  expect(detailURL.origin).toBe(new URL(baseURL).origin);
+  expect(detailURL.pathname).toBe(`/admin/pages/${pageID}`);
+  await Promise.all([
+    page.waitForURL((next) => next.origin === detailURL.origin && next.pathname === detailURL.pathname, { timeout: 30_000 }),
+    detailLink.click(),
+  ]);
+  await expectPageDetailReady(page);
+}
+
+async function clickManagedPageIndex(page: Page, baseURL: string): Promise<void> {
+  const detail = page.locator(PAGE_DETAIL_RENDERER).first();
+  const indexLink = detail.locator("a[data-gosx-link='true']").filter({ hasText: /Back to pages|Cancel/ }).first();
+  await expect(indexLink, "Page CMS detail must expose a managed link back to Pages").toBeVisible();
+  const href = await indexLink.getAttribute("href");
+  const indexURL = new URL(href ?? "", baseURL);
+  expect(indexURL.origin).toBe(new URL(baseURL).origin);
+  expect(indexURL.pathname).toBe("/admin/pages");
+  await Promise.all([
+    page.waitForURL((next) => next.origin === indexURL.origin && next.pathname === indexURL.pathname, { timeout: 30_000 }),
+    indexLink.click(),
+  ]);
+}
+
+async function assertManagedAssetURLs(
+  page: Page,
+  request: APIRequestContext,
+  baseURL: string,
+  capturedRequestURLs: string[],
+  requireFreshRequests: boolean,
+): Promise<ManagedAssetEvidence> {
+  const origin = new URL(baseURL).origin;
+  const rendered = await page.locator("script[data-gosx-script='managed']").evaluateAll((nodes, expectedBaseURL) => {
+    const base = new URL(String(expectedBaseURL));
+    return nodes.map((node) => {
+      const src = node.getAttribute("src") || "";
+      let url: URL | null = null;
+      try {
+        url = new URL(src, base);
+      } catch {
+        // Preserve malformed source details so the assertion below fails with
+        // the actual rendered value rather than hiding a bad script node.
+      }
+      return {
+        src,
+        href: url?.href || "",
+        origin: url?.origin || "",
+        pathname: url?.pathname || "",
+        releaseKey: url?.searchParams.get("v") || "",
+        loadMode: node.getAttribute("data-gosx-script-load") || "",
+        loaded: node.getAttribute("data-gosx-script-loaded") || "",
+      };
+    });
+  }, baseURL);
+  const paths = [CONTENT_RUNTIME_PATH, MEDIA_RUNTIME_PATH];
+  const selected: Record<string, ManagedScriptSnapshot[]> = {};
+  for (const assetPath of paths) {
+    const matches = rendered.filter((script) => script.origin === origin && script.pathname === assetPath);
+    expect(matches.length, `${assetPath} must render a same-origin canonical managed script`).toBeGreaterThan(0);
+    expect(matches.every((script) => script.loadMode === "dom"), `${assetPath} must retain the managed DOM loading marker`).toBe(true);
+    expect(matches.every((script) => script.loaded === "pending" || script.loaded === "true"), `${assetPath} must use pending/true executable markers`).toBe(true);
+    expect(matches.every((script) => script.releaseKey.length > 0), `${assetPath} must use a nonempty ?v= release key: ${JSON.stringify(rendered)}`).toBe(true);
+    if (EXPECTED_MODULE_VERSION) {
+      expect(matches.every((script) => script.releaseKey === EXPECTED_MODULE_VERSION), `${assetPath} must match GOSX_STUDIO_EXPECTED_MODULE_VERSION`).toBe(true);
+    }
+    const executed = matches.filter((script) => script.loaded === "true").length;
+    if (requireFreshRequests) {
+      expect(executed, `${assetPath} should have one actual executable managed script; pending SSR markers may coexist`).toBe(1);
+    } else {
+      expect(executed, `${assetPath} must not execute more than once on a managed revisit`).toBeLessThanOrEqual(1);
+    }
+    selected[assetPath] = matches;
+  }
+
+  const renderedKeys = paths.flatMap((assetPath) => selected[assetPath].map((script) => script.releaseKey));
+  expect(new Set(renderedKeys).size, "content and media managed scripts must share one release key").toBe(1);
+  const releaseKey = renderedKeys[0] || "";
+  expect(FIXTURE_DEPLOYMENT_VERSION).not.toBe(releaseKey);
+  const fetched: Array<{ path: string; url: string; status: number; releaseKey: string }> = [];
+  for (const assetPath of paths) {
+    const script = selected[assetPath][0];
+    const response = await request.get(script.href);
+    const responseURL = new URL(response.url(), baseURL);
+    expect(response.status(), `${assetPath} canonical managed asset should be fetchable`).toBe(200);
+    expect(responseURL.origin).toBe(origin);
+    expect(responseURL.pathname).toBe(assetPath);
+    expect(responseURL.searchParams.get("v"), `${assetPath} fetched URL must retain the release key`).toBe(releaseKey);
+    fetched.push({ path: assetPath, url: response.url(), status: response.status(), releaseKey: responseURL.searchParams.get("v") || "" });
+  }
+
+  const captured = capturedRequestURLs.map((raw) => {
+    const url = new URL(raw, baseURL);
+    return { path: url.pathname, url: raw, releaseKey: url.searchParams.get("v") || "" };
+  });
+  if (requireFreshRequests) {
+    const contentRequests = captured.filter((entry) => entry.path === CONTENT_RUNTIME_PATH && new URL(entry.url, baseURL).origin === origin);
+    expect(contentRequests.length, `${CONTENT_RUNTIME_PATH} must be requested during the fresh signed-in Content navigation`).toBeGreaterThan(0);
+    expect(contentRequests.every((entry) => entry.releaseKey.length > 0), `${CONTENT_RUNTIME_PATH} browser requests must not use an unversioned legacy URL`).toBe(true);
+    expect(contentRequests.every((entry) => entry.releaseKey === releaseKey), `${CONTENT_RUNTIME_PATH} browser requests must use the module release key`).toBe(true);
+    if (EXPECTED_MODULE_VERSION) expect(contentRequests.every((entry) => entry.releaseKey === EXPECTED_MODULE_VERSION)).toBe(true);
+
+    const mediaRequests = captured.filter((entry) => entry.path === MEDIA_RUNTIME_PATH && new URL(entry.url, baseURL).origin === origin);
+    const allowedMediaKeys = new Set([releaseKey, FIXTURE_DEPLOYMENT_VERSION]);
+    expect(mediaRequests.length, `${MEDIA_RUNTIME_PATH} must be requested during the fresh signed-in Content navigation`).toBeGreaterThan(0);
+    expect(mediaRequests.every((entry) => entry.releaseKey.length > 0), `${MEDIA_RUNTIME_PATH} browser requests must not use an unversioned legacy URL`).toBe(true);
+    expect(mediaRequests.every((entry) => allowedMediaKeys.has(entry.releaseKey)), `${MEDIA_RUNTIME_PATH} browser requests must use only the managed module or outer deployment release key`).toBe(true);
+    expect(mediaRequests.some((entry) => entry.releaseKey === releaseKey), `${MEDIA_RUNTIME_PATH} must request the module-keyed managed runtime on Pages`).toBe(true);
+    expect(mediaRequests.some((entry) => entry.releaseKey === FIXTURE_DEPLOYMENT_VERSION), `${MEDIA_RUNTIME_PATH} must request the outer admin deployment-keyed runtime`).toBe(true);
+    if (EXPECTED_MODULE_VERSION) expect(mediaRequests.some((entry) => entry.releaseKey === EXPECTED_MODULE_VERSION)).toBe(true);
+  }
+
+  return {
+    rendered,
+    fetched,
+    capturedRequests: captured,
+    executed: Object.fromEntries(paths.map((assetPath) => [assetPath, selected[assetPath].filter((script) => script.loaded === "true").length])),
+    pending: Object.fromEntries(paths.map((assetPath) => [assetPath, selected[assetPath].filter((script) => script.loaded === "pending").length])),
+  };
+}
+
+async function expectRuntimeSingleton(
+  page: Page,
+  firstContentRuntime: JSHandle<unknown> | undefined,
+  firstMediaRuntime: JSHandle<unknown> | undefined,
+  label: string,
+): Promise<void> {
+  if (firstContentRuntime) {
+    await expect.poll(
+      () => page.evaluate((initial) => (window as unknown as { GoSXStudioContentEditorRuntime?: unknown }).GoSXStudioContentEditorRuntime === initial, firstContentRuntime),
+      { timeout: 30_000, message: `${label} must retain the content editor runtime singleton` },
+    ).toBe(true);
+  }
+  if (firstMediaRuntime) {
+    await expect.poll(
+      () => page.evaluate((initial) => (window as unknown as { GoSXStudioMediaRuntime?: unknown }).GoSXStudioMediaRuntime === initial, firstMediaRuntime),
+      { timeout: 30_000, message: `${label} must retain the media runtime singleton` },
+    ).toBe(true);
+  }
+}
+
+async function readPageForm(page: Page): Promise<PageFormSnapshot> {
+  const detail = page.locator(PAGE_DETAIL_RENDERER).first();
+  return {
+    title: await detail.locator("input[name='title']").inputValue(),
+    slug: await detail.locator("input[name='slug']").inputValue(),
+    body: await detail.locator("textarea[name='body']").inputValue(),
+    expectedRevision: await detail.locator("input[name='expectedRevision']").inputValue(),
+    published: await detail.locator("input[name='published']").isChecked(),
+  };
+}
+
+async function firstContentField(page: Page): Promise<Locator> {
+  const field = page.locator(
+    "[data-content-editor='true'] .content-block__fields input:not([type='hidden']), " +
+    "[data-content-editor='true'] .content-block__fields textarea",
+  ).first();
+  await expect(field, "the Page CMS editor must expose a keyboard-editable block field").toBeVisible();
+  return field;
+}
+
+async function replaceWithKeyboard(page: Page, field: Locator, value: string): Promise<void> {
+  await field.click();
+  await field.press("ControlOrMeta+A");
+  await page.keyboard.type(value);
+}
+
+async function expectHistoryFallbackFocus(editor: Locator, label: string): Promise<string> {
+  const focused = editor.locator(
+    "[data-content-editor-action='undo']:focus, " +
+    "[data-content-editor-action='redo']:focus, " +
+    "[data-content-add]:focus",
+  ).first();
+  await expect(focused, `${label} must leave focus on a visible history or Add control`).toBeVisible();
+  await expect(focused, `${label} fallback focus must remain enabled`).toBeEnabled();
+  const action = await focused.getAttribute("data-content-editor-action");
+  const addType = await focused.getAttribute("data-content-add");
+  const identity = action || (addType ? `add:${addType}` : "");
+  expect(identity, `${label} must identify the focused fallback control`).toBeTruthy();
+  return identity;
+}
+
+async function pressFilterEnterWithoutSubmit(
+  page: Page,
+  search: Locator,
+  postRequests: string[],
+  beforePostCount: number,
+  label: string,
+): Promise<void> {
+  await search.focus();
+  await expect(search, `${label} must begin with the filter focused`).toBeFocused();
+  await search.press("Enter");
+  await page.waitForTimeout(250);
+  await expect(search, `${label} must retain focus after Enter`).toBeFocused();
+  expect(postRequests.length, `${label} must not submit its ancestor form`).toBe(beforePostCount);
+}
+
+async function saveDraft(page: Page, pageID: string, trigger: SaveTrigger = "button", keyboardTarget?: Locator): Promise<SaveResult> {
+  let mainFrameNavigated = false;
+  const onNavigated = (frame: Frame) => {
+    if (frame === page.mainFrame()) mainFrameNavigated = true;
+  };
+  page.on("framenavigated", onNavigated);
+  const responsePromise = page.waitForResponse((response) =>
+    response.url().includes(`/admin/pages/${pageID}/__actions/save`) &&
+    response.request().method() === "POST",
+  { timeout: 30_000 });
+  try {
+    if (trigger === "keyboard") {
+      const target = keyboardTarget ?? page.locator("[data-content-editor-search='true']").first();
+      await expect(target, "the keyboard save trigger must be a visible focused control").toBeVisible();
+      await target.focus();
+      await page.keyboard.press("ControlOrMeta+S");
+    } else {
+      await page.getByRole("button", { name: "Save draft", exact: true }).first().click();
+    }
+    const response = await responsePromise;
+    let payload: ActionResponsePayload | null = null;
+    try {
+      payload = await response.json() as ActionResponsePayload;
+    } catch {
+      // A non-JSON failure body is still useful to the caller through status.
+    }
+    let revisionReadback: string | null = null;
+    let source: SaveResult["source"] = "none";
+    const hasStructuredSuccess = payload?.ok === true;
+    if (hasStructuredSuccess || response.status() === 303) {
+      // RuntimeSAVE07 follows the structured action redirect with a real
+      // same-route navigation. Wait for that frame event even though the
+      // pathname stays the same, then verify the remounted editor so all
+      // following assertions observe persisted values rather than the
+      // pre-submit DOM.
+      await expect.poll(() => mainFrameNavigated, { timeout: 30_000, message: "a successful Page CMS save must remount through its real redirect" }).toBe(true);
+      await page.waitForLoadState("domcontentloaded");
+      await expectPageDetailReady(page);
+
+      // GoSX action.Redirect deliberately emits HTTP 303 for a successful
+      // form action. Playwright cannot read a redirect response body, even
+      // though the browser follows it and the runtime receives the
+      // structured result. Keep that response payload untouched when JSON is
+      // available; for a 303, record only the verified remounted readback so
+      // callers cannot mistake it for response.values.
+      revisionReadback = await page.locator(`${PAGE_DETAIL_RENDERER} input[name='expectedRevision']`).first().inputValue();
+      source = hasStructuredSuccess ? "structured-response" : "remounted-form";
+    }
+    return { status: response.status(), payload, revisionReadback, source };
+  } finally {
+    page.off("framenavigated", onNavigated);
+  }
+}
+
+function expectObservedSuccess(result: SaveResult, label: string, oldRevision: string): string {
+  let nextRevision: string | undefined;
+  if (result.source === "structured-response") {
+    // JSON action responses are the actual response payload, so validate the
+    // structured success and token directly. The real remounted form must
+    // agree with that payload as an additional persistence check.
+    expect(result.payload?.ok, `${label} response must be a structured success`).toBe(true);
+    nextRevision = result.payload?.values?.expectedRevision;
+    expect(nextRevision, `${label} response must include values.expectedRevision`).toBeTruthy();
+    expect(result.revisionReadback, `${label} remounted form must expose the response revision`).toBe(nextRevision);
+  } else {
+    // GoSX action.Redirect emits HTTP 303 and Playwright cannot expose its
+    // redirect response body. Do not invent a payload: validate the observed
+    // redirect, real navigation, and remounted form token instead.
+    expect(result.source, `${label} must report an observed save source`).toBe("remounted-form");
+    expect(result.status, `${label} redirect must be HTTP 303`).toBe(303);
+    expect(result.payload?.ok ?? true, `${label} redirect must not carry a failed JSON payload`).toBe(true);
+    nextRevision = result.revisionReadback ?? undefined;
+    expect(nextRevision, `${label} remounted form must expose values.expectedRevision`).toBeTruthy();
+  }
+  expect(nextRevision, `${label} save must expose a next revision`).toBeTruthy();
+  expect(nextRevision, `${label} save must rotate values.expectedRevision`).not.toBe(oldRevision);
+  if (!nextRevision) throw new Error(`${label} observed save did not expose values.expectedRevision`);
+  return nextRevision;
+}
+
+async function readGalleryIndexGeometry(page: Page): Promise<GalleryIndexGeometry> {
+  return page.evaluate(() => {
+    const table = document.querySelector<HTMLTableElement>("table.data-table");
+    const panel = table?.closest<HTMLElement>(".panel");
+    const row = table?.tBodies[0]?.rows[0];
+    const workCell = row?.cells[0];
+    const yearCell = row?.cells[1];
+    const product = workCell?.querySelector<HTMLElement>(".table-product");
+    const info = product?.querySelector<HTMLElement>(":scope > div");
+    const title = info?.querySelector<HTMLElement>(":scope > strong");
+    const materials = info?.querySelector<HTMLElement>(":scope > span");
+    const thumbnail = product?.querySelector<HTMLImageElement>(":scope > img");
+    const edit = row?.querySelector<HTMLAnchorElement>("a[data-gosx-link='true']");
+
+    if (!table || !panel || !row || !workCell || !yearCell || !product || !info || !title || !materials || !thumbnail || !edit) {
+      throw new Error("real Gallery index table markup is incomplete");
+    }
+
+    const box = (element: Element): GalleryIndexBox => {
+      const rect = element.getBoundingClientRect();
+      return {
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      };
+    };
+    const lineBoxes = (element: Element): GalleryIndexBox[] => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return Array.from(range.getClientRects()).map((rect) => ({
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      }));
+    };
+    const overlaps = (a: GalleryIndexBox, b: GalleryIndexBox) =>
+      a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+    const work = box(workCell);
+    const year = box(yearCell);
+    const titleLines = lineBoxes(title);
+    const materialLines = lineBoxes(materials);
+    const titleRect = box(title);
+    const materialsRect = box(materials);
+    const readableWidth = 8 * Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+
+    return {
+      viewportWidth: window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+      tableWidth: box(table).width,
+      panel: box(panel),
+      table: box(table),
+      row: box(row),
+      workCell: work,
+      yearCell: year,
+      titleRect,
+      materialsRect,
+      titleLines,
+      materialLines,
+      titleOverlapsYear: titleLines.some((line) => overlaps(line, year)),
+      materialsOverlapsYear: materialLines.some((line) => overlaps(line, year)),
+      titleFitsWorkCell: titleLines.every((line) => line.left >= work.left - 0.5 && line.right <= work.right + 0.5),
+      materialsFitWorkCell: materialLines.every((line) => line.left >= work.left - 0.5 && line.right <= work.right + 0.5),
+      titleReadableWidth: titleRect.width >= readableWidth,
+      materialsReadableWidth: materialsRect.width >= readableWidth,
+      readableWidth,
+      nativeTable: table instanceof HTMLTableElement,
+      tableDisplay: getComputedStyle(table).display,
+      rowDisplay: getComputedStyle(row).display,
+      labels: Array.from(row.cells, (cell) => cell.getAttribute("data-label") ?? ""),
+      headers: Array.from(table.tHead?.rows[0]?.cells ?? [], (cell) => cell.textContent?.trim() ?? ""),
+      headerScopes: Array.from(table.tHead?.rows[0]?.cells ?? [], (cell) => cell.getAttribute("scope") ?? ""),
+      thumbnailWidth: box(thumbnail).width,
+      editVisible: !!(edit.offsetWidth || edit.offsetHeight || edit.getClientRects().length),
+      editTabIndex: edit.tabIndex,
+      editBox: box(edit),
+      pageLevelOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth || document.body.scrollWidth > document.documentElement.clientWidth,
+    };
+  });
+}
+
+async function assertGalleryIndexResponsive(page: Page, gallery: Locator): Promise<GalleryIndexResponsiveEvidence> {
+  const originalViewport = page.viewportSize();
+  if (!originalViewport) throw new Error("Gallery responsive check requires a configured page viewport");
+
+  const samples: GalleryIndexResponsiveEvidence["samples"] = [];
+  try {
+    for (const viewport of [
+      { width: 320, height: 844 },
+      { width: 390, height: 844 },
+      { width: 1280, height: 800 },
+    ]) {
+      await page.setViewportSize(viewport);
+      const table = gallery.locator("table.data-table").first();
+      const row = table.locator("tbody tr").first();
+      const bodyRows = table.locator("tbody tr");
+      const work = row.locator("td[data-label='Work']").first();
+      const edit = row.locator("a[data-gosx-link='true']").first();
+      await expect(table, `real Gallery index table must be visible at ${viewport.width}px`).toBeVisible();
+      await expect(row, `real seeded Gallery row must be visible at ${viewport.width}px`).toBeVisible();
+      await expect(bodyRows, `real Gallery seed must retain ${SEEDED_GALLERY_ROW_COUNT} rows at ${viewport.width}px`).toHaveCount(SEEDED_GALLERY_ROW_COUNT);
+      await expect(work.locator("strong").first()).toHaveText(SEEDED_GALLERY_TITLE);
+      await expect(work.locator("span").first()).toHaveText(SEEDED_GALLERY_MATERIALS);
+      await expect(edit, `real Gallery Edit action must be visible at ${viewport.width}px`).toBeVisible();
+      await expect(edit).toHaveAttribute("href", /\/admin\/gallery\/[^/]+/);
+
+      const geometry = await readGalleryIndexGeometry(page);
+      expect(geometry.viewportWidth).toBe(viewport.width);
+      expect(geometry.nativeTable, `Gallery index must remain a native table at ${viewport.width}px`).toBe(true);
+      expect(geometry.headers).toEqual(GALLERY_INDEX_HEADERS);
+      expect(geometry.headerScopes).toEqual(["col", "col", "col", "col", "col"]);
+      expect(geometry.labels).toEqual(GALLERY_INDEX_LABELS);
+      expect(geometry.tableDisplay).toBe(viewport.width <= 820 ? "block" : "table");
+      expect(geometry.rowDisplay).toBe(viewport.width <= 820 ? "grid" : "table-row");
+      expect(geometry.pageLevelOverflow, `Gallery page overflow at ${viewport.width}px: ${JSON.stringify(geometry)}`).toBe(false);
+      expect(geometry.scrollWidth, `document overflow at ${viewport.width}px`).toBeLessThanOrEqual(geometry.clientWidth + 1);
+      expect(geometry.bodyScrollWidth, `body overflow at ${viewport.width}px`).toBeLessThanOrEqual(geometry.clientWidth + 1);
+      expect(geometry.panel.left, `Gallery panel must stay inside the viewport at ${viewport.width}px`).toBeGreaterThanOrEqual(-0.5);
+      expect(geometry.panel.right, `Gallery panel must stay inside the viewport at ${viewport.width}px`).toBeLessThanOrEqual(viewport.width + 0.5);
+      expect(geometry.table.left).toBeGreaterThanOrEqual(geometry.panel.left - 0.5);
+      expect(geometry.table.right).toBeLessThanOrEqual(geometry.panel.right + 0.5);
+      expect(geometry.row.left).toBeGreaterThanOrEqual(geometry.table.left - 0.5);
+      expect(geometry.row.right).toBeLessThanOrEqual(geometry.table.right + 0.5);
+      expect(geometry.titleOverlapsYear, `Work title crosses Year at ${viewport.width}px: ${JSON.stringify(geometry)}`).toBe(false);
+      expect(geometry.materialsOverlapsYear, `Work materials cross Year at ${viewport.width}px: ${JSON.stringify(geometry)}`).toBe(false);
+      expect(geometry.titleFitsWorkCell).toBe(true);
+      expect(geometry.materialsFitWorkCell).toBe(true);
+      expect(geometry.titleReadableWidth, `Work title collapsed below ${geometry.readableWidth}px at ${viewport.width}px`).toBe(true);
+      expect(geometry.materialsReadableWidth, `Work materials collapsed below ${geometry.readableWidth}px at ${viewport.width}px`).toBe(true);
+      expect(geometry.thumbnailWidth, `seeded Work thumbnail became too narrow at ${viewport.width}px`).toBeGreaterThanOrEqual(64);
+      expect(geometry.editVisible).toBe(true);
+      expect(geometry.editTabIndex, `Gallery Edit link must remain keyboard reachable at ${viewport.width}px`).toBe(0);
+      expect(geometry.editBox.left).toBeGreaterThanOrEqual(-0.5);
+      expect(geometry.editBox.right).toBeLessThanOrEqual(viewport.width + 0.5);
+
+      const tableRole = gallery.getByRole("table", { includeHidden: true });
+      const rows = table.getByRole("row", { includeHidden: true });
+      const columnHeaders = table.getByRole("columnheader", { includeHidden: true });
+      await expect(tableRole, `Gallery index must expose a table role at ${viewport.width}px`).toHaveCount(1);
+      await expect(rows, `Gallery index must expose native row roles at ${viewport.width}px`).toHaveCount(SEEDED_GALLERY_ROW_COUNT + 1);
+      await expect(columnHeaders, `Gallery index must expose five column roles at ${viewport.width}px`).toHaveCount(5);
+      await expect(table.getByRole("columnheader", { name: "Work", exact: true, includeHidden: true })).toHaveCount(1);
+      await expect(table.getByRole("columnheader", { name: "Year", exact: true, includeHidden: true })).toHaveCount(1);
+      const ariaSnapshot = await table.ariaSnapshot();
+      expect(ariaSnapshot).toContain("table");
+      expect(ariaSnapshot).toContain("row");
+      expect(ariaSnapshot).toContain('columnheader "Work"');
+      expect(ariaSnapshot).toContain('columnheader "Year"');
+
+      // Keep the index capture distinct from the later filter-panel captures.
+      // It runs before either picker is opened and therefore records the real
+      // host shell/table surface at each requested width.
+      const screenshot = await captureScreenshot(page, `gallery-index-real-host-${viewport.width}x${viewport.height}`, viewport.width, viewport.height, false);
+      const galleryHeading = gallery.getByRole("heading", { name: "Gallery works", exact: true }).first();
+      await expect(galleryHeading, `Gallery heading must be available to establish page focus at ${viewport.width}px`).toBeVisible();
+      await galleryHeading.click();
+      let editReachedByTab = false;
+      for (let step = 0; step < 64; step += 1) {
+        await page.keyboard.press("Tab");
+        if (await edit.evaluate((element) => document.activeElement === element)) {
+          editReachedByTab = true;
+          break;
+        }
+      }
+      expect(editReachedByTab, `Gallery Edit link must be reachable by keyboard Tab at ${viewport.width}px`).toBe(true);
+      await expect(edit).toBeFocused();
+      samples.push({ viewport, screenshot, geometry });
+    }
+  } finally {
+    await page.setViewportSize(originalViewport);
+  }
+  return { originalViewport, samples };
+}
+
+async function captureScreenshot(page: Page, label: string, width: number, height: number, fullPage = true): Promise<string> {
+  await page.setViewportSize({ width, height });
+  const filename = `${label}.png`;
+  const screenshotPath = path.join(INTEGRATION_ROOT, "screenshots", filename);
+  mkdirSync(path.dirname(screenshotPath), { recursive: true });
+  await page.screenshot({ path: screenshotPath, fullPage });
+  return screenshotPath;
+}
+
+async function readConflictLayout(page: Page): Promise<Record<string, unknown>> {
+  return page.evaluate(() => {
+    const describe = (element: Element | null): Record<string, unknown> | null => {
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      const style = window.getComputedStyle(element);
+      return {
+        tag: element.tagName.toLowerCase(),
+        id: element.id,
+        className: typeof element.className === "string" ? element.className : "",
+        rect: {
+          left: Math.round(rect.left * 100) / 100,
+          top: Math.round(rect.top * 100) / 100,
+          right: Math.round(rect.right * 100) / 100,
+          bottom: Math.round(rect.bottom * 100) / 100,
+          width: Math.round(rect.width * 100) / 100,
+          height: Math.round(rect.height * 100) / 100,
+        },
+        display: style.display,
+        position: style.position,
+        gridTemplateColumns: style.gridTemplateColumns,
+        gridTemplateRows: style.gridTemplateRows,
+        gridColumn: style.gridColumn,
+        alignSelf: style.alignSelf,
+        minWidth: style.minWidth,
+        maxWidth: style.maxWidth,
+        width: style.width,
+        overflow: style.overflow,
+      };
+    };
+    const editor = document.querySelector("[data-content-editor='true']");
+    const status = editor?.querySelector("[data-content-editor-save-status]") ?? null;
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      document: {
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+      },
+      editor: describe(editor),
+      status: describe(status),
+      label: describe(status?.querySelector("[data-content-editor-save-label]") ?? null),
+      detail: describe(status?.querySelector("[data-content-editor-save-detail-text]") ?? null),
+      errors: describe(status?.querySelector("[data-content-editor-save-errors]") ?? null),
+      conflictLink: describe(status?.querySelector("[data-content-editor-save-conflict-link]") ?? null),
+      statusParent: describe(status?.parentElement ?? null),
+      editorParent: describe(editor?.parentElement ?? null),
+    };
+  });
+}
+
+async function assertConflictLayout(page: Page, width: number, height: number): Promise<Record<string, unknown>> {
+  await page.setViewportSize({ width, height });
+  const layout = await readConflictLayout(page);
+  const viewport = layout.viewport as { width?: number; height?: number };
+  expect(viewport.width, "conflict layout must be sampled at the requested viewport width").toBe(width);
+  expect(viewport.height, "conflict layout must be sampled at the requested viewport height").toBe(height);
+
+  const rectOf = (name: string): { width?: number; height?: number } => {
+    const element = layout[name] as { rect?: { width?: number; height?: number } } | null | undefined;
+    return element?.rect ?? {};
+  };
+  const statusRect = rectOf("status");
+  const detailRect = rectOf("detail");
+  const documentLayout = layout.document as { clientWidth?: number; scrollWidth?: number };
+  const limits = width <= 820 ? CONFLICT_LAYOUT_LIMITS.mobile : CONFLICT_LAYOUT_LIMITS.desktop;
+
+  expect(detailRect.width, `conflict detail must have a readable width at ${width}x${height}`).toBeGreaterThanOrEqual(limits.detailMinWidth);
+  expect(detailRect.height, `conflict detail must stay bounded at ${width}x${height}`).toBeLessThanOrEqual(limits.maxHeight);
+  expect(statusRect.height, `conflict status must stay bounded at ${width}x${height}`).toBeLessThanOrEqual(limits.maxHeight);
+  expect(documentLayout.scrollWidth, `conflict surface must not introduce horizontal overflow at ${width}x${height}`).toBeLessThanOrEqual((documentLayout.clientWidth ?? width) + 1);
+
+  const editor = page.locator("[data-content-editor='true']").first();
+  await expect(editor.locator("[data-content-editor-save-status]")).toBeVisible();
+  await expect(editor.locator("[data-content-editor-save-detail-text]")).toContainText(/Your draft remains local/i);
+  await expect(editor.locator("[data-content-editor-save-conflict-link]")).toBeVisible();
+  return layout;
+}
+
+async function clickManagedPages(page: Page, baseURL: string): Promise<void> {
+  const contentSummary = page.locator("nav[aria-label='Main'] details summary", { hasText: "Content" }).first();
+  await expect(contentSummary, "the dashboard must expose the managed Content navigation").toBeVisible();
+  const contentMenu = contentSummary.locator("xpath=..");
+  if ((await contentMenu.getAttribute("open")) === null) await contentSummary.click();
+
+  const pagesLink = page.locator("nav[aria-label='Main'] a[data-gosx-link='true'][href$='/admin/pages']").first();
+  await expect(pagesLink).toBeVisible();
+  const href = await pagesLink.getAttribute("href");
+  const url = new URL(href ?? "", baseURL);
+  expect(url.origin).toBe(new URL(baseURL).origin);
+  expect(url.pathname).toBe("/admin/pages");
+  await Promise.all([
+    page.waitForURL((next) => next.origin === url.origin && next.pathname === url.pathname),
+    pagesLink.click(),
+  ]);
+}
+
+function writeEvidence(name: string, value: Record<string, unknown>): void {
+  mkdirSync(INTEGRATION_ROOT, { recursive: true });
+  writeFileSync(path.join(INTEGRATION_ROOT, `${name}.json`), JSON.stringify({ generatedAt: new Date().toISOString(), ...value }, null, 2));
+}

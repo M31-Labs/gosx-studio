@@ -8,24 +8,25 @@ import (
 )
 
 type WorkbenchToolbarOptions struct {
-	Class                  string
-	ActionsClass           string
-	TitleClass             string
-	Kicker                 string
-	Title                  string
-	Summary                string
-	PreviewLinkClass       string
-	PreviewLabel           string
-	SaveButtonClass        string
-	SaveButtonLabel        string
-	DisablePreviewAction   bool
-	DisableSaveButton      bool
-	DisableHistoryControls bool
-	CommandPaletteNode     gosx.Node
-	SaveStatusNode         gosx.Node
-	HistoryControlsNode    gosx.Node
-	Controls               []gosx.Node
-	Actions                []gosx.Node
+	Class                    string
+	ActionsClass             string
+	TitleClass               string
+	Kicker                   string
+	Title                    string
+	Summary                  string
+	PreviewLinkClass         string
+	PreviewLabel             string
+	SaveButtonClass          string
+	SaveButtonLabel          string
+	DisablePreviewAction     bool
+	DisableSaveButton        bool
+	DisableHistoryControls   bool
+	CommandPaletteNode       gosx.Node
+	SaveStatusNode           gosx.Node
+	CollaborationSummaryNode gosx.Node
+	HistoryControlsNode      gosx.Node
+	Controls                 []gosx.Node
+	Actions                  []gosx.Node
 }
 
 type WorkbenchSaveStatusOptions struct {
@@ -121,6 +122,14 @@ func RenderWorkbenchToolbar(view map[string]any, options WorkbenchToolbarOptions
 	children = appendWorkbenchNode(children, options.CommandPaletteNode)
 
 	actions := []gosx.Node{}
+	// handoff-4 (punch #7 -- presence to top chrome): the collaborators
+	// facepile+count moves into this shared toolbar action row, ahead of
+	// the save-state indicator, so it's visible from every mode without
+	// scrolling to the (still-present, now-detail-view) collaboration
+	// panel lower on the page. Presentation-only move -- the collab
+	// runtime's socket/presence contract (collabruntime/island_runtime.js)
+	// is untouched; only WHERE its facepile/count DOM gets mounted widens.
+	actions = appendWorkbenchNode(actions, options.CollaborationSummaryNode)
 	actions = appendWorkbenchNode(actions, options.SaveStatusNode)
 	if !options.DisableHistoryControls {
 		if core.WorkbenchNodeEmpty(options.HistoryControlsNode) {
@@ -146,6 +155,25 @@ func RenderWorkbenchToolbar(view map[string]any, options WorkbenchToolbarOptions
 			actions = append(actions, gosx.El("button", gosx.Attrs(
 				gosx.Attr("class", core.FirstNonEmpty(options.SaveButtonClass, "button button--primary")),
 				gosx.Attr("type", "submit"),
+				// This button submits the SHARED workbench form — every
+				// panel's fields, including any hidden behind a
+				// data-studio-mode-panel the operator isn't currently
+				// viewing, are "listed" constraint-validation candidates of
+				// that one form. Native HTML5 validation runs BEFORE the
+				// browser dispatches the form's "submit" event; if any
+				// hidden control is invalid, the browser can't focus it to
+				// show a validation bubble and instead silently cancels the
+				// submission with no submit event at all (Chrome logs "An
+				// invalid form control with name='<x>' is not focusable" and
+				// stops there) — the primary Save button would otherwise be
+				// a no-op click with no visible error whenever an unrelated
+				// hidden panel happens to carry an invalid value. Every
+				// other action button that submits this same shared form
+				// (Publish/Discard/Schedule in publish_panel.go, Restore in
+				// revision_history_panel.go, Save in navigation_panel.go /
+				// checkout_panel.go) already carries this exemption for the
+				// same reason; the primary Save button must too.
+				gosx.Attr("formnovalidate", "formnovalidate"),
 				gosx.Attr("data-editor-save-button", "true"),
 				gosx.Attr("data-gosx-studio-save-button", "true"),
 			), gosx.Text(saveLabel)))
@@ -446,6 +474,52 @@ func RenderWorkbenchCommandPalette(view map[string]any, options WorkbenchCommand
 	)
 }
 
+type WorkbenchCollaborationSummaryOptions struct {
+	Class         string
+	FacepileClass string
+	CountClass    string
+	Label         string
+	PanelID       string
+}
+
+// RenderWorkbenchCollaborationSummary renders the compact collaborators
+// facepile+count control that lives in the top toolbar chrome (handoff-4,
+// punch #7 -- "presence to top chrome"). It is a presentation-only mount
+// point: collabruntime/island_runtime.js's renderPresence already updates
+// EVERY element in the document carrying data-studio-collab-facepile (not
+// only the one inside panels.RenderCollaborationPanel), so this toolbar
+// button free-rides the exact same live roster payload with no new
+// wiring, and a matching data-studio-collab-count output gets the live
+// member count the same way. Clicking it reveals PanelID (the existing
+// RenderCollaborationPanel section, still rendered lower on the page) as
+// the detail view — see workbench_runtime.js's toggleCollaborationDetail.
+func RenderWorkbenchCollaborationSummary(options WorkbenchCollaborationSummaryOptions) gosx.Node {
+	className := core.FirstNonEmpty(options.Class, "gosx-studio-collab-summary")
+	panelID := strings.TrimSpace(options.PanelID)
+	attrs := []any{
+		gosx.Attr("type", "button"),
+		gosx.Attr("class", className),
+		gosx.Attr("data-studio-collab-summary", "true"),
+		gosx.Attr("data-studio-collab-state", "offline"),
+		gosx.Attr("aria-label", core.FirstNonEmpty(options.Label, "Show collaborators")),
+		gosx.Attr("aria-expanded", "false"),
+	}
+	if panelID != "" {
+		attrs = append(attrs, gosx.Attr("aria-controls", panelID))
+	}
+	return gosx.El("button", gosx.Attrs(attrs...),
+		gosx.El("ul", gosx.Attrs(
+			gosx.Attr("class", core.FirstNonEmpty(options.FacepileClass, className+"__facepile")),
+			gosx.Attr("data-studio-collab-facepile", "true"),
+			gosx.Attr("aria-hidden", "true"),
+		)),
+		gosx.El("output", gosx.Attrs(
+			gosx.Attr("class", core.FirstNonEmpty(options.CountClass, className+"__count")),
+			gosx.Attr("data-studio-collab-count", "true"),
+		), gosx.Text("0")),
+	)
+}
+
 func RenderWorkbenchSaveStatus(options WorkbenchSaveStatusOptions) gosx.Node {
 	className := core.FirstNonEmpty(options.Class, "gosx-studio-save-status")
 	return gosx.El("div", gosx.Attrs(
@@ -517,7 +591,20 @@ func renderWorkbenchToolbarTitle(className, kicker, title, summary string) gosx.
 	}
 	children = append(children, gosx.El("strong", nil, gosx.Text(title)))
 	if summary != "" {
-		children = append(children, gosx.El("span", nil, gosx.Text(summary)))
+		// This subtitle is fed by selectionLabel (falling back to routeLabel) at
+		// server-render time (see RenderWorkbenchToolbar above), so it MUST carry
+		// the same data-studio-selection-label hook the OTHER selection readouts
+		// use (RenderWorkbenchCanvasBar, RenderWorkbenchCanvasStatus,
+		// shell/workbench_page_canvas.go). Without it, workbench_runtime.js's
+		// setReadout("[data-studio-selection-label]", ...) can never find this
+		// node, so it stays frozen at whatever string was baked in on initial
+		// load (almost always "No selection") no matter how many times the user
+		// clicks the canvas — this is the toolbar-title-never-updates defect
+		// (HANDOFF-19): every OTHER selection surface (the page-canvas readout,
+		// the right-rail inspector) updates correctly on click; only this most
+		// prominent, top-of-page label was silently exempt because it is a bare
+		// <span> with no data attribute at all.
+		children = append(children, gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-selection-label", "true")), gosx.Text(summary)))
 	}
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", className)), gosx.Fragment(children...))
 }

@@ -32,12 +32,13 @@ func TestRenderBackendResourceIndexOrderTable(t *testing.T) {
 		`<div class="admin-page" data-gosx-studio-backend-resource-index-renderer="gosx-studio">`,
 		`<section class="admin-heading"><p class="kicker">CMS</p><h1>Orders</h1><p>Checkout sessions, payment status, and fulfillment totals.</p></section>`,
 		`<section class="panel"><table class="data-table">`,
-		`<thead><tr><th>Order</th><th>Customer</th><th>Status</th><th>Total</th><th>Created</th><th></th></tr></thead>`,
-		`<td><strong>Mug &lt;Special&gt;</strong><span>order-1</span></td>`,
-		`<td>ada@example.test</td>`,
-		`<td><span class="status status--ready">paid</span></td>`,
-		`<td><time datetime="2026-06-28T16:30:00Z" data-viewer-time="datetime">Jun 28, 2026 4:30 PM</time></td>`,
-		`<td><a href="/admin/orders/order-1" data-gosx-link="true">Open</a></td>`,
+		`<thead><tr><th scope="col">Order</th><th scope="col">Customer</th><th scope="col">Status</th><th scope="col">Total</th><th scope="col">Created</th><th scope="col"></th></tr></thead>`,
+		`<td data-label="Order"><strong>Mug &lt;Special&gt;</strong><span>order-1</span></td>`,
+		`<td data-label="Customer">ada@example.test</td>`,
+		`<td data-label="Status"><span class="status status--ready">paid</span></td>`,
+		`<td data-label="Total">$120.00</td>`,
+		`<td data-label="Created"><time datetime="2026-06-28T16:30:00Z" data-viewer-time="datetime">Jun 28, 2026 4:30 PM</time></td>`,
+		`<td data-label="Actions"><a href="/admin/orders/order-1" data-gosx-link="true" tabindex="0">Open</a></td>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("rendered order resource index missing %q:\n%s", fragment, html)
@@ -70,7 +71,7 @@ func TestRenderBackendResourceIndexContactCards(t *testing.T) {
 		`<section class="message-list message-list--full">`,
 		`<article class="panel"><div class="panel__header"><h2>Ada</h2><span class="status status--new">new</span></div>`,
 		`<p>Is &lt;this&gt; available?</p>`,
-		`<div class="button-row"><a href="mailto:ada@example.test">ada@example.test</a><a href="/admin/contacts/contact-1" data-gosx-link="true">Open</a><time class="field-note" datetime="2026-06-28T16:35:00Z" data-viewer-time="datetime">Jun 28, 2026 4:35 PM</time></div>`,
+		`<div class="button-row"><a href="mailto:ada@example.test" tabindex="0">ada@example.test</a><a href="/admin/contacts/contact-1" data-gosx-link="true" tabindex="0">Open</a><time class="field-note" datetime="2026-06-28T16:35:00Z" data-viewer-time="datetime">Jun 28, 2026 4:35 PM</time></div>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("rendered contact resource index missing %q:\n%s", fragment, html)
@@ -109,7 +110,7 @@ func TestRenderBackendResourceIndexContentOmitsPageWrapper(t *testing.T) {
 	for _, fragment := range []string{
 		`<section class="admin-heading"><p class="kicker">CMS</p><h1>Categories</h1><p>Storefront taxonomy for grouping products and shaping headless commerce queries.</p></section>`,
 		`<section class="panel"><table class="data-table">`,
-		`<thead><tr><th>Category</th><th>Slug</th><th>Status</th><th>Updated</th><th></th></tr></thead>`,
+		`<thead><tr><th scope="col">Category</th><th scope="col">Slug</th><th scope="col">Status</th><th scope="col">Updated</th><th scope="col"></th></tr></thead>`,
 		`<p class="empty">No categories yet.</p>`,
 	} {
 		if !strings.Contains(html, fragment) {
@@ -148,10 +149,10 @@ func TestRenderBackendResourceIndexTableCellNode(t *testing.T) {
 	}))
 
 	for _, fragment := range []string{
-		`<td><div class="table-product"><img src="/media/cup.jpg" alt="Cup" /><div><strong>Cup &lt;One&gt;</strong><span>Published</span><span>Bowls</span></div></div></td>`,
-		`<td><span class="status status--available">Available</span></td>`,
-		`<td><span class="status status--ready">Stripe ready</span></td>`,
-		`<td><a href="/admin/products/product-1" data-gosx-link="true">Edit</a></td>`,
+		`<td data-label="Piece"><div class="table-product"><img src="/media/cup.jpg" alt="Cup" /><div><strong>Cup &lt;One&gt;</strong><span>Published</span><span>Bowls</span></div></div></td>`,
+		`<td data-label="Status"><span class="status status--available">Available</span></td>`,
+		`<td data-label="Checkout"><span class="status status--ready">Stripe ready</span></td>`,
+		`<td data-label="Actions"><a href="/admin/products/product-1" data-gosx-link="true" tabindex="0">Edit</a></td>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("resource index content with node cell missing %q:\n%s", fragment, html)

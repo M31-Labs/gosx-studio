@@ -50,6 +50,77 @@
     return Array.prototype.slice.call(root.querySelectorAll(selector));
   }
 
+  // handoff-4 (item 5 — left rail section-collapse): the 2489px-tall left
+  // rail (Site areas / Sections / Layers, magnolia-4 evidence) has no way
+  // to shrink any one of those groups out of the way. leftRailGroupState
+  // persists each group's collapsed/open state in sessionStorage — the
+  // SAME storage mechanism (one JSON blob, read-merge-write, session-only)
+  // workbenchruntime/island_runtime.js's restoreWorkbenchWorkingState
+  // already uses for mode/selection/scroll — so collapsing "Sections"
+  // survives a reload within the same tab session the same way switching
+  // to LOOK mode does, but resets for a fresh session.
+  var leftRailGroupStorageKey = "gosx-studio-left-rail-groups";
+  function readLeftRailGroupState() {
+    try {
+      return JSON.parse(window.sessionStorage.getItem(leftRailGroupStorageKey) || "{}") || {};
+    } catch (error) {
+      return {};
+    }
+  }
+  function writeLeftRailGroupState(key, collapsed) {
+    try {
+      var current = readLeftRailGroupState();
+      current[key] = collapsed;
+      window.sessionStorage.setItem(leftRailGroupStorageKey, JSON.stringify(current));
+    } catch (error) {
+      return;
+    }
+  }
+  // collapseLeftRailGroups adds one collapse toggle per [data-studio-rail-group]
+  // section (site_navigator_panel.go's "site-navigator",
+  // block_layout_engine.go's "sections", home_layers_panel.go's "layers" —
+  // each carries this attribute specifically BECAUSE their existing
+  // "-renderer" marker attributes repeat on nested sub-elements, not just
+  // the section root, so they can't be used to find "one card, once"
+  // here). Every child of the group other than its own heading row
+  // (<header> or .studio-panel-heading, matching every left-rail panel's
+  // existing head markup) gets toggled via [hidden] — cheap, and already
+  // display:none via the [hidden] rule at the top of this stylesheet.
+  function collapseLeftRailGroups(root) {
+    var state = readLeftRailGroupState();
+    queryAll(root || document, "[data-studio-rail-group]").forEach(function (group) {
+      if (group.dataset.gosxRailGroupBound === "true") return;
+      group.dataset.gosxRailGroupBound = "true";
+      var key = group.getAttribute("data-studio-rail-group") || "";
+      var heading = group.querySelector("h2");
+      if (!key || !heading) return;
+      var headRow = (heading.closest && heading.closest("header, .studio-panel-heading")) || heading.parentNode;
+      if (!headRow || headRow.parentNode !== group) return;
+      var body = queryAll(group, ":scope > *").filter(function (node) { return node !== headRow; });
+      if (!body.length) return;
+      var toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "studio-rail-group-toggle";
+      toggle.setAttribute("data-studio-rail-group-toggle", key);
+      headRow.appendChild(toggle);
+      function apply(collapsed) {
+        body.forEach(function (node) {
+          if (collapsed) node.setAttribute("hidden", "hidden");
+          else node.removeAttribute("hidden");
+        });
+        group.setAttribute("data-studio-rail-group-collapsed", collapsed ? "true" : "false");
+        toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        toggle.textContent = collapsed ? "Show" : "Hide";
+      }
+      toggle.addEventListener("click", function () {
+        var next = group.getAttribute("data-studio-rail-group-collapsed") !== "true";
+        apply(next);
+        writeLeftRailGroupState(key, next);
+      });
+      apply(!!state[key]);
+    });
+  }
+
   function storageKey(form) {
     return "gosx-studio-workbench:" + compactText(form.getAttribute("data-studio-shell") || form.getAttribute("action") || window.location.pathname || "studio");
   }
@@ -202,6 +273,102 @@
     return parsed > 0 ? parsed : 1;
   }
 
+  // Wave 3A (inspector-presentation, fix (b)) / wave 3B (tamarind, generalized):
+  // scopeSelectionPanels is the studio-side idempotence guard for hosts that
+  // compose more than one selected-target's support panel on the same page at
+  // once (muddy-noni-commerce's editorDirectEditPanels Fragments home:hero's,
+  // about:content's, AND all three contact:contact-links direct-edit forms
+  // together, regardless of which is actually selected on canvas — the same
+  // root cause wave 3A found for its "respLayoutCount=2" defect, just wider).
+  // These panels are rendered by the HOST outside this <form> (a <form>
+  // cannot legally nest inside the workbench's own <form>, so hosts render
+  // them as siblings instead — see workbenchruntime/island_runtime.js's
+  // workbenchModeGateRoot for the same constraint), so they can't be found
+  // via form.querySelector and can't be deduped by a Go-side render guard
+  // alone. This walks the whole document (not just this form) for that
+  // reason. It shows every panel whose data-studio-selected-component (or,
+  // for direct-edit panels, data-studio-target-component — the same
+  // ComponentKey concept under the panel's own existing attribute name)
+  // matches the form's current data-studio-selection; with no selection yet
+  // it falls back to showing every panel sharing the FIRST panel's key
+  // (not just the first panel alone), matching the server's own
+  // default-selected target while still keeping panels that share one
+  // selected component together (e.g. Contact's three direct-edit fields —
+  // email/Instagram/newsletter — all key off the same "contact:contact-links"
+  // ComponentKey and are meant to show together once that component is
+  // selected, the same way Contact's own canvas selection covers all three
+  // fields at once). Every non-matching panel gets [hidden] — already
+  // display:none via the [hidden] rule at the top of studio.css — so a real
+  // browser measurement (e.g. querying h1/h2/h3 text, or counting visible
+  // [data-studio-direct-edit-panel] forms) only ever finds the ACTIVE
+  // target's panel(s) rendered, even though the host still composes every
+  // target's panel every time.
+  //
+  // handoff-3b2 (osier) found a namespace mismatch on top of the retrigger
+  // gap fixed below (see initWorkbench's MutationObserver): every REAL
+  // selection-changing gesture writes data-studio-selection in its OWN
+  // namespace, never the panel's own ComponentKey the keyAttr comparison
+  // alone expects:
+  //   1. A live preview field click writes the field path itself
+  //      ("pages.about.title"), not "about:content". direct_edit_panel.go
+  //      already emits BOTH data-studio-target-component (the ComponentKey)
+  //      AND data-studio-target-field (that same field path) on the
+  //      identical panel element, so the optional fieldAttr parameter lets a
+  //      caller match against either namespace with no new Go-side
+  //      attribute.
+  //   2. HOME's own Layers panel (selectionruntime/island_runtime.js's
+  //      updateSelection(), the ONLY producer of data-block-studio-block row
+  //      keys) writes the bare home-section key ("hero"), not "home:hero" —
+  //      and does so unconditionally at bind time (bindSelection() calls
+  //      updateSelection("") once outside advanced mode, which resolves to
+  //      the default-selected row), so this mismatch hit the DEFAULT view on
+  //      every single page load once the retrigger gap above was fixed, not
+  //      only a deliberate row click. Every ComponentKey in this codebase is
+  //      "<page-or-namespace>:<section>" (home:hero, about:content,
+  //      contact:contact-links) and a block-key selection is BY DEFINITION a
+  //      HOME section (Layers is HOME-only), so comparing the active value
+  //      against the ComponentKey's suffix after its LAST ":" bridges this
+  //      honestly without guessing at a hardcoded "home:" prefix.
+  function scopeSelectionPanels(form, selector, keyAttr, fieldAttr) {
+    var panels = queryAll(document, selector);
+    if (!panels.length) return;
+    var active = form ? compactText(form.getAttribute("data-studio-selection")) : "";
+    var fallbackKey = null;
+    panels.forEach(function (panel) {
+      var key = compactText(panel.getAttribute(keyAttr));
+      var fieldKey = fieldAttr ? compactText(panel.getAttribute(fieldAttr)) : "";
+      var keySuffix = key.indexOf(":") >= 0 ? key.slice(key.indexOf(":") + 1) : "";
+      var matches = key === active || (fieldKey !== "" && fieldKey === active) || (keySuffix !== "" && keySuffix === active);
+      var show = active ? matches : (fallbackKey === null || key === fallbackKey);
+      if (show) {
+        if (fallbackKey === null) fallbackKey = key;
+        panel.removeAttribute("hidden");
+      } else {
+        panel.setAttribute("hidden", "true");
+      }
+    });
+  }
+
+  function scopeResponsiveLayoutInspectors(form) {
+    scopeSelectionPanels(form, "[data-studio-responsive-layout-inspector]", "data-studio-selected-component");
+  }
+
+  // Wave 3B (tamarind, fix #2 — dedupe "Selected content"): generalizes the
+  // same guard to panels/direct_edit_panel.go's RenderDirectEditPanel
+  // instances (data-studio-direct-edit-panel="true", keyed by the panel's
+  // own data-studio-target-component attribute — no new Go-side attribute
+  // needed, the ComponentKey it already emits is the selection key). The
+  // trailing data-studio-target-field argument is handoff-3b2's field-path
+  // bridge (see scopeSelectionPanels's doc comment above).
+  function scopeDirectEditPanels(form) {
+    scopeSelectionPanels(form, "[data-studio-direct-edit-panel]", "data-studio-target-component", "data-studio-target-field");
+  }
+
+  function scopeSupportSelectionPanels(form) {
+    scopeResponsiveLayoutInspectors(form);
+    scopeDirectEditPanels(form);
+  }
+
   function initWorkbench(form) {
     if (!form || (form.dataset.gosxStudioWorkbenchBound === "true" && form.__gosxStudioWorkbenchRuntime)) return;
     form.dataset.gosxStudioWorkbenchBound = "true";
@@ -257,11 +424,11 @@
       return {};
     }
 
-    function clearPreviewSelections() {
+    function clearPreviewSelections(options) {
       if (typeof window.__gosx_preview_runtime_island_clearSelections !== "function") return null;
       return window.__gosx_preview_runtime_island_clearSelections(form, {
         finishInlineTextEdit: finishInlineTextEdit
-      }) || null;
+      }, options) || null;
     }
 
     function emitPreviewDockAction(action, detail) {
@@ -336,12 +503,24 @@
       return { field: detail.field || "", source: null, control: null, found: false };
     }
 
+    function setWorkbenchHomeMode(reason) {
+      var runtime = window.GoSXStudioWorkbenchRuntime;
+      if (runtime && typeof runtime.setMode === "function") {
+        try {
+          runtime.setMode(form, "home", true);
+          return true;
+        } catch (error) {
+          // Fall back to this legacy host-local setter below.
+        }
+      }
+      setMode("home", { scroll: true, reason: reason || "preview-select" });
+      return false;
+    }
+
     function revealPreviewField(detail, reason) {
       detail = detail || {};
       if (!detail.field) return false;
-      if (form.querySelector('[data-studio-mode-control="content"], [data-studio-mode-panel="content"]')) {
-        setMode("content", { reason: reason || "preview-select" });
-      }
+      setWorkbenchHomeMode(reason || "preview-select");
       var payload = {
         detail: detail,
         reason: reason || ""
@@ -415,6 +594,7 @@
         applyPreviewSelection: applyPreviewSelection,
         dispatchPreviewFieldNavigation: dispatchPreviewFieldNavigation,
         dispatchPreviewFieldActionResolve: dispatchPreviewFieldActionResolve,
+        previewFieldActionLabel: previewFieldActionLabel,
         startInlineTextFromDetail: startInlineTextFromDetail,
         submitPreviewFieldAction: submitPreviewFieldAction,
         navigateToHref: navigatePreviewDockHref
@@ -473,7 +653,7 @@
     function applyPreviewSelection(frame, target, detail, options) {
       detail = detail || previewSelectionDetail(target);
       options = options || {};
-      if (!detail.field && !detail.blockKey && !detail.nodeID) return false;
+      if (!detail.field && !detail.blockKey && !detail.nodeID && !detail.pageID) return false;
       if (typeof window.__gosx_preview_runtime_island_applySelection !== "function") return false;
       var result = window.__gosx_preview_runtime_island_applySelection({
         form: form,
@@ -582,11 +762,31 @@
       return emitEditorOperation("set_field", envelope);
     }
 
+    function valueBearingTextControl(control) {
+      if (!control || !("value" in control) || control.disabled) return null;
+      var tag = String(control.tagName || "").toLowerCase();
+      var type = String(control.type || "").toLowerCase();
+      if (tag === "input" && type === "hidden") return null;
+      return control;
+    }
+
     function textControlForField(field) {
       var target = previewFieldTarget(field);
-      if (target.control && "value" in target.control) return target.control;
-      if (target.source && "value" in target.source) return target.source;
+      var control = valueBearingTextControl(target.control);
+      if (control) return control;
+      var source = valueBearingTextControl(target.source);
+      if (source) return source;
       return null;
+    }
+
+    function inlineTextControlForDetail(detail) {
+      if (!detail || detail.editable !== "text" || !detail.field) return null;
+      return textControlForField(detail.field);
+    }
+
+    function previewFieldActionLabel(detail) {
+      if (!detail || detail.editable !== "text" || detail.action) return "";
+      return inlineTextControlForDetail(detail) ? "Edit text" : "Open field";
     }
 
     function previewInlineTextRuntime(method) {
@@ -613,21 +813,34 @@
       };
     }
 
+    function previewInlineTextHostWithControl(frame, field, control) {
+      var host = previewInlineTextHost(frame);
+      host.controlForField = function (candidate) {
+        return candidate === field ? control : textControlForField(candidate);
+      };
+      return host;
+    }
+
     function syncInlineTextEdit(frame, reason) {
       var runtime = previewInlineTextRuntime("syncPreviewTextSession");
       if (!runtime) return false;
       return runtime.syncPreviewTextSession(frame, reason, previewInlineTextHost(frame));
     }
 
-    function startInlineTextEdit(frame, detail, reason) {
+    function startInlineTextEdit(frame, detail, reason, host) {
       var runtime = previewInlineTextRuntime("startPreviewTextSession");
       if (!runtime) return false;
-      return runtime.startPreviewTextSession(frame, detail, reason || "preview-dock", previewInlineTextHost(frame));
+      return runtime.startPreviewTextSession(frame, detail, reason || "preview-dock", host || previewInlineTextHost(frame));
     }
 
     function startInlineTextFromDetail(frame, detail, reason) {
       if (!detail || detail.editable !== "text") return false;
-      if (!startInlineTextEdit(frame, detail, reason || "preview-dock")) return false;
+      var control = inlineTextControlForDetail(detail);
+      if (!control) {
+        revealPreviewField(detail, reason || "preview-dock");
+        return false;
+      }
+      if (!startInlineTextEdit(frame, detail, reason || "preview-dock", previewInlineTextHostWithControl(frame, detail.field || "", control))) return false;
       emitPreviewDockAction("field-action", detail);
       return true;
     }
@@ -673,6 +886,16 @@
       }, previewDocumentHost());
       if (typeof window.__gosx_preview_runtime_island_bindFrames !== "function") return null;
       return window.__gosx_preview_runtime_island_bindFrames(form, host) || null;
+    }
+
+    function bindPreviewFramesWhenReady(attempt) {
+      attempt = Number(attempt) || 0;
+      var result = bindPreviewFrames();
+      if (result || attempt >= 20) return result;
+      window.setTimeout(function () {
+        bindPreviewFramesWhenReady(attempt + 1);
+      }, 25);
+      return null;
     }
 
     function previewDocumentHost() {
@@ -999,6 +1222,7 @@
       form.setAttribute("data-studio-selection-kind", detail.kind || "");
       setReadout("[data-studio-selection-label]", detail.label || "No selection");
       setReadout("[data-studio-selection-status]", detail.key ? (detail.kind || "Selected") : "No selection");
+      scopeSupportSelectionPanels(form);
     });
 
     form.addEventListener("input", function (event) {
@@ -1023,7 +1247,7 @@
 
     form.addEventListener("gosxstudio:save-state", function (event) {
       var detail = event.detail || {};
-      if (detail.state === "dirty") setPreviewStatus("dirty", "Draft changed", detail.reason || "dirty");
+      if (detail.state === "dirty") setPreviewStatus("dirty", "Unsaved edit", detail.reason || "dirty");
       else if (detail.state === "autosaving" || detail.state === "saving") setPreviewStatus("syncing", "Syncing preview", detail.reason || "saving");
       else if (detail.state === "saved") schedulePreviewRefresh(detail.reason || "saved", "");
       else if (detail.state === "error") setPreviewStatus("error", "Preview waiting on save", detail.reason || "error");
@@ -1051,14 +1275,18 @@
       } else if (event.key === "Escape" && form.getAttribute("data-studio-focus") === "true") {
         setFocus(false, "keyboard");
       } else if (event.key === "Escape" && form.querySelector("[data-gosx-studio-preview-dock]:not([hidden])")) {
-        clearPreviewSelections();
+        // #5 — Escape cancels an in-progress inline edit rather than
+        // committing it (clearEditorPreviewSelections defaults to committing,
+        // which is correct when moving to a NEW selection, but Escape is a
+        // cancel gesture, not a navigation — it must revert instead).
+        clearPreviewSelections({ commit: false });
         dispatchPreviewSelectionClear("keyboard-escape");
       }
     });
 
     restoreLayout(form);
     bindResizers();
-    bindPreviewFrames();
+    bindPreviewFramesWhenReady(0);
     updateResizerValue("left", currentRailWidth("left"));
     updateResizerValue("right", currentRailWidth("right"));
     setMode(form.getAttribute("data-studio-mode") || "", { reason: "init" });
@@ -1066,6 +1294,28 @@
     setZoom(form.getAttribute("data-studio-zoom") || "", { reason: "init" });
     syncRailButtons();
     syncActivityButtons();
+    collapseLeftRailGroups(document);
+    scopeSupportSelectionPanels(form);
+    // handoff-3b2 (osier): scopeSupportSelectionPanels only ever re-ran on
+    // the "gosxstudio:canvas-select" CustomEvent, but no real selection path
+    // dispatches it — the Layers row click, the site-map board, and the
+    // live preview's own field-click selection (selectionruntime/
+    // island_runtime.js's updateSelection()/applyPreviewSelectionState())
+    // all write data-studio-selection directly, so the support panels
+    // scoped above at init froze at whatever the server's default selection
+    // rendered, no matter what the operator clicked afterward — the 4
+    // non-default direct-edit/responsive-layout panels became permanently
+    // unreachable. Mirrors the exact pattern
+    // workbenchruntime/island_runtime.js's restoreWorkbenchWorkingState
+    // already uses to persist this same attribute to sessionStorage: a
+    // MutationObserver on the attribute itself, not a single event type, so
+    // every current AND future way of writing data-studio-selection keeps
+    // this guard honest.
+    if (window.MutationObserver) {
+      new MutationObserver(function () {
+        scopeSupportSelectionPanels(form);
+      }).observe(form, { attributes: true, attributeFilter: ["data-studio-selection"] });
+    }
   }
 
   function initAll(root) {

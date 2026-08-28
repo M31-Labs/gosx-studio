@@ -220,6 +220,135 @@ func TestAuthoringMutationFromFormNormalizesAndValidates(t *testing.T) {
 	}
 }
 
+func TestAuthoringMutationFromFormAllowsBoundPageLevelSetField(t *testing.T) {
+	form := map[string]string{
+		AuthoringFieldOperation:           string(AuthoringOperationSetField),
+		AuthoringFieldPageKey:             "home",
+		AuthoringFieldBinding:             "page.level.value",
+		AuthoringFieldValue:               `["first","second"]`,
+		AuthoringFieldOperationID:         "order-1",
+		AuthoringFieldExpectedTargetValue: `{"present":true,"value":"[\"first\",\"second\"]"}`,
+	}
+	mutation, validation := AuthoringMutationFromForm(form)
+	if !validation.OK() {
+		t.Fatalf("bound page-level set-field should be valid: mutation=%#v validation=%#v", mutation, validation)
+	}
+	if mutation.PageKey != "home" || mutation.ComponentKey != "" || mutation.Binding != form[AuthoringFieldBinding] || mutation.Value != form[AuthoringFieldValue] {
+		t.Fatalf("unexpected page-level mutation shape: %#v", mutation)
+	}
+	if mutation.ExpectedTargetValue == nil || !mutation.ExpectedTargetValue.Present || mutation.ExpectedTargetValue.Value != form[AuthoringFieldValue] {
+		t.Fatalf("expected value CAS token was not parsed: %#v", mutation.ExpectedTargetValue)
+	}
+
+	missingPage := cloneStringMap(form)
+	delete(missingPage, AuthoringFieldPageKey)
+	_, missingPageValidation := AuthoringMutationFromForm(missingPage)
+	if missingPageValidation.OK() || missingPageValidation.FieldErrors[AuthoringFieldPageKey] == "" {
+		t.Fatalf("missing page must remain invalid: %#v", missingPageValidation)
+	}
+
+	missingField := cloneStringMap(form)
+	delete(missingField, AuthoringFieldBinding)
+	_, missingFieldValidation := AuthoringMutationFromForm(missingField)
+	if missingFieldValidation.OK() || missingFieldValidation.FieldErrors[AuthoringFieldBinding] == "" {
+		t.Fatalf("missing field target must remain invalid: %#v", missingFieldValidation)
+	}
+
+	componentRelative := cloneStringMap(form)
+	componentRelative[AuthoringFieldComponentKey] = "hero"
+	componentRelative[AuthoringFieldControlKey] = "headline"
+	delete(componentRelative, AuthoringFieldBinding)
+	if _, componentRelativeValidation := AuthoringMutationFromForm(componentRelative); !componentRelativeValidation.OK() {
+		t.Fatalf("component-relative control-only set-field should remain valid: %#v", componentRelativeValidation)
+	}
+
+	controlWithoutComponent := cloneStringMap(componentRelative)
+	delete(controlWithoutComponent, AuthoringFieldComponentKey)
+	_, controlWithoutComponentValidation := AuthoringMutationFromForm(controlWithoutComponent)
+	if controlWithoutComponentValidation.OK() || controlWithoutComponentValidation.FieldErrors[AuthoringFieldComponentKey] == "" {
+		t.Fatalf("control-only set-field without component must remain invalid: %#v", controlWithoutComponentValidation)
+	}
+}
+
+func TestAuthoringMutationExpectedTargetValueFormRoundTripsPresence(t *testing.T) {
+	base := map[string]string{
+		AuthoringFieldOperation:    "set-field",
+		AuthoringFieldPageKey:      "home",
+		AuthoringFieldComponentKey: "hero",
+		AuthoringFieldBinding:      "pages.home.hero.headline",
+	}
+	cases := []struct {
+		name        string
+		wire        string
+		wantPresent bool
+		wantValue   string
+		wantField   bool
+	}{
+		{name: "omitted", wantField: false},
+		{name: "explicitly absent", wire: `{"present":false}`, wantField: true},
+		{name: "explicit empty", wire: `{"present":true,"value":""}`, wantPresent: true, wantField: true},
+		{name: "string value", wire: `{"present":true,"value":"seed"}`, wantPresent: true, wantValue: "seed", wantField: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			form := cloneStringMap(base)
+			if tc.wantField {
+				form[AuthoringFieldExpectedTargetValue] = tc.wire
+			}
+			mutation, validation := AuthoringMutationFromForm(form)
+			if !validation.OK() {
+				t.Fatalf("expected valid form, got %#v", validation)
+			}
+			if !tc.wantField {
+				if mutation.ExpectedTargetValue != nil || mutation.FormValues()[AuthoringFieldExpectedTargetValue] != "" {
+					t.Fatalf("omitted expected value should remain nil: mutation=%#v values=%#v", mutation, mutation.FormValues())
+				}
+				return
+			}
+			if mutation.ExpectedTargetValue == nil || mutation.ExpectedTargetValue.Present != tc.wantPresent || mutation.ExpectedTargetValue.Value != tc.wantValue {
+				t.Fatalf("expected parsed value (%v, %q), got %#v", tc.wantPresent, tc.wantValue, mutation.ExpectedTargetValue)
+			}
+			values := mutation.FormValues()
+			var roundTrip OperationValue
+			if err := json.Unmarshal([]byte(values[AuthoringFieldExpectedTargetValue]), &roundTrip); err != nil {
+				t.Fatalf("round-trip form value is not JSON OperationValue: %v", err)
+			}
+			if roundTrip != *mutation.ExpectedTargetValue {
+				t.Fatalf("round-trip expected value=%#v want %#v", roundTrip, *mutation.ExpectedTargetValue)
+			}
+			rebuilt, rebuiltValidation := AuthoringMutationFromForm(values)
+			if !rebuiltValidation.OK() || rebuilt.ExpectedTargetValue == nil || *rebuilt.ExpectedTargetValue != *mutation.ExpectedTargetValue {
+				t.Fatalf("rebuilt mutation=%#v validation=%#v", rebuilt, rebuiltValidation)
+			}
+			view := AuthoringMutationView(mutation)
+			viewValue, ok := view["expectedTargetValue"].(*OperationValue)
+			if !ok || viewValue == nil || *viewValue != *mutation.ExpectedTargetValue {
+				t.Fatalf("mutation view expectedTargetValue=%#v", view["expectedTargetValue"])
+			}
+			if !authoringFormInputsContain(AuthoringMutationFormInputViews(mutation), AuthoringFieldExpectedTargetValue, values[AuthoringFieldExpectedTargetValue]) {
+				t.Fatalf("form inputs missing expected target value: %#v", AuthoringMutationFormInputViews(mutation))
+			}
+		})
+	}
+}
+
+func TestAuthoringMutationExpectedTargetValueFormRejectsMalformedJSON(t *testing.T) {
+	form := map[string]string{
+		AuthoringFieldOperation:           "set-field",
+		AuthoringFieldPageKey:             "home",
+		AuthoringFieldComponentKey:        "hero",
+		AuthoringFieldBinding:             "pages.home.hero.headline",
+		AuthoringFieldExpectedTargetValue: "{not-json",
+	}
+	mutation, validation := AuthoringMutationFromForm(form)
+	if validation.OK() || mutation.ExpectedTargetValue != nil {
+		t.Fatalf("malformed expected value should fail validation: mutation=%#v validation=%#v", mutation, validation)
+	}
+	if validation.FieldErrors[AuthoringFieldExpectedTargetValue] == "" {
+		t.Fatalf("missing expected target value validation error: %#v", validation.FieldErrors)
+	}
+}
+
 func TestAuthoringActionHandlerInvokesAdapter(t *testing.T) {
 	adapter := &stubAuthoringAdapter{result: AuthoringMutationResult{
 		Message:        "Updated hero.",
@@ -417,5 +546,17 @@ func TestSaveAppearanceMutationAdapterReceivesColorFields(t *testing.T) {
 	}
 	if !result.OK || result.Message != "Palette saved." {
 		t.Fatalf("unexpected action result: %#v", result)
+	}
+}
+
+func TestAuthoringMutationResultViewCarriesAuthoritativeDurableValue(t *testing.T) {
+	view := AuthoringMutationResultView(AuthoringMutationResult{
+		DocumentRevision: 4,
+		TargetHead:       "head-4",
+		OperationID:      "op-4",
+		Value:            "  meaningful content  ",
+	})
+	if got := view["value"]; got != "  meaningful content  " {
+		t.Fatalf("durable value must preserve content exactly, got %#v", got)
 	}
 }

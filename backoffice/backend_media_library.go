@@ -91,8 +91,13 @@ func RenderBackendMediaLibraryPageContent(props BackendMediaLibraryPageProps) go
 	children = append(children,
 		RenderBackendMediaLibraryAssets(props.Library),
 		RenderBackendMediaLibraryActions(props),
+		RenderBackendMediaLibraryScripts(),
 	)
 	return gosx.Fragment(children...)
+}
+
+func RenderBackendMediaLibraryScripts() gosx.Node {
+	return renderBackendManagedStudioScript(backendMediaRuntimePath)
 }
 
 func RenderBackendMediaLibraryActions(props BackendMediaLibraryPageProps) gosx.Node {
@@ -118,9 +123,28 @@ func RenderBackendMediaLibraryUploadForm(props BackendMediaLibraryPageProps) gos
 			gosx.Attr("enctype", "multipart/form-data"),
 		),
 			gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "csrf_token"), gosx.Attr("value", props.CSRFToken))),
-			gosx.El("div", gosx.Attrs(gosx.Attr("class", "field-row")),
+			gosx.El("div", gosx.Attrs(
+				gosx.Attr("class", "field-row"),
+				gosx.Attr("data-media-upload", "true"),
+			),
 				gosx.El("label", gosx.Attrs(gosx.Attr("for", "file")), gosx.Text("File")),
-				gosx.El("input", gosx.Attrs(gosx.Attr("id", "file"), gosx.Attr("name", "file"), gosx.Attr("type", "file"), gosx.Attr("accept", backendMediaLibraryUploadAccept))),
+				gosx.El("button", gosx.Attrs(
+					gosx.Attr("class", "media-picker__drop-zone"),
+					gosx.Attr("type", "button"),
+					gosx.Attr("data-media-upload-dropzone", "true"),
+					gosx.Attr("data-media-upload-drop-zone", "true"),
+					gosx.Attr("data-studio-media-upload-drop-zone", "true"),
+					gosx.Attr("aria-describedby", "mediaUploadHelp mediaUploadStatus"),
+				),
+					gosx.El("strong", nil, gosx.Text("Drop one file here")),
+					gosx.El("span", nil, gosx.Text("or choose a file before pressing Upload file.")),
+				),
+				gosx.El("input", gosx.Attrs(gosx.Attr("id", "file"), gosx.Attr("name", "file"), gosx.Attr("type", "file"), gosx.Attr("accept", backendMediaLibraryUploadAccept), gosx.Attr("data-media-upload-input", "true"))),
+				gosx.El("p", gosx.Attrs(gosx.Attr("class", "field-help"), gosx.Attr("id", "mediaUploadHelp")), gosx.Text("Accepted: images, icons, and font files. Dropping a file only selects it; Upload file saves it.")),
+				gosx.El("output", gosx.Attrs(gosx.Attr("class", "form-status media-picker__filename"), gosx.Attr("id", "mediaUploadStatus"), gosx.Attr("data-media-upload-status", "true"), gosx.Attr("data-media-picker-filename", "true"), gosx.Attr("aria-live", "polite")), gosx.Text("No file selected.")),
+				gosx.El("p", gosx.Attrs(gosx.Attr("class", "media-picker__error"), gosx.Attr("data-media-upload-error", "true"), gosx.Attr("hidden", true))),
+				gosx.El("img", gosx.Attrs(gosx.Attr("class", "media-upload-preview"), gosx.Attr("data-media-upload-preview", "true"), gosx.Attr("hidden", true))),
+				gosx.El("button", gosx.Attrs(gosx.Attr("class", "button button--secondary media-picker__clear"), gosx.Attr("type", "button"), gosx.Attr("data-media-upload-clear", "true"), gosx.Attr("data-media-picker-clear", "true"), gosx.Attr("hidden", true)), gosx.Text("Clear file")),
 			),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "field-row")),
 				gosx.El("label", gosx.Attrs(gosx.Attr("for", "uploadAlt")), gosx.Text("Alt text")),

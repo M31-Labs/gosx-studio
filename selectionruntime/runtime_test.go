@@ -518,6 +518,11 @@ func TestSelectionRuntimeIslandOwnsPreviewFieldTargetReveal(t *testing.T) {
 		`var control = fieldControl(source);`,
 		`found: !!source`,
 		`function revealPreviewFieldTarget(target)`,
+		`function valueBearingFieldControl(control)`,
+		`if (!control || !("value" in control) || control.disabled) return null;`,
+		`if (tag === "input" && type === "hidden") return null;`,
+		`function inlineTextControlForField(field)`,
+		`return valueBearingFieldControl(target.control) || valueBearingFieldControl(target.source);`,
 		`var row = target.source.closest ? target.source.closest(".field-row, [data-studio-field-row]") : null;`,
 		`var scrollTarget = row || target.source;`,
 		`scrollTarget.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });`,
@@ -529,6 +534,10 @@ func TestSelectionRuntimeIslandOwnsPreviewFieldTargetReveal(t *testing.T) {
 		`var target = previewFieldTarget(envelope.detail || envelope);`,
 		`revealed: revealPreviewFieldTarget(target),`,
 		`field: target.field`,
+		`editable === "text" ? (inlineTextControlForField(field) ? "Edit text" : "Open field") : "Open field"`,
+		`var fieldActionLabel = compactText(form.getAttribute("data-studio-field-action-label") || "");`,
+		`if (field && editable === "text" && (fieldActionLabel === "Open field" || !inlineTextControlForField(field)))`,
+		`runSelectedFieldAction(field, editable);`,
 	} {
 		if !strings.Contains(body, contract) {
 			t.Fatalf("IslandRuntimeJS() missing preview field target/reveal contract %q", contract)
@@ -606,5 +615,38 @@ func TestBundleConcatenatesIslandRuntimeAndShim(t *testing.T) {
 	}
 	if islandIdx > shimIdx {
 		t.Fatalf("Bundle() must place island runtime before shim (island=%d shim=%d)", islandIdx, shimIdx)
+	}
+}
+
+func TestIslandRuntimePersistsOnlyRouteScopedSelectionLocator(t *testing.T) {
+	script := string(IslandRuntimeJS())
+	for _, fragment := range []string{
+		`function selectionLocatorStorageKey(form, route)`,
+		`window.location.origin + window.location.pathname`,
+		`window.sessionStorage.setItem(selectionLocatorStorageKey(form, locator.route), JSON.stringify(locator))`,
+		`route: normalizeSelectionLocatorRoute(detail.route || "/")`,
+		`pageID: compactText(detail.pageID)`,
+		`field: compactText(detail.field)`,
+		`blockKey: compactText(detail.blockKey)`,
+		`nodeID: compactText(detail.nodeID)`,
+		`kind: compactText(detail.kind`,
+		`function syncInspectorForExactSelection(key)`,
+		`function pageNavigatorIdentityForRoute(route)`,
+		`form.setAttribute("data-studio-preview-route-current", route)`,
+		`syncPageNavigatorSelection(pageID, route)`,
+		`syncInspectorForExactSelection(pageID)`,
+		`gosxstudio:preview-selection-restore-request`,
+		`selection-runtime-bound`,
+		`gosxstudio:preview-selection-locator-restore`,
+		`gosxstudio:preview-selection-locator-stale`,
+	} {
+		if !strings.Contains(script, fragment) {
+			t.Fatalf("selection locator runtime missing %q", fragment)
+		}
+	}
+	for _, forbidden := range []string{`locator.content`, `locator.value`, `locator.html`, `locator.text`} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("selection locator must not persist content via %q", forbidden)
+		}
 	}
 }

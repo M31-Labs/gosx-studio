@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { startMuddyCanvas } from "./reference_apps_harness";
+import { revealModeIfPresent, startMuddyCanvas } from "./reference_apps_harness";
 import {
   formatCanvasRenderEvidence,
   waitForCanvasBoardRenderEvidence,
@@ -60,6 +60,10 @@ test.describe("@reference-apps canvas2d site-map selection bridge", () => {
     try {
       await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
       await expect(page.locator("[data-studio-workbench='true']").first()).toBeAttached();
+      // The legacy site-map/canvas board now lives inside the "Advanced" mode
+      // panel (studio-pagecanvas-handoff moved it there once a PageCanvas
+      // surface is present); reveal it before touching the board below.
+      await revealModeIfPresent(page, "advanced");
       await expect(page.locator(BOARD_SELECTOR).first(), "DOM site-map board should be present (the bridge feeds its selection state)").toBeAttached();
 
       const canvas = page.locator(CANVAS_SELECTOR).first();
@@ -87,6 +91,12 @@ test.describe("@reference-apps canvas2d site-map selection bridge", () => {
           document.documentElement.getAttribute("data-gosx-studio-canvas-selection-bridge-bound") === "true";
       }, null, { timeout: 120_000 });
 
+      // The legacy canvas board now lives deep inside the "Advanced" mode
+      // panel (studio-pagecanvas-handoff), well below the fold, so its
+      // boundingBox() must be read AFTER scrolling it into the viewport —
+      // otherwise the box coordinates land outside the actual viewport and
+      // the synthesized click below misses the canvas entirely.
+      await canvas.scrollIntoViewIfNeeded();
       const box = await canvas.boundingBox();
       expect(box, "canvas should have a layout box").not.toBeNull();
       expect(box!.width, "canvas CSS width > 0").toBeGreaterThan(0);
@@ -153,6 +163,18 @@ test.describe("@reference-apps canvas2d site-map selection bridge", () => {
 
       const bridgeErrors = consoleErrors.filter((line) => /selection|sitemap|site-map|__gosx_get_shared_signal|GoSXStudioSiteMapRuntime/i.test(line));
       expect(bridgeErrors, `unexpected selection-bridge console errors: ${JSON.stringify(bridgeErrors)}`).toEqual([]);
+
+      // Guards the data-gosx-studio-state / data-gosx-studio-style-state
+      // attribute-collision fix (panels/responsive_layout_inspector.go +
+      // hostruntime/assets/state_runtime.js): before the fix, selecting a
+      // canvas node (as above) rendered the responsive layout inspector's
+      // style-state buttons under the SAME attribute name
+      // state_runtime.js's initAll() selects for the workbench <form>,
+      // throwing "TypeError: Array.prototype.forEach called on null or
+      // undefined" out of formSignature/initForm on every editor load. Assert
+      // zero uncaught page errors of any kind for the full session above.
+      const pageErrors = consoleErrors.filter((line) => line.startsWith("pageerror:"));
+      expect(pageErrors, `unexpected uncaught page errors: ${JSON.stringify(pageErrors)}`).toEqual([]);
     } finally {
       await server.stop();
     }

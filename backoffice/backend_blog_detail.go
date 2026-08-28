@@ -124,10 +124,12 @@ func RenderBackendBlogDetailForm(props BackendBlogDetailPageProps) gosx.Node {
 		gosx.Attr("class", "panel admin-form"),
 		gosx.Attr("method", "post"),
 		gosx.Attr("action", props.SaveAction),
+		gosx.Attr("data-content-editor-enhanced-submit", "true"),
 	),
 		gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "csrf_token"), gosx.Attr("value", props.CSRFToken))),
 		gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "id"), gosx.Attr("value", post.ID))),
 		gosx.Fragment(renderBackendBlogDetailStatuses(props)...),
+		renderBackendBlogDetailPrimaryButtons(props),
 		props.Preview,
 		renderBackendBlogDetailInput("title", "Title", post.Title, "", renderBackendBlogDetailFieldError(props.SaveStatus, "title")),
 		renderBackendBlogDetailInput("slug", "Slug", post.Slug, "", nil),
@@ -144,15 +146,12 @@ func RenderBackendBlogDetailForm(props BackendBlogDetailPageProps) gosx.Node {
 		renderBackendBlogDetailRelations("Related products", props.Products),
 		renderBackendBlogDetailRelations("Related gallery works", props.GalleryWorks),
 		renderBackendBlogDetailChecks(post),
-		renderBackendBlogDetailButtons(props),
+		renderBackendBlogDetailSecondaryButtons(props),
 	)
 }
 
 func RenderBackendBlogDetailScripts() gosx.Node {
-	return gosx.Fragment(
-		gosx.El("script", gosx.Attrs(gosx.Attr("src", "/content-editor.js"), gosx.Attr("defer", true))),
-		gosx.El("script", gosx.Attrs(gosx.Attr("src", "/media-picker.js"), gosx.Attr("defer", true))),
-	)
+	return renderBackendManagedStudioScripts()
 }
 
 func renderBackendBlogDetailStatuses(props BackendBlogDetailPageProps) []gosx.Node {
@@ -295,13 +294,23 @@ func renderBackendBlogDetailChecks(post BackendBlogDetailValues) gosx.Node {
 	)
 }
 
-func renderBackendBlogDetailButtons(props BackendBlogDetailPageProps) gosx.Node {
+func renderBackendBlogDetailPrimaryButtons(props BackendBlogDetailPageProps) gosx.Node {
 	post := props.Post
-	nodes := []gosx.Node{
+	primary := []gosx.Node{
 		gosx.El("button", gosx.Attrs(gosx.Attr("class", "button button--primary"), gosx.Attr("type", "submit")), gosx.Text("Save post")),
+		gosx.El("a", gosx.Attrs(gosx.Attr("class", "button button--secondary"), gosx.Attr("href", post.PreviewHref), gosx.Attr("data-gosx-link", "true")), gosx.Text("Preview")),
 	}
+	return gosx.El("div", gosx.Attrs(
+		gosx.Attr("class", "button-row admin-form__primary-actions"),
+		gosx.Attr("data-content-editor-primary-actions", "true"),
+	), gosx.Fragment(primary...))
+}
+
+func renderBackendBlogDetailSecondaryButtons(props BackendBlogDetailPageProps) gosx.Node {
+	post := props.Post
+	secondary := []gosx.Node{}
 	if post.CanArchive {
-		nodes = append(nodes, gosx.El("button", gosx.Attrs(
+		secondary = append(secondary, gosx.El("button", gosx.Attrs(
 			gosx.Attr("class", "button button--secondary"),
 			gosx.Attr("type", "submit"),
 			gosx.Attr("formaction", props.ArchiveAction),
@@ -309,16 +318,17 @@ func renderBackendBlogDetailButtons(props BackendBlogDetailPageProps) gosx.Node 
 		), gosx.Text("Archive")))
 	}
 	if post.CanRestore {
-		nodes = append(nodes, gosx.El("button", gosx.Attrs(
+		secondary = append(secondary, gosx.El("button", gosx.Attrs(
 			gosx.Attr("class", "button button--secondary"),
 			gosx.Attr("type", "submit"),
 			gosx.Attr("formaction", props.RestoreAction),
 			gosx.Attr("data-admin-confirm", "Restore this post?"),
 		), gosx.Text("Restore")))
 	}
-	nodes = append(nodes,
-		gosx.El("a", gosx.Attrs(gosx.Attr("class", "button button--secondary"), gosx.Attr("href", post.PreviewHref), gosx.Attr("data-gosx-link", "true")), gosx.Text("Preview")),
-		gosx.El("a", gosx.Attrs(gosx.Attr("class", "button button--secondary"), gosx.Attr("href", "/admin/blog"), gosx.Attr("data-gosx-link", "true")), gosx.Text("Back to blog")),
-	)
-	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "button-row")), gosx.Fragment(nodes...))
+	secondary = append(secondary, gosx.El("a", gosx.Attrs(gosx.Attr("class", "button button--secondary"), gosx.Attr("href", "/admin/blog"), gosx.Attr("data-gosx-link", "true"), gosx.Attr("data-content-editor-discard", "true")), gosx.Text("Back to blog")))
+	return gosx.El("div", gosx.Attrs(
+		gosx.Attr("class", "button-row admin-form__secondary-actions admin-form__danger-actions"),
+		gosx.Attr("data-content-editor-secondary-actions", "true"),
+		gosx.Attr("data-content-editor-danger-actions", "true"),
+	), gosx.Fragment(secondary...))
 }

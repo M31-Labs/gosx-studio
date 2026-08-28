@@ -68,13 +68,76 @@ func TestRenderSiteNavigatorPanelUsesTypedProps(t *testing.T) {
 	}, SiteNavigatorPanelOptions{}))
 
 	for _, fragment := range []string{
-		`<section class="studio-nav-panel" data-studio-site-navigator-panel="true" data-studio-mode-panel="site" data-studio-engine-source="gosx" data-studio-site-filter="all" data-gosx-studio-site-navigator-renderer="gosx-studio">`,
+		`<section class="studio-nav-panel" data-studio-site-navigator-panel="true" data-studio-mode-panel="site" data-studio-engine-source="gosx" data-studio-site-filter="all" data-gosx-studio-site-navigator-renderer="gosx-studio" data-studio-rail-group="site-navigator">`,
 		`<div class="studio-page-filter" role="toolbar" aria-label="Site area filter">`,
-		`<button type="button" aria-pressed>All</button>`,
 		`<a href="/admin/products" class="is-active" data-gosx-link="true" data-studio-site-page="products" data-studio-site-group="store" title="Manage product catalog"><span>Products</span></a>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("site navigator panel render missing %q:\n%s", fragment, html)
+		}
+	}
+	if !strings.Contains(html, `<button type="button" aria-pressed>All</button>`) &&
+		!strings.Contains(html, `<button type="button" aria-pressed="true">All</button>`) {
+		t.Fatalf("site navigator panel render missing pressed All filter:\n%s", html)
+	}
+}
+
+func TestRenderSiteNavigatorNewPage(t *testing.T) {
+	view := map[string]any{
+		"newPageLabel": "New page",
+		"newPageItems": []map[string]any{{
+			"key":     "landing",
+			"label":   "Landing page",
+			"formID":  "studioSiteMapIntentForm-landing",
+			"summary": "Hero, story, and a direct next step.",
+		}},
+	}
+
+	html := gosx.RenderHTML(RenderSiteNavigatorNewPage(view, SiteNavigatorPanelOptions{}))
+
+	for _, fragment := range []string{
+		`<details class="studio-new-page" data-studio-new-page="true" data-gosx-studio-site-navigator-renderer="gosx-studio">`,
+		`<summary>+ New page</summary>`,
+		`<div class="studio-new-page__options">`,
+		`<button type="submit" form="studioSiteMapIntentForm-landing" class="button button--secondary studio-new-page-option" data-editor-add-block="page-landing" data-studio-new-page-blueprint="landing" title="Hero, story, and a direct next step.">New page: Landing page</button>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("rendered new-page disclosure missing %q:\n%s", fragment, html)
+		}
+	}
+}
+
+func TestRenderSiteNavigatorNewPageEmpty(t *testing.T) {
+	html := gosx.RenderHTML(RenderSiteNavigatorNewPage(map[string]any{}, SiteNavigatorPanelOptions{}))
+	if strings.Contains(html, "studio-new-page") {
+		t.Fatalf("new-page disclosure should not render with no blueprint choices:\n%s", html)
+	}
+}
+
+func TestRenderSiteNavigatorPanelIncludesNewPageWhenProvided(t *testing.T) {
+	html := gosx.RenderHTML(RenderSiteNavigatorPanel(SiteNavigatorProps{
+		Mode:         "home",
+		Kicker:       "Website",
+		Title:        "Site areas",
+		Label:        "Site areas",
+		Empty:        "No pages.",
+		HasItems:     true,
+		NewPageLabel: "New page",
+		NewPageItems: []SiteNavigatorNewPageItem{{
+			Key:    "landing",
+			Label:  "Landing page",
+			FormID: "studioSiteMapIntentForm-landing",
+		}},
+		Items: []SiteNavigatorItem{{Key: "home", Label: "Home page", Href: "/"}},
+	}, SiteNavigatorPanelOptions{}))
+
+	for _, fragment := range []string{
+		`data-studio-new-page="true"`,
+		`New page: Landing page`,
+		`data-editor-add-block="page-landing"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("site navigator panel missing new-page disclosure %q:\n%s", fragment, html)
 		}
 	}
 }

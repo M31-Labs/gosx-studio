@@ -99,7 +99,7 @@ func TestApplySetStyleCallsWriterWithCorrectArgs(t *testing.T) {
 	})
 
 	page, component := core.Page{Key: "home", Label: "Home", Route: "/"}, core.Component{Key: "hero", Label: "Hero"}
-	m := AuthoringMutationForStyle(page, component, "padding-block", "96px", StyleBreakpointTablet, StyleStateHover)
+	m := AuthoringMutationForStyle(page, component, "padding-block", "var(--space-xl)", StyleBreakpointTablet, StyleStateHover)
 	result, err := ApplySetStyle(m, write)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -110,7 +110,7 @@ func TestApplySetStyleCallsWriterWithCorrectArgs(t *testing.T) {
 	if !result.RefreshPreview {
 		t.Fatal("result must have RefreshPreview=true")
 	}
-	if gotKey != "hero" || gotProp != "padding-block" || gotVal != "96px" ||
+	if gotKey != "hero" || gotProp != "padding-block" || gotVal != "var(--space-xl)" ||
 		gotBP != StyleBreakpointTablet || gotState != StyleStateHover {
 		t.Fatalf("writer called with wrong args: key=%q prop=%q val=%q bp=%q state=%q",
 			gotKey, gotProp, gotVal, gotBP, gotState)

@@ -99,10 +99,22 @@ func TestRenderInspectorFieldListPreservesRepresentativeControls(t *testing.T) {
 		`disabled`,
 		`data-editor-logo-url="true"`,
 		`list="editor-media-urls"`,
+		// handoff-4 (text truncation sweep): the generic/ADVANCED field
+		// control path gets the same value-echoing title tooltip as the Home
+		// variant (renderHomeInspectorInput) -- see
+		// inspectorFieldMapAttrsWithTitle. Both text-valued controls
+		// (customCss's textarea, logoUrl's input) get one; the checkbox
+		// (whose value slot holds "on"/"true", not preview text) and the
+		// select (no free-typed value to preview) do not.
+		`title=".hero{color:red}"`,
+		`title="/media/logo.png"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("rendered inspector field list missing %q:\n%s", want, html)
 		}
+	}
+	if strings.Contains(html, `title="on"`) || strings.Count(html, "title=") != 2 {
+		t.Fatalf("expected exactly the customCss textarea and logoUrl input to carry a value-echoing title:\n%s", html)
 	}
 }
 
@@ -262,12 +274,17 @@ func TestRenderInspectorFieldListHomeVariantPreservesRowControlAttrsAndMeta(t *t
 		`<label for="heroHeadline">Headline</label>`,
 		`<span>Text</span>`,
 		`<div class="studio-home-field__meta">`,
-		`<output>Ready</output>`,
+		// Wave 3A (vocabulary pruning, fix (e)): a per-field "READY" chip
+		// is noise once you have 15+ fields on a page — the validation
+		// output stays in the DOM (so a script toggling it later doesn't
+		// need new markup) but hidden unless the field is actually invalid.
+		`<output hidden>Ready</output>`,
 		`<small>Live preview</small>`,
 		`<small class="studio-home-field__invalid">Needs attention</small>`,
 		`name="heroHeadline"`,
 		`type="text"`,
 		`value="Mud Relics"`,
+		`title="Mud Relics"`,
 		`required`,
 		`data-editor-source="hero-headline"`,
 		`data-editor-frame-target=".hero h1"`,
@@ -286,6 +303,74 @@ func TestRenderInspectorFieldListHomeVariantPreservesRowControlAttrsAndMeta(t *t
 	}
 	if !strings.Contains(html, "\n  Preserve this copy.\n") {
 		t.Fatalf("home textarea did not preserve raw whitespace:\n%s", html)
+	}
+	if !strings.Contains(html, "title=\"\n  Preserve this copy.\n\"") {
+		t.Fatalf("home textarea missing a title tooltip mirroring its value:\n%s", html)
+	}
+}
+
+// TestRenderHomeInspectorInputOmitsTitleForCheckboxesAndEmptyValues guards
+// handoff-4's text-truncation-sweep fix: a title tooltip mirroring the
+// current value is added to every home-inspector text/textarea/link
+// input so a value clipped by the fixed rail width (e.g. "Small-batch
+// ceramics for daily ritua…") stays discoverable on hover/focus, but a
+// checkbox's "on"/"true" value slot isn't real preview text and an empty
+// value has nothing to reveal, so neither should render a title attribute.
+func TestRenderHomeInspectorInputOmitsTitleForCheckboxesAndEmptyValues(t *testing.T) {
+	checkboxHTML := gosx.RenderHTML(RenderInspectorFieldRow(map[string]any{
+		"isInput":   true,
+		"id":        "showAnnouncement",
+		"label":     "Show announcement",
+		"inputName": "showAnnouncement",
+		"inputType": "checkbox",
+		"checked":   true,
+	}, InspectorFieldRowOptions{Variant: InspectorFieldRowVariantHome}))
+	if strings.Contains(checkboxHTML, "title=") {
+		t.Fatalf("checkbox input must not render a value-echoing title:\n%s", checkboxHTML)
+	}
+
+	emptyHTML := gosx.RenderHTML(RenderInspectorFieldRow(map[string]any{
+		"isInput":    true,
+		"id":         "ctaUrl",
+		"label":      "CTA URL",
+		"inputName":  "ctaUrl",
+		"inputType":  "text",
+		"inputValue": "",
+	}, InspectorFieldRowOptions{Variant: InspectorFieldRowVariantHome}))
+	if strings.Contains(emptyHTML, "title=") {
+		t.Fatalf("empty-valued input must not render an empty title:\n%s", emptyHTML)
+	}
+}
+
+// TestRenderInspectorFieldRowHomeVariantShowsValidationOutputOnlyWhenInvalid
+// guards wave 3A fix (e): the per-field "READY"/"Required"/"Linked" chip is
+// vocabulary noise on a valid field (it was visible on every single field in
+// the inspector, all the time) — only an actual validation problem
+// ("invalid": true) is worth surfacing here.
+func TestRenderInspectorFieldRowHomeVariantShowsValidationOutputOnlyWhenInvalid(t *testing.T) {
+	valid := gosx.RenderHTML(RenderInspectorFieldRow(map[string]any{
+		"isInput":         true,
+		"id":              "tagline",
+		"label":           "Tagline",
+		"validationLabel": "Ready",
+		"invalid":         false,
+	}, InspectorFieldRowOptions{Variant: InspectorFieldRowVariantHome}))
+	if !strings.Contains(valid, `<output hidden>Ready</output>`) {
+		t.Fatalf("expected a valid field's validation output to be present but hidden, got:\n%s", valid)
+	}
+
+	invalid := gosx.RenderHTML(RenderInspectorFieldRow(map[string]any{
+		"isInput":         true,
+		"id":              "tagline",
+		"label":           "Tagline",
+		"validationLabel": "Needs value",
+		"invalid":         true,
+	}, InspectorFieldRowOptions{Variant: InspectorFieldRowVariantHome}))
+	if !strings.Contains(invalid, `<output>Needs value</output>`) {
+		t.Fatalf("expected an invalid field's validation error to render visibly, got:\n%s", invalid)
+	}
+	if strings.Contains(invalid, `<output hidden>`) {
+		t.Fatalf("an invalid field's validation output must not be hidden:\n%s", invalid)
 	}
 }
 
@@ -343,6 +428,13 @@ func TestRenderInspectorFieldRowHomeVariantRendersCardActions(t *testing.T) {
 		`data-studio-field-action-formaction="/admin/editor/__actions/save"`,
 		`formaction="/admin/editor/__actions/save"`,
 		`formmethod="post"`,
+		// Edit-revert regression (Noni staging incident, handoff-24): this
+		// button submits the SHARED websiteEditorForm without its own form=
+		// attribute (relies on DOM nesting) — formnovalidate must be present
+		// or a hidden invalid control elsewhere in the form silently cancels
+		// the submission with no server round trip, indistinguishable from a
+		// revert.
+		`formnovalidate="formnovalidate"`,
 		`name="refresh"`,
 		`value="hero"`,
 		`data-admin-confirm="Refresh source?"`,

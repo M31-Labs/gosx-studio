@@ -168,6 +168,75 @@
     return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }
 
+  // workbenchWorkingStateStorageKey — sessionStorage (NOT localStorage: this
+  // is per-tab-session working context, not a durable layout preference,
+  // and should not resurrect a stale mode/selection days later) key holding
+  // the operator's in-progress working context: the active mode tab, the
+  // current data-studio-selection key, and the canvas stage's scroll
+  // position. A host form POST (Save) navigates the browser, which tears
+  // down all in-memory JS state; without this, every save silently resets
+  // the editor back to the default mode with no selection and a scrolled-
+  // to-top canvas, discarding the operator's place in the document. Restored
+  // on the next bindChromeIsland() call (i.e. after the post-save page
+  // reload) — see restoreWorkbenchWorkingState.
+  var workbenchWorkingStateStorageKey = "gosx-studio-editor-working-state";
+
+  // readWorkbenchWorkingState / writeWorkbenchWorkingState — guarded
+  // sessionStorage read/merge-write, mirroring readWorkbenchLayout /
+  // saveLayoutIsland's error-swallowing convention (a lost working-state
+  // restore is a UX regression, never a correctness break).
+  function readWorkbenchWorkingState() {
+    try {
+      return JSON.parse(window.sessionStorage.getItem(workbenchWorkingStateStorageKey) || "{}") || {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function writeWorkbenchWorkingState(patch) {
+    try {
+      var current = readWorkbenchWorkingState();
+      for (var key in patch) {
+        if (Object.prototype.hasOwnProperty.call(patch, key)) current[key] = patch[key];
+      }
+      window.sessionStorage.setItem(workbenchWorkingStateStorageKey, JSON.stringify(current));
+    } catch (error) {
+      return;
+    }
+  }
+
+  // restoreWorkbenchWorkingState — applies a persisted mode/selection/scroll
+  // position onto the freshly bound form + stage, then rebinds the
+  // persistence listeners (selection attribute + stage scroll) so future
+  // changes within this tab session keep the snapshot current. Called once
+  // per bindChromeIsland() call, before setModeIsland seeds the mode from
+  // the server-rendered default.
+  function restoreWorkbenchWorkingState(form, stage) {
+    var state = readWorkbenchWorkingState();
+    if (state.selection) {
+      form.setAttribute("data-studio-selection", state.selection);
+    }
+    if (stage && (state.scrollTop || state.scrollLeft)) {
+      frame(function () {
+        if (state.scrollTop) stage.scrollTop = state.scrollTop;
+        if (state.scrollLeft) stage.scrollLeft = state.scrollLeft;
+      });
+    }
+    if (window.MutationObserver) {
+      new MutationObserver(function () {
+        var selection = form.getAttribute("data-studio-selection") || "";
+        writeWorkbenchWorkingState({ selection: selection });
+      }).observe(form, { attributes: true, attributeFilter: ["data-studio-selection"] });
+    }
+    if (stage) {
+      var saveScrollSoon = frameTask(function () {
+        writeWorkbenchWorkingState({ scrollTop: stage.scrollTop, scrollLeft: stage.scrollLeft });
+      });
+      stage.addEventListener("scroll", saveScrollSoon, { passive: true });
+    }
+    return state;
+  }
+
   // Workbench label maps — exact mirror of studio-engines.js:242-265.
   var workbenchLayoutStorageKey = "gosx-studio-editor-layout";
   var workbenchModeLabels = {
@@ -202,9 +271,31 @@
     return mode || "home";
   }
 
+  // workbenchModeGateRoot — the scope setMode searches for
+  // [data-studio-mode-panel] elements. Most mode-gated panels render inside
+  // the workbench <form> itself (the left/right rails), but a host's own
+  // companion panels that need their OWN <form> (e.g. Muddy/Noni's direct-
+  // edit panel, interactions inspector, flow field editor, shared-
+  // components palette — a <form> cannot legally nest inside the workbench's
+  // own <form id="websiteEditorForm">, so hosts render them as siblings
+  // instead) live OUTSIDE the form. Search the nearest
+  // [data-gosx-studio-backend-editor-renderer] ancestor (the whole backend
+  // editor page — see shell.RenderBackendEditorPage) when present, so those
+  // sibling panels are reachable too; fall back to the form itself so
+  // fixtures/hosts that mount the form standalone (no such ancestor) keep
+  // their existing form-scoped behavior unchanged.
+  function workbenchModeGateRoot(form) {
+    if (form.closest) {
+      var root = form.closest("[data-gosx-studio-backend-editor-renderer]");
+      if (root) return root;
+    }
+    return form;
+  }
+
   function workbenchModePanel(form, mode) {
+    var root = workbenchModeGateRoot(form);
     var selector = '[data-studio-mode-panel="' + attrValue(normalizeWorkbenchMode(mode)) + '"]';
-    return form.querySelector(".studio-right-rail " + selector) || form.querySelector(".editor-panel" + selector) || form.querySelector(selector);
+    return root.querySelector(".studio-right-rail " + selector) || root.querySelector(".editor-panel" + selector) || root.querySelector(selector);
   }
 
   function workbenchPanelFollowsMode(panel) {
@@ -439,7 +530,9 @@
       refreshWorkbenchCanvas();
     });
     applyWorkbenchLayout(form);
-    setModeIsland(form, form.getAttribute("data-studio-mode") || "home", false);
+    var stage = workbenchStage(form);
+    var workingState = restoreWorkbenchWorkingState(form, stage);
+    setModeIsland(form, workingState.mode || form.getAttribute("data-studio-mode") || "home", false);
     if (!form.hasAttribute("data-studio-left")) form.setAttribute("data-studio-left", "open");
     if (!form.hasAttribute("data-studio-right")) form.setAttribute("data-studio-right", "open");
     if (!form.hasAttribute("data-studio-focus")) form.setAttribute("data-studio-focus", "false");
@@ -464,10 +557,15 @@
     if (!form) return;
     mode = normalizeWorkbenchMode(mode);
     form.setAttribute("data-studio-mode", mode);
+    writeWorkbenchWorkingState({ mode: mode });
     Array.prototype.forEach.call(form.querySelectorAll("[data-studio-mode-control]"), function (button) {
       button.setAttribute("aria-pressed", normalizeWorkbenchMode(button.getAttribute("data-studio-mode-control")) === mode ? "true" : "false");
     });
-    Array.prototype.forEach.call(form.querySelectorAll("[data-studio-mode-panel]"), function (panel) {
+    // Widened to workbenchModeGateRoot (not just the form): a host's own
+    // companion panels needing their own <form> (direct-edit, interactions,
+    // flow field editor, shared components...) render as siblings of the
+    // workbench form, not descendants of it — see workbenchModeGateRoot.
+    Array.prototype.forEach.call(workbenchModeGateRoot(form).querySelectorAll("[data-studio-mode-panel]"), function (panel) {
       var active = normalizeWorkbenchMode(panel.getAttribute("data-studio-mode-panel")) === mode;
       panel.classList.toggle("is-mode-active", active);
       if (workbenchPanelFollowsMode(panel)) {

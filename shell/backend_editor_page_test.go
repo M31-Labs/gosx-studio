@@ -59,7 +59,7 @@ func TestRenderBackendEditorPagePreservesEditorShellContract(t *testing.T) {
 		`<p class="form-status form-status--ok">Published.</p>`,
 		`<p class="form-status form-status--error">Flow failed.</p>`,
 		`<p class="form-status form-status--error">Restore failed.</p>`,
-		`<p class="form-status form-status--ok">Editor settings restored.</p>`,
+		`<p class="form-status form-status--ok" role="status" tabindex="-1">Editor settings restored.</p>`,
 		`<section data-workbench="true">workbench</section>`,
 		`<form data-site-map-authoring="true"></form>`,
 		`<form data-style-palette="true"></form>`,
@@ -86,6 +86,30 @@ func TestRenderBackendEditorPagePreservesEditorShellContract(t *testing.T) {
 		`data-gosx-studio-state-runtime="true"`,
 		`data-gosx-studio-engine-runtime="true"`,
 	)
+}
+
+// TestRenderBackendEditorStatusesRestoredBannerIsFocusableStatus proves the
+// post-restore confirmation ("Editor settings restored.") carries
+// role="status" (so assistive tech announces it without a page-level
+// aria-live region) and tabindex="-1" (so the runtime can move focus onto
+// it after an async restore, when nothing else naturally has focus) -- and
+// that the other action-status banners (which are not tied to a background
+// restore completing) are left as plain <p> elements, unaffected.
+func TestRenderBackendEditorStatusesRestoredBannerIsFocusableStatus(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendEditorStatuses(BackendEditorPageProps{
+		SaveStatus: BackendEditorActionStatus{
+			OK:      true,
+			Message: "Saved.",
+		},
+		RevisionRestored: true,
+	}))
+
+	if !strings.Contains(html, `<p class="form-status form-status--ok" role="status" tabindex="-1">Editor settings restored.</p>`) {
+		t.Fatalf("restored banner missing role/tabindex accessibility attrs:\n%s", html)
+	}
+	if !strings.Contains(html, `<p class="form-status form-status--ok">Saved.</p>`) {
+		t.Fatalf("save status should render without role/tabindex:\n%s", html)
+	}
 }
 
 func TestRenderBackendEditorPageDefaultsAndSplitNodes(t *testing.T) {
@@ -222,6 +246,73 @@ func TestRenderBackendEditorPageRendersStylePanelFromProps(t *testing.T) {
 		`data-gosx-studio-engine-hosts-renderer="gosx-studio"`,
 		`data-gosx-studio-workbench-runtime="true"`,
 	)
+}
+
+// TestRenderBackendEditorPageStylePanelIsModeGatedToLook guards wave 3B fix
+// #3: the color-token/font style panel (backendEditorStylePanelNode)
+// previously rendered with no data-studio-mode-panel at all, so it composed
+// as a permanent, un-gated fixture visible in every editor mode (confirmed
+// live against a staging seed: present and visible under HOME, LOOK,
+// PREVIEW, PUBLISH, and ADVANCED alike). It belongs to LOOK — the raw token
+// editor is a second, ungrouped surface for the same "visual system" LOOK's
+// own grouped RenderLookPanel already owns as the primary one — so its
+// auto-rendered output must now carry the same
+// data-studio-mode-panel="look" + .editor-panel + data-studio-mode-gate-wrapper
+// convention muddy-noni-commerce's own editorGatedModePanel already uses for
+// its host-composed support nodes, so workbenchruntime/island_runtime.js's
+// setModeIsland actually hides it outside LOOK.
+func TestRenderBackendEditorPageStylePanelIsModeGatedToLook(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendEditorPage(BackendEditorPageProps{
+		StylePanelView: map[string]any{
+			"palette": []map[string]any{{
+				"key":      "accent",
+				"name":     "colorAccent",
+				"label":    "Accent",
+				"cssVar":   "--color-accent",
+				"value":    "#b5651d",
+				"fallback": "#b5651d",
+			}},
+		},
+		StylePanelFormID:    "editorStylePaletteForm",
+		StylePanelAction:    "/admin/editor/__actions/authoring",
+		StylePanelCSRFToken: "csrf-token",
+	}))
+
+	for _, want := range []string{
+		`data-studio-mode-panel="look"`,
+		`data-studio-mode-gate-wrapper="true"`,
+		`class="editor-panel editor-panel--mode-gate"`,
+		`data-gosx-studio-style-panel="true"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("style panel missing mode-gate wrapper %q:\n%s", want, html)
+		}
+	}
+	assertOrder(t, html,
+		`data-studio-mode-panel="look"`,
+		`data-gosx-studio-style-panel="true"`,
+	)
+}
+
+// TestRenderBackendEditorPageStylePanelNodeOverrideIsNotModeGated confirms
+// the mode-gate wrapping above only applies to the panel this shell renders
+// itself from StylePanelView; a host-supplied StylePanelNode override stays
+// exactly as given (the host owns its own placement/gating decisions for
+// that escape hatch — see TestRenderBackendEditorPageStylePanelNodeOverridesView).
+func TestRenderBackendEditorPageStylePanelNodeOverrideIsNotModeGated(t *testing.T) {
+	html := gosx.RenderHTML(RenderBackendEditorPage(BackendEditorPageProps{
+		StylePanelView: map[string]any{
+			"palette": []map[string]any{{"key": "accent", "name": "colorAccent", "label": "Accent", "cssVar": "--color-accent", "value": "#b5651d", "fallback": "#b5651d"}},
+		},
+		StylePanelAction: "/admin/editor/__actions/authoring",
+		StylePanelNode:   gosx.El("form", gosx.Attrs(gosx.Attr("data-explicit-style-panel", "true"))),
+	}))
+	if !strings.Contains(html, `<form data-explicit-style-panel="true"></form>`) {
+		t.Fatalf("explicit style panel node should render unwrapped:\n%s", html)
+	}
+	if strings.Contains(html, `data-studio-mode-gate-wrapper="true"`) {
+		t.Fatalf("explicit style panel node should not be mode-gate wrapped:\n%s", html)
+	}
 }
 
 func TestRenderBackendEditorPageSkipsEmptyStylePanelProps(t *testing.T) {

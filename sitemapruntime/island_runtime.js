@@ -5,6 +5,8 @@
   var LAYOUT_ACTION = "data-gosx-studio-site-map-layout-action";
   var BOUND = "data-gosx-studio-site-map-runtime-bound";
   var BOUND_PROP = "__gosxStudioSiteMapRuntimeBound";
+  var ACTIVE_GESTURE_PROP = "__gosxStudioSiteMapActiveGesture";
+  var SUPPRESS_CLICK_PROP = "__gosxStudioSiteMapSuppressClick";
 
   function attr(el, name, fallback) {
     if (!el || !el.getAttribute) return fallback || "";
@@ -61,6 +63,56 @@
   function styleNum(el, prop) {
     var value = el && el.style ? parseFloat(el.style[prop]) : NaN;
     return isFinite(value) ? value : null;
+  }
+
+  function attributeSnapshot(el, name) {
+    return {
+      present: !!(el && el.hasAttribute && el.hasAttribute(name)),
+      value: el && el.getAttribute ? el.getAttribute(name) : null,
+    };
+  }
+
+  function restoreAttribute(el, name, snapshot) {
+    if (!el || !snapshot) return;
+    if (snapshot.present) setAttr(el, name, snapshot.value);
+    else if (el.removeAttribute) el.removeAttribute(name);
+  }
+
+  function claimGesture(root, gesture) {
+    if (!root || root[ACTIVE_GESTURE_PROP]) return false;
+    root[ACTIVE_GESTURE_PROP] = gesture;
+    return true;
+  }
+
+  function releaseGesture(root, gesture) {
+    if (root && root[ACTIVE_GESTURE_PROP] === gesture) root[ACTIVE_GESTURE_PROP] = null;
+  }
+
+  function suppressTrailingClick(root) {
+    if (!root) return;
+    // This is intentionally one-shot rather than time-based. The next
+    // pointerdown clears it, so a legitimate immediate tap is not swallowed
+    // when a browser omits the trailing click for the canceled gesture.
+    root[SUPPRESS_CLICK_PROP] = true;
+  }
+
+  function consumeSuppressedClick(root, event) {
+    if (!root) return false;
+    if (!root[SUPPRESS_CLICK_PROP]) return false;
+    // A click with detail=0 is keyboard activation, not the trailing click
+    // synthesized by the pointer gesture we just finished. Leave the guard
+    // armed until the next pointerdown clears it.
+    if (event && event.detail === 0) return false;
+    root[SUPPRESS_CLICK_PROP] = false;
+    return true;
+  }
+
+  function sameStringList(left, right) {
+    if (!left || !right || left.length !== right.length) return false;
+    for (var i = 0; i < left.length; i += 1) {
+      if (left[i] !== right[i]) return false;
+    }
+    return true;
   }
 
   function clampScale(value) {
@@ -138,8 +190,15 @@
   }
 
   function handlePointerDown(root, event) {
+    // Clear a prior one-shot drag-click guard on any fresh pointerdown,
+    // including controls outside this board's canvas.
+    root[SUPPRESS_CLICK_PROP] = false;
     if (event.button !== 0 && event.button !== 1) return;
     if (!closest(event.target, "[data-studio-site-map-canvas]")) return;
+    // A board owns one gesture at a time. A second touch/stylus pointer must
+    // never replace the initiating pointer's snapshot or add stale document
+    // listeners alongside it.
+    if (root[ACTIVE_GESTURE_PROP]) return;
     var onEmpty = viewportDragAllowed(event.target);
     // Plain left-press on a node = potential drag-to-reposition. Shift is
     // reserved for marquee/multi-select, so it never starts a node drag.
@@ -159,6 +218,8 @@
   // the pointer at any zoom. A press that never crosses DRAG_THRESHOLD stays a
   // click (the click handler selects it) and emits no move event.
   function startNodeDrag(root, node, event) {
+    var gesture = { type: "node", pointerId: event.pointerId };
+    if (!claimGesture(root, gesture)) return;
     var key = attr(node, "data-studio-site-map-workspace-node", "");
     var startClientX = event.clientX;
     var startClientY = event.clientY;
@@ -167,7 +228,52 @@
     var startTop = styleNum(node, "top");
     if (startTop == null) startTop = node.offsetTop || 0;
     var dragging = false;
+    var active = true;
+    var originalNodeStyle = {
+      position: node.style.position,
+      left: node.style.left,
+      top: node.style.top,
+    };
+    var originalNodeX = attributeSnapshot(node, "data-studio-site-map-node-x");
+    var originalNodeY = attributeSnapshot(node, "data-studio-site-map-node-y");
+    var originalRootDragging = attributeSnapshot(root, "data-studio-site-map-node-dragging");
+    function cleanup() {
+      if (!active) return;
+      active = false;
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      document.removeEventListener("pointercancel", cancelPointer);
+      document.removeEventListener("keydown", cancelEscape, true);
+      releaseGesture(root, gesture);
+    }
+    function restore() {
+      node.style.position = originalNodeStyle.position;
+      node.style.left = originalNodeStyle.left;
+      node.style.top = originalNodeStyle.top;
+      restoreAttribute(node, "data-studio-site-map-node-x", originalNodeX);
+      restoreAttribute(node, "data-studio-site-map-node-y", originalNodeY);
+      restoreAttribute(root, "data-studio-site-map-node-dragging", originalRootDragging);
+    }
+    function cancelGesture() {
+      if (!active) return;
+      var hadMovement = dragging;
+      cleanup();
+      restore();
+      if (hadMovement) suppressTrailingClick(root);
+    }
+    function cancelPointer(ev) {
+      if (!active || !ev || ev.pointerId !== gesture.pointerId) return;
+      if (ev.cancelable) ev.preventDefault();
+      cancelGesture();
+    }
+    function cancelEscape(ev) {
+      if (!active || !ev || ev.key !== "Escape") return;
+      ev.preventDefault();
+      if (ev.stopPropagation) ev.stopPropagation();
+      cancelGesture();
+    }
     function move(ev) {
+      if (!active || !ev || ev.pointerId !== gesture.pointerId) return;
       var dxScreen = ev.clientX - startClientX;
       var dyScreen = ev.clientY - startClientY;
       if (!dragging && Math.abs(dxScreen) < DRAG_THRESHOLD && Math.abs(dyScreen) < DRAG_THRESHOLD) return;
@@ -179,14 +285,23 @@
       node.style.position = "absolute";
       node.style.left = startLeft + dxScreen / scale + "px";
       node.style.top = startTop + dyScreen / scale + "px";
+      if (ev.cancelable) ev.preventDefault();
     }
-    function up() {
-      document.removeEventListener("pointermove", move);
-      document.removeEventListener("pointerup", up);
-      if (!dragging) return; // sub-threshold press: leave it to click-to-select.
-      setAttr(root, "data-studio-site-map-node-dragging", "false");
+    function up(ev) {
+      if (!active || !ev || ev.pointerId !== gesture.pointerId) return;
+      var hadMovement = dragging;
+      cleanup();
+      if (!hadMovement) return; // sub-threshold press: leave it to click-to-select.
       var x = snapTo(styleNum(node, "left") || 0, NODE_SNAP_GRID);
       var y = snapTo(styleNum(node, "top") || 0, NODE_SNAP_GRID);
+      if (x === snapTo(startLeft, NODE_SNAP_GRID) && y === snapTo(startTop, NODE_SNAP_GRID)) {
+        // A move out-and-back (or a sub-grid move) is a no-op. Restore the
+        // original inline values/attrs so the gesture cannot dirty the draft.
+        restore();
+        suppressTrailingClick(root);
+        return;
+      }
+      setAttr(root, "data-studio-site-map-node-dragging", "false");
       node.style.left = x + "px";
       node.style.top = y + "px";
       setAttr(node, "data-studio-site-map-node-x", x);
@@ -195,29 +310,87 @@
         bubbles: true,
         detail: { key: key, x: x, y: y },
       }));
+      suppressTrailingClick(root);
     }
     document.addEventListener("pointermove", move);
     document.addEventListener("pointerup", up);
+    document.addEventListener("pointercancel", cancelPointer);
+    document.addEventListener("keydown", cancelEscape, true);
   }
 
   function startPan(root, event) {
+    var gesture = { type: "pan", pointerId: event.pointerId };
+    if (!claimGesture(root, gesture)) return;
     var origin = state(root);
     var startX = event.clientX;
     var startY = event.clientY;
+    var active = true;
+    var moved = false;
+    var originalRootPanning = attributeSnapshot(root, "data-studio-site-map-panning");
     setAttr(root, "data-studio-site-map-panning", "true");
     function move(ev) {
+      if (!active || !ev || ev.pointerId !== gesture.pointerId) return;
+      var dx = ev.clientX - startX;
+      var dy = ev.clientY - startY;
+      if (dx === 0 && dy === 0 && !moved) return;
+      moved = true;
       setState(root, {
-        panX: origin.panX + (ev.clientX - startX),
-        panY: origin.panY + (ev.clientY - startY),
+        panX: origin.panX + dx,
+        panY: origin.panY + dy,
       });
+      if (ev.cancelable) ev.preventDefault();
     }
-    function up() {
-      setAttr(root, "data-studio-site-map-panning", "false");
+    function cleanup() {
+      if (!active) return;
+      active = false;
       document.removeEventListener("pointermove", move);
       document.removeEventListener("pointerup", up);
+      document.removeEventListener("pointercancel", cancelPointer);
+      document.removeEventListener("keydown", cancelEscape, true);
+      releaseGesture(root, gesture);
+    }
+    function restore() {
+      if (moved) {
+        var restored = state(root);
+        restored.panX = origin.panX;
+        restored.panY = origin.panY;
+        writeState(root, restored);
+        sync(root);
+      }
+      restoreAttribute(root, "data-studio-site-map-panning", originalRootPanning);
+    }
+    function cancelGesture() {
+      if (!active) return;
+      cleanup();
+      restore();
+      if (moved) suppressTrailingClick(root);
+    }
+    function cancelPointer(ev) {
+      if (!active || !ev || ev.pointerId !== gesture.pointerId) return;
+      if (ev.cancelable) ev.preventDefault();
+      cancelGesture();
+    }
+    function cancelEscape(ev) {
+      if (!active || !ev || ev.key !== "Escape") return;
+      ev.preventDefault();
+      if (ev.stopPropagation) ev.stopPropagation();
+      cancelGesture();
+    }
+    function up(ev) {
+      if (!active || !ev || ev.pointerId !== gesture.pointerId) return;
+      var hadMovement = moved;
+      cleanup();
+      if (!hadMovement) {
+        restore();
+        return;
+      }
+      setAttr(root, "data-studio-site-map-panning", "false");
+      suppressTrailingClick(root);
     }
     document.addEventListener("pointermove", move);
     document.addEventListener("pointerup", up);
+    document.addEventListener("pointercancel", cancelPointer);
+    document.addEventListener("keydown", cancelEscape, true);
   }
 
   function parseKeyList(value) {
@@ -256,12 +429,26 @@
   function startMarquee(root, event) {
     var canvas = canvasEl(root);
     if (!canvas) return;
+    var gesture = { type: "marquee", pointerId: event.pointerId };
+    if (!claimGesture(root, gesture)) return;
+    var existingOverlay = canvas.querySelector("[data-studio-site-map-marquee]");
     var overlay = ensureMarqueeOverlay(canvas);
     var startX = event.clientX;
     var startY = event.clientY;
     var moved = false;
+    var active = true;
+    var originalSelectedNodes = state(root).selectedNodes.slice();
+    var originalRootMarqueeing = attributeSnapshot(root, "data-studio-site-map-marqueeing");
+    var originalOverlayStyle = existingOverlay ? {
+      display: overlay.style.display,
+      left: overlay.style.left,
+      top: overlay.style.top,
+      width: overlay.style.width,
+      height: overlay.style.height,
+    } : null;
     setAttr(root, "data-studio-site-map-marqueeing", "true");
     function move(ev) {
+      if (!active || !ev || ev.pointerId !== gesture.pointerId) return;
       var box = marqueeRect(startX, startY, ev);
       if (box.w > 3 || box.h > 3) moved = true;
       var canvasRect = canvas.getBoundingClientRect();
@@ -271,12 +458,62 @@
       overlay.style.width = box.w + "px";
       overlay.style.height = box.h + "px";
     }
-    function up(ev) {
+    function cleanup() {
+      if (!active) return;
+      active = false;
       document.removeEventListener("pointermove", move);
       document.removeEventListener("pointerup", up);
+      document.removeEventListener("pointercancel", cancelPointer);
+      document.removeEventListener("keydown", cancelEscape, true);
+      releaseGesture(root, gesture);
+    }
+    function restore() {
+      if (!existingOverlay && overlay.parentNode) {
+        overlay.parentNode.removeChild(overlay);
+      } else if (originalOverlayStyle) {
+        overlay.style.display = originalOverlayStyle.display;
+        overlay.style.left = originalOverlayStyle.left;
+        overlay.style.top = originalOverlayStyle.top;
+        overlay.style.width = originalOverlayStyle.width;
+        overlay.style.height = originalOverlayStyle.height;
+      } else {
+        overlay.style.display = "none";
+      }
+      var current = state(root);
+      if (!sameStringList(current.selectedNodes, originalSelectedNodes)) {
+        current.selectedNodes = originalSelectedNodes.slice();
+        writeState(root, current);
+        sync(root);
+      }
+      restoreAttribute(root, "data-studio-site-map-marqueeing", originalRootMarqueeing);
+    }
+    function cancelGesture() {
+      if (!active) return;
+      cleanup();
+      restore();
+      if (moved) suppressTrailingClick(root);
+    }
+    function cancelPointer(ev) {
+      if (!active || !ev || ev.pointerId !== gesture.pointerId) return;
+      if (ev.cancelable) ev.preventDefault();
+      cancelGesture();
+    }
+    function cancelEscape(ev) {
+      if (!active || !ev || ev.key !== "Escape") return;
+      ev.preventDefault();
+      if (ev.stopPropagation) ev.stopPropagation();
+      cancelGesture();
+    }
+    function up(ev) {
+      if (!active || !ev || ev.pointerId !== gesture.pointerId) return;
+      var hadMovement = moved;
+      cleanup();
+      if (!hadMovement) {
+        restore();
+        return;
+      }
       overlay.style.display = "none";
       setAttr(root, "data-studio-site-map-marqueeing", "false");
-      if (!moved) return;
       var box = marqueeRect(startX, startY, ev);
       var selected = [];
       all(root, "[data-studio-site-map-workspace-node]").forEach(function (node) {
@@ -285,9 +522,12 @@
         }
       });
       setState(root, { selectedNodes: selected });
+      suppressTrailingClick(root);
     }
     document.addEventListener("pointermove", move);
     document.addEventListener("pointerup", up);
+    document.addEventListener("pointercancel", cancelPointer);
+    document.addEventListener("keydown", cancelEscape, true);
   }
 
   // ---- Keyboard node navigation (spatial arrows + activate) ----
@@ -627,6 +867,7 @@
   }
 
   function handleClick(root, event) {
+    if (consumeSuppressedClick(root, event)) return;
     var target = event.target;
     var value = "";
 

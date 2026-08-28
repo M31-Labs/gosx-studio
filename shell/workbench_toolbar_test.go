@@ -85,6 +85,53 @@ func TestRenderWorkbenchToolbarUsesShellView(t *testing.T) {
 	}
 }
 
+// TestRenderWorkbenchToolbarTitleSummaryIsReactiveSelectionReadout is the
+// regression test for HANDOFF-19 (owner report: clicking anywhere in the
+// center canvas never visibly selects anything — the editor's most prominent
+// selection status, next to the "Website editor" title, read "No selection"
+// the whole time).
+//
+// Root cause: the toolbar title's summary node (fed by selectionLabel,
+// falling back to routeLabel — see RenderWorkbenchToolbar above) was rendered
+// as a completely bare <span> with no attributes at all. Every OTHER
+// selection-label readout in this file (RenderWorkbenchCanvasBar,
+// RenderWorkbenchCanvasStatus) and in shell/workbench_page_canvas.go carries
+// data-studio-selection-label="true", which
+// hostruntime/assets/workbench_runtime.js's setReadout() targets via
+// queryAll(form, "[data-studio-selection-label]") on every real selection
+// change. Lacking that attribute, the toolbar title span was invisible to
+// that update path and stayed frozen at whatever string the server baked in
+// on the FIRST render (in muddy-noni-commerce, literally the hardcoded
+// string "No selection" — see app/admin/editor/page.server.go's
+// editorStudioShell) no matter how many real, successful clicks the user
+// made on the canvas underneath it.
+//
+// This test asserts the summary span now carries that attribute, so a
+// regression here (dropping the attribute again) fails loudly at the render
+// layer without needing a live browser.
+func TestRenderWorkbenchToolbarTitleSummaryIsReactiveSelectionReadout(t *testing.T) {
+	shell := New(Options{
+		Title:      "Pajaritos Website",
+		PreviewURL: "/",
+		SaveAction: "/admin/editor/__actions/save",
+		Canvas: CanvasSurface{
+			RouteLabel:     "Home",
+			SelectionLabel: "Hero",
+		},
+	})
+	view := WorkbenchShellViewForShell(shell, WorkbenchShellViewOptions{ToolbarKicker: "Website"})
+
+	html := gosx.RenderHTML(RenderWorkbenchToolbar(view, WorkbenchToolbarOptions{}))
+
+	want := `<span data-studio-selection-label="true">Hero</span>`
+	if !strings.Contains(html, want) {
+		t.Fatalf("expected reactive selection-label span %q in toolbar title html, got: %s", want, html)
+	}
+	if strings.Contains(html, "<span>Hero</span>") {
+		t.Fatalf("toolbar title summary span rendered WITHOUT a data-studio-selection-label hook — client-side setReadout() can never update it, reproducing the frozen 'No selection' defect: %s", html)
+	}
+}
+
 func TestRenderWorkbenchCommandPaletteUsesShellViewCommands(t *testing.T) {
 	view := WorkbenchShellView(WorkbenchShellSource{
 		Title: "Client Site",
@@ -387,6 +434,58 @@ func TestRenderWorkbenchToolbarHonorsDisabledActions(t *testing.T) {
 	} {
 		if strings.Contains(html, blocked) {
 			t.Fatalf("expected disabled toolbar action %q to be omitted: %s", blocked, html)
+		}
+	}
+}
+
+// TestRenderWorkbenchToolbarPlacesCollaborationSummaryAheadOfSaveStatus
+// guards handoff-4 (punch #7 -- presence to top chrome): the collaborators
+// facepile+count moves into the shared toolbar action row (previously it
+// only lived in the page-bottom RenderCollaborationPanel), ahead of the
+// save-state indicator, so presence is visible from every mode without
+// scrolling.
+func TestRenderWorkbenchToolbarPlacesCollaborationSummaryAheadOfSaveStatus(t *testing.T) {
+	view := WorkbenchShellView(WorkbenchShellSource{Title: "Client Site", PreviewURL: "/"}, WorkbenchShellViewOptions{})
+	html := gosx.RenderHTML(RenderWorkbenchToolbar(view, WorkbenchToolbarOptions{
+		CollaborationSummaryNode: RenderWorkbenchCollaborationSummary(WorkbenchCollaborationSummaryOptions{
+			PanelID: "studio-collaboration-panel",
+		}),
+		SaveStatusNode: RenderWorkbenchSaveStatus(WorkbenchSaveStatusOptions{}),
+	}))
+	summaryIndex := strings.Index(html, `data-studio-collab-summary="true"`)
+	saveStatusIndex := strings.Index(html, `data-gosx-studio-save-status="true"`)
+	if summaryIndex < 0 || saveStatusIndex < 0 {
+		t.Fatalf("expected both collaboration summary and save status in toolbar: %s", html)
+	}
+	if summaryIndex > saveStatusIndex {
+		t.Fatalf("expected collaboration summary before save status:\n%s", html)
+	}
+	for _, want := range []string{
+		`data-studio-collab-facepile="true"`,
+		`data-studio-collab-count="true"`,
+		`aria-controls="studio-collaboration-panel"`,
+		`aria-expanded="false"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("toolbar missing %q:\n%s", want, html)
+		}
+	}
+}
+
+func TestRenderWorkbenchCollaborationSummaryOmitsAriaControlsWithoutPanelID(t *testing.T) {
+	html := gosx.RenderHTML(RenderWorkbenchCollaborationSummary(WorkbenchCollaborationSummaryOptions{}))
+	if strings.Contains(html, "aria-controls") {
+		t.Fatalf("expected no aria-controls without a PanelID: %s", html)
+	}
+	for _, want := range []string{
+		`data-studio-collab-summary="true"`,
+		`data-studio-collab-state="offline"`,
+		`data-studio-collab-facepile="true"`,
+		`data-studio-collab-count="true"`,
+		">0</output>",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("collaboration summary missing %q: %s", want, html)
 		}
 	}
 }

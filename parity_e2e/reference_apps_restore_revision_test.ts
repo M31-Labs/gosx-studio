@@ -129,14 +129,43 @@ test.describe("@reference-apps canvas2d site-map WASM-free restore-revision loop
         "the revision history panel must render after two publishes",
       ).toBeAttached({ timeout: 30_000 });
 
+      // Regression guard for #20 (owner-reported: the panel showed "No
+      // previous versions yet." simultaneously with a populated, working
+      // revision list). The empty-state <p class="empty"> must stay
+      // gated `hidden` (and therefore not visible) once the list is
+      // populated -- this is a real in-browser check, not just the Go
+      // render-level unit test, since the reported bug was a live-DOM
+      // observation.
+      const emptyState = page.locator(`${REVISION_HISTORY} p.empty`).first();
+      await expect(emptyState, "empty-state text must not render as visible once revisions exist").toBeHidden({ timeout: 30_000 });
+
+      // STALE-PREMISE FIX: the lifecycle engine mints an AUTOMATIC "restore
+      // point" revision (labeled "Previous version") alongside every
+      // publish's own "editor published" revision, pairing a pre-publish
+      // snapshot with each publish operation (muddy's LifecycleAdapter.
+      // ApplyPublish/internal/cms/lifecycle_adapter.go: "Engine itself has
+      // already minted the PRE-restore restore point before calling this").
+      // So two publishes surface FOUR restore-button rows, most-recent-first:
+      //   row[0] = V2's own "editor published" revision (the just-published V2 content)
+      //   row[1] = the auto restore point paired with the V2 publish -- labeled
+      //            "Previous version", it snapshots whatever was live right
+      //            before V2 went live, i.e. V1's content
+      //   row[2] = V1's own "editor published" revision (the V1 content)
+      //   row[3] = the auto restore point paired with the V1 publish (snapshots
+      //            the seed content from before V1)
+      // This predates the current lifecycle engine's dual-entry-per-publish
+      // history model; the assertion below now reflects the true row count.
       const restoreButtons = page.locator(`${REVISION_HISTORY} ${RESTORE_BUTTON}`);
       await expect(
         restoreButtons,
-        "at least two revision rows (V2 then V1) must each carry a native restore button",
-      ).toHaveCount(2, { timeout: 30_000 });
+        "two publishes must each carry a native restore button for both the published revision and its paired automatic restore point (4 rows total)",
+      ).toHaveCount(4, { timeout: 30_000 });
 
-      // Revision ordering is most-recent-first: row[0] restores the current live (V2),
-      // row[1] restores the prior live (V1). Click row[1] to restore V1.
+      // row[1] (the "Previous version" auto restore point paired with V2's
+      // publish) is the correct, most-direct restore-to-V1 target: it is
+      // EXACTLY the snapshot of what was live immediately before V2 published,
+      // i.e. V1's content -- same semantic row the test always intended to
+      // click, just at its new (still second) position in the richer list.
       const restoreV1Button = restoreButtons.nth(1);
       // The history panel lives in a scrollable publish-mode column; bring the button
       // (and every scrollable ancestor) into view so the real click can land.
@@ -262,7 +291,12 @@ async function openEditorToHeroSurface(page: Page, baseURL: string, consoleError
   void consoleErrors;
 }
 
+// waitForHeroEditable is called after the initial editor load AND after every
+// reload (publish/restore cycles), so it must re-reveal the "Advanced" mode
+// panel each time: the legacy site-map/canvas board (which hosts this overlay)
+// resets to hidden on every fresh page load.
 async function waitForHeroEditable(page: Page) {
+  await revealModeIfPresent(page, "advanced");
   const overlayHero = page.locator(OVERLAY_HERO).first();
   await expect(
     overlayHero,

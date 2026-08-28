@@ -93,6 +93,11 @@ func AuthoringSiteMapView(surface AuthoringSurface, options SiteMapViewOptions) 
 	return sitemap.AuthoringSiteMapView(surface, options)
 }
 
+// Deprecated: use sitemap.AuthoringSiteMapComponentDefinitionPaletteViews.
+func AuthoringSiteMapComponentDefinitionPaletteViews(definitions []ComponentDefinition, pages []Page, selectedPage Page, hasSelectedPage bool, options SiteMapViewOptions) []map[string]any {
+	return sitemap.AuthoringSiteMapComponentDefinitionPaletteViews(definitions, pages, selectedPage, hasSelectedPage, options)
+}
+
 // --- Site-map board (sitemap/sitemap_board.go) ---
 
 // Deprecated: use sitemap.SiteMapBoardOptions.
@@ -113,6 +118,11 @@ func RenderSiteMapAuthoringPanels(siteMapView map[string]any, options SiteMapAut
 	return sitemap.RenderSiteMapAuthoringPanels(siteMapView, options)
 }
 
+// Deprecated: use sitemap.RenderSharedComponentPalettePanel.
+func RenderSharedComponentPalettePanel(siteMapView map[string]any, options SiteMapAuthoringPanelsOptions) gosx.Node {
+	return sitemap.RenderSharedComponentPalettePanel(siteMapView, options)
+}
+
 // --- Site-map authoring forms (sitemap/sitemap_authoring_forms.go) ---
 
 // Deprecated: use sitemap.SiteMapAuthoringFormsOptions.
@@ -123,6 +133,11 @@ func RenderSiteMapAuthoringForms(siteMapView map[string]any, options SiteMapAuth
 	return sitemap.RenderSiteMapAuthoringForms(siteMapView, options)
 }
 
+// Deprecated: use sitemap.RenderSharedComponentPaletteForms.
+func RenderSharedComponentPaletteForms(siteMapView map[string]any, options SiteMapAuthoringFormsOptions) gosx.Node {
+	return sitemap.RenderSharedComponentPaletteForms(siteMapView, options)
+}
+
 // --- Site navigator panel (sitemap/site_navigator_panel.go) ---
 
 // Deprecated: use sitemap.SiteNavigatorItem.
@@ -130,6 +145,9 @@ type SiteNavigatorItem = sitemap.SiteNavigatorItem
 
 // Deprecated: use sitemap.SiteNavigatorProps.
 type SiteNavigatorProps = sitemap.SiteNavigatorProps
+
+// Deprecated: use sitemap.SiteNavigatorNewPageItem.
+type SiteNavigatorNewPageItem = sitemap.SiteNavigatorNewPageItem
 
 // Deprecated: use sitemap.SiteNavigatorPanelOptions.
 type SiteNavigatorPanelOptions = sitemap.SiteNavigatorPanelOptions
@@ -142,6 +160,11 @@ func SiteNavigatorPropsFromMap(view map[string]any) SiteNavigatorProps {
 // Deprecated: use sitemap.RenderSiteNavigatorPanel.
 func RenderSiteNavigatorPanel(props SiteNavigatorProps, options SiteNavigatorPanelOptions) gosx.Node {
 	return sitemap.RenderSiteNavigatorPanel(props, options)
+}
+
+// Deprecated: use sitemap.RenderSiteNavigatorNewPage.
+func RenderSiteNavigatorNewPage(view map[string]any, options SiteNavigatorPanelOptions) gosx.Node {
+	return sitemap.RenderSiteNavigatorNewPage(view, options)
 }
 
 // Deprecated: use sitemap.RenderSiteNavigatorHeader.

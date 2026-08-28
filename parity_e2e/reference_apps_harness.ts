@@ -4,6 +4,15 @@ import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createServer } from "node:net";
+import {
+  assertResolvedCandidateModule,
+  createCandidateSourceCopy,
+  loadCandidateIdentity,
+  resolveCandidateModuleGraph,
+  withCandidateModuleEnvironment,
+  type CandidateIdentity,
+  type CandidateSourceCopy,
+} from "./reference_apps_candidate_identity";
 
 const workRoot = path.resolve(__dirname, "../..");
 const muddyRepo = process.env.GOSX_STUDIO_MUDDY_REPO ?? path.join(workRoot, "muddy-noni-commerce");
@@ -11,6 +20,12 @@ const pajaritosRepo = process.env.GOSX_STUDIO_PAJARITOS_REPO ?? path.join(workRo
 const defaultGoBin = "/home/draco/go/bin";
 
 let muddyDistBuildPromise: Promise<void> | null = null;
+
+let candidateIdentityLoaded = false;
+let candidateIdentityError: unknown = null;
+let candidateIdentity: CandidateIdentity | null = null;
+const candidateModuleGraphHosts = new Set<string>();
+const candidateSourceCopies = new Map<string, CandidateSourceCopy>();
 
 export type ClickAuthoringOptions = {
   noWaitAfter?: boolean;
@@ -20,6 +35,7 @@ export type ClickAuthoringOptions = {
 
 export type ServerHandle = {
   baseURL: string;
+  dataDir?: string;
   stop: () => Promise<void>;
 };
 
@@ -78,10 +94,15 @@ export async function clickEditorActionButton(page: Page, buttonSelector: string
   const response = await responsePromise;
   await navigationPromise;
   if (options?.settleAfter !== false) {
-    await page.waitForLoadState("networkidle");
+    // Best-effort settle: interaction-heavy pages (15 canvas targets) keep
+    // background requests trickling and never reach networkidle on slow CI
+    // runners — tests must rely on their own element/response assertions,
+    // not this wait, so a missed idle is not an error.
+    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
   }
   if (options?.reloadAfter !== false) {
-    await page.goto(page.url(), { waitUntil: "networkidle" });
+    await page.goto(page.url(), { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
   }
   return response;
 }
@@ -210,6 +231,42 @@ export async function revealModeIfPresent(page: Page, mode: string | undefined) 
   await page.waitForTimeout(150);
 }
 
+// openInteractionsTargetDisclosure opens whatever native <details> disclosures
+// currently stand between the DOM and one interactions-target card's own
+// controls, matching the real human steps wave 3A's inspector-presentation
+// pass introduced (panels/interactions_panel.go):
+//   1. RenderInteractionsInspector groups every canvas target with ZERO
+//      attached interactions behind one shared closed-by-default
+//      `[data-studio-interactions-add]` "+ Add interaction" picker. A target
+//      that hasn't had anything attached yet (the common starting state for
+//      these tests) is nested inside that picker and must have it opened
+//      first, or its own card never reaches the layout at all.
+//   2. Every target card (attached or not) additionally wraps its own
+//      Effect/Duration/Delay rows in a second, per-target closed-by-default
+//      `.studio-interactions-target__editor` disclosure (RenderInteractionsPanel).
+// Both checks re-read the LIVE DOM at call time (not a one-shot assumption
+// about page structure), so this is safe to call again after an in-place
+// authoring save/fragment-refresh moves a target between the attached and
+// unattached buckets.
+export async function openInteractionsTargetDisclosure(page: Page, targetSelector: string) {
+  const target = page.locator(targetSelector).first();
+  await expect(target, `interactions target ${targetSelector} must render`).toBeAttached();
+
+  const nestedInClosedAddPicker = await target.evaluate((el) => {
+    const picker = el.closest("[data-studio-interactions-add]");
+    return picker instanceof HTMLDetailsElement && !picker.open;
+  });
+  if (nestedInClosedAddPicker) {
+    await page.locator("[data-studio-interactions-add] > summary").first().click();
+  }
+
+  const editor = target.locator(".studio-interactions-target__editor");
+  const editorClosed = await editor.evaluate((el) => el instanceof HTMLDetailsElement && !el.open);
+  if (editorClosed) {
+    await editor.locator("summary").first().click();
+  }
+}
+
 export async function waitForStudioPreviewRefresh(page: Page, reason: string) {
   return page.evaluate((expectedReason) => new Promise<{ reason: string; route: string } | null>((resolve) => {
     let handler: EventListener;
@@ -332,7 +389,12 @@ export async function applyAuthoringPanelInPlace(page: Page, panelSelector: stri
 export async function saveEditableControl(page: Page, value: string, options?: ClickAuthoringOptions & { expectedMessage?: string }) {
   const panel = page.locator("[data-gosx-studio-editable-control='true']").first();
   await expect(panel).toBeVisible();
-  const input = panel.locator("input[name='gosx_studio_value']");
+  // The value field renders as <input> for plain controls and <textarea> for
+  // rich-text controls (e.g. Muddy's hero headline is studio.ControlRichText
+  // — app/admin/editor/site_map.server.go — so it always renders a
+  // textarea); both share the stable name="gosx_studio_value", so match
+  // either widget kind rather than assuming a plain <input>.
+  const input = panel.locator("input[name='gosx_studio_value'], textarea[name='gosx_studio_value']");
   await expect(input).toBeVisible();
   await setFieldValue(input, value);
   await expectPanelButtonReceivesPointer(page, "[data-gosx-studio-editable-control='true']");
@@ -356,7 +418,7 @@ export async function saveEditableControl(page: Page, value: string, options?: C
     await expect(page.locator("[data-gosx-studio-save-detail]").first()).toHaveText(options.expectedMessage ?? /./);
     return;
   }
-  await expect(page.locator("[data-gosx-studio-editable-control='true'] input[name='gosx_studio_value']").first()).toHaveValue(value);
+  await expect(page.locator("[data-gosx-studio-editable-control='true'] input[name='gosx_studio_value'], [data-gosx-studio-editable-control='true'] textarea[name='gosx_studio_value']").first()).toHaveValue(value);
 }
 
 export async function savePageMetadata(page: Page, title: string, route: string, options?: ClickAuthoringOptions & { expectedMessage?: string }) {
@@ -495,6 +557,48 @@ export async function startMuddy(request: APIRequestContext, extraEnv?: Record<s
   });
 }
 
+export async function startMuddyCollaboration(request: APIRequestContext, extraEnv?: Record<string, string>): Promise<ServerHandle> {
+  await ensureMuddyDist();
+  const port = await freePort();
+  const tempDir = mkdtempSync(path.join(tmpdir(), "gosx-studio-muddy-collab-e2e-"));
+  mkdirSync(path.join(tempDir, "media"), { recursive: true });
+  return startGoServer(request, {
+    cwd: muddyRepo,
+    command: "./cmd/muddy-noni",
+    baseURL: `http://127.0.0.1:${port}`,
+    env: {
+      PORT: String(port),
+      PUBLIC_SITE_URL: `http://127.0.0.1:${port}`,
+      SESSION_SECRET: "noni-collaboration-playwright-signed-session-secret",
+      MUDDY_ENVIRONMENT: "test",
+      MUDDY_COLLAB_TEST_AUTH: "1",
+      MUDDY_DATA_PATH: path.join(tempDir, "cms.json"),
+      MUDDY_FLOW_DATA_PATH: path.join(tempDir, "flows.json"),
+      MUDDY_LIFECYCLE_DB_PATH: path.join(tempDir, "lifecycle.db"),
+      MUDDY_STUDIO_DB_PATH: path.join(tempDir, "studio.db"),
+      MUDDY_MEDIA_PATH: path.join(tempDir, "media"),
+      MUDDY_LIFECYCLE_WORKER: "0",
+      MUDDY_MOCK_CHECKOUT: "1",
+      ...(extraEnv ?? {}),
+    },
+    tempDir,
+  });
+}
+
+// startMuddyCanvasHTMLSurfaceCollaboration combines the MUDDY_EDITOR_SCENE_DOM
+// canvas HTML-surface fixture (startMuddyCanvasHTMLSurface's env) with the
+// authenticated collaboration test-auth wiring (startMuddyCollaboration's
+// env) -- handoff-31's inline-edit durable-dispatch e2e proof needs BOTH: a
+// real contenteditable canvas surface to commit from, AND a live,
+// capability-granting websocket connection for that commit to actually take
+// the durable path instead of falling back to the legacy save-control POST
+// (see reference_apps_interactions_test.ts's header comment for why plain
+// startMuddy's MUDDY_MOCK_AUTH fallback does not cover the collaboration
+// websocket's own auth).
+export async function startMuddyCanvasHTMLSurfaceCollaboration(request: APIRequestContext): Promise<ServerHandle> {
+  return startMuddyCollaboration(request, { MUDDY_CANVAS_WASM_FREE: "1", MUDDY_EDITOR_SCENE_DOM: "1" });
+}
+
 function ensureMuddyDist(): Promise<void> {
   if (!muddyDistBuildPromise) {
     muddyDistBuildPromise = buildMuddyDist().catch((error) => {
@@ -507,13 +611,15 @@ function ensureMuddyDist(): Promise<void> {
 
 async function buildMuddyDist(): Promise<void> {
   const gosxBin = process.env.GOSX_STUDIO_GOSX_BIN ?? "gosx";
+  const buildRepo = candidateSourceRepo(muddyRepo);
   const env = {
     ...process.env,
     GOWORK: "off",
+    ...candidateGoEnvironment(muddyRepo),
     PATH: process.env.GOSX_STUDIO_GOSX_BIN ? process.env.PATH : withPathEntry(process.env.PATH, defaultGoBin),
   };
   await runLoggedCommand(gosxBin, ["build", "--dev", "."], {
-    cwd: muddyRepo,
+    cwd: buildRepo,
     env,
     label: "Muddy GoSX dist build",
   });
@@ -567,7 +673,7 @@ export async function startMuddyCanvasWASMFree(request: APIRequestContext): Prom
 // WASM-free client with no full CanvasBoard WASM. The HTML-surface injection is
 // opt-in; only the canvas-html-surface parity e2e flips it on.
 export async function startMuddyCanvasHTMLSurface(request: APIRequestContext): Promise<ServerHandle> {
-  return startMuddy(request, { MUDDY_EDITOR_SCENE_DOM: "1" });
+  return startMuddy(request, { MUDDY_CANVAS_WASM_FREE: "1", MUDDY_EDITOR_SCENE_DOM: "1" });
 }
 
 export async function startPajaritos(request: APIRequestContext): Promise<ServerHandle> {
@@ -583,6 +689,7 @@ export async function startPajaritos(request: APIRequestContext): Promise<Server
       PAJARITOS_LIFECYCLE_DB_PATH: path.join(tempDir, "lifecycle.db"),
       PAJARITOS_FLOW_STORE_PATH: path.join(tempDir, "flows.json"),
       PAJARITOS_LIFECYCLE_WORKER: "0",
+      PAJARITOS_MOCK_AUTH: "1",
     },
     tempDir,
   });
@@ -602,12 +709,153 @@ type LoggedCommandOptions = {
   label: string;
 };
 
+// ── Orphaned-process-group prevention ───────────────────────────────────────
+//
+// `go run <pkg>` does not exec(2) into the compiled binary — it forks a real
+// child process for it and stays alive as a supervisor/relay. On a graceful
+// SIGINT, `go run` forwards the signal to that child and waits for it, but a
+// SIGKILL (our 5s-timeout fallback below) or an abrupt external kill of the
+// Node harness itself (mid-test Ctrl-C/SIGINT on the Playwright process, a
+// timed-out test, an afterAll that never runs) kills `go run` with no chance
+// to relay anything — its exec'd `muddy-noni`/`pajaritos` binary is simply
+// reparented to init and keeps running forever, accumulating across runs
+// (proven: a `muddy-noni` binary from an earlier ad hoc session was still
+// alive, PPID reparented to /init, when this fix started).
+//
+// The fix is to always start these processes `detached: true`. On POSIX,
+// that makes each spawned process its own process-group LEADER (pgid ===
+// its own pid) instead of joining the harness's group. `go run`'s exec'd
+// child inherits `go run`'s (new, detached) pgid by default (Go's os/exec
+// does not set a new group for its own children), so `process.kill(-pgid,
+// signal)` — the negative-pid form targets the whole process GROUP, not
+// just one process — reaches `go run` AND its compiled-binary child in one
+// signal, however the group leader dies (graceful or SIGKILL).
+//
+// `activeProcessGroups` tracks every live group so a process-level SIGINT/
+// SIGTERM/exit on the Playwright/Node runner itself (a mid-test abort) also
+// sweeps every still-tracked group as a last resort, even if a test's own
+// `finally`/`afterAll` never gets to call `stop()`.
+const activeProcessGroups = new Set<number>();
+
+function trackProcessGroup(pid: number | undefined) {
+  if (pid !== undefined) activeProcessGroups.add(pid);
+}
+
+function untrackProcessGroup(pid: number | undefined) {
+  if (pid !== undefined) activeProcessGroups.delete(pid);
+}
+
+function killProcessGroup(pid: number, signal: NodeJS.Signals) {
+  try {
+    process.kill(-pid, signal);
+  } catch {
+    // ESRCH: the group is already gone (process exited/reaped on its own,
+    // or this is a stale entry from a group we already killed). Cleanup is
+    // best-effort here — never throw out of a shutdown path.
+  }
+}
+
+function candidateGoEnvironment(hostRepo: string, extraEnv: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const baseEnv = { ...process.env, ...extraEnv };
+  const identity = loadCandidateIdentityOnce(baseEnv);
+  if (!identity) return {};
+
+  const sourceRepo = candidateSourceRepo(hostRepo, baseEnv);
+  const commandEnv = withCandidateModuleEnvironment(baseEnv);
+  console.log(
+    `[gosx-studio candidate] using sourceCopy=${sourceRepo} Module.Replace.Dir=${identity.candidateRepo} candidateSHA=${identity.candidateSHA} host=${path.resolve(hostRepo)}`,
+  );
+  return {
+    GOWORK: commandEnv.GOWORK,
+    ...(commandEnv.GOFLAGS ? { GOFLAGS: commandEnv.GOFLAGS } : {}),
+  };
+}
+
+function loadCandidateIdentityOnce(baseEnv: NodeJS.ProcessEnv): CandidateIdentity | null {
+  if (!candidateIdentityLoaded) {
+    candidateIdentityLoaded = true;
+    try {
+      candidateIdentity = loadCandidateIdentity(baseEnv);
+    } catch (error) {
+      candidateIdentityError = error;
+    }
+  }
+  if (candidateIdentityError) throw candidateIdentityError;
+  return candidateIdentity;
+}
+
+function candidateSourceRepo(hostRepo: string, extraEnv: NodeJS.ProcessEnv = {}): string {
+  const baseEnv = { ...process.env, ...extraEnv };
+  const identity = loadCandidateIdentityOnce(baseEnv);
+  if (!identity) return hostRepo;
+
+  installProcessGroupCleanupOnce();
+  const hostKey = path.resolve(hostRepo);
+  let sourceCopy = candidateSourceCopies.get(hostKey);
+  if (!sourceCopy) {
+    sourceCopy = createCandidateSourceCopy(hostKey, identity);
+    candidateSourceCopies.set(hostKey, sourceCopy);
+  }
+
+  if (!candidateModuleGraphHosts.has(hostKey)) {
+    try {
+      const graph = resolveCandidateModuleGraph(sourceCopy.sourceRepo, baseEnv);
+      assertResolvedCandidateModule(graph, identity);
+      candidateModuleGraphHosts.add(hostKey);
+      console.log(
+        `[gosx-studio candidate] verified module=${graph.Path} Module.Replace.Dir=${identity.candidateRepo} candidateSHA=${identity.candidateSHA} sourceCopy=${sourceCopy.sourceRepo} host=${hostKey}`,
+      );
+    } catch (error) {
+      sourceCopy.dispose();
+      candidateSourceCopies.delete(hostKey);
+      throw error;
+    }
+  }
+  return sourceCopy.sourceRepo;
+}
+
+function cleanupCandidateSourceCopies() {
+  for (const [hostKey, sourceCopy] of candidateSourceCopies) {
+    try {
+      sourceCopy.dispose();
+    } catch (error) {
+      console.error(`[gosx-studio candidate] failed to remove source copy ${sourceCopy.sourceRepo}: ${String(error)}`);
+    }
+    candidateSourceCopies.delete(hostKey);
+  }
+  candidateModuleGraphHosts.clear();
+}
+
+let processGroupCleanupInstalled = false;
+
+// installProcessGroupCleanupOnce registers a last-resort sweep of every
+// still-tracked process group on process exit and on SIGINT/SIGTERM
+// delivered to this Node process (e.g. Ctrl-C on `npx playwright test`).
+// It intentionally does not call process.exit() itself — Playwright installs
+// its own SIGINT handling for graceful worker teardown/reporting; we only
+// need to piggyback cleanup, not own the exit sequence.
+function installProcessGroupCleanupOnce() {
+  if (processGroupCleanupInstalled) return;
+  processGroupCleanupInstalled = true;
+  const sweep = () => {
+    for (const pid of activeProcessGroups) killProcessGroup(pid, "SIGKILL");
+    activeProcessGroups.clear();
+    cleanupCandidateSourceCopies();
+  };
+  process.on("exit", sweep);
+  process.on("SIGINT", sweep);
+  process.on("SIGTERM", sweep);
+}
+
 async function runLoggedCommand(command: string, args: string[], options: LoggedCommandOptions): Promise<void> {
+  installProcessGroupCleanupOnce();
   const proc = spawn(command, args, {
     cwd: options.cwd,
     env: options.env,
     stdio: ["ignore", "pipe", "pipe"],
+    detached: true,
   });
+  trackProcessGroup(proc.pid);
   const stdout: string[] = [];
   const stderr: string[] = [];
   proc.stdout?.on("data", (chunk: Buffer) => stdout.push(chunk.toString()));
@@ -615,9 +863,11 @@ async function runLoggedCommand(command: string, args: string[], options: Logged
 
   return new Promise((resolve, reject) => {
     proc.on("error", (error) => {
+      untrackProcessGroup(proc.pid);
       reject(new Error(`${options.label} failed to start: ${error.message}\n\nstdout:\n${stdout.join("")}\n\nstderr:\n${stderr.join("")}`));
     });
     proc.on("exit", (code, signal) => {
+      untrackProcessGroup(proc.pid);
       if (code === 0) {
         resolve();
         return;
@@ -628,11 +878,20 @@ async function runLoggedCommand(command: string, args: string[], options: Logged
 }
 
 async function startGoServer(request: APIRequestContext, options: ServerOptions): Promise<ServerHandle> {
+  installProcessGroupCleanupOnce();
+  const serverCwd = candidateSourceRepo(options.cwd, options.env);
   const proc = spawn("go", ["run", options.command], {
-    cwd: options.cwd,
-    env: { ...process.env, GOWORK: "off", ...options.env },
+    cwd: serverCwd,
+    env: {
+      ...process.env,
+      GOWORK: "off",
+      ...options.env,
+      ...candidateGoEnvironment(options.cwd, options.env),
+    },
     stdio: ["ignore", "pipe", "pipe"],
+    detached: true,
   });
+  trackProcessGroup(proc.pid);
   const logs: string[] = [];
   proc.stdout?.on("data", (chunk: Buffer) => logs.push(chunk.toString()));
   proc.stderr?.on("data", (chunk: Buffer) => logs.push(chunk.toString()));
@@ -648,9 +907,13 @@ async function startGoServer(request: APIRequestContext, options: ServerOptions)
 
   return {
     baseURL: options.baseURL,
+    dataDir: options.tempDir,
     stop: async () => {
-      await stopProcess(proc);
-      cleanupTempDir(options.tempDir);
+      try {
+        await stopProcess(proc);
+      } finally {
+        cleanupTempDir(options.tempDir);
+      }
     },
   };
 }
@@ -703,16 +966,31 @@ async function freePort(): Promise<number> {
 }
 
 async function stopProcess(proc: ChildProcess) {
-  if (proc.exitCode !== null || proc.signalCode !== null) return;
-  const exited = new Promise<void>((resolve) => proc.once("exit", () => resolve()));
-  proc.kill("SIGINT");
-  const timeout = new Promise<void>((resolve) => {
-    setTimeout(() => {
-      if (proc.exitCode === null && proc.signalCode === null) proc.kill("SIGKILL");
-      resolve();
-    }, 5_000);
-  });
-  await Promise.race([exited, timeout]);
+  const pid = proc.pid;
+  try {
+    if (proc.exitCode !== null || proc.signalCode !== null) return;
+    const exited = new Promise<void>((resolve) => proc.once("exit", () => resolve()));
+    // Kill the whole process GROUP (negative pid), not just the immediate
+    // child: `go run` does not exec(2) into its compiled binary, so a plain
+    // proc.kill() only reaches the `go run` supervisor and leaves the
+    // muddy-noni/pajaritos binary it forked running as an orphan. Both
+    // processes share this pgid because we spawned with `detached: true`
+    // (see installProcessGroupCleanupOnce's comment above).
+    if (pid !== undefined) killProcessGroup(pid, "SIGINT");
+    else proc.kill("SIGINT");
+    const timeout = new Promise<void>((resolve) => {
+      setTimeout(() => {
+        if (proc.exitCode === null && proc.signalCode === null) {
+          if (pid !== undefined) killProcessGroup(pid, "SIGKILL");
+          else proc.kill("SIGKILL");
+        }
+        resolve();
+      }, 5_000);
+    });
+    await Promise.race([exited, timeout]);
+  } finally {
+    untrackProcessGroup(pid);
+  }
 }
 
 function cleanupTempDir(tempDir: string) {

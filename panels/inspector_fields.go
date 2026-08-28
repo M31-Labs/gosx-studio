@@ -78,7 +78,12 @@ func renderHomeInspectorFieldRow(field map[string]any, options InspectorFieldRow
 			gosx.El("span", nil, gosx.Text(core.WorkbenchViewString(field, "kindLabel"))),
 		),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-home-field__meta")),
-			gosx.El("output", nil, gosx.Text(core.WorkbenchViewString(field, "validationLabel"))),
+			// Wave 3A (vocabulary pruning, fix (e)): a per-field "READY" chip
+			// on every valid field was pure noise (162 selects' worth of
+			// context also meant dozens of these on one page) — only an
+			// actual validation problem is worth a chip here, so this output
+			// is hidden whenever the field isn't invalid.
+			gosx.El("output", gosx.Attrs(gosx.Attr("hidden", !core.WorkbenchViewBool(field, "invalid"))), gosx.Text(core.WorkbenchViewString(field, "validationLabel"))),
 			gosx.El("small", nil, gosx.Text(core.WorkbenchViewString(field, "reactionLabel"))),
 			gosx.El("small", gosx.Attrs(gosx.Attr("class", "studio-home-field__invalid")), gosx.Text(options.InvalidLabel)),
 		),
@@ -114,6 +119,30 @@ func renderHomeInspectorFieldActions(field map[string]any) []gosx.Node {
 				gosx.Attr("type", "submit"),
 				gosx.Attr("formaction", core.WorkbenchViewString(action, "formAction")),
 				gosx.Attr("formmethod", core.WorkbenchViewString(action, "formMethod")),
+				// This button submits the SHARED websiteEditorForm (every
+				// Home-mode field row renders inside that one <form>; every
+				// panel's fields — including ones currently hidden by
+				// mode-gating CSS — are "listed" constraint-validation
+				// candidates of it). Native HTML5 validation runs BEFORE the
+				// browser dispatches the form's "submit" event; if ANY
+				// control anywhere in the form is invalid, the browser
+				// silently cancels the submission with no submit event at
+				// all, regardless of which button was clicked. formnovalidate
+				// exempts THIS submission from that shared-form validation
+				// surface, mirroring every other workbench-form action button
+				// (Publish/Discard/Schedule in publish_panel.go, Restore in
+				// revision_history_panel.go, Save navigation in
+				// navigation_panel.go, Save checkout in checkout_panel.go,
+				// Publish flow in flow_designer_panel.go) — a Home field's
+				// formaction-driven action (e.g. a future "detach shared
+				// component"/"reset to default" button) must behave the same
+				// way or it would silently no-op whenever an unrelated hidden
+				// panel happens to carry an invalid value. Present
+				// unconditionally alongside formaction/formmethod above
+				// (which are also always rendered, gated only by the sibling
+				// hidden attribute below), so it costs nothing when
+				// hasFormAction is false.
+				gosx.Attr("formnovalidate", "formnovalidate"),
 				gosx.Attr("name", core.WorkbenchViewString(action, "name")),
 				gosx.Attr("value", inspectorFieldRawString(action, "value")),
 				gosx.Attr("data-admin-confirm", core.WorkbenchViewString(action, "confirm")),
@@ -132,8 +161,15 @@ func renderHomeInspectorFieldActions(field map[string]any) []gosx.Node {
 	return nodes
 }
 
+// handoff-4 (text truncation sweep): the Home inspector's textarea/input
+// value previews (Tagline/Headline/Subhead/CTA label/CTA URL, etc.) render
+// at a fixed right-rail width and clip long saved values with no way to
+// read the rest ("Small-batch ceramics for daily ritua…") — a title
+// attribute mirroring the current value gives every truncated preview a
+// native hover/focus tooltip with the full text, at zero layout cost.
 func renderHomeInspectorTextarea(field map[string]any) gosx.Node {
-	return gosx.El("textarea", gosx.Attrs(
+	value := inspectorFieldRawString(field, "areaValue")
+	attrs := []any{
 		gosx.Attr("id", core.WorkbenchViewString(field, "id")),
 		gosx.Attr("name", core.WorkbenchViewString(field, "areaName")),
 		gosx.Attr("rows", inspectorFieldValue(field, "rows")),
@@ -147,7 +183,11 @@ func renderHomeInspectorTextarea(field map[string]any) gosx.Node {
 		gosx.Attr("data-editor-frame-attr-prefix", core.WorkbenchViewString(field, "areaAttrPrefix")),
 		gosx.Attr("data-editor-frame-attr-suffix", core.WorkbenchViewString(field, "areaAttrSuffix")),
 		gosx.Attr("hidden", !core.WorkbenchViewBool(field, "isArea")),
-	), gosx.Text(inspectorFieldRawString(field, "areaValue")))
+	}
+	if value != "" {
+		attrs = append(attrs, gosx.Attr("title", value))
+	}
+	return gosx.El("textarea", gosx.Attrs(attrs...), gosx.Text(value))
 }
 
 func renderHomeInspectorSelect(field map[string]any) gosx.Node {
@@ -174,11 +214,12 @@ func renderHomeInspectorSelect(field map[string]any) gosx.Node {
 }
 
 func renderHomeInspectorInput(field map[string]any) gosx.Node {
-	return gosx.El("input", gosx.Attrs(
+	value := inspectorFieldRawString(field, "inputValue")
+	attrs := []any{
 		gosx.Attr("id", core.WorkbenchViewString(field, "id")),
 		gosx.Attr("name", core.WorkbenchViewString(field, "inputName")),
 		gosx.Attr("type", core.WorkbenchViewString(field, "inputType")),
-		gosx.Attr("value", inspectorFieldRawString(field, "inputValue")),
+		gosx.Attr("value", value),
 		gosx.Attr("placeholder", core.WorkbenchViewString(field, "placeholder")),
 		gosx.Attr("required", core.WorkbenchViewBool(field, "inputRequired")),
 		gosx.Attr("disabled", core.WorkbenchViewBool(field, "inputDisabled")),
@@ -190,25 +231,58 @@ func renderHomeInspectorInput(field map[string]any) gosx.Node {
 		gosx.Attr("data-editor-frame-attr-prefix", core.WorkbenchViewString(field, "inputAttrPrefix")),
 		gosx.Attr("data-editor-frame-attr-suffix", core.WorkbenchViewString(field, "inputAttrSuffix")),
 		gosx.Attr("hidden", core.WorkbenchViewBool(field, "isArea") || core.WorkbenchViewBool(field, "isSelect") || core.WorkbenchViewBool(field, "isCard")),
-	))
+	}
+	// Checkboxes carry "on"/"true" in this same value slot; a hover tooltip
+	// repeating that is noise, not a truncation fix, so only text-like
+	// inputs get one.
+	if value != "" && core.WorkbenchViewString(field, "inputType") != "checkbox" {
+		attrs = append(attrs, gosx.Attr("title", value))
+	}
+	return gosx.El("input", gosx.Attrs(attrs...))
 }
 
 func renderInspectorFieldControl(field map[string]any) gosx.Node {
-	attrs := gosx.Attrs(inspectorFieldMapAttrs(core.WorkbenchViewMap(field, "controlAttrs"))...)
+	controlAttrs := core.WorkbenchViewMap(field, "controlAttrs")
 	switch {
 	case core.WorkbenchViewBool(field, "isArea"):
-		return gosx.El("textarea", attrs, gosx.Text(inspectorFieldRawString(field, "value")))
+		value := inspectorFieldRawString(field, "value")
+		return gosx.El("textarea", gosx.Attrs(inspectorFieldMapAttrsWithTitle(controlAttrs, value)...), gosx.Text(value))
 	case core.WorkbenchViewBool(field, "isSelect"):
 		optionNodes := []gosx.Node{}
 		for _, option := range siteMapMapList(field, "options") {
 			optionNodes = append(optionNodes, gosx.El("option", gosx.Attrs(inspectorFieldMapAttrs(core.WorkbenchViewMap(option, "attrs"))...), gosx.Text(core.WorkbenchViewString(option, "label"))))
 		}
-		return gosx.El("select", attrs, gosx.Fragment(optionNodes...))
+		return gosx.El("select", gosx.Attrs(inspectorFieldMapAttrs(controlAttrs)...), gosx.Fragment(optionNodes...))
 	case core.WorkbenchViewBool(field, "isCheckbox"), core.WorkbenchViewBool(field, "isInput"):
-		return gosx.El("input", attrs)
+		value, _ := controlAttrs["value"].(string)
+		return gosx.El("input", gosx.Attrs(inspectorFieldMapAttrsWithTitle(controlAttrs, value)...))
 	default:
 		return gosx.Fragment()
 	}
+}
+
+// inspectorFieldMapAttrsWithTitle builds the attrs list from values (see
+// inspectorFieldMapAttrs) plus a "title" attribute mirroring value, unless
+// values already carries its own title, the control's type is "checkbox"
+// (whose value slot holds "on"/"true", not preview text worth a tooltip),
+// or value is empty. handoff-4 (text truncation sweep): the ADVANCED/
+// generic field controls this feeds (BlockFieldInspectorFields,
+// WorkbenchFieldInspectorFields) render at fixed rail widths and clip long
+// values the same way the Home inspector's own inputs did (see
+// renderHomeInspectorInput/renderHomeInspectorTextarea's identical fix) —
+// a title gives every one of them a native hover/focus fallback.
+func inspectorFieldMapAttrsWithTitle(values map[string]any, value string) []any {
+	attrs := inspectorFieldMapAttrs(values)
+	if value == "" {
+		return attrs
+	}
+	if _, hasTitle := values["title"]; hasTitle {
+		return attrs
+	}
+	if typeValue, _ := values["type"].(string); typeValue == "checkbox" {
+		return attrs
+	}
+	return append(attrs, gosx.Attr("title", value))
 }
 
 func renderInspectorFieldHelp(field map[string]any) gosx.Node {

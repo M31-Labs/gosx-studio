@@ -1358,6 +1358,20 @@ func renderFieldAction(action FieldAction) gosx.Node {
 			gosx.Attr("class", className),
 			gosx.Attr("type", "submit"),
 			gosx.Attr("formaction", action.FormAction),
+			// This button submits a shared, ancestor-nested <form> (a card
+			// field action has no form= attribute of its own — it relies on
+			// DOM nesting inside whatever <form> the caller wraps the field
+			// list in). If that shared form has ANY invalid control anywhere
+			// in it — including one hidden by mode-gating CSS elsewhere in
+			// the panel stack — native HTML5 validation silently cancels
+			// this submission before the browser ever dispatches "submit",
+			// regardless of which button was clicked. formnovalidate exempts
+			// this action from that shared-form validation surface, mirroring
+			// every workbench-form action button in the panels package
+			// (Publish/Discard/Schedule, Restore, Save navigation, Save
+			// checkout, Publish flow — see panels/*_panel.go) and
+			// panels/inspector_fields.go's Home field-row actions.
+			gosx.Attr("formnovalidate", "formnovalidate"),
 			gosx.Attr("data-studio-field-action-formaction", action.FormAction),
 		}
 		if method := strings.TrimSpace(action.FormMethod); method != "" {
@@ -1583,7 +1597,20 @@ func inspectorKindForWorkbenchField(kind workbench.FieldKind) InspectorFieldKind
 
 func inspectorInputTypeForBlockField(kind blockstudio.FieldKind) string {
 	switch kind {
-	case blockstudio.FieldURL, blockstudio.FieldImage:
+	// handoff-4 (save-vocabulary audit): FieldURL used to render
+	// type="url", but this codebase's own link fields (e.g. cms/blocks
+	// Hero's "ctaUrl") legitimately hold SITE-RELATIVE targets like "/shop"
+	// alongside absolute externals -- and the HTML "valid URL" constraint
+	// native <input type="url"> enforces rejects a bare relative path,
+	// which live-proved a false "Needs attention" (the row's
+	// :has(:invalid) CSS hook, muddy-noni-commerce's public/site.css) on a
+	// perfectly valid, already-saved CTA URL. NEEDS ATTENTION is reserved
+	// for real validation problems; a false native-constraint positive on
+	// legitimate data isn't one, so FieldURL renders as plain text (no
+	// native format constraint) while FieldImage -- always populated from
+	// the media picker's own resolved asset URL, never free-typed -- keeps
+	// the stricter type="url" hint.
+	case blockstudio.FieldImage:
 		return "url"
 	default:
 		return "text"

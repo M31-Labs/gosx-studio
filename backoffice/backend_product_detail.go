@@ -145,7 +145,7 @@ func RenderBackendProductDetailForm(props BackendProductDetailPageProps) gosx.No
 }
 
 func RenderBackendProductDetailScripts() gosx.Node {
-	return gosx.El("script", gosx.Attrs(gosx.Attr("src", "/media-picker.js"), gosx.Attr("defer", true)))
+	return renderBackendManagedStudioScript(backendMediaRuntimePath)
 }
 
 func renderBackendProductDetailStatuses(props BackendProductDetailPageProps) []gosx.Node {

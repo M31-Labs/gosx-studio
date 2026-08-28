@@ -12,10 +12,17 @@ type BackendMediaDetailPageProps struct {
 	ArchiveAction string
 	RestoreAction string
 	ReplaceAction string
+	// DeleteAction posts to the host's guarded permanent-delete endpoint (see
+	// gosx-studio/cms/media.GuardDeleteMediaAsset). The button only renders
+	// when Asset.CanDelete is true — hosts set that from their own
+	// MediaUsage(id) check so an operator is never shown a delete control for
+	// an asset that is still referenced.
+	DeleteAction  string
 	CSRFToken     string
 	SaveStatus    BackendMediaDetailActionStatus
 	ArchiveStatus BackendMediaDetailActionStatus
 	RestoreStatus BackendMediaDetailActionStatus
+	DeleteStatus  BackendMediaDetailActionStatus
 	Replaced      bool
 	HasError      bool
 	Error         string
@@ -43,7 +50,12 @@ type BackendMediaDetailAsset struct {
 	IsImage       bool
 	CanArchive    bool
 	CanRestore    bool
-	Variants      []BackendMediaDetailVariant
+	// CanDelete is true only when the host's own usage check found no
+	// referencing content for this asset. Studio never computes this itself —
+	// the host owns MediaUsage — so the button's mere presence is the
+	// referenced-asset-protection signal a browser test can assert on.
+	CanDelete bool
+	Variants  []BackendMediaDetailVariant
 }
 
 type BackendMediaDetailVariant struct {
@@ -152,7 +164,7 @@ func RenderBackendMediaReplaceForm(props BackendMediaDetailPageProps) gosx.Node 
 
 func renderBackendMediaDetailStatuses(props BackendMediaDetailPageProps) []gosx.Node {
 	nodes := []gosx.Node{}
-	for _, status := range []BackendMediaDetailActionStatus{props.SaveStatus, props.ArchiveStatus, props.RestoreStatus} {
+	for _, status := range []BackendMediaDetailActionStatus{props.SaveStatus, props.ArchiveStatus, props.RestoreStatus, props.DeleteStatus} {
 		if status.Submitted {
 			nodes = append(nodes, gosx.El("p", gosx.Attrs(gosx.Attr("class", "form-status form-status--error")), gosx.Text(status.Message)))
 		}
@@ -267,6 +279,15 @@ func renderBackendMediaDetailButtons(props BackendMediaDetailPageProps) gosx.Nod
 			gosx.Attr("formaction", props.RestoreAction),
 			gosx.Attr("data-admin-confirm", "Restore this media asset?"),
 		), gosx.Text("Restore")))
+	}
+	if asset.CanDelete {
+		nodes = append(nodes, gosx.El("button", gosx.Attrs(
+			gosx.Attr("class", "button button--danger"),
+			gosx.Attr("type", "submit"),
+			gosx.Attr("formaction", props.DeleteAction),
+			gosx.Attr("data-gosx-studio-media-delete", "true"),
+			gosx.Attr("data-admin-confirm", "Permanently delete this media asset? This cannot be undone."),
+		), gosx.Text("Delete permanently")))
 	}
 	nodes = append(nodes, gosx.El("a", gosx.Attrs(gosx.Attr("class", "button button--secondary"), gosx.Attr("href", "/admin/media"), gosx.Attr("data-gosx-link", "true")), gosx.Text("Back to media")))
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "button-row")), gosx.Fragment(nodes...))

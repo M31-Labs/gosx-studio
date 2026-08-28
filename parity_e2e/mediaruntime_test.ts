@@ -1,0 +1,610 @@
+import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+declare global {
+  interface Window {
+    GoSXStudioMediaRuntime: {
+      init(root?: Document | Element): void;
+      mediaDragType: string;
+    };
+    revokedURLs?: string[];
+  }
+}
+
+const runtimeScript = readFileSync(resolve(__dirname, "../mediaruntime/media_runtime.js"), "utf8");
+
+async function appendManagedRuntimeScript(page: import("@playwright/test").Page, id: string) {
+  await page.evaluate(({ id, source }) => {
+    const script = document.createElement("script");
+    script.id = id;
+    script.setAttribute("data-gosx-script", "managed");
+    script.setAttribute("data-gosx-script-load", "dom");
+    script.setAttribute("data-gosx-script-loaded", "pending");
+    script.textContent = source;
+    document.head.appendChild(script);
+  }, { id, source: runtimeScript });
+}
+
+async function installMediaRuntime(page: import("@playwright/test").Page, managed = false) {
+  await page.setContent(`
+    <!doctype html>
+    <html>
+      <body>
+        <form id="media-form">
+          <datalist id="product-media-urls">
+            <option value="/media/cup.jpg" label="cup.jpg" data-media-alt="Cup alt">cup.jpg</option>
+            <option value="/media/vase.webp" label="vase.webp" data-media-alt="Vase alt">vase.webp</option>
+            <option value="javascript:alert(1)" label="bad.jpg" data-media-alt="Bad">bad.jpg</option>
+          </datalist>
+          <input id="hero" name="hero" list="product-media-urls" data-media-alt-target="heroAlt" value="">
+          <input id="heroAlt" name="heroAlt" value="">
+          <textarea id="imagesText" name="imagesText" data-media-lines-list="product-media-urls"></textarea>
+          <div data-media-upload>
+            <button type="button" data-media-upload-drop-zone aria-describedby="mediaUploadHelp mediaUploadStatus">
+              <strong>Drop one file here</strong>
+            </button>
+            <input id="file" name="file" type="file" accept="image/png,image/jpeg,.txt" data-media-upload-input>
+            <p id="mediaUploadHelp">Dropping only selects.</p>
+            <output id="mediaUploadStatus" data-media-upload-status data-media-picker-filename aria-live="polite">No file selected.</output>
+            <p data-media-upload-error hidden></p>
+            <img data-media-upload-preview hidden>
+            <button type="button" data-media-upload-clear data-media-picker-clear hidden>Clear file</button>
+          </div>
+          <button
+            type="button"
+            id="focal"
+            data-media-focal-preview
+            style="width: 200px; height: 100px; position: relative; display: block;"
+          >
+            <span data-media-focal-marker></span>
+          </button>
+          <input id="focalX" data-media-focal-x value="0.25">
+          <input id="focalY" data-media-focal-y value="0.75">
+        </form>
+      </body>
+    </html>
+  `);
+  if (managed) await appendManagedRuntimeScript(page, "media-runtime-first");
+  else await page.addScriptTag({ content: runtimeScript });
+}
+
+async function dropFiles(page: import("@playwright/test").Page, files: Array<{ name: string; type: string; body: string }>) {
+  await page.locator("[data-media-upload-drop-zone]").dispatchEvent("drop", {
+    dataTransfer: await page.evaluateHandle((payload) => {
+      const transfer = new DataTransfer();
+      for (const item of payload) {
+        transfer.items.add(new File([item.body], item.name, { type: item.type }));
+      }
+      return transfer;
+    }, files),
+  });
+}
+
+test.describe("GoSXStudioMediaRuntime", () => {
+  test("file drop selects one valid file, requires explicit submit, previews, and clears", async ({ page }) => {
+    await installMediaRuntime(page);
+    let submitted = 0;
+    await page.locator("#media-form").evaluate((form) => {
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        (window as unknown as { submitted: number }).submitted = ((window as unknown as { submitted?: number }).submitted ?? 0) + 1;
+      });
+    });
+
+    await dropFiles(page, [{ name: "cup.jpg", type: "image/jpeg", body: "jpeg-body" }]);
+
+    await expect(page.locator("#mediaUploadStatus")).toContainText("cup.jpg selected");
+    await expect(page.locator("[data-media-upload-preview]")).toHaveJSProperty("hidden", false);
+    await expect(page.locator("[data-media-upload-preview]")).toHaveAttribute("src", /^blob:/);
+    expect(await page.locator("#file").evaluate((input: HTMLInputElement) => input.files?.[0]?.name)).toBe("cup.jpg");
+    submitted = await page.evaluate(() => (window as unknown as { submitted?: number }).submitted ?? 0);
+    expect(submitted).toBe(0);
+
+    await page.locator("[data-media-upload-clear]").click();
+    await expect(page.locator("#mediaUploadStatus")).toHaveText("No file selected.");
+    await expect(page.locator("[data-media-upload-preview]")).toBeHidden();
+    expect(await page.locator("#file").evaluate((input: HTMLInputElement) => input.files?.length ?? 0)).toBe(0);
+  });
+
+  test("invalid and multiple drops are recoverable and do not overwrite the current file", async ({ page }) => {
+    await installMediaRuntime(page);
+    await dropFiles(page, [{ name: "cup.jpg", type: "image/jpeg", body: "jpeg-body" }]);
+    expect(await page.locator("#file").evaluate((input: HTMLInputElement) => input.files?.[0]?.name)).toBe("cup.jpg");
+
+    await dropFiles(page, [{ name: "script.js", type: "text/javascript", body: "alert(1)" }]);
+    await expect(page.locator("[data-media-upload-error]")).toContainText("not accepted");
+    expect(await page.locator("#file").evaluate((input: HTMLInputElement) => input.files?.[0]?.name)).toBe("cup.jpg");
+
+    await dropFiles(page, [
+      { name: "a.jpg", type: "image/jpeg", body: "a" },
+      { name: "b.jpg", type: "image/jpeg", body: "b" },
+    ]);
+    await expect(page.locator("[data-media-upload-error]")).toContainText("one file");
+    expect(await page.locator("#file").evaluate((input: HTMLInputElement) => input.files?.[0]?.name)).toBe("cup.jpg");
+  });
+
+  test("native file input fallback preserves browser input behavior", async ({ page }) => {
+    await installMediaRuntime(page);
+
+    const chooserPromise = page.waitForEvent("filechooser");
+    await page.locator("[data-media-upload-drop-zone]").click();
+    const chooser = await chooserPromise;
+    await chooser.setFiles({
+      name: "notes.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("hello"),
+    });
+
+    await expect(page.locator("#mediaUploadStatus")).toContainText("notes.txt selected");
+    expect(await page.locator("#file").evaluate((input: HTMLInputElement) => ({
+      name: input.files?.[0]?.name,
+      listAttr: input.getAttribute("accept"),
+      stillInForm: input.form?.id,
+    }))).toEqual({
+      name: "notes.txt",
+      listAttr: "image/png,image/jpeg,.txt",
+      stillInForm: "media-form",
+    });
+
+    const keyboardChooserPromise = page.waitForEvent("filechooser");
+    await page.locator("[data-media-upload-drop-zone]").focus();
+    await page.keyboard.press("Enter");
+    const keyboardChooser = await keyboardChooserPromise;
+    await keyboardChooser.setFiles({
+      name: "keyboard.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("keyboard"),
+    });
+    await expect(page.locator("#mediaUploadStatus")).toContainText("keyboard.txt selected");
+  });
+
+  test("invalid native picker selection clears stale preview and clear affordance", async ({ page }) => {
+    await installMediaRuntime(page);
+
+    await dropFiles(page, [{ name: "cup.jpg", type: "image/jpeg", body: "jpeg-body" }]);
+    await expect(page.locator("[data-media-upload-preview]")).toHaveJSProperty("hidden", false);
+    await expect(page.locator("[data-media-upload-clear]")).not.toBeHidden();
+
+    await page.locator("#file").setInputFiles({
+      name: "script.js",
+      mimeType: "text/javascript",
+      buffer: Buffer.from("alert(1)"),
+    });
+
+    await expect(page.locator("[data-media-upload-error]")).toContainText("not accepted");
+    await expect(page.locator("[data-media-upload-preview]")).toBeHidden();
+    await expect(page.locator("[data-media-upload-clear]")).toBeHidden();
+    await expect(page.locator("#mediaUploadStatus")).toContainText("not accepted");
+    expect(await page.locator("#file").evaluate((input: HTMLInputElement) => input.files?.length ?? 0)).toBe(0);
+  });
+
+  test("object URLs are revoked when upload roots detach or navigation cleans current previews", async ({ page }) => {
+    await installMediaRuntime(page);
+    await page.evaluate(() => {
+      window.revokedURLs = [];
+      const originalRevoke = URL.revokeObjectURL.bind(URL);
+      URL.revokeObjectURL = (url: string) => {
+        window.revokedURLs?.push(url);
+        originalRevoke(url);
+      };
+    });
+
+    await dropFiles(page, [{ name: "cup.jpg", type: "image/jpeg", body: "jpeg-body" }]);
+    const firstURL = await page.locator("[data-media-upload-preview]").getAttribute("src");
+    expect(firstURL).toMatch(/^blob:/);
+
+    await page.dispatchEvent("body", "gosx:navigate");
+    await expect(page.locator("[data-media-upload-preview]")).toBeHidden();
+    await expect.poll(() => page.evaluate(() => window.revokedURLs ?? [])).toContain(firstURL);
+
+    await dropFiles(page, [{ name: "second.jpg", type: "image/jpeg", body: "jpeg-body" }]);
+    const secondURL = await page.locator("[data-media-upload-preview]").getAttribute("src");
+    expect(secondURL).toMatch(/^blob:/);
+    await page.locator("[data-media-upload]").evaluate((root) => root.remove());
+    await expect.poll(() => page.evaluate(() => window.revokedURLs ?? [])).toContain(secondURL);
+  });
+
+  test("focal pointercancel and Escape restore the drag start values", async ({ page }) => {
+    await installMediaRuntime(page);
+    await page.locator("#focal").evaluate((node) => {
+      (node as HTMLElement).setPointerCapture = () => {};
+    });
+
+    await page.locator("#focal").dispatchEvent("pointerdown", { button: 0, pointerId: 1, clientX: 100, clientY: 50 });
+    await page.locator("#focal").dispatchEvent("pointermove", { pointerId: 1, clientX: 190, clientY: 10 });
+    await expect(page.locator("#focalX")).not.toHaveValue("0.25");
+    await expect(page.locator("#focalY")).not.toHaveValue("0.75");
+    await page.locator("#focal").dispatchEvent("pointercancel", { pointerId: 1 });
+    await expect(page.locator("#focalX")).toHaveValue("0.25");
+    await expect(page.locator("#focalY")).toHaveValue("0.75");
+
+    await page.locator("#focal").dispatchEvent("pointerdown", { button: 0, pointerId: 2, clientX: 100, clientY: 50 });
+    await page.locator("#focal").dispatchEvent("pointermove", { pointerId: 2, clientX: 180, clientY: 20 });
+    await expect(page.locator("#focalX")).not.toHaveValue("0.25");
+    await expect(page.locator("#focalY")).not.toHaveValue("0.75");
+    await page.locator("#focal").focus();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#focalX")).toHaveValue("0.25");
+    await expect(page.locator("#focalY")).toHaveValue("0.75");
+  });
+
+  test("picker chooses URL, fills alt text, ignores unsafe options, and duplicate init is idempotent", async ({ page }) => {
+    await installMediaRuntime(page);
+
+    await page.locator(".media-picker__trigger").first().click();
+    const singlePickerAssets = page.locator("#hero + .media-picker .media-picker__asset");
+    await expect(singlePickerAssets).toHaveCount(2);
+    await singlePickerAssets.filter({ hasText: "cup.jpg" }).click();
+
+    await expect(page.locator("#hero")).toHaveValue("/media/cup.jpg");
+    await expect(page.locator("#heroAlt")).toHaveValue("Cup alt");
+    await page.evaluate(() => window.GoSXStudioMediaRuntime.init(document));
+    await page.dispatchEvent("body", "gosxstudio:content-editor-render");
+    await expect(page.locator(".media-picker")).toHaveCount(1);
+    await expect(page.locator("#hero + .media-picker")).toHaveCount(1);
+    await expect(page.locator("#hero")).toHaveAttribute("list", "product-media-urls");
+
+    await page.evaluate(() => {
+      const input = document.createElement("input");
+      input.id = "dynamicHero";
+      input.setAttribute("list", "product-media-urls");
+      document.querySelector("#media-form")?.append(input);
+      window.GoSXStudioMediaRuntime.init(input);
+    });
+    await expect(page.locator("#dynamicHero + .media-picker")).toHaveCount(1);
+  });
+
+  test("filter Enter stays view-only for single and gallery pickers while asset Enter still activates", async ({ page }) => {
+    await installMediaRuntime(page);
+
+    await page.locator("#media-form").evaluate((form) => {
+      const mediaForm = form as HTMLFormElement;
+      const win = window as unknown as { mediaSubmitCount?: number };
+      win.mediaSubmitCount = 0;
+      mediaForm.method = "post";
+      mediaForm.action = "https://example.test/media-submit";
+      const save = document.createElement("button");
+      save.id = "media-save";
+      save.type = "submit";
+      save.textContent = "Save media";
+      mediaForm.appendChild(save);
+      mediaForm.dataset.dirty = "true";
+      mediaForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        win.mediaSubmitCount = (win.mediaSubmitCount ?? 0) + 1;
+      }, true);
+    });
+
+    const singlePicker = page.locator("#hero + .media-picker");
+    const singleTrigger = singlePicker.locator(".media-picker__trigger");
+    const singleSearch = singlePicker.locator(".media-picker__search");
+    const singlePanel = singlePicker.locator(".media-picker__panel");
+    await singleTrigger.click();
+    await singleSearch.fill("cup");
+    const singleBefore = await page.evaluate(() => ({
+      value: (document.querySelector("#hero") as HTMLInputElement).value,
+      alt: (document.querySelector("#heroAlt") as HTMLInputElement).value,
+      dirty: document.querySelector("#media-form")?.getAttribute("data-dirty"),
+      query: (document.querySelector("#hero + .media-picker .media-picker__search") as HTMLInputElement).value,
+    }));
+    await singleSearch.press("Enter");
+    await expect(singleSearch).toBeFocused();
+    await expect(singlePanel).not.toBeHidden();
+    expect(await page.evaluate(() => ({
+      value: (document.querySelector("#hero") as HTMLInputElement).value,
+      alt: (document.querySelector("#heroAlt") as HTMLInputElement).value,
+      dirty: document.querySelector("#media-form")?.getAttribute("data-dirty"),
+      query: (document.querySelector("#hero + .media-picker .media-picker__search") as HTMLInputElement).value,
+      submits: (window as unknown as { mediaSubmitCount?: number }).mediaSubmitCount ?? 0,
+    }))).toEqual({
+      value: singleBefore.value,
+      alt: singleBefore.alt,
+      dirty: singleBefore.dirty,
+      query: "cup",
+      submits: 0,
+    });
+    const composingEnterPrevented = await singleSearch.evaluate((node) => {
+      const event = new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        isComposing: true,
+        key: "Enter",
+      });
+      node.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+    expect(composingEnterPrevented).toBe(true);
+
+    await singlePicker.locator(".media-picker__asset").first().press("Enter");
+    await expect(page.locator("#hero")).toHaveValue("/media/cup.jpg");
+    await expect(page.locator("#heroAlt")).toHaveValue("Cup alt");
+    await expect(singlePanel).toBeHidden();
+    await expect(page.locator("#hero")).toBeFocused();
+
+    await page.locator("#imagesText").evaluate((node) => {
+      const textarea = node as HTMLTextAreaElement;
+      textarea.value = "/media/vase.webp | Vase entry";
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const gallery = page.locator("#imagesText + .media-list-editor");
+    const galleryTrigger = gallery.locator(".media-picker__trigger");
+    const gallerySearch = gallery.locator(".media-picker__search");
+    const galleryPanel = gallery.locator(".media-picker__panel");
+    await galleryTrigger.click();
+    await gallerySearch.fill("cup");
+    const galleryBefore = await page.evaluate(() => ({
+      value: (document.querySelector("#imagesText") as HTMLTextAreaElement).value,
+      dirty: document.querySelector("#media-form")?.getAttribute("data-dirty"),
+      query: (document.querySelector("#imagesText + .media-list-editor .media-picker__search") as HTMLInputElement).value,
+    }));
+    await gallerySearch.press("Enter");
+    await expect(gallerySearch).toBeFocused();
+    await expect(galleryPanel).not.toBeHidden();
+    expect(await page.evaluate(() => ({
+      value: (document.querySelector("#imagesText") as HTMLTextAreaElement).value,
+      dirty: document.querySelector("#media-form")?.getAttribute("data-dirty"),
+      query: (document.querySelector("#imagesText + .media-list-editor .media-picker__search") as HTMLInputElement).value,
+      submits: (window as unknown as { mediaSubmitCount?: number }).mediaSubmitCount ?? 0,
+    }))).toEqual({
+      value: galleryBefore.value,
+      dirty: galleryBefore.dirty,
+      query: "cup",
+      submits: 0,
+    });
+
+    await gallery.locator(".media-picker__asset").first().press("Enter");
+    await expect(page.locator("#imagesText")).toHaveValue(/\/media\/cup\.jpg \| Cup alt/);
+    await expect(galleryPanel).toBeHidden();
+    await expect(galleryTrigger).toBeFocused();
+    await galleryTrigger.click();
+    await gallerySearch.fill("no match");
+    await expect(gallery.locator("[data-media-picker-status]")).toHaveText('No matching media for "no match".');
+    await gallerySearch.press("Escape");
+    await expect(galleryPanel).toBeHidden();
+    await expect(galleryTrigger).toBeFocused();
+  });
+
+  test("media gallery preserves focus and duplicate entries through boundary edits and removal", async ({ page }) => {
+    await installMediaRuntime(page);
+
+    await page.locator("#imagesText").evaluate((node) => {
+      const textarea = node as HTMLTextAreaElement;
+      textarea.value = [
+        "/media/cup.jpg | First cup",
+        "/media/vase.webp | Vase entry",
+        "/media/cup.jpg | Second cup",
+      ].join("\n");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const gallery = page.locator("#imagesText + .media-list-editor");
+    const items = gallery.locator(".media-list-editor__item");
+    await expect(items).toHaveCount(3);
+    const initialIDs = await items.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-media-item-id")));
+    expect(new Set(initialIDs).size).toBe(3);
+
+    const vaseAlt = items.nth(1).locator("input[type='text']");
+    await expect(vaseAlt).toHaveValue("Vase entry");
+    await vaseAlt.fill("Vase changed");
+    await vaseAlt.press("Control+Z");
+    await expect(vaseAlt, "native alt-text undo must stay inside the field").toHaveValue("Vase entry");
+    await expect(page.locator("#imagesText")).toHaveValue(/\/media\/vase\.webp \| Vase entry/);
+
+    const rawToggle = gallery.locator(".media-list-editor__raw-toggle");
+    await expect(rawToggle).toHaveAttribute("aria-controls", "imagesText");
+    await expect(rawToggle).toHaveAttribute("aria-expanded", "false");
+    await rawToggle.press("Enter");
+    await expect(rawToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#imagesText")).not.toBeHidden();
+    await expect(page.locator("#imagesText")).toBeFocused();
+    await rawToggle.click();
+    await expect(rawToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator("#imagesText")).toBeHidden();
+
+    const firstDown = items.nth(0).locator("button[data-media-list-action='down']");
+    await firstDown.press("Enter");
+    await expect.poll(() => items.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-media-item-id")))).toEqual([
+      initialIDs[1],
+      initialIDs[0],
+      initialIDs[2],
+    ]);
+    await expect.poll(() => page.evaluate(() => ({
+      itemID: document.activeElement?.closest("[data-media-item-id]")?.getAttribute("data-media-item-id"),
+      action: document.activeElement?.getAttribute("data-media-list-action"),
+    }))).toEqual({ itemID: initialIDs[0], action: "down" });
+
+    await items.nth(1).locator("button[data-media-list-action='up']").click();
+    await expect.poll(() => items.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-media-item-id")))).toEqual([
+      initialIDs[0],
+      initialIDs[1],
+      initialIDs[2],
+    ]);
+    await expect.poll(() => page.evaluate(() => ({
+      itemID: document.activeElement?.closest("[data-media-item-id]")?.getAttribute("data-media-item-id"),
+      tag: document.activeElement?.tagName,
+      action: document.activeElement?.getAttribute("data-media-list-action"),
+    }))).toEqual({ itemID: initialIDs[0], tag: "INPUT", action: null });
+
+    const addTrigger = gallery.locator(".media-list-editor__actions .media-picker__trigger");
+    const addSearch = gallery.locator(".media-picker__search");
+    const addStatus = gallery.locator("[data-media-picker-status]");
+    await addTrigger.click();
+    await addSearch.fill("cup");
+    await expect(addStatus).toHaveText('Showing 1 media result for "cup".');
+    const cupAsset = gallery.locator(".media-picker__asset").first();
+    await expect(cupAsset).toHaveAttribute("data-media-asset-selected", "true");
+    await expect(cupAsset).toHaveAttribute("aria-label", /already in gallery/);
+
+    await items.nth(0).locator("button[data-media-list-action='remove']").click();
+    await expect.poll(() => items.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-media-item-id")))).toEqual([
+      initialIDs[1],
+      initialIDs[2],
+    ]);
+    await expect.poll(() => page.evaluate(() => ({
+      itemID: document.activeElement?.closest("[data-media-item-id]")?.getAttribute("data-media-item-id"),
+      action: document.activeElement?.getAttribute("data-media-list-action"),
+    }))).toEqual({ itemID: initialIDs[1], action: "remove" });
+
+    await items.nth(0).locator("button[data-media-list-action='remove']").click();
+    await expect.poll(() => items.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-media-item-id")))).toEqual([
+      initialIDs[2],
+    ]);
+    await expect.poll(() => page.evaluate(() => ({
+      itemID: document.activeElement?.closest("[data-media-item-id]")?.getAttribute("data-media-item-id"),
+      action: document.activeElement?.getAttribute("data-media-list-action"),
+    }))).toEqual({ itemID: initialIDs[2], action: "remove" });
+
+    await items.nth(0).locator("button[data-media-list-action='remove']").click();
+    await expect(items).toHaveCount(0);
+    await expect(page.locator("#imagesText")).toHaveValue("");
+    await expect(addTrigger).toBeFocused();
+    await expect(cupAsset).toHaveAttribute("data-media-asset-selected", "false");
+    await expect(cupAsset).not.toHaveAttribute("aria-label", /already in gallery/);
+  });
+
+  test("single media picker exposes selection, announces results, and contains Escape", async ({ page }) => {
+    await installMediaRuntime(page);
+
+    const heroPicker = page.locator("#hero + .media-picker");
+    const heroTrigger = heroPicker.locator(".media-picker__trigger");
+    const heroSearch = heroPicker.locator(".media-picker__search");
+    const heroPanel = heroPicker.locator(".media-picker__panel");
+    const heroStatus = heroPicker.locator("[data-media-picker-status]");
+    await heroTrigger.click();
+    await expect(heroStatus).toHaveAttribute("role", "status");
+    await expect(heroStatus).toHaveAttribute("aria-live", "polite");
+    await expect(heroStatus).toContainText("Showing 2 media results");
+    await heroSearch.fill("vase");
+    await expect(heroStatus).toHaveText('Showing 1 media result for "vase".');
+
+    await page.locator("#media-form").evaluate((form) => {
+      form.addEventListener("keydown", (event) => {
+        const keyboardEvent = event as KeyboardEvent;
+        if (keyboardEvent.key === "Escape") {
+          (window as unknown as { mediaAncestorEscapeCount?: number }).mediaAncestorEscapeCount =
+            ((window as unknown as { mediaAncestorEscapeCount?: number }).mediaAncestorEscapeCount ?? 0) + 1;
+        }
+      });
+    });
+    await heroSearch.press("Escape");
+    await expect(heroPanel).toBeHidden();
+    await expect(heroTrigger).toBeFocused();
+    expect(await page.evaluate(() => (window as unknown as { mediaAncestorEscapeCount?: number }).mediaAncestorEscapeCount ?? 0)).toBe(0);
+
+    await heroTrigger.click();
+    await heroSearch.fill("cup");
+    const cupAsset = heroPicker.locator(".media-picker__asset").first();
+    await expect(cupAsset).toHaveAttribute("aria-current", "false");
+    await cupAsset.click();
+    await expect(page.locator("#hero")).toHaveValue("/media/cup.jpg");
+
+    await heroTrigger.click();
+    await heroSearch.fill("cup");
+    await expect(heroPicker.locator(".media-picker__asset").first()).toHaveAttribute("aria-current", "true");
+  });
+
+  test("marks managed scripts loaded and keeps one media runtime across cleanup and new roots", async ({ page }) => {
+    await installMediaRuntime(page, true);
+    await expect(page.locator("#media-runtime-first")).toHaveAttribute("data-gosx-script-loaded", "true");
+    await expect(page.locator("#hero + .media-picker")).toHaveCount(1);
+    await page.evaluate(() => {
+      const win = window as unknown as { firstMediaRuntime?: unknown; GoSXStudioMediaRuntime?: unknown };
+      win.firstMediaRuntime = win.GoSXStudioMediaRuntime;
+    });
+    await page.evaluate(() => {
+      const stats = { documentListeners: 0, windowListeners: 0, observers: 0 };
+      const documentAdd = Document.prototype.addEventListener;
+      Document.prototype.addEventListener = function (
+        type: string,
+        listener: EventListenerOrEventListenerObject,
+        options?: boolean | AddEventListenerOptions,
+      ) {
+        stats.documentListeners += 1;
+        return documentAdd.call(this, type, listener, options);
+      };
+      const windowAdd = Window.prototype.addEventListener;
+      Window.prototype.addEventListener = function (
+        type: string,
+        listener: EventListenerOrEventListenerObject,
+        options?: boolean | AddEventListenerOptions,
+      ) {
+        stats.windowListeners += 1;
+        return windowAdd.call(this, type, listener, options);
+      };
+      const OriginalObserver = window.MutationObserver;
+      const observed = class extends OriginalObserver {
+        constructor(callback: MutationCallback) {
+          stats.observers += 1;
+          super(callback);
+        }
+      };
+      window.MutationObserver = observed as unknown as typeof MutationObserver;
+      (window as unknown as { mediaInstallListenerStats?: typeof stats }).mediaInstallListenerStats = stats;
+    });
+
+    await appendManagedRuntimeScript(page, "media-runtime-second");
+    await expect(page.locator("#media-runtime-second")).toHaveAttribute("data-gosx-script-loaded", "true");
+    expect(await page.evaluate(() => {
+      const win = window as unknown as { firstMediaRuntime?: unknown; GoSXStudioMediaRuntime?: unknown };
+      return win.firstMediaRuntime === win.GoSXStudioMediaRuntime;
+    })).toBe(true);
+    expect(await page.evaluate(() => (window as unknown as {
+      mediaInstallListenerStats?: { documentListeners: number; windowListeners: number; observers: number };
+    }).mediaInstallListenerStats)).toEqual({ documentListeners: 0, windowListeners: 0, observers: 0 });
+    await expect(page.locator("#hero + .media-picker")).toHaveCount(1);
+
+    await page.evaluate(() => {
+      window.revokedURLs = [];
+      const originalRevoke = URL.revokeObjectURL.bind(URL);
+      URL.revokeObjectURL = (url: string) => {
+        window.revokedURLs?.push(url);
+        originalRevoke(url);
+      };
+    });
+    await dropFiles(page, [{ name: "managed.jpg", type: "image/jpeg", body: "jpeg-body" }]);
+    const uploadedURL = await page.locator("[data-media-upload-preview]").getAttribute("src");
+    expect(uploadedURL).toMatch(/^blob:/);
+    const revokedBeforeNavigation = await page.evaluate(() => window.revokedURLs ?? []);
+    expect(revokedBeforeNavigation).toHaveLength(1);
+    await page.dispatchEvent("body", "gosx:navigate");
+    await expect.poll(() => page.evaluate(() => window.revokedURLs ?? [])).toEqual([...revokedBeforeNavigation, uploadedURL]);
+
+    await page.evaluate(() => {
+      const root = document.createElement("div");
+      root.id = "new-media-root";
+      const list = document.createElement("datalist");
+      list.id = "new-media-urls";
+      const option = document.createElement("option");
+      option.value = "/media/new.jpg";
+      option.label = "new.jpg";
+      list.append(option);
+      const input = document.createElement("input");
+      input.id = "newMedia";
+      input.setAttribute("list", list.id);
+      root.append(list, input);
+      document.body.append(root);
+    });
+    await expect(page.locator("#newMedia + .media-picker")).toHaveCount(1);
+    const pickerIDs = await page.locator(".media-picker__panel").evaluateAll((panels) => panels.map((panel) => panel.id));
+    expect(pickerIDs).toEqual(["media-picker-1", "media-lines-2", "media-picker-3"]);
+  });
+
+  test("asset grid exposes draggable Studio media payload", async ({ page }) => {
+    await installMediaRuntime(page);
+    await page.locator(".media-picker__trigger").first().click();
+
+    const payload = await page.locator(".media-picker__asset", { hasText: "vase.webp" }).first().evaluate((button) => {
+      const event = new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() });
+      button.dispatchEvent(event);
+      return event.dataTransfer?.getData("application/x-gosx-studio-media") ?? "";
+    });
+
+    expect(JSON.parse(payload)).toEqual({
+      url: "/media/vase.webp",
+      alt: "Vase alt",
+      label: "vase.webp",
+      kind: "webp",
+    });
+  });
+});

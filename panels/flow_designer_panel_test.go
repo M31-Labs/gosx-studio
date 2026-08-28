@@ -18,12 +18,13 @@ func TestRenderFlowDesignerPanelFull(t *testing.T) {
 		`<article class="studio-flow-editor" data-editor-flow="contact" data-studio-flow-editor="contact" data-studio-flow-valid="true" data-studio-flow-readiness-status="ready" data-studio-flow-dirty="false" data-studio-flow-editor-visible="true">`,
 		`<output class="studio-flow-editor__state studio-flow-editor__state--ready" data-studio-flow-editor-state="contact" data-studio-flow-editor-state-visible="true">Ready to publish</output>`,
 		`<output class="studio-flow-editor__state studio-flow-editor__state--watch" data-studio-flow-editor-state="contact" data-studio-flow-editor-state-visible="false">Unsaved changes</output>`,
-		`<button class="button button--secondary" type="submit" form="websiteEditorForm" formaction="/admin/editor/__actions/publishFlow" formmethod="post" name="flowKey" value="contact" data-studio-submit-action="publish-flow">Publish flow</button>`,
+		`<button class="button button--secondary" type="submit" form="websiteEditorForm" formaction="/admin/editor/__actions/publishFlow" formmethod="post" name="flowKey" value="contact" formnovalidate="formnovalidate" data-studio-submit-action="publish-flow">Publish flow</button>`,
 		`<div class="studio-flow-readiness studio-flow-readiness--ready" data-studio-flow-readiness="contact">`,
 		`<section class="studio-flow-check studio-flow-check--ready" role="listitem" tabindex="0" data-studio-flow-check="handler" data-studio-flow-check-status="ready">`,
 		`<div class="studio-flow-graph" role="list" aria-label="Flow map">`,
 		`<section class="studio-flow-node studio-flow-node--ready studio-flow-node--action" role="listitem" tabindex="0" data-studio-flow-node="action:submit" data-studio-flow-node-kind="action" data-studio-flow-node-status="ready">`,
-		`<input id="studio-flow-route-contact" name="flowContactRoute" value="/contact" form="websiteEditorForm" data-studio-field-source="flow.contact.route" data-studio-field-editable="routing" readonly />`,
+		`<div class="field field--static studio-flow-editor__placement"><span class="field__label">Public page</span><strong class="field__value" data-studio-flow-route-value="true">/contact</strong><small class="field__note">Set with support during flow setup.</small></div>`,
+		`<div class="field field--static studio-flow-editor__placement"><span class="field__label">Appears in</span><strong class="field__value" data-studio-flow-embed-value="true">main</strong><small class="field__note">Set with support during flow setup.</small></div>`,
 		`<input id="studio-flow-handler-contact" name="flowContactHandlerRef" value="contact.submit" form="websiteEditorForm" data-studio-field-source="flow.contact.handlerRef" data-studio-field-editable="flow" data-studio-flow-handler-ref="true" type="hidden" />`,
 		`<section class="studio-flow-step" data-studio-flow-step="details" tabindex="0">`,
 		`<input id="studio-flow-step-details" name="flowContactStepDetailsLabel" value="Details" form="websiteEditorForm" data-studio-field-source="flow.contact.steps.details.label" data-studio-field-editable="flow" />`,
@@ -34,9 +35,38 @@ func TestRenderFlowDesignerPanelFull(t *testing.T) {
 			t.Fatalf("flow designer panel missing %q:\n%s", fragment, html)
 		}
 	}
-	for _, notWant := range []string{"<form", "csrf_token"} {
+	for _, notWant := range []string{
+		"<form", "csrf_token",
+		// Public page / Appears in must no longer render as inputs -- they
+		// look editable-but-locked instead of honestly non-editable here.
+		`name="flowContactRoute"`,
+		`name="flowContactEmbedTarget"`,
+		`data-studio-field-source="flow.contact.route"`,
+		`data-studio-field-source="flow.contact.embedTarget"`,
+	} {
 		if strings.Contains(html, notWant) {
 			t.Fatalf("flow designer panel must not include %q:\n%s", notWant, html)
+		}
+	}
+}
+
+// TestRenderFlowDesignerPanelPlacementEmDash proves an unset placement fact
+// (no route, no embed target) renders an em dash instead of a blank or
+// fabricated value.
+func TestRenderFlowDesignerPanelPlacementEmDash(t *testing.T) {
+	view := flowDesignerPanelTestView()
+	flows := view["flows"].([]map[string]any)
+	flows[0]["route"] = ""
+	flows[0]["embedTarget"] = ""
+
+	html := gosx.RenderHTML(RenderFlowDesignerPanel(view, FlowDesignerPanelOptions{}))
+
+	for _, fragment := range []string{
+		`<strong class="field__value" data-studio-flow-route-value="true">—</strong>`,
+		`<strong class="field__value" data-studio-flow-embed-value="true">—</strong>`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("flow designer panel missing %q:\n%s", fragment, html)
 		}
 	}
 }

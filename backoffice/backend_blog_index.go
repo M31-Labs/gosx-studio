@@ -90,8 +90,10 @@ func RenderBackendBlogCreatePanel(props BackendBlogIndexPageProps) gosx.Node {
 			gosx.Attr("class", "admin-form"),
 			gosx.Attr("method", "post"),
 			gosx.Attr("action", props.CreateAction),
+			gosx.Attr("data-content-editor-enhanced-submit", "true"),
 		),
 			gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "csrf_token"), gosx.Attr("value", props.CSRFToken))),
+			renderBackendBlogIndexButtons(),
 			renderBackendBlogIndexInput("title", "Title", post.Title, "", renderBackendBlogIndexFieldError(props.CreateStatus, "title")),
 			renderBackendBlogIndexInput("slug", "Slug", post.Slug, "", nil),
 			renderBackendBlogIndexInput("authorName", "Author", post.AuthorName, "", nil),
@@ -107,7 +109,6 @@ func RenderBackendBlogCreatePanel(props BackendBlogIndexPageProps) gosx.Node {
 			renderBackendBlogIndexRelations("Related products", props.Products),
 			renderBackendBlogIndexRelations("Related gallery works", props.GalleryWorks),
 			renderBackendBlogIndexChecks(),
-			gosx.El("button", gosx.Attrs(gosx.Attr("class", "button button--primary"), gosx.Attr("type", "submit")), gosx.Text("Create post")),
 		),
 	)
 }
@@ -133,10 +134,7 @@ func RenderBackendBlogIndexTagsDatalist(tags []BackendBlogIndexTag) gosx.Node {
 }
 
 func RenderBackendBlogIndexScripts() gosx.Node {
-	return gosx.Fragment(
-		gosx.El("script", gosx.Attrs(gosx.Attr("src", "/content-editor.js"), gosx.Attr("defer", true))),
-		gosx.El("script", gosx.Attrs(gosx.Attr("src", "/media-picker.js"), gosx.Attr("defer", true))),
-	)
+	return renderBackendManagedStudioScripts()
 }
 
 func renderBackendBlogIndexStatus(status BackendBlogIndexActionStatus) gosx.Node {
@@ -271,4 +269,14 @@ func renderBackendBlogIndexChecks() gosx.Node {
 		gosx.El("label", nil, gosx.El("input", gosx.Attrs(gosx.Attr("type", "checkbox"), gosx.Attr("name", "published"), gosx.Attr("checked", "checked"))), gosx.Text(" Published")),
 		gosx.El("label", nil, gosx.El("input", gosx.Attrs(gosx.Attr("type", "checkbox"), gosx.Attr("name", "featured"))), gosx.Text(" Featured")),
 	)
+}
+
+func renderBackendBlogIndexButtons() gosx.Node {
+	return gosx.El("div", gosx.Attrs(
+		gosx.Attr("class", "button-row admin-form__primary-actions"),
+		gosx.Attr("data-content-editor-primary-actions", "true"),
+	), gosx.El("button", gosx.Attrs(
+		gosx.Attr("class", "button button--primary"),
+		gosx.Attr("type", "submit"),
+	), gosx.Text("Create post")))
 }

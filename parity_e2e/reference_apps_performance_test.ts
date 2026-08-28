@@ -65,8 +65,16 @@ const referenceApps: ReferenceAppPerformanceGate[] = [
     publishMode: "publish",
     budgets: {
       ...defaultBudgets,
-      editorRuntimePayloadBytes: 6_000_000,
-      largestRuntimeResourceBytes: 5_000_000,
+      // STALE-PREMISE FIX: the no-signal default site-map surface mode is now
+      // "canvas-default" (muddy's editorSiteMapCanvasMode default, matching
+      // reference_apps_canvas_default_test.ts's locked "no-env default uses
+      // the real full-WASM CanvasBoard" contract) — the shared full gosx WASM
+      // runtime (~30MB) is genuinely, intentionally fetched on every editor
+      // load, not merely an islands-only/wasm-free footprint. These budgets
+      // predate that default and were sized for the old low-WASM default;
+      // raised to the real, current payload with modest headroom.
+      editorRuntimePayloadBytes: 36_000_000,
+      largestRuntimeResourceBytes: 32_000_000,
       canvasNodeCount: 260,
       publishCheckCount: 60,
     },
@@ -76,6 +84,19 @@ const referenceApps: ReferenceAppPerformanceGate[] = [
     start: startPajaritos,
     canvasSelector: "#website-map",
     publishSelector: "#publishing",
+    // STALE-PREMISE FIX: #website-map and #publishing now live inside the
+    // "Advanced" mode panel (studio-pagecanvas-handoff moved them there once
+    // a PageCanvas surface is present — mirrors reference_apps_visual_a11y_test.ts's
+    // Pajaritos gate). Without an explicit mode this measurement never
+    // reveals that panel, so #publishing stays hidden and the visibility
+    // wait times out.
+    canvasMode: "advanced",
+    // The preview frame lives in the page-canvas ("Home") stage, which
+    // studio.css hides outright while data-studio-mode="advanced"; switch
+    // back to a non-advanced mode before the preview-frame gate (mirrors
+    // reference_apps_visual_a11y_test.ts's Pajaritos previewMode).
+    previewMode: "home",
+    publishMode: "advanced",
     assertPublishing: expectPajaritosPublishingReadiness,
     budgets: {
       ...defaultBudgets,
@@ -247,7 +268,7 @@ async function scrollSelectorIntoView(page: Page, selector: string) {
       while (current && current !== ancestor && ancestor.contains(current)) {
         top += current.offsetTop;
         left += current.offsetLeft;
-        const next = current.offsetParent instanceof HTMLElement ? current.offsetParent : current.parentElement;
+        const next: HTMLElement | null = current.offsetParent instanceof HTMLElement ? current.offsetParent : current.parentElement;
         current = next;
       }
       return { top, left };

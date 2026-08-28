@@ -12,12 +12,25 @@ type BackendPageDetailPageProps struct {
 	ArchiveAction         string
 	RestoreAction         string
 	CSRFToken             string
+	SaveLabel             string
+	PublishedLabel        string
+	PublishedHelp         string
+	CancelHref            string
+	CancelLabel           string
+	PublishHref           string
+	PublishLabel          string
+	PublishNotice         string
 	SaveStatus            BackendPageDetailActionStatus
 	ArchiveStatus         BackendPageDetailActionStatus
 	RestoreStatus         BackendPageDetailActionStatus
 	RestoreRevisionStatus BackendPageDetailActionStatus
 	RevisionRestored      bool
-	Page                  BackendPageDetailValues
+	// ExpectedRevision is an optional optimistic-concurrency token supplied by
+	// a host that protects editor saves. nil keeps this shared form backward
+	// compatible for hosts without a revision contract; a non-nil empty value
+	// deliberately renders the marked field so a guarded host fails closed.
+	ExpectedRevision *string
+	Page             BackendPageDetailValues
 }
 
 type BackendPageDetailActionStatus struct {
@@ -92,26 +105,38 @@ func RenderBackendPageDetailForm(props BackendPageDetailPageProps) gosx.Node {
 		gosx.Attr("class", "panel admin-form"),
 		gosx.Attr("method", "post"),
 		gosx.Attr("action", props.SaveAction),
+		gosx.Attr("data-content-editor-enhanced-submit", "true"),
 	),
 		gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "csrf_token"), gosx.Attr("value", props.CSRFToken))),
 		gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "id"), gosx.Attr("value", page.ID))),
+		renderBackendPageDetailRevisionInput(props.ExpectedRevision),
 		gosx.Fragment(renderBackendPageDetailStatuses(props)...),
+		renderBackendPageDetailPrimaryButtons(props),
 		props.Preview,
 		renderBackendPageDetailInput("title", "Title", page.Title, "", renderBackendPageDetailFieldError(props.SaveStatus, "title")),
 		renderBackendPageDetailInput("slug", "Slug", page.Slug, "", nil),
 		renderBackendPageDetailBodyFormat(page),
 		renderBackendPageDetailContentEditor(page.Body),
 		renderBackendPageDetailSEO(page),
-		renderBackendPageDetailChecks(page),
-		renderBackendPageDetailButtons(props),
+		renderBackendPageDetailChecks(props),
+		renderBackendPageDetailSecondaryButtons(props),
 	)
 }
 
+func renderBackendPageDetailRevisionInput(expectedRevision *string) gosx.Node {
+	if expectedRevision == nil {
+		return gosx.Fragment()
+	}
+	return gosx.El("input", gosx.Attrs(
+		gosx.Attr("type", "hidden"),
+		gosx.Attr("name", "expectedRevision"),
+		gosx.Attr("value", *expectedRevision),
+		gosx.Attr("data-content-editor-revision", "true"),
+	))
+}
+
 func RenderBackendPageDetailScripts() gosx.Node {
-	return gosx.Fragment(
-		gosx.El("script", gosx.Attrs(gosx.Attr("src", "/content-editor.js"), gosx.Attr("defer", true))),
-		gosx.El("script", gosx.Attrs(gosx.Attr("src", "/media-picker.js"), gosx.Attr("defer", true))),
-	)
+	return renderBackendManagedStudioScripts()
 }
 
 func renderBackendPageDetailStatuses(props BackendPageDetailPageProps) []gosx.Node {
@@ -212,20 +237,46 @@ func renderBackendPageDetailSEO(page BackendPageDetailValues) gosx.Node {
 	)
 }
 
-func renderBackendPageDetailChecks(page BackendPageDetailValues) gosx.Node {
+func renderBackendPageDetailChecks(props BackendPageDetailPageProps) gosx.Node {
+	page := props.Page
+	label := firstNonEmptyPageDetail(props.PublishedLabel, "Published")
+	nodes := []gosx.Node{
+		gosx.El("label", nil, gosx.El("input", gosx.Attrs(gosx.Attr("type", "checkbox"), gosx.Attr("name", "published"), gosx.Attr("checked", page.Published))), gosx.Text(" "+label)),
+	}
+	if props.PublishedHelp != "" {
+		nodes = append(nodes, gosx.El("small", gosx.Attrs(gosx.Attr("class", "field-help")), gosx.Text(props.PublishedHelp)))
+	}
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "check-row")),
-		gosx.El("label", nil, gosx.El("input", gosx.Attrs(gosx.Attr("type", "checkbox"), gosx.Attr("name", "published"), gosx.Attr("checked", page.Published))), gosx.Text(" Published")),
+		gosx.Fragment(nodes...),
 	)
 }
 
-func renderBackendPageDetailButtons(props BackendPageDetailPageProps) gosx.Node {
+func renderBackendPageDetailPrimaryButtons(props BackendPageDetailPageProps) gosx.Node {
 	page := props.Page
-	nodes := []gosx.Node{
-		gosx.El("button", gosx.Attrs(gosx.Attr("class", "button button--primary"), gosx.Attr("type", "submit")), gosx.Text("Save page")),
+	primary := []gosx.Node{
+		gosx.El("button", gosx.Attrs(gosx.Attr("class", "button button--primary"), gosx.Attr("type", "submit")), gosx.Text(firstNonEmptyPageDetail(props.SaveLabel, "Save page"))),
 		gosx.El("a", gosx.Attrs(gosx.Attr("class", "button button--secondary"), gosx.Attr("href", page.PreviewHref), gosx.Attr("data-gosx-link", "true")), gosx.Text("Preview")),
 	}
+	if props.CancelHref != "" {
+		primary = append(primary, gosx.El("a", gosx.Attrs(gosx.Attr("class", "button button--secondary"), gosx.Attr("href", props.CancelHref), gosx.Attr("data-gosx-link", "true"), gosx.Attr("data-content-editor-discard", "true")), gosx.Text(firstNonEmptyPageDetail(props.CancelLabel, "Cancel"))))
+	}
+	return gosx.El("div", gosx.Attrs(
+		gosx.Attr("class", "button-row admin-form__primary-actions"),
+		gosx.Attr("data-content-editor-primary-actions", "true"),
+	), gosx.Fragment(primary...))
+}
+
+func renderBackendPageDetailSecondaryButtons(props BackendPageDetailPageProps) gosx.Node {
+	page := props.Page
+	secondary := []gosx.Node{}
+	if props.PublishHref != "" {
+		secondary = append(secondary, gosx.El("a", gosx.Attrs(gosx.Attr("class", "button button--primary"), gosx.Attr("href", props.PublishHref), gosx.Attr("data-gosx-link", "true")), gosx.Text(firstNonEmptyPageDetail(props.PublishLabel, "Publish"))))
+	}
+	if props.PublishNotice != "" {
+		secondary = append(secondary, gosx.El("small", gosx.Attrs(gosx.Attr("class", "field-help")), gosx.Text(props.PublishNotice)))
+	}
 	if page.CanArchive {
-		nodes = append(nodes, gosx.El("button", gosx.Attrs(
+		secondary = append(secondary, gosx.El("button", gosx.Attrs(
 			gosx.Attr("class", "button button--secondary"),
 			gosx.Attr("type", "submit"),
 			gosx.Attr("formaction", props.ArchiveAction),
@@ -233,15 +284,27 @@ func renderBackendPageDetailButtons(props BackendPageDetailPageProps) gosx.Node 
 		), gosx.Text("Archive")))
 	}
 	if page.CanRestore {
-		nodes = append(nodes, gosx.El("button", gosx.Attrs(
+		secondary = append(secondary, gosx.El("button", gosx.Attrs(
 			gosx.Attr("class", "button button--secondary"),
 			gosx.Attr("type", "submit"),
 			gosx.Attr("formaction", props.RestoreAction),
 			gosx.Attr("data-admin-confirm", "Restore this page?"),
 		), gosx.Text("Restore")))
 	}
-	nodes = append(nodes,
+	secondary = append(secondary,
 		gosx.El("a", gosx.Attrs(gosx.Attr("class", "button button--secondary"), gosx.Attr("href", "/admin/pages"), gosx.Attr("data-gosx-link", "true")), gosx.Text("Back to pages")),
 	)
-	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "button-row")), gosx.Fragment(nodes...))
+	return gosx.El("div", gosx.Attrs(
+		gosx.Attr("class", "button-row admin-form__secondary-actions"),
+		gosx.Attr("data-content-editor-secondary-actions", "true"),
+	), gosx.Fragment(secondary...))
+}
+
+func firstNonEmptyPageDetail(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

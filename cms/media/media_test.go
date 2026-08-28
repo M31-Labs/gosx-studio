@@ -1,6 +1,11 @@
 package media
 
-import "testing"
+import (
+	"errors"
+	"testing"
+
+	"m31labs.dev/gosx-studio/core"
+)
 
 func TestNormalizeListDedupesAndAddsFallbackAlt(t *testing.T) {
 	items := NormalizeList([]Item{
@@ -107,5 +112,101 @@ func TestInputFromStoredObject(t *testing.T) {
 	}
 	if input.Variants["thumb"].URL != "/media/uploads/forest-thumb.jpg" {
 		t.Fatalf("expected normalized variants, got %#v", input.Variants)
+	}
+}
+
+func TestNormalizeAssetKeepsCaption(t *testing.T) {
+	asset := NormalizeAsset(Input{URL: "/media/cup.jpg", Caption: "  A cup on a shelf.  "}, Asset{})
+	if asset.Caption != "A cup on a shelf." {
+		t.Fatalf("expected trimmed caption, got %q", asset.Caption)
+	}
+}
+
+// --- GuardDeleteMediaAsset ---
+
+type stubUsageLookup struct {
+	usage map[string][]Usage
+}
+
+func (lookup stubUsageLookup) MediaUsage(id string) []Usage { return lookup.usage[id] }
+
+type stubAssetDeleter struct {
+	deleted []string
+	err     error
+}
+
+func (deleter *stubAssetDeleter) DeleteMediaAsset(id string) error {
+	if deleter.err != nil {
+		return deleter.err
+	}
+	deleter.deleted = append(deleter.deleted, id)
+	return nil
+}
+
+func TestGuardDeleteMediaAssetAllowsUnreferencedAsset(t *testing.T) {
+	lookup := stubUsageLookup{usage: map[string][]Usage{}}
+	deleter := &stubAssetDeleter{}
+	usage, err := GuardDeleteMediaAsset(lookup, deleter, "med-1")
+	if err != nil {
+		t.Fatalf("unexpected error deleting an unreferenced asset: %v", err)
+	}
+	if len(usage) != 0 {
+		t.Fatalf("expected no usage for an unreferenced asset, got %#v", usage)
+	}
+	if len(deleter.deleted) != 1 || deleter.deleted[0] != "med-1" {
+		t.Fatalf("expected the deleter to be called with the asset id, got %#v", deleter.deleted)
+	}
+}
+
+func TestGuardDeleteMediaAssetRejectsReferencedAsset(t *testing.T) {
+	lookup := stubUsageLookup{usage: map[string][]Usage{
+		"med-1": {{Kind: "Product", Title: "Hand-thrown mug", ID: "prod-1"}},
+	}}
+	deleter := &stubAssetDeleter{}
+	usage, err := GuardDeleteMediaAsset(lookup, deleter, "med-1")
+	if !errors.Is(err, ErrAssetReferenced) {
+		t.Fatalf("expected ErrAssetReferenced, got %v", err)
+	}
+	if len(usage) != 1 || usage[0].Title != "Hand-thrown mug" {
+		t.Fatalf("expected the blocking usage to be returned, got %#v", usage)
+	}
+	if len(deleter.deleted) != 0 {
+		t.Fatal("expected the deleter to never be called for a referenced asset")
+	}
+}
+
+func TestGuardDeleteMediaAssetPropagatesDeleterError(t *testing.T) {
+	lookup := stubUsageLookup{usage: map[string][]Usage{}}
+	deleter := &stubAssetDeleter{err: errors.New("store unavailable")}
+	if _, err := GuardDeleteMediaAsset(lookup, deleter, "med-1"); err == nil || err.Error() != "store unavailable" {
+		t.Fatalf("expected the deleter's error to propagate, got %v", err)
+	}
+}
+
+func TestGuardDeleteMediaAssetRequiresID(t *testing.T) {
+	deleter := &stubAssetDeleter{}
+	if _, err := GuardDeleteMediaAsset(stubUsageLookup{}, deleter, "  "); err == nil {
+		t.Fatal("expected a blank id to be rejected")
+	}
+	if len(deleter.deleted) != 0 {
+		t.Fatal("expected the deleter to never be called for a blank id")
+	}
+}
+
+// --- AssetReadiness ---
+
+func TestAssetReadinessRequiresAltOnlyWhenReferenced(t *testing.T) {
+	unused := Asset{ID: "med-1"}
+	if status := AssetReadinessStatus(unused, nil); status != core.ReadinessWatch {
+		t.Fatalf("expected an unused asset with no alt text to be Watch, got %v", status)
+	}
+	referenced := Asset{ID: "med-2"}
+	usage := []Usage{{Kind: "Product", Title: "Mug"}}
+	if status := AssetReadinessStatus(referenced, usage); status != core.ReadinessBlocked {
+		t.Fatalf("expected a referenced asset with no alt text to be Blocked, got %v", status)
+	}
+	withAlt := Asset{ID: "med-3", Alt: "A hand-thrown mug"}
+	if status := AssetReadinessStatus(withAlt, usage); status != core.ReadinessReady {
+		t.Fatalf("expected a referenced asset with alt text to be Ready, got %v", status)
 	}
 }

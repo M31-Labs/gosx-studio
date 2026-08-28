@@ -172,6 +172,13 @@ func renderLookScopeField(label, value, attr string) gosx.Node {
 	if attr != "" {
 		attrs = append(attrs, gosx.Attr(attr, "true"))
 	}
+	// #15 — long scope values ("SYSTEM muddy-no…", "DEFAU…") clip under the
+	// grid's min-width + ellipsis truncation (see studio.css
+	// .studio-style-scope__grid output); a title tooltip keeps the full value
+	// discoverable on hover/focus without widening the card.
+	if value != "" {
+		attrs = append(attrs, gosx.Attr("title", value))
+	}
 	return gosx.El("span", nil,
 		gosx.El("small", nil, gosx.Text(label)),
 		gosx.El("output", gosx.Attrs(attrs...), gosx.Text(value)),
@@ -214,7 +221,27 @@ func renderLookStyleWorkbench(workbench map[string]any) gosx.Node {
 	), gosx.Fragment(children...))
 }
 
+// renderLookStyleImpact renders the Recipes grid's "Preview impact" card.
+//
+// Wave 3B (tamarind, residual #6 — LOOK Recipes card crowding): live against
+// the ~20rem right rail (--size-studio-right), the impact label/summary
+// column and the count/scope/state chip column were crowding each other —
+// confirmed live: "No…" (an already-truncated label) wrapped against
+// "Awaiting / scoped / change." across three cramped lines beside
+// full-width "0 AFFECTED" / "SITE > HOME > HERO" / "DEFAULT / DESKTOP"
+// chips. Mirrors the #15 fix already applied to renderLookScopeField: every
+// value that can truncate under the grid's min-width/ellipsis rules
+// (studio.css/site.css) gets a title tooltip so the full text stays
+// discoverable on hover/focus without widening the card; the width-budget
+// half of the fix (min-width for the text column, a tighter chip max-width)
+// lives in host CSS (muddy-noni-commerce's public/site.css
+// .studio-style-impact / .studio-style-impact__meta rules).
 func renderLookStyleImpact(impact map[string]any) gosx.Node {
+	label := core.WorkbenchViewString(impact, "label")
+	summary := core.WorkbenchViewString(impact, "summary")
+	countLabel := core.WorkbenchViewString(impact, "countLabel")
+	scopeLabel := core.WorkbenchViewString(impact, "scopeLabel")
+	stateLabel := core.WorkbenchViewString(impact, "stateLabel")
 	return gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", "studio-style-impact"),
 		gosx.Attr("data-studio-style-impact-panel", "true"),
@@ -222,15 +249,46 @@ func renderLookStyleImpact(impact map[string]any) gosx.Node {
 	),
 		gosx.El("div", nil,
 			gosx.El("p", gosx.Attrs(gosx.Attr("class", "kicker")), gosx.Text(core.WorkbenchViewString(impact, "kicker"))),
-			gosx.El("strong", gosx.Attrs(gosx.Attr("data-studio-style-impact-label", "true")), gosx.Text(core.WorkbenchViewString(impact, "label"))),
-			gosx.El("p", gosx.Attrs(gosx.Attr("data-studio-style-impact-summary", "true")), gosx.Text(core.WorkbenchViewString(impact, "summary"))),
+			gosx.El("strong", gosx.Attrs(lookTooltipAttrs("data-studio-style-impact-label", label)...), gosx.Text(label)),
+			gosx.El("p", gosx.Attrs(lookTooltipAttrs("data-studio-style-impact-summary", summary)...), gosx.Text(summary)),
 		),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-style-impact__meta")),
-			gosx.El("output", gosx.Attrs(gosx.Attr("data-studio-style-impact-count", "true")), gosx.Text(core.WorkbenchViewString(impact, "countLabel"))),
-			gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-style-impact-scope", "true")), gosx.Text(core.WorkbenchViewString(impact, "scopeLabel"))),
-			gosx.El("span", gosx.Attrs(gosx.Attr("data-studio-style-impact-state", "true")), gosx.Text(core.WorkbenchViewString(impact, "stateLabel"))),
+			gosx.El("output", gosx.Attrs(lookTooltipAttrs("data-studio-style-impact-count", countLabel)...), gosx.Text(countLabel)),
+			gosx.El("span", gosx.Attrs(lookTooltipAttrs("data-studio-style-impact-scope", scopeLabel)...), gosx.Text(scopeLabel)),
+			gosx.El("span", gosx.Attrs(lookTooltipAttrs("data-studio-style-impact-state", stateLabel)...), gosx.Text(stateLabel)),
 		),
 	)
+}
+
+// lookTooltipAttrs builds the marker attribute plus a title tooltip carrying
+// the full value when non-empty (see renderLookStyleImpact/
+// renderLookScopeField's identical #15 pattern).
+func lookTooltipAttrs(markerAttr, value string) []any {
+	attrs := []any{gosx.Attr(markerAttr, "true")}
+	if value != "" {
+		attrs = append(attrs, gosx.Attr("title", value))
+	}
+	return attrs
+}
+
+// lookChoiceButtonAttrs builds a segmented-choice option button's attrs
+// (Hero shape's EDITORIAL/OVERLAY/SPLIT, Width's NARROW/STANDARD/WIDE,
+// etc.) plus a title tooltip mirroring its own label, unless the host
+// already supplied one. handoff-4 (text truncation sweep): these buttons
+// sit in a fixed 3-column grid (muddy-noni-commerce's public/site.css
+// .studio-style-choice-row) narrow enough that "IMMERSIVE"/"STANDARD"
+// clip to "IMMER…"/"STAND…" -- the accompanying CSS fix lets them wrap
+// onto two lines, and this tooltip covers hosts/viewports where a label
+// still doesn't fit.
+func lookChoiceButtonAttrs(values map[string]any, label string) []any {
+	attrs := BlockLibraryPanelMapAttrs(values)
+	if label == "" {
+		return attrs
+	}
+	if _, hasTitle := values["title"]; hasTitle {
+		return attrs
+	}
+	return append(attrs, gosx.Attr("title", label))
 }
 
 func renderLookStyleRecipe(recipe map[string]any) gosx.Node {
@@ -266,7 +324,8 @@ func renderLookStyleControlGroup(control map[string]any) gosx.Node {
 	options := core.WorkbenchViewMapList(control, "options")
 	children := make([]gosx.Node, 0, len(options))
 	for _, option := range options {
-		children = append(children, gosx.El("button", gosx.Attrs(BlockLibraryPanelMapAttrs(core.WorkbenchViewMap(option, "attrs"))...), gosx.Text(core.WorkbenchViewString(option, "label"))))
+		label := core.WorkbenchViewString(option, "label")
+		children = append(children, gosx.El("button", gosx.Attrs(lookChoiceButtonAttrs(core.WorkbenchViewMap(option, "attrs"), label)...), gosx.Text(label)))
 	}
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-style-control-group")),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "studio-style-control-group__head")),

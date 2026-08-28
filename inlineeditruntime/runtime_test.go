@@ -97,6 +97,34 @@ func TestInlineEditRuntimeCommitBehavior(t *testing.T) {
 	}
 }
 
+// TestInlineEditRuntimeEscapeCancelsWithoutCommit verifies the #5 fix: Escape
+// during a direct canvas-surface inline edit reverts the in-progress value to
+// its pre-edit baseline and ends editing WITHOUT going through commit() (no
+// POST), unlike Enter/blur which intentionally still commit.
+func TestInlineEditRuntimeEscapeCancelsWithoutCommit(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"function cancelEdit(el)",
+		`if (ev.key === "Escape") {`,
+		"cancelEdit(el);",
+		"var original = startOf(el);",
+		"if (original === undefined) return;",
+		"if (textOf(el) !== original) el.textContent = original;",
+		"clearStart(el);",
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() missing Escape-cancel fragment %q:\n%s", fragment, body)
+		}
+	}
+	// Escape must be handled ahead of the Enter-commit branch in the same
+	// keydown listener, and must return before falling into it.
+	escapeIndex := strings.Index(body, `if (ev.key === "Escape") {`)
+	enterIndex := strings.Index(body, `if (ev.key !== "Enter" || ev.shiftKey === true) return;`)
+	if escapeIndex < 0 || enterIndex < 0 || escapeIndex >= enterIndex {
+		t.Fatalf("InlineEditRuntimeScript() must check Escape before the Enter-commit guard in install()'s keydown listener:\n%s", body)
+	}
+}
+
 // TestInlineEditRuntimePOSTBody verifies the expected form field names that
 // mirror the server's AuthoringMutationFromForm contract.
 func TestInlineEditRuntimePOSTBody(t *testing.T) {
@@ -255,6 +283,10 @@ func TestInlineEditRuntimeOwnsPreviewTextSessionLifecycle(t *testing.T) {
 		`detail.editable !== "text"`,
 		`frame.__gosxStudioPreviewDockTarget`,
 		`target.setAttribute("contenteditable", "plaintext-only")`,
+		`hadHref: target.hasAttribute && target.hasAttribute("href")`,
+		`originalHref: target.hasAttribute && target.hasAttribute("href") ? target.getAttribute("href") || "" : ""`,
+		`if (edit.hadHref) target.removeAttribute("href")`,
+		`if (edit.hadHref) edit.target.setAttribute("href", edit.originalHref)`,
 		`target.setAttribute("spellcheck", "true")`,
 		`target.setAttribute("data-gosx-studio-inline-editing", "true")`,
 		`target.removeAttribute("contenteditable")`,
@@ -305,6 +337,30 @@ func TestInlineEditRuntimePreviewTextCallbacks(t *testing.T) {
 	}
 }
 
+func TestInlineEditRuntimePreviewTextRequiresBackingControl(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"function valueBearingPreviewTextControl(control)",
+		`if (!control || !("value" in control) || control.disabled) return null;`,
+		`if (tag === "input" && type === "hidden") return null;`,
+		`return valueBearingPreviewTextControl(control);`,
+		`var control = previewTextControl(detail.field, opts);`,
+		`if (!control) return false;`,
+		`target.setAttribute("contenteditable", "plaintext-only");`,
+		`target.setAttribute("data-gosx-studio-inline-editing", "true");`,
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() missing preview text backing-control fragment %q:\n%s", fragment, body)
+		}
+	}
+	controlIdx := strings.Index(body, `var control = previewTextControl(detail.field, opts);`)
+	gateIdx := strings.Index(body, `if (!control) return false;`)
+	contentEditableIdx := strings.Index(body, `target.setAttribute("contenteditable", "plaintext-only");`)
+	if controlIdx < 0 || gateIdx < 0 || contentEditableIdx < 0 || !(controlIdx < gateIdx && gateIdx < contentEditableIdx) {
+		t.Fatalf("InlineEditRuntimeScript() must reject unbacked preview text before setting contenteditable:\n%s", body)
+	}
+}
+
 func TestInlineEditRuntimeOwnsPreviewTextSessionAdapter(t *testing.T) {
 	body := string(InlineEditRuntimeScript())
 	for _, fragment := range []string{
@@ -315,7 +371,7 @@ func TestInlineEditRuntimeOwnsPreviewTextSessionAdapter(t *testing.T) {
 		`form.getAttribute("data-studio-selection")`,
 		`form.getAttribute("data-studio-selection-kind")`,
 		"selection: selection || edit.blockKey || edit.field || \"\"",
-		`host.setStatus("dirty", "Draft changed", reason || "inline-text")`,
+		`host.setStatus("dirty", "Unsaved edit", reason || "inline-text")`,
 		"host.setDirty(reason || \"inline-text\")",
 		"typeof host.emitOperation === \"function\"",
 		"host.emitOperation(type, operation)",
@@ -357,6 +413,56 @@ func TestInlineEditRuntimeNoPersistRepaintSafeLogic(t *testing.T) {
 		if strings.Contains(body, muddySpecific) {
 			t.Fatalf("InlineEditRuntimeScript() must NOT reference muddy-specific symbol %q:\n%s", muddySpecific, body)
 		}
+	}
+}
+
+// TestInlineEditRuntimeDurableDispatch guards handoff-31 ("one product
+// path"): a contenteditable field the host opts into
+// (data-gosx-studio-durable-history="true") must submit through
+// window.GoSXStudioCollaborationRuntime when it is available/synced, using
+// the same OperationRequest wire shape operationruntime/island_runtime.js's
+// direct-edit forms build for kind "set-field" — so the same server-side
+// decode path, OperationRecord log, change-set, and undo/redo machinery
+// apply regardless of which client island produced the request.
+func TestInlineEditRuntimeDurableDispatch(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	for _, fragment := range []string{
+		"data-gosx-studio-durable-history",
+		"data-gosx-studio-durable-field",
+		"data-gosx-studio-durable-page-id",
+		"data-gosx-studio-durable-route",
+		"data-gosx-studio-durable-component",
+		"function durableMetaFromElement(el, binding)",
+		"function durableOperationRequest(durable, value)",
+		`kind: "set-field"`,
+		"window.GoSXStudioCollaborationRuntime",
+		"collaboration.available()",
+		"collaboration.submit(request)",
+		"collaboration.expectedHead",
+	} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("InlineEditRuntimeScript() missing durable dispatch fragment %q:\n%s", fragment, body)
+		}
+	}
+}
+
+// TestInlineEditRuntimeDurablePathRetiresLegacyPostForThatCommit is the
+// absence assertion the durable unification requires: when the durable
+// collaboration path is taken, commit() must `return` before ever reaching
+// the legacy resolveAction/doFetch POST — i.e. exactly one write per commit,
+// never both. This locks the control-flow shape (early return immediately
+// after collaboration.submit(...)), not just the presence of both code
+// paths somewhere in the file.
+func TestInlineEditRuntimeDurablePathRetiresLegacyPostForThatCommit(t *testing.T) {
+	body := string(InlineEditRuntimeScript())
+	durableIdx := strings.Index(body, "var collaborationReady = durable.enabled")
+	returnIdx := strings.Index(body, "return; // Durable path taken: the legacy POST below never fires for this commit.")
+	actionIdx := strings.Index(body, "var action = resolveAction(root, opts.action);")
+	if durableIdx < 0 || returnIdx < 0 || actionIdx < 0 {
+		t.Fatalf("InlineEditRuntimeScript() must contain the durable-path early return before the legacy POST:\n%s", body)
+	}
+	if !(durableIdx < returnIdx && returnIdx < actionIdx) {
+		t.Fatalf("InlineEditRuntimeScript() durable dispatch must return BEFORE resolving the legacy POST action, so a durable commit never also fires the legacy write:\n%s", body)
 	}
 }
 

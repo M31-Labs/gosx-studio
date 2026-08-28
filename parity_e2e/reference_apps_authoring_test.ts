@@ -8,6 +8,7 @@ import {
   expectPanelButtonReceivesPointer,
   gotoEditor,
   reorderComponent,
+  revealModeIfPresent,
   saveEditableControl,
   savePageMetadata,
   startMuddy,
@@ -23,14 +24,24 @@ test.describe("@reference-apps browser authoring workflows", () => {
     const server = await startMuddy(request);
     try {
       await gotoEditor(page, server.baseURL);
+      // The site-map authoring forms (page-metadata, composition-intent panels)
+      // now live inside the "Advanced" mode panel (studio-pagecanvas-handoff
+      // moved the legacy site-map/canvas board there); reveal it before driving
+      // any authoring control below.
+      await revealModeIfPresent(page, "advanced");
 
       await savePageMetadata(page, "Studio Test Notes", "/pages/studio-test-notes", {
         reloadAfter: false,
-        expectedMessage: "Studio Test Notes saved.",
+        // Muddy's authoring.server.go emits "<title> saved as a draft." (locked
+        // by its own TestEditorPageMetadataSave-style Go test) — this stale
+        // "<title> saved." expectation predates that draft-status wording and
+        // was never reachable before now (the CSS/stacking defect below
+        // blocked every click before the button could ever be reached).
+        expectedMessage: "Studio Test Notes saved as a draft.",
       });
 
       await applyCompositionIntentInPlace(page, "create-page:landing", {
-        expectedMessage: "Landing created.",
+        expectedMessage: "Landing page created with 3 starter sections.",
         expectedChangeKind: "page",
         requireSelection: false,
       });
@@ -62,6 +73,7 @@ test.describe("@reference-apps browser authoring workflows", () => {
     const server = await startMuddy(request);
     try {
       await gotoEditor(page, server.baseURL);
+      await revealModeIfPresent(page, "advanced");
       await expectSharedSiteMapBoard(page, "Muddy/Noni");
     } finally {
       await server.stop();
@@ -72,6 +84,7 @@ test.describe("@reference-apps browser authoring workflows", () => {
     const server = await startPajaritos(request);
     try {
       await gotoEditor(page, server.baseURL);
+      await revealModeIfPresent(page, "advanced");
 
       const createResult = await applyCompositionIntentInPlace(page, "create-page:program-page", {
         expectedMessage: "Program Page created.",
@@ -135,6 +148,7 @@ test.describe("@reference-apps browser authoring workflows", () => {
     const server = await startPajaritos(request);
     try {
       await gotoEditor(page, server.baseURL);
+      await revealModeIfPresent(page, "advanced");
       await expectSharedSiteMapBoard(page, "Pajaritos");
     } finally {
       await server.stop();

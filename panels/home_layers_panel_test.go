@@ -55,7 +55,7 @@ func TestRenderHomeLayersPanelSegmentsNonEmpty(t *testing.T) {
 	html := gosx.RenderHTML(gosx.Fragment(segments.RootOpen, segments.HeaderOpen, gosx.Text("SLOT"), segments.HeaderClose, segments.Body, segments.RootClose))
 
 	for _, fragment := range []string{
-		`<section class="studio-nav-panel studio-nav-panel--layers" data-studio-mode-panel="home" data-studio-engine-source="gosx" data-gosx-studio-home-layers-panel-renderer="gosx-studio">`,
+		`<section class="studio-nav-panel studio-nav-panel--layers" data-studio-mode-panel="home" data-studio-engine-source="gosx" data-gosx-studio-home-layers-panel-renderer="gosx-studio" data-studio-rail-group="layers">`,
 		`<header class="studio-panel-heading"><div><p class="kicker">Home</p><h2>Layers</h2></div>SLOT</header>`,
 		`<div class="home-section-list editor-block-list" data-block-studio="homepage">`,
 		`<article class="home-section-card is-active" data-block-studio-block="hero" data-studio-block-label="Hero" draggable="true" tabindex="-1">`,
@@ -121,7 +121,7 @@ func TestRenderHomeLayersPanelFullWithPickerSlot(t *testing.T) {
 	}))
 
 	for _, fragment := range []string{
-		`<section class="studio-nav-panel studio-nav-panel--layers" data-studio-mode-panel="home" data-studio-engine-source="gosx" data-gosx-studio-home-layers-panel-renderer="gosx-studio">`,
+		`<section class="studio-nav-panel studio-nav-panel--layers" data-studio-mode-panel="home" data-studio-engine-source="gosx" data-gosx-studio-home-layers-panel-renderer="gosx-studio" data-studio-rail-group="layers">`,
 		`<header class="studio-panel-heading"><div><p class="kicker">Home</p><h2>Layers</h2></div><div data-studio-home-layer-picker="true">Picker</div></header>`,
 		`<div class="home-section-list editor-block-list" data-block-studio="homepage">`,
 		`data-block-studio-block="hero"`,

@@ -32,7 +32,7 @@ test.describe("@smoke GoSXStudio authoring surface workflows", () => {
     await installManagedActionHarness(page);
 
     await page.getByRole("button", { name: "Create page" }).click();
-    await expect(page.locator("[data-gosx-studio-save-detail]")).toHaveText("Landing created.");
+    await expect(page.locator("[data-gosx-studio-save-detail]")).toHaveText("Landing page created with 3 starter sections.");
     await expect(page.locator("[data-gosx-studio-workbench]")).toHaveAttribute("data-gosx-studio-authoring-change-page", "landing");
     await expect(page.locator("iframe")).toHaveAttribute("src", /gosx-studio-refresh=/);
 
@@ -102,7 +102,7 @@ async function installManagedActionHarness(page: import("@playwright/test").Page
 
       if (operation === "apply-intent" && intentKind === "create-page") {
         w.__authoringStore.pages.push("landing");
-        message = "Landing created.";
+        message = "Landing page created with 3 starter sections.";
         previewURL = "http://127.0.0.1:4173/pages/landing?preview=1";
         draftID = "page_landing";
         change = { key: "page-landing", label: "Landing", kind: "page", pageKey: "landing" };

@@ -63,7 +63,28 @@ const (
 	// Deprecated: use authoring.AuthoringOperationSaveAppearance.
 	AuthoringOperationSaveAppearance = authoring.AuthoringOperationSaveAppearance
 	// Deprecated: use authoring.AuthoringOperationSetStyle.
-	AuthoringOperationSetStyle = authoring.AuthoringOperationSetStyle
+	AuthoringOperationSetStyle   = authoring.AuthoringOperationSetStyle
+	AuthoringOperationSetField   = authoring.AuthoringOperationSetField
+	AuthoringOperationResetStyle = authoring.AuthoringOperationResetStyle
+	AuthoringOperationUndo       = authoring.AuthoringOperationUndo
+	AuthoringOperationRedo       = authoring.AuthoringOperationRedo
+)
+
+// Durable operation protocol aliases for hosts that still import the Studio
+// root facade.
+type OperationKind = authoring.OperationKind
+type OperationTarget = authoring.OperationTarget
+type OperationValue = authoring.OperationValue
+type OperationRequest = authoring.OperationRequest
+type OperationRecord = authoring.OperationRecord
+
+const OperationSchemaVersion = authoring.OperationSchemaVersion
+const (
+	OperationSetField   = authoring.OperationSetField
+	OperationSetStyle   = authoring.OperationSetStyle
+	OperationResetStyle = authoring.OperationResetStyle
+	OperationUndo       = authoring.OperationUndo
+	OperationRedo       = authoring.OperationRedo
 )
 
 const (
@@ -108,7 +129,12 @@ const (
 	// Deprecated: use authoring.AuthoringFieldPosition.
 	AuthoringFieldPosition = authoring.AuthoringFieldPosition
 	// Deprecated: use authoring.AuthoringFieldVisible.
-	AuthoringFieldVisible = authoring.AuthoringFieldVisible
+	AuthoringFieldVisible             = authoring.AuthoringFieldVisible
+	AuthoringFieldOperationID         = authoring.AuthoringFieldOperationID
+	AuthoringFieldExpectedRevision    = authoring.AuthoringFieldExpectedRevision
+	AuthoringFieldExpectedTargetHead  = authoring.AuthoringFieldExpectedTargetHead
+	AuthoringFieldExpectedTargetValue = authoring.AuthoringFieldExpectedTargetValue
+	AuthoringFieldHistoryOperationID  = authoring.AuthoringFieldHistoryOperationID
 )
 
 // Deprecated: use authoring.AuthoringActionHandler.
@@ -224,6 +250,18 @@ func SupportedStyleProperties() []string { return authoring.SupportedStyleProper
 // Deprecated: use authoring.IsSupportedStyleProperty.
 func IsSupportedStyleProperty(property string) bool {
 	return authoring.IsSupportedStyleProperty(property)
+}
+
+type LayoutValueOption = authoring.LayoutValueOption
+type LayoutControl = authoring.LayoutControl
+
+func ResponsiveLayoutControls() []LayoutControl { return authoring.ResponsiveLayoutControls() }
+func ResponsiveLayoutProperties() []string      { return authoring.ResponsiveLayoutProperties() }
+func IsResponsiveLayoutProperty(property string) bool {
+	return authoring.IsResponsiveLayoutProperty(property)
+}
+func ValidateLayoutValue(property, value string) (string, bool) {
+	return authoring.ValidateLayoutValue(property, value)
 }
 
 // Deprecated: use authoring.SupportedStyleBreakpoints.

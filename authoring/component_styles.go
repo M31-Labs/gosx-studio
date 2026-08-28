@@ -28,7 +28,7 @@ func RenderComponentStylesCSS(overrides StyleOverrides) string {
 	var b strings.Builder
 	for _, componentKey := range sortedOverrideKeys(overrides) {
 		scopes := overrides[componentKey]
-		for _, scope := range sortedOverrideKeys(scopes) {
+		for _, scope := range orderedOverrideScopes(scopes) {
 			props := scopes[scope]
 			if len(props) == 0 {
 				continue
@@ -55,6 +55,36 @@ func RenderComponentStylesCSS(overrides StyleOverrides) string {
 		}
 	}
 	return b.String()
+}
+
+// orderedOverrideScopes follows the semantic desktop-first cascade. Lexical
+// ordering places mobile before tablet, allowing a tablet rule to accidentally
+// win at phone widths.
+func orderedOverrideScopes[V any](m map[string]V) []string {
+	keys := sortedOverrideKeys(m)
+	rank := func(scope string) int {
+		breakpoint, state := splitOverrideScope(scope)
+		base := 0
+		switch breakpoint {
+		case StyleBreakpointTablet:
+			base = 1
+		case StyleBreakpointMobile:
+			base = 2
+		}
+		stateRank := 0
+		if state != StyleStateDefault {
+			stateRank = 1
+		}
+		return base*2 + stateRank
+	}
+	sort.SliceStable(keys, func(i, j int) bool {
+		ri, rj := rank(keys[i]), rank(keys[j])
+		if ri != rj {
+			return ri < rj
+		}
+		return keys[i] < keys[j]
+	})
+	return keys
 }
 
 func sortedOverrideKeys[V any](m map[string]V) []string {

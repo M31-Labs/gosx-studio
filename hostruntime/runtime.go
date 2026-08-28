@@ -11,7 +11,6 @@
 package hostruntime
 
 import (
-	"bytes"
 	"embed"
 	"net/http"
 	"net/url"
@@ -25,9 +24,13 @@ import (
 	"m31labs.dev/gosx-studio/canvasinlineeditruntime"
 	"m31labs.dev/gosx-studio/canvasselectionbridgeruntime"
 	"m31labs.dev/gosx-studio/canvaswasmfreeruntime"
+	"m31labs.dev/gosx-studio/collabruntime"
+	"m31labs.dev/gosx-studio/contenteditorruntime"
 	"m31labs.dev/gosx-studio/fieldruntime"
 	"m31labs.dev/gosx-studio/inlineeditruntime"
 	"m31labs.dev/gosx-studio/inspectorruntime"
+	"m31labs.dev/gosx-studio/internal/runtimeasset"
+	"m31labs.dev/gosx-studio/operationruntime"
 	"m31labs.dev/gosx-studio/previewruntime"
 	"m31labs.dev/gosx-studio/selectionruntime"
 	"m31labs.dev/gosx-studio/sitemapruntime"
@@ -73,8 +76,24 @@ func builtinRuntimeSlices() [][]byte {
 		sitemapruntime.Bundle(),
 		inspectorruntime.Bundle(),
 		inlineeditruntime.Bundle(),
+		operationruntime.Script(),
+		collabruntime.Script(),
 	}
 }
+
+// OperationRuntimeScript returns the durable operation bridge used by hosts
+// that opt into data-gosx-studio-durable-history.
+func OperationRuntimeScript() []byte { return operationruntime.Script() }
+
+func OperationRuntimeHandler() http.Handler { return operationruntime.Handler() }
+
+func CollaborationRuntimeScript() []byte { return collabruntime.Script() }
+
+func CollaborationRuntimeHandler() http.Handler { return collabruntime.Handler() }
+
+func ContentEditorRuntimeScript() []byte { return contenteditorruntime.Script() }
+
+func ContentEditorRuntimeHandler() http.Handler { return contenteditorruntime.Handler() }
 
 // concatRuntimeSlices joins non-empty island bundles, each terminated by a
 // newline (the historical engine-bundle framing).
@@ -254,12 +273,7 @@ func ScriptHandler(name string, data []byte) http.Handler {
 }
 
 func AssetHandler(name string, data []byte, contentType string) http.Handler {
-	modtime := RuntimeAssetModTime()
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", contentType)
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		http.ServeContent(w, r, name, modtime, bytes.NewReader(data))
-	})
+	return runtimeasset.Handler(name, data, contentType)
 }
 
 func RuntimeAssetModTime() time.Time {

@@ -513,6 +513,70 @@ func TestWorkbenchRuntimeDelegatesPreviewInlineTextToInlineEditRuntime(t *testin
 	}
 }
 
+func TestWorkbenchRuntimePreviewInlineTextRequiresBackingControl(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	body := jsFunctionBody(t, script, "startInlineTextFromDetail")
+	for _, check := range []string{
+		`var control = inlineTextControlForDetail(detail);`,
+		`if (!control) {`,
+		`revealPreviewField(detail, reason || "preview-dock");`,
+		`return false;`,
+		`previewInlineTextHostWithControl(frame, detail.field || "", control)`,
+		`emitPreviewDockAction("field-action", detail);`,
+	} {
+		if !strings.Contains(body, check) {
+			t.Fatalf("startInlineTextFromDetail missing fail-safe inline-text gate fragment %q in:\n%s", check, body)
+		}
+	}
+	fallback := strings.Index(body, `if (!control) {`)
+	start := strings.Index(body, `startInlineTextEdit(frame, detail`)
+	emitAction := strings.Index(body, `emitPreviewDockAction("field-action", detail);`)
+	if fallback < 0 || start < 0 || emitAction < 0 || fallback > start || fallback > emitAction {
+		t.Fatalf("unbacked inline text fallback must run before contenteditable start/action emission:\n%s", body)
+	}
+	if strings.Contains(body, `setPreviewStatus("dirty"`) || strings.Contains(body, `emitEditorOperation("set_text"`) || strings.Contains(body, `inline_text_start`) {
+		t.Fatalf("unbacked inline text fallback must not dirty or emit inline operations itself:\n%s", body)
+	}
+}
+
+func TestWorkbenchRuntimePreviewInlineTextControlIsReusedForBackedStart(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`function valueBearingTextControl(control)`,
+		`if (!control || !("value" in control) || control.disabled) return null;`,
+		`if (tag === "input" && type === "hidden") return null;`,
+		`function inlineTextControlForDetail(detail)`,
+		`return textControlForField(detail.field);`,
+		`function previewInlineTextHostWithControl(frame, field, control)`,
+		`host.controlForField = function (candidate) {`,
+		`return candidate === field ? control : textControlForField(candidate);`,
+		`function startInlineTextEdit(frame, detail, reason, host)`,
+		`host || previewInlineTextHost(frame)`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing backed inline text control fragment %q", check)
+		}
+	}
+}
+
+func TestWorkbenchRuntimePreviewInlineTextActionCopyReflectsBackingControl(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	body := jsFunctionBody(t, script, "previewFieldActionLabel")
+	for _, check := range []string{
+		`if (!detail || detail.editable !== "text" || detail.action) return "";`,
+		`return inlineTextControlForDetail(detail) ? "Edit text" : "Open field";`,
+	} {
+		if !strings.Contains(body, check) {
+			t.Fatalf("previewFieldActionLabel missing honest action-copy fragment %q in:\n%s", check, body)
+		}
+	}
+
+	hostBody := jsFunctionBody(t, script, "previewDockActionHost")
+	if !strings.Contains(hostBody, "previewFieldActionLabel: previewFieldActionLabel") {
+		t.Fatalf("previewDockActionHost must expose the host-specific inline text action label:\n%s", hostBody)
+	}
+}
+
 func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *testing.T) {
 	script := string(WorkbenchRuntimeScript())
 	for _, check := range []string{
@@ -535,6 +599,9 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionStateToSelectionRuntime(t *tes
 		`finishInlineTextEdit: finishInlineTextEdit,`,
 		`if (!result || !result.handled || !result.applied) return false;`,
 		`function revealPreviewField(detail, reason)`,
+		`function setWorkbenchHomeMode(reason)`,
+		`runtime.setMode(form, "home", true);`,
+		`setMode("home", { scroll: true, reason: reason || "preview-select" });`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-reveal", { bubbles: true, detail: payload }))`,
 		`if (payload.result) return !!payload.result.revealed;`,
 		`if (options.reveal) revealPreviewField(detail, options.reason || "preview-select");`,
@@ -626,12 +693,17 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldTargetRevealToSelectionRuntime(t *
 		`bindSelectionRuntime()`,
 		`return { field: detail.field || "", source: null, control: null, found: false };`,
 		`function revealPreviewField(detail, reason)`,
-		`setMode("content", { reason: reason || "preview-select" });`,
+		`function setWorkbenchHomeMode(reason)`,
+		`runtime.setMode(form, "home", true);`,
+		`setMode("home", { scroll: true, reason: reason || "preview-select" });`,
+		`setWorkbenchHomeMode(reason || "preview-select");`,
 		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-field-reveal", { bubbles: true, detail: payload }))`,
 		`if (payload.result) return !!payload.result.revealed;`,
 		`var target = previewFieldTarget(field);`,
-		`if (target.control && "value" in target.control) return target.control;`,
-		`if (target.source && "value" in target.source) return target.source;`,
+		`var control = valueBearingTextControl(target.control);`,
+		`if (control) return control;`,
+		`var source = valueBearingTextControl(target.source);`,
+		`if (source) return source;`,
 	} {
 		if !strings.Contains(script, check) {
 			t.Fatalf("workbench runtime missing preview field target/reveal delegation fragment %q", check)
@@ -847,13 +919,27 @@ func TestWorkbenchRuntimeDelegatesPreviewFieldActionIntentToSelectionRuntime(t *
 	for _, forbidden := range []string{
 		`function isFormSubmitControl`,
 		`function fieldActionSubmitter`,
+	} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("workbench runtime should delegate concrete field-action submit mechanics; found %q", forbidden)
+		}
+	}
+
+	// handoff-4 (item 5 -- left rail section-collapse) added its own,
+	// unrelated document.createElement("button") for the rail-group
+	// collapse toggle (collapseLeftRailGroups) -- these four submit-
+	// mechanics fragments are specifically about submitPreviewFieldAction
+	// no longer synthesizing/clicking a submit button itself, so they are
+	// scoped to that function's own body rather than the whole bundle.
+	submitFieldActionBody := jsFunctionBody(t, script, "submitPreviewFieldAction")
+	for _, forbidden := range []string{
 		`form.requestSubmit`,
 		`document.createElement("button")`,
 		`form.dataset.gosxStudioPendingAction`,
 		`form.submit()`,
 	} {
-		if strings.Contains(script, forbidden) {
-			t.Fatalf("workbench runtime should delegate concrete field-action submit mechanics; found %q", forbidden)
+		if strings.Contains(submitFieldActionBody, forbidden) {
+			t.Fatalf("submitPreviewFieldAction should delegate concrete field-action submit mechanics; found %q in:\n%s", forbidden, submitFieldActionBody)
 		}
 	}
 
@@ -930,6 +1016,7 @@ func TestWorkbenchRuntimeCallsPreviewDockActionRunHelper(t *testing.T) {
 		`applyPreviewSelection: applyPreviewSelection`,
 		`dispatchPreviewFieldNavigation: dispatchPreviewFieldNavigation`,
 		`dispatchPreviewFieldActionResolve: dispatchPreviewFieldActionResolve`,
+		`previewFieldActionLabel: previewFieldActionLabel`,
 		`startInlineTextFromDetail: startInlineTextFromDetail`,
 		`submitPreviewFieldAction: submitPreviewFieldAction`,
 		`navigateToHref: navigatePreviewDockHref`,
@@ -974,6 +1061,11 @@ func TestWorkbenchRuntimeDelegatesPreviewSelectionClearToSelectionRuntime(t *tes
 		`typeof window.__gosx_preview_runtime_island_clearSelections !== "function"`,
 		`return window.__gosx_preview_runtime_island_clearSelections(form, {`,
 		`finishInlineTextEdit: finishInlineTextEdit`,
+		// #5 — Escape cancels rather than commits: the keyboard-Escape caller
+		// passes { commit: false } through to clearEditorPreviewSelections
+		// (previewruntime/island_runtime.js) instead of the bare call that
+		// used to silently commit whatever the user had just typed.
+		`clearPreviewSelections({ commit: false });`,
 		`dispatchPreviewSelectionClear("keyboard-escape");`,
 	} {
 		if !strings.Contains(script, check) {
@@ -1606,6 +1698,22 @@ func TestStudioRuntimeScriptsAreNonEmpty(t *testing.T) {
 	}
 }
 
+// TestStateRuntimeInitFormGuardsNonFormElements locks the defense-in-depth
+// guard against the data-gosx-studio-state attribute collision fixed
+// alongside this test (panels/responsive_layout_inspector.go's style-state
+// buttons were renamed to data-gosx-studio-style-state so
+// initAll()'s querySelectorAll("[data-gosx-studio-state]") only ever matches
+// the workbench's own <form>). initForm must still fail closed -- rather than
+// throw "forEach called on null or undefined" out of formSignature -- if any
+// future non-form element ever matches that selector, since form.elements is
+// undefined on non-HTMLFormElement nodes.
+func TestStateRuntimeInitFormGuardsNonFormElements(t *testing.T) {
+	script := string(StateRuntimeScript())
+	if !strings.Contains(script, `if (!form || !form.elements || form.dataset.gosxStudioStateBound === "true") return;`) {
+		t.Fatal("state runtime's initForm must guard on form.elements before calling formSignature")
+	}
+}
+
 func TestPreviewSubscriberHandlerServesSubscriberScript(t *testing.T) {
 	rec := httptest.NewRecorder()
 	PreviewSubscriberHandler().ServeHTTP(rec, httptest.NewRequest("GET", PreviewSubscriberPath, nil))
@@ -1687,6 +1795,167 @@ func TestEngineRuntimeHandlerServesIslandBundles(t *testing.T) {
 	} {
 		if !strings.Contains(body, check) {
 			t.Fatalf("engine runtime body missing %q", check)
+		}
+	}
+}
+
+// TestWorkbenchRuntimeScopesResponsiveLayoutInspectorsBySelection guards
+// wave 3A fix (b): the "respLayoutCount=2" defect (muddy-noni-commerce's
+// editorDirectEditPanels always Fragments home:hero's AND about:content's
+// RenderResponsiveLayoutInspector together, outside this <form>, regardless
+// of which one is actually selected). scopeResponsiveLayoutInspectors is the
+// studio-side idempotence guard that hides every instance except the one
+// matching the live canvas selection (or the first, with no selection yet)
+// by toggling [hidden] — already display:none via the [hidden] rule in
+// studio.css — so a live measurement only ever finds one visible
+// "Responsive layout" heading even though the host still composes several.
+//
+// Wave 3B (tamarind) generalized the mechanism into a shared
+// scopeSelectionPanels(form, selector, keyAttr) helper (see fix #2 below),
+// so this test now checks for the shared helper plus
+// scopeResponsiveLayoutInspectors's use of it, rather than asserting the
+// old inlined selector string verbatim.
+func TestWorkbenchRuntimeScopesResponsiveLayoutInspectorsBySelection(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		"function scopeSelectionPanels(form, selector, keyAttr, fieldAttr)",
+		"function scopeResponsiveLayoutInspectors(form)",
+		`scopeSelectionPanels(form, "[data-studio-responsive-layout-inspector]", "data-studio-selected-component")`,
+		`panel.setAttribute("hidden", "true")`,
+		`panel.removeAttribute("hidden")`,
+		"scopeSupportSelectionPanels(form);",
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing %q", check)
+		}
+	}
+	// Must run both at initial bind (server-rendered default selection) and
+	// whenever the canvas selection changes, not just once.
+	if strings.Count(script, "scopeSupportSelectionPanels(form)") < 2 {
+		t.Fatalf("expected scopeSupportSelectionPanels to be invoked at init and on selection change, got:\n%s", script)
+	}
+}
+
+// TestWorkbenchRuntimeScopesDirectEditPanelsBySelection guards wave 3B fix
+// #2 (dedupe "Selected content"): muddy-noni-commerce's editorDirectEditPanels
+// Fragments home:hero's, about:content's, and all three
+// contact:contact-links direct-edit forms together, outside this <form>,
+// regardless of which target is actually selected on canvas (the magnolia-3
+// re-score's "5 stacked Selected content forms" finding). scopeDirectEditPanels
+// generalizes the same scopeSelectionPanels guard wave 3A built for the
+// Responsive layout duplicate: it hides every [data-studio-direct-edit-panel]
+// form except the one (or ones — Contact's three fields share one
+// ComponentKey and are meant to stay together) matching the live selection.
+func TestWorkbenchRuntimeScopesDirectEditPanelsBySelection(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		"function scopeDirectEditPanels(form)",
+		`scopeSelectionPanels(form, "[data-studio-direct-edit-panel]", "data-studio-target-component", "data-studio-target-field")`,
+		"function scopeSupportSelectionPanels(form)",
+		"scopeDirectEditPanels(form);",
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing %q", check)
+		}
+	}
+}
+
+// TestWorkbenchRuntimeScopeSelectionPanelsBridgesFieldPathSelection guards
+// handoff-3b2 (osier)'s namespace-mismatch finding: a real preview-field
+// click writes data-studio-selection as the field path itself
+// ("pages.about.title"), never the panel's ComponentKey
+// ("about:content"), so scopeSelectionPanels must also match a panel whose
+// OWN field attribute (data-studio-target-field on direct-edit panels)
+// equals the live selection, not only its ComponentKey attribute.
+func TestWorkbenchRuntimeScopeSelectionPanelsBridgesFieldPathSelection(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		"function scopeSelectionPanels(form, selector, keyAttr, fieldAttr)",
+		"var fieldKey = fieldAttr ? compactText(panel.getAttribute(fieldAttr)) : \"\";",
+		"(fieldKey !== \"\" && fieldKey === active)",
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing %q", check)
+		}
+	}
+}
+
+// TestWorkbenchRuntimeScopeSelectionPanelsBridgesHomeBlockKeySelection guards
+// the second half of handoff-3b2's namespace-mismatch finding: HOME's own
+// Layers panel (the only producer of data-block-studio-block row keys)
+// writes the BARE home-section key ("hero") to data-studio-selection, not
+// the panel's ComponentKey ("home:hero") -- and does so at bind time for the
+// default-selected row, so this mismatch hid the default home:hero panel on
+// every page load once the retrigger gap was fixed, not only a deliberate
+// row click. scopeSelectionPanels must also match a panel whose ComponentKey
+// SUFFIX (after its last ":") equals the live bare selection.
+func TestWorkbenchRuntimeScopeSelectionPanelsBridgesHomeBlockKeySelection(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`var keySuffix = key.indexOf(":") >= 0 ? key.slice(key.indexOf(":") + 1) : "";`,
+		"(keySuffix !== \"\" && keySuffix === active)",
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing %q", check)
+		}
+	}
+}
+
+// TestWorkbenchRuntimeRetriggersScopeOnSelectionAttributeMutation guards
+// handoff-3b2 (osier)'s root-cause finding: scopeSupportSelectionPanels
+// used to re-run ONLY inside the "gosxstudio:canvas-select" CustomEvent
+// handler, but no real selection-changing gesture (Layers row click,
+// site-map board, live preview field click) ever dispatches that event —
+// they all write the data-studio-selection attribute directly. A
+// MutationObserver on that attribute (the same pattern
+// workbenchruntime/island_runtime.js's restoreWorkbenchWorkingState already
+// uses to persist it to sessionStorage) is required so every real
+// selection change re-scopes the support panels, not just the one dead
+// event path.
+func TestWorkbenchRuntimeRetriggersScopeOnSelectionAttributeMutation(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		"if (window.MutationObserver) {",
+		"new MutationObserver(function () {",
+		`}).observe(form, { attributes: true, attributeFilter: ["data-studio-selection"] });`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing %q", check)
+		}
+	}
+	// Must be invoked at init (before the observer binds) AND on every
+	// subsequent attribute mutation the observer catches, mirroring the
+	// existing "at init and on selection change" contract.
+	if strings.Count(script, "scopeSupportSelectionPanels(form);") < 2 {
+		t.Fatalf("expected scopeSupportSelectionPanels(form) to appear at least twice (init + MutationObserver callback), got:\n%s", script)
+	}
+}
+
+// TestWorkbenchRuntimeCollapsesLeftRailGroupsWithPersistedState guards
+// handoff-4 (item 5 -- left rail section-collapse): each
+// [data-studio-rail-group] section (Site areas / Sections / Layers) gets
+// a collapse toggle inserted into its own heading row, persisted in
+// sessionStorage the same read-merge-write way
+// workbenchruntime/island_runtime.js's restoreWorkbenchWorkingState
+// already persists mode/selection/scroll, and collapseLeftRailGroups is
+// invoked at workbench init.
+func TestWorkbenchRuntimeCollapsesLeftRailGroupsWithPersistedState(t *testing.T) {
+	script := string(WorkbenchRuntimeScript())
+	for _, check := range []string{
+		`var leftRailGroupStorageKey = "gosx-studio-left-rail-groups";`,
+		`function readLeftRailGroupState()`,
+		`function writeLeftRailGroupState(key, collapsed)`,
+		`function collapseLeftRailGroups(root)`,
+		`queryAll(root || document, "[data-studio-rail-group]")`,
+		`var heading = group.querySelector("h2");`,
+		`node.setAttribute("hidden", "hidden");`,
+		`group.setAttribute("data-studio-rail-group-collapsed", collapsed ? "true" : "false");`,
+		`toggle.setAttribute("data-studio-rail-group-toggle", key);`,
+		`writeLeftRailGroupState(key, next);`,
+		`collapseLeftRailGroups(document);`,
+	} {
+		if !strings.Contains(script, check) {
+			t.Fatalf("workbench runtime missing %q", check)
 		}
 	}
 }

@@ -315,7 +315,24 @@
   // any previously-mounted surfaces are torn down — EXCEPT a surface that
   // currently contains the document's activeElement, which is kept so an
   // in-progress edit is never destroyed (the focus-guard).
-  function renderCanvasBoardHTML(overlay, bundle, cssWidth, cssHeight) {
+  //
+  // Cross-page pointer gating (fix): every eligible page card mounts its own
+  // full-size live surface simultaneously once zoomed in past
+  // CANVAS_LOD_SURFACE_ZOOM, but each surface's REAL rendered content (a full
+  // page, e.g. a hero or product grid) is very commonly larger than its own
+  // tiny site-map card placement box — that overflow is deliberately NOT
+  // clipped (the near-zoom surface must stay fully visible/editable), so a
+  // neighboring card's surface <div> can end up covering part of a DIFFERENT
+  // page's on-screen area in DOM/paint order. Without gating, whichever
+  // surface happens to paint on top there would steal the click. activeKey
+  // (the currently selected/edited surface id, if any) makes every OTHER
+  // surface pointer-events:none so a click aimed at the active surface's area
+  // passes straight through instead of being intercepted; a surface that is
+  // itself currently focused (mid-edit) is always treated as active too, and
+  // the server-authored h.pointerEvents==='none' escape hatch always wins.
+  // Before anything is selected (activeKey empty) every surface stays
+  // interactive so the very first click can still pick one.
+  function renderCanvasBoardHTML(overlay, bundle, cssWidth, cssHeight, activeKey) {
     if (!overlay || !bundle || !Array.isArray(bundle.html)) return;
     var doc0 = overlay.ownerDocument;
 
@@ -342,7 +359,6 @@
         el = doc.createElement('div');
         el.setAttribute('data-gosx-canvas-html', h.id);
         el.style.position = 'absolute'; el.style.transformOrigin = '0 0';
-        el.style.pointerEvents = (h.pointerEvents === 'none') ? 'none' : 'auto';
         overlay.appendChild(el);
       }
       var editing = doc.activeElement && el.contains(doc.activeElement);
@@ -350,6 +366,10 @@
       var left = t.x(h.x), top = t.y(h.y);
       el.style.transform = 'translate(' + left + 'px,' + top + 'px) scale(' + t.zoom + ')';
       el.style.width = h.width + 'px'; if (h.height) el.style.height = h.height + 'px';
+      // Re-evaluated every call (not just at creation): selection/focus can
+      // change from frame to frame, so which surface is "active" must too.
+      var isActive = editing || !activeKey || activeKey === h.id;
+      el.style.pointerEvents = (h.pointerEvents === 'none') ? 'none' : (isActive ? 'auto' : 'none');
     }
     var kids = overlay.querySelectorAll('[data-gosx-canvas-html]');
     for (var j = 0; j < kids.length; j++) { var id = kids[j].getAttribute('data-gosx-canvas-html'); if (!seen[id]) overlay.removeChild(kids[j]); }

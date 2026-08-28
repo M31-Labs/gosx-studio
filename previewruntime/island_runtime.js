@@ -89,8 +89,16 @@
   function editorPreviewDockForFrame(frame) {
     var shell = editorPreviewShellForFrame(frame);
     if (!shell) return { dock: null, shell: null };
+    var dock = shell.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]");
+    if (!dock) {
+      var form = closestWorkbenchForm(frame);
+      dock = form && form.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]");
+      if (dock && shell.matches && shell.matches("[data-gosx-studio-page-canvas]") && !shell.contains(dock)) {
+        shell.appendChild(dock);
+      }
+    }
     return {
-      dock: shell.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]"),
+      dock: dock,
       shell: shell
     };
   }
@@ -126,7 +134,145 @@
 
   function editorPreviewSelectableNode(target) {
     if (!target || !target.closest) return null;
-    return target.closest("[data-studio-field], [data-editor-preview], [data-studio-field-source], [data-studio-block-key], [data-studio-node-id]");
+    var selectable = target.closest("[data-studio-field], [data-editor-preview], [data-studio-field-source], [data-studio-block-key], [data-studio-node-id]");
+    if (selectable) {
+      var pageOnlyAncestor = selectable !== target && selectable.hasAttribute("data-studio-page-id") && !selectable.hasAttribute("data-studio-field") && !selectable.hasAttribute("data-studio-block-key");
+      if (!pageOnlyAncestor) return selectable;
+    }
+    return target.matches && target.matches("[data-studio-page-id]") ? target : null;
+  }
+
+  function normalizedEditorPreviewRoute(value) {
+    value = String(value || "").trim();
+    if (!value) return "/";
+    try {
+      var parsed = new URL(value, window.location.origin);
+      return parsed.pathname || "/";
+    } catch (error) {
+      return (value.split("#")[0].split("?")[0] || "/");
+    }
+  }
+
+  function editorPreviewRouteForFrame(frame) {
+    var frameDoc = editorPreviewFrameDocument(frame);
+    var declared = frameDoc && frameDoc.documentElement && frameDoc.documentElement.getAttribute("data-studio-route");
+    if (!declared && frameDoc && frameDoc.body) declared = frameDoc.body.getAttribute("data-studio-route");
+    if (declared) return normalizedEditorPreviewRoute(declared);
+    try {
+      if (frame && frame.contentWindow && frame.contentWindow.location) return normalizedEditorPreviewRoute(frame.contentWindow.location.pathname);
+    } catch (error) {
+      return normalizedEditorPreviewRoute(editorPreviewURL(frame));
+    }
+    return normalizedEditorPreviewRoute(editorPreviewURL(frame));
+  }
+
+  function editorPreviewIdentityDetail(frame, target, detail) {
+    detail = detail || {};
+    var frameDoc = editorPreviewFrameDocument(frame);
+    var page = target && target.closest ? target.closest("[data-studio-page-id]") : null;
+    if (!page && frameDoc) page = frameDoc.querySelector("[data-studio-page-id]");
+    detail.route = editorPreviewRouteForFrame(frame);
+    detail.pageID = page ? page.getAttribute("data-studio-page-id") || "" : "";
+    detail.kind = detail.field ? "field" : detail.blockKey ? "block" : detail.nodeID ? "node" : detail.pageID ? "page" : "";
+    return detail;
+  }
+
+  function setEditorPreviewDiagnostic(form, code, detail) {
+    detail = detail || {};
+    var route = normalizedEditorPreviewRoute(detail.route || "");
+    var tag = String(detail.tag || "node").toLowerCase();
+    var message = detail.message || "";
+    if (!message && code === "unsupported-node") {
+      message = "Unsupported <" + tag + "> on " + route + ". Add a stable Studio field, block, node, or page identity.";
+    } else if (!message && code === "same-origin-unavailable") {
+      message = "Page canvas unavailable: the preview must be same-origin and permitted by the frame policy.";
+    } else if (!message && code === "stale-selection") {
+      message = "The previous selection no longer exists on " + route + ". Select another page object.";
+    }
+    editorPreviewShells(form).forEach(function (shell) {
+      shell.setAttribute("data-studio-preview-diagnostic-code", code || "");
+    });
+    queryAll(form, "[data-studio-preview-diagnostic]").forEach(function (node) {
+      node.setAttribute("data-studio-preview-diagnostic-code", code || "");
+      node.setAttribute("data-studio-preview-diagnostic-route", route);
+      node.setAttribute("data-studio-preview-diagnostic-tag", tag);
+      node.textContent = message;
+    });
+    form.dispatchEvent(new CustomEvent("gosxstudio:preview-diagnostic", {
+      bubbles: true,
+      detail: { code: code || "", route: route, tag: tag, nearest: detail.nearest || "", message: message }
+    }));
+    return { handled: true, code: code || "", message: message };
+  }
+
+  function clearEditorPreviewDiagnostic(form) {
+    editorPreviewShells(form).forEach(function (shell) {
+      shell.removeAttribute("data-studio-preview-diagnostic-code");
+    });
+    queryAll(form, "[data-studio-preview-diagnostic]").forEach(function (node) {
+      node.removeAttribute("data-studio-preview-diagnostic-code");
+      node.removeAttribute("data-studio-preview-diagnostic-route");
+      node.removeAttribute("data-studio-preview-diagnostic-tag");
+      node.textContent = "";
+    });
+  }
+
+  function diagnoseUnsupportedEditorPreviewNode(form, frame, target) {
+    var nearest = target && target.closest ? target.closest("[data-studio-page-id], [data-studio-route]") : null;
+    return setEditorPreviewDiagnostic(form, "unsupported-node", {
+      route: editorPreviewRouteForFrame(frame),
+      tag: target && target.tagName ? target.tagName : "node",
+      nearest: nearest ? nearest.getAttribute("data-studio-page-id") || nearest.getAttribute("data-studio-route") || "" : ""
+    });
+  }
+
+  function stopEditorPreviewActivation(event) {
+    if (!event) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function makeEditorPreviewIdentityFocusable(frameDoc) {
+    if (!frameDoc) return 0;
+    var count = 0;
+    queryAll(frameDoc, "[data-studio-field], [data-editor-preview], [data-studio-field-source], [data-studio-block-key], [data-studio-node-id], [data-studio-page-id]").forEach(function (node) {
+      if (node.matches && node.matches("a[href], button, input, select, textarea, [tabindex]")) return;
+      var ownsLeaf = node.matches && node.matches("[data-studio-field], [data-editor-preview], [data-studio-field-source]");
+      var nestedLeaf = node.querySelector && node.querySelector("[data-studio-field], [data-editor-preview], [data-studio-field-source]");
+      if (!ownsLeaf && nestedLeaf) return;
+      node.setAttribute("tabindex", "0");
+      node.setAttribute("data-gosx-studio-preview-tab-stop", "true");
+      count += 1;
+    });
+    return count;
+  }
+
+  function editorPreviewTargetForLocator(frame, locator) {
+    var frameDoc = editorPreviewFrameDocument(frame);
+    if (!frameDoc || !locator) return null;
+    if (locator.field) return frameDoc.querySelector('[data-studio-field="' + attrValue(locator.field) + '"], [data-editor-preview="' + attrValue(locator.field) + '"], [data-studio-field-source="' + attrValue(locator.field) + '"]');
+    if (locator.blockKey) return frameDoc.querySelector('[data-studio-block-key="' + attrValue(locator.blockKey) + '"]');
+    if (locator.nodeID) return frameDoc.querySelector('[data-studio-node-id="' + attrValue(locator.nodeID) + '"]');
+    if (locator.pageID) return frameDoc.querySelector('[data-studio-page-id="' + attrValue(locator.pageID) + '"]');
+    return null;
+  }
+
+  function restoreEditorPreviewSelection(form, frame, host) {
+    var route = editorPreviewRouteForFrame(frame);
+    var envelope = { route: route, result: null };
+    form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-locator-restore", { bubbles: true, detail: envelope }));
+    var locator = envelope.result;
+    if (!locator) return { handled: false, restored: false };
+    var target = editorPreviewTargetForLocator(frame, locator);
+    if (!target) {
+      setEditorPreviewDiagnostic(form, "stale-selection", { route: route });
+      form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-locator-stale", { bubbles: true, detail: { route: route } }));
+      return { handled: true, restored: false, stale: true };
+    }
+    var detail = editorPreviewIdentityDetail(frame, target, editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {});
+    var restored = editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: false, reason: "restore" });
+    if (restored) clearEditorPreviewDiagnostic(form);
+    return { handled: true, restored: !!restored, detail: detail };
   }
 
   function editorPreviewFieldKeyForTarget(target) {
@@ -309,13 +455,22 @@
     return { handled: true, count: docks.length };
   }
 
-  function clearEditorPreviewSelections(form, host) {
+  // clearEditorPreviewSelections clears the preview dock's selection chrome
+  // and ends any in-progress inline text edit. options.commit defaults to
+  // true (moving to a NEW selection legitimately commits the edit you were
+  // just on, matching blur semantics), but the keyboard-Escape caller passes
+  // { commit: false } (#5) so cancelling a selection with Escape reverts the
+  // in-progress value instead of silently persisting it.
+  function clearEditorPreviewSelections(form, host, options) {
+    options = options || {};
+    var commit = options.commit !== false;
+    var reason = commit ? "clear-selection" : "escape";
     if (!form) return { handled: false, frames: 0, fieldMaps: 0, markers: 0, chrome: null, docks: null };
     var frames = editorPreviewFrames(form);
     var fieldMaps = 0;
     var markers = 0;
     frames.forEach(function (frame) {
-      editorPreviewHostCall(host, "finishInlineTextEdit", null, frame, true, "clear-selection");
+      editorPreviewHostCall(host, "finishInlineTextEdit", null, frame, commit, reason);
     });
     frames.forEach(function (frame) {
       var fieldMap = clearEditorPreviewFieldMap(frame);
@@ -336,7 +491,7 @@
     var selection = detail.selection || detail.detail || {};
     var options = detail.options || {};
     var host = detail.host || {};
-    if (!selection.field && !selection.blockKey && !selection.nodeID) {
+    if (!selection.field && !selection.blockKey && !selection.nodeID && !selection.pageID) {
       return { handled: false, applied: null, targets: [] };
     }
     var cleared = clearEditorPreviewSelections(form, host);
@@ -347,7 +502,7 @@
     if (!applied) {
       return { handled: false, applied: null, targets: selectedTargets, marker: marker, cleared: cleared };
     }
-    var chrome = applyEditorPreviewSelectionChrome(form, frame, selection.field || selection.blockKey || selection.nodeID || "");
+    var chrome = applyEditorPreviewSelectionChrome(form, frame, selection.field || selection.blockKey || selection.nodeID || selection.pageID || "");
     var dockSelection = editorPreviewDockSelection(selection, applied);
     var dock = syncEditorPreviewDockSelection(form, frame, selectedTargets[0] || target, dockSelection, host);
     return { handled: true, applied: applied, targets: selectedTargets, marker: marker, chrome: chrome, dock: dock, cleared: cleared };
@@ -597,6 +752,8 @@
     var shell = dockLookup.shell;
     if (!dock || !target) return { handled: false, dock: dock || null, state: null, bound: false, positioned: false };
     var normalizedSelection = editorPreviewDockSelection(selection);
+    var hostActionLabel = editorPreviewHostCall(host, "previewFieldActionLabel", "", normalizedSelection);
+    if (hostActionLabel) normalizedSelection.action = hostActionLabel;
     var bindResult = bindEditorPreviewDock(form, frame, dock, host);
     frame.__gosxStudioPreviewDock = dock;
     frame.__gosxStudioPreviewDockTarget = target;
@@ -762,6 +919,22 @@
     return true;
   }
 
+  function editorPreviewActionControl(target) {
+    return target && target.closest ? target.closest("a[href], button, input, select, textarea, form") : null;
+  }
+
+  function blockEditorPreviewActionControl(form, frame, event, actionControl) {
+    actionControl = actionControl || editorPreviewActionControl(event && event.target);
+    if (!actionControl) return false;
+    setEditorPreviewDiagnostic(form, "preview-action-blocked", {
+      route: editorPreviewRouteForFrame(frame),
+      tag: actionControl.tagName || "control",
+      message: "Form submission and navigation are disabled inside the authoring canvas. Open the public preview to test this action."
+    });
+    stopEditorPreviewActivation(event);
+    return true;
+  }
+
   function editorPreviewKeyboardIntent(event) {
     if (!event || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return null;
     var focusedControl = event.target && event.target.closest ? event.target.closest("input, textarea, select, button, a[href], [contenteditable='true'], [contenteditable='plaintext-only']") : null;
@@ -788,29 +961,61 @@
 
   function bindEditorPreviewDocument(form, frame, host) {
     var frameDoc = editorPreviewFrameDocument(frame);
-    if (!frame || !frameDoc || editorPreviewBoundDocument(frame) === frameDoc) return { handled: false, bound: false };
+    if (!frame || !frameDoc) {
+      if (frame) setEditorPreviewDiagnostic(form, "same-origin-unavailable", { route: editorPreviewURL(frame) });
+      return { handled: false, bound: false };
+    }
+    if (editorPreviewBoundDocument(frame) === frameDoc) return { handled: false, bound: false };
     setEditorPreviewBoundDocument(frame, frameDoc);
     if (frameDoc.documentElement) frameDoc.documentElement.setAttribute("data-gosx-studio-preview-selectable", "true");
+    makeEditorPreviewIdentityFocusable(frameDoc);
+    clearEditorPreviewDiagnostic(form);
     var repositionDock = editorPreviewFrameTask(function () {
       syncEditorPreviewDockPositionForFrame(frame);
     });
     frameDoc.addEventListener("click", function (event) {
-      if (editorPreviewInlineEditContains(frame, event.target)) return;
-      if (!editorPreviewPointerEventEligible(event)) return;
+      var actionControl = editorPreviewActionControl(event.target);
+      if (editorPreviewInlineEditContains(frame, event.target)) {
+        if (actionControl) event.preventDefault();
+        return;
+      }
+      if (!editorPreviewPointerEventEligible(event)) {
+        blockEditorPreviewActionControl(form, frame, event, actionControl);
+        return;
+      }
       var target = editorPreviewSelectableNode(event.target);
-      if (!target) return;
-      var detail = editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {};
-      if (editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: true, reason: "click" })) {
+      if (!target) {
+        if (actionControl) {
+          blockEditorPreviewActionControl(form, frame, event, actionControl);
+        } else {
+          diagnoseUnsupportedEditorPreviewNode(form, frame, event.target);
+        }
+        return;
+      }
+      var detail = editorPreviewIdentityDetail(frame, target, editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {});
+      var selectionApplied = editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: true, reason: "click" });
+      if (selectionApplied) {
+        clearEditorPreviewDiagnostic(form);
+      }
+      if (selectionApplied || actionControl) {
         event.preventDefault();
         event.stopPropagation();
       }
+    }, true);
+    frameDoc.addEventListener("auxclick", function (event) {
+      var actionControl = editorPreviewActionControl(event.target);
+      if (actionControl) {
+        blockEditorPreviewActionControl(form, frame, event, actionControl);
+        return;
+      }
+      if (editorPreviewInlineEditContains(frame, event.target)) return;
     }, true);
     frameDoc.addEventListener("dblclick", function (event) {
       if (editorPreviewInlineEditContains(frame, event.target)) return;
       if (!editorPreviewPointerEventEligible(event)) return;
       var target = editorPreviewSelectableNode(event.target);
       if (!target) return;
-      var detail = editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {};
+      var detail = editorPreviewIdentityDetail(frame, target, editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {});
       if (detail.editable !== "text") return;
       if (editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: true, reason: "double-click" }) && editorPreviewHostCall(host, "startInlineTextFromDetail", false, frame, detail, "double-click")) {
         event.preventDefault();
@@ -821,18 +1026,38 @@
       if (editorPreviewInlineEditContains(frame, event.target)) return;
       var target = editorPreviewSelectableNode(event.target);
       if (target) {
-        var detail = editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {};
+        var detail = editorPreviewIdentityDetail(frame, target, editorPreviewHostCall(host, "previewSelectionDetail", {}, target) || {});
         editorPreviewHostCall(host, "applyPreviewSelection", false, frame, target, detail, { reveal: false, reason: "focus" });
       }
     }, true);
     frameDoc.addEventListener("input", function (event) {
       editorPreviewHostCall(host, "handleInlineTextInput", false, frame, event);
     });
+    frameDoc.addEventListener("submit", function (event) {
+      stopEditorPreviewActivation(event);
+      setEditorPreviewDiagnostic(form, "preview-action-blocked", {
+        route: editorPreviewRouteForFrame(frame),
+        tag: "form",
+        message: "Form submission is disabled inside the authoring canvas. Open the public preview to test this action."
+      });
+    }, true);
     frameDoc.addEventListener("keydown", function (event) {
       editorPreviewHostCall(host, "handleInlineTextKeyEvent", false, frame, event);
     });
     frameDoc.addEventListener("keydown", function (event) {
       if (frame.__gosxStudioInlineEdit) return;
+      if ((event.key === "Enter" || event.key === " ") && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) {
+        var selectionTarget = editorPreviewSelectableNode(event.target);
+        if (selectionTarget) {
+          var selectionDetail = editorPreviewIdentityDetail(frame, selectionTarget, editorPreviewHostCall(host, "previewSelectionDetail", {}, selectionTarget) || {});
+          if (editorPreviewHostCall(host, "applyPreviewSelection", false, frame, selectionTarget, selectionDetail, { reveal: true, reason: "keyboard-select" })) {
+            clearEditorPreviewDiagnostic(form);
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+        }
+      }
       var intent = editorPreviewKeyboardIntent(event);
       if (!intent) return;
       if (intent.action === "prev-field" || intent.action === "next-field") {
@@ -876,8 +1101,23 @@
     return bindEditorPreviewDocument(form, frame, host);
   }
 
+  function bindEditorPreviewSelectionRestoreHandshake(form, host) {
+    if (!form || !form.addEventListener) return false;
+    form.__gosxStudioPreviewSelectionRestoreHost = host;
+    if (form.__gosxStudioPreviewSelectionRestoreHandshake) return false;
+    form.__gosxStudioPreviewSelectionRestoreHandshake = true;
+    form.addEventListener("gosxstudio:preview-selection-restore-request", function () {
+      var restoreHost = form.__gosxStudioPreviewSelectionRestoreHost || host;
+      editorPreviewFrames(form).forEach(function (frame) {
+        restoreEditorPreviewSelection(form, frame, restoreHost);
+      });
+    });
+    return true;
+  }
+
   function bindEditorPreviewFrames(form, host) {
     if (!form) return { handled: false, frames: 0, bound: 0 };
+    bindEditorPreviewSelectionRestoreHandshake(form, host);
     var frames = editorPreviewFrames(form);
     var bound = 0;
     frames.forEach(function (frame) {
@@ -888,9 +1128,23 @@
         frame.setAttribute("data-studio-preview-src", frame.getAttribute("src") || "");
       }
       frame.addEventListener("load", function () {
-        setEditorPreviewStatus(form, "ready", "Ready", "load");
+        // Wave 3B (tamarind, residual #6 — stray ready-family chip): the
+        // canvas preview status output used to write the literal word
+        // "Ready" once the iframe finished loading — a second, differently
+        // worded "good state" vocabulary item living right next to the
+        // toolbar's own unified Saved/Unsaved indicator (wave 3A fix (e)
+        // already folded the field-level "Ready" synonym into "Saved" for
+        // that exact reason). The state/reason attributes
+        // (data-gosx-studio-preview-state="ready", data-studio-preview-reason)
+        // still record the transition for CSS/JS/tests; only the visible
+        // label goes silent in this happy-path case, matching the same
+        // "quiet unless something needs attention" pattern already used for
+        // the per-field READY/Required/Linked chips — loading/error/dirty/
+        // syncing states below still write a real, visible label.
+        setEditorPreviewStatus(form, "ready", "", "load");
         syncEditorPreviewFrame(form, frame, "load", typeof host.shouldTransportPreviewPatch === "function" ? host.shouldTransportPreviewPatch : null);
         bindEditorPreviewFrameDocument(form, frame, host);
+        restoreEditorPreviewSelection(form, frame, host);
         var route = editorPreviewURL(frame) || frame.getAttribute("src") || "";
         postEditorPreviewPatch(form, "load-sync", editorPreviewPatchEnvelope("load-sync", { route: route }, null));
       });
@@ -898,9 +1152,32 @@
         setEditorPreviewStatus(form, "error", "Preview failed", "error");
       });
       bindEditorPreviewFrameDocument(form, frame, host);
+      restoreEditorPreviewSelection(form, frame, host);
       bound += 1;
     });
+    bindEditorPreviewRouteControls(form);
     return { handled: true, frames: frames.length, bound: bound };
+  }
+
+  function bindEditorPreviewRouteControls(form) {
+    queryAll(form, "button[data-studio-preview-route]").forEach(function (button) {
+      if (button.dataset && button.dataset.gosxStudioPreviewRouteBound === "true") return;
+      if (button.dataset) button.dataset.gosxStudioPreviewRouteBound = "true";
+      button.addEventListener("click", function (event) {
+        event.preventDefault();
+        var route = button.getAttribute("data-studio-preview-route") || "";
+        if (!route) return;
+        queryAll(form, "button[data-studio-preview-route]").forEach(function (candidate) {
+          candidate.setAttribute("aria-pressed", candidate === button ? "true" : "false");
+        });
+        form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-suspend", {
+          bubbles: true,
+          detail: { route: normalizedEditorPreviewRoute(route), reason: "route-switch" }
+        }));
+        clearEditorPreviewDiagnostic(form);
+        refreshEditorPreviewNow(form, "route", route);
+      });
+    });
   }
 
   function setEditorPreviewStatus(form, state, label, reason) {
@@ -921,11 +1198,16 @@
   function syncEditorPreviewRoute(form, route, reason) {
     route = route || "";
     if (!form || !route) return { handled: false };
+    form.setAttribute("data-studio-preview-route-current", normalizedEditorPreviewRoute(route));
     editorPreviewShells(form).forEach(function (shell) {
       shell.setAttribute("data-gosx-studio-preview-url", route);
     });
     editorPreviewFrames(form).forEach(function (frame) {
       frame.setAttribute("data-studio-preview-src", route);
+      frame.setAttribute("data-studio-preview-route", normalizedEditorPreviewRoute(route));
+    });
+    queryAll(form, "button[data-studio-preview-route]").forEach(function (button) {
+      button.setAttribute("aria-pressed", normalizedEditorPreviewRoute(button.getAttribute("data-studio-preview-route")) === normalizedEditorPreviewRoute(route) ? "true" : "false");
     });
     queryAll(form, "[data-studio-open-preview]").forEach(function (link) {
       if (link.getAttribute("aria-disabled") === "true") return;
@@ -938,6 +1220,77 @@
     return { handled: true };
   }
 
+  // ── Inline-edit session guard for preview refresh ──────────────────────
+  // Reassigning a frame's `src` is a full navigation: it destroys whatever
+  // live document state that frame currently holds. inlineeditruntime/
+  // island_runtime.js's startPreviewTextEdit/finishPreviewTextEdit already
+  // track an open contenteditable session on frame.__gosxStudioInlineEdit
+  // (set on start, cleared on commit OR cancel — see
+  // editorPreviewInlineEditContains above, which reads the same flag). But
+  // nothing consulted that flag here: on EVERY keystroke, inlineeditruntime's
+  // syncPreviewTextEdit fires a gosxstudio:editor-operation "set_text" event;
+  // hostruntime/assets/state_runtime.js always recomputes and dispatches
+  // gosxstudio:save-state "saved" on that event whenever the tracked form
+  // isn't otherwise dirty (its own update()/updateFrame()) — true on
+  // essentially every keystroke for a field with no live mirrored form
+  // control — and separately, once a field IS mirrored, its own autosave
+  // debounce (scheduleAutosave, reset every keystroke) eventually completes
+  // and dispatches its own "saved"/"autosave". Either way,
+  // hostruntime/assets/workbench_runtime.js's listener on gosxstudio:save-state
+  // turns EVERY "saved" dispatch into schedulePreviewRefresh(...)
+  // unconditionally, and this function's caller only debounced that for
+  // 180ms before reassigning frame.setAttribute("src", ...) — reloading the
+  // preview iframe on essentially any inter-keystroke gap over ~180ms
+  // (trivially common at a natural typing cadence) and silently discarding
+  // whatever the user had just typed. Contract: NEVER reload/replace the
+  // preview document while an inline-edit session is active on it; queue
+  // the refresh and apply it once the session ends (commit or cancel).
+  function editorPreviewFrameSessionActive(frame) {
+    return !!(frame && frame.__gosxStudioInlineEdit);
+  }
+
+  var editorPreviewPendingRefreshes = typeof WeakMap !== "undefined" ? new WeakMap() : null;
+  function editorPreviewPendingRefresh(frame) {
+    return editorPreviewPendingRefreshes ? editorPreviewPendingRefreshes.get(frame) : frame.__gosxStudioPreviewPendingRefresh;
+  }
+  function setEditorPreviewPendingRefresh(frame, pending) {
+    if (editorPreviewPendingRefreshes) editorPreviewPendingRefreshes.set(frame, pending);
+    else frame.__gosxStudioPreviewPendingRefresh = pending;
+  }
+
+  function applyEditorPreviewFrameRefresh(form, frame, reason, route) {
+    setEditorPreviewStatus(form, "loading", "Refreshing preview", reason);
+    var base = route || editorPreviewURL(frame) || frame.getAttribute("src") || "/";
+    frame.setAttribute("src", cacheBustPreviewURL(base, reason));
+    emitEditorPreview(form, "gosxstudio:preview-refresh", { route: route, reason: reason });
+  }
+
+  // A bounded poll (not an event hook): inlineeditruntime and previewruntime
+  // are separate modules with no direct "session ended" callback wired
+  // between them, and every session-ending path (commit via blur/Enter,
+  // cancel via Escape) already clears frame.__gosxStudioInlineEdit
+  // synchronously in finishPreviewTextEdit, so a short poll observes the
+  // transition promptly without new cross-module plumbing. The attempt
+  // ceiling is a defensive fallback only, so the preview eventually catches
+  // up even if some future caller ever left the session flag stuck.
+  var EDITOR_PREVIEW_SESSION_POLL_MS = 150;
+  var EDITOR_PREVIEW_SESSION_POLL_LIMIT = 800; // ~120s ceiling
+  function queueEditorPreviewRefresh(form, frame, reason, route) {
+    setEditorPreviewPendingRefresh(frame, { reason: reason, route: route });
+    if (frame.__gosxStudioPreviewSessionPoll) return;
+    var attempts = 0;
+    frame.__gosxStudioPreviewSessionPoll = window.setInterval(function () {
+      attempts += 1;
+      if (editorPreviewFrameSessionActive(frame) && attempts < EDITOR_PREVIEW_SESSION_POLL_LIMIT) return;
+      window.clearInterval(frame.__gosxStudioPreviewSessionPoll);
+      frame.__gosxStudioPreviewSessionPoll = null;
+      var pending = editorPreviewPendingRefresh(frame);
+      setEditorPreviewPendingRefresh(frame, null);
+      if (!pending) return;
+      applyEditorPreviewFrameRefresh(form, frame, pending.reason, pending.route);
+    }, EDITOR_PREVIEW_SESSION_POLL_MS);
+  }
+
   function refreshEditorPreviewNow(form, reason, route) {
     if (!form) return { handled: false };
     reason = reason || "refresh";
@@ -945,13 +1298,18 @@
     if (route) syncEditorPreviewRoute(form, route, reason);
     var frames = editorPreviewFrames(form);
     if (!frames.length) return { handled: false };
-    setEditorPreviewStatus(form, "loading", "Refreshing preview", reason);
+    var applied = false;
+    var deferred = false;
     frames.forEach(function (frame) {
-      var base = route || editorPreviewURL(frame) || frame.getAttribute("src") || "/";
-      frame.setAttribute("src", cacheBustPreviewURL(base, reason));
+      if (editorPreviewFrameSessionActive(frame)) {
+        queueEditorPreviewRefresh(form, frame, reason, route);
+        deferred = true;
+        return;
+      }
+      applied = true;
+      applyEditorPreviewFrameRefresh(form, frame, reason, route);
     });
-    emitEditorPreview(form, "gosxstudio:preview-refresh", { route: route, reason: reason });
-    return { handled: true };
+    return { handled: true, applied: applied, deferred: deferred };
   }
 
   var editorPreviewRefreshTimers = typeof WeakMap !== "undefined" ? new WeakMap() : null;
@@ -991,8 +1349,8 @@
   window.__gosx_preview_runtime_island_bindFrames = function (form, host) {
     return bindEditorPreviewFrames(form, host);
   };
-  window.__gosx_preview_runtime_island_clearSelections = function (form, host) {
-    return clearEditorPreviewSelections(form, host);
+  window.__gosx_preview_runtime_island_clearSelections = function (form, host, options) {
+    return clearEditorPreviewSelections(form, host, options);
   };
   window.__gosx_preview_runtime_island_applySelection = function (detail) {
     return applyEditorPreviewSelectionSync(detail, null);

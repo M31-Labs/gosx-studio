@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { startMuddyCanvasWASMFree } from "./reference_apps_harness";
+import { revealModeIfPresent, startMuddyCanvasWASMFree } from "./reference_apps_harness";
 import {
   formatCanvasRenderEvidence,
   waitForCanvasBoardRenderEvidence,
@@ -91,6 +91,10 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
     try {
       await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
       await expect(page.locator("[data-studio-workbench='true']").first()).toBeAttached();
+      // HAZEL PROOF-OF-FIX: the legacy site-map/canvas board now lives inside the
+      // "Advanced" mode panel (studio-pagecanvas-handoff moved it there once a
+      // PageCanvas surface is present) and is hidden until that mode is active.
+      await revealModeIfPresent(page, "advanced");
       await expect(page.locator(BOARD_SELECTOR).first(), "DOM site-map board element must stay in the markup (selection sink)").toBeAttached();
 
       const canvas = page.locator(CANVAS_SELECTOR).first();
@@ -185,6 +189,12 @@ test.describe("@reference-apps canvas2d site-map WASM-free", () => {
         zeroWasmNoManifestRuntime || islandsOnlyFootprint,
         `wasm-free mode must have either zero WASM with no manifest runtime path, or an islands-only WASM footprint; footprint=${JSON.stringify(footprintEvidence)}`,
       ).toBe(true);
+
+      // Zoom out to the file's TEST_ZOOM before the very first rect discovery
+      // (see TEST_ZOOM/resetCamera's doc comment) so this board's narrower
+      // Advanced-panel width still frames >=2 site-map columns.
+      await resetCamera(page);
+      await page.waitForTimeout(60);
 
       // Discover the rects the DOM board can resolve, with on-screen + world
       // centers, from the live inline bundle + the live JS camera.
@@ -376,11 +386,24 @@ async function readCamera(page: Page): Promise<{ x: number; y: number; z: number
   }, CANVAS_SELECTOR);
 }
 
+// TEST_ZOOM is the "reset" zoom used throughout this file. The Advanced-mode
+// panel hosting this board now shares its row with the persistent Layers +
+// Inspector rails (studio-pagecanvas-handoff's PageCanvas checkpoint), so the
+// board's on-screen width is narrower than it used to be. At zoom=1 (the
+// server-authored default), the site-map's 280-world-unit column stride no
+// longer frames two adjacent page columns inside that narrower width — only
+// the first column lands inside the canvas's own visible bounds. Zooming out
+// one notch is exactly what a real user would do to see more of the map, and
+// keeps every downstream assertion (pan/zoom/pick/marquee/nav) honestly
+// proven against genuinely-visible, genuinely-resolvable rects rather than
+// coincidentally-cropped ones.
+const TEST_ZOOM = 0.5;
+
 async function resetCamera(page: Page): Promise<void> {
-  await page.evaluate((sel) => {
+  await page.evaluate(({ sel, zoom }) => {
     const el = document.querySelector(sel) as (HTMLCanvasElement & { GoSXStudioCanvasWasmFree?: { setCamera: (x: number, y: number, z: number) => void } }) | null;
-    el?.GoSXStudioCanvasWasmFree?.setCamera(0, 0, 1);
-  }, CANVAS_SELECTOR);
+    el?.GoSXStudioCanvasWasmFree?.setCamera(0, 0, zoom);
+  }, { sel: CANVAS_SELECTOR, zoom: TEST_ZOOM });
 }
 
 // paintSignature samples a coarse fingerprint of the painted backing store so we

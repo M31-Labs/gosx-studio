@@ -54,6 +54,18 @@ body:has(.editor-page),
   --size-studio-right-min: 17rem;
   --size-studio-right-max: 24rem;
   --size-studio-frame: 88rem;
+  /* Wave 3B (tamarind, fix #1 — width system): the shared max-width for
+     every support-node panel that renders below/beside the three-zone
+     workbench (direct-edit forms, Responsive layout, the Interactions
+     inspector, the LOOK-gated style/theme panel, the flow field editor, the
+     shared-components palette — see [data-studio-mode-gate-wrapper] below).
+     Before this fix each one measured a different width on a live staging
+     seed (483px direct-edit stack, ~1213px Interactions, ~1440px raw
+     full-bleed sections) purely as a byproduct of its own content's
+     intrinsic sizing inside .admin-page.editor-page's single-column grid,
+     not a deliberate design. One consistent column (62.5rem = 1000px, within
+     the 960-1100px band) replaces that accidental variety. */
+  --size-studio-support-panel: 62.5rem;
   --size-studio-resizer: 0.85rem;
   --studio-stage-height: clamp(48rem, calc(100svh - 6rem), 92rem);
   --space-chip-y: 0.28rem;
@@ -409,6 +421,133 @@ button.button {
   font-weight: 700;
 }
 
+/* Verified bug: .editor-toolbar (the top toolbar row -- see
+   shell.renderBackendEditorWorkbenchToolbar) packs the title, the mode
+   tabs (.studio-modebar), the metric strip (.studio-context-strip), and
+   the command launcher (.studio-command-palette > .studio-command-launcher)
+   into one row. None of those children carried min-width: 0, so at
+   ~1000-1200px wide (e.g. an 1100x700 viewport) the command launcher's
+   intrinsic content width didn't shrink with the row -- it overflowed its
+   track and painted on top of (hit-blocking clicks on) the Publish and
+   Advanced mode tabs, which sit earlier in DOM order and so stack
+   underneath it. min-width: 0 lets each toolbar child shrink to fit its
+   row instead of bleeding into a neighbor's space -- the same fix already
+   applied above for the site-map board/engine/frame/rail-resizer
+   renderers (see the min-width: 0 rule keyed off
+   [data-gosx-studio-*-renderer="gosx-studio"] earlier in this file). */
+.gosx-studio-toolbar__title,
+.studio-modebar,
+.studio-context-strip,
+.studio-command-palette {
+  min-width: 0;
+}
+
+.gosx-studio-toolbar__title {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.gosx-studio-toolbar__title [data-studio-selection-label] {
+  display: inline-block;
+  max-width: min(14rem, 32vw);
+  margin-inline-start: var(--space-chip-x);
+  border-inline-start: 1px solid var(--color-line-strong);
+  padding-inline-start: var(--space-chip-x);
+  overflow: hidden;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
+/* At laptop widths the complete shared toolbar cannot stay on one flex row:
+   wrapping keeps all mode tabs and action controls reachable instead of
+   letting the modebar paint underneath the title/command controls. */
+@media (max-width: 1360px) {
+  .editor-toolbar {
+    flex-wrap: wrap;
+  }
+}
+
+/* The shared Studio toolbar is mounted inside Noni's editor-page shell. Noni
+   gives that shell a single-row grid and a horizontally scrolling modebar;
+   keep the Studio owner modes visible and hit-testable on desktop/laptop
+   surfaces by overriding those shell defaults at a stronger, renderer-scoped
+   specificity. The modebar may occupy a second internal row when needed. */
+@media (min-width: 821px) {
+  .admin-page.editor-page[data-gosx-studio-backend-editor-renderer="gosx-studio"] .editor-toolbar {
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto auto;
+    grid-template-areas: "title modes command actions";
+  }
+
+  .admin-page.editor-page[data-gosx-studio-backend-editor-renderer="gosx-studio"] .studio-modebar {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-self: stretch;
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
+}
+
+/* At bounded desktop/laptop widths, give the owner modes their own full
+   toolbar row. The title, metrics, command launcher, and action group stay
+   together above it, so the modebar never gets stranded in the narrow track
+   left over by the save/history chrome. */
+@media (min-width: 821px) and (max-width: 1360px) {
+  .admin-page.editor-page[data-gosx-studio-backend-editor-renderer="gosx-studio"] .editor-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    grid-template-rows: auto auto;
+    grid-template-areas:
+      "title metrics command actions"
+      "modes modes modes modes";
+  }
+
+  .admin-page.editor-page[data-gosx-studio-backend-editor-renderer="gosx-studio"] .gosx-studio-toolbar__title {
+    grid-area: title;
+  }
+
+  .admin-page.editor-page[data-gosx-studio-backend-editor-renderer="gosx-studio"] .studio-modebar {
+    grid-area: modes;
+  }
+
+  .admin-page.editor-page[data-gosx-studio-backend-editor-renderer="gosx-studio"] .studio-context-strip {
+    grid-area: metrics;
+  }
+
+  .admin-page.editor-page[data-gosx-studio-backend-editor-renderer="gosx-studio"] .studio-command-palette {
+    grid-area: command;
+  }
+
+  .admin-page.editor-page[data-gosx-studio-backend-editor-renderer="gosx-studio"] .editor-toolbar > .button-row {
+    grid-area: actions;
+  }
+}
+
+@media (max-width: 1200px) {
+  /* Give the mode tabs the row space they need to stay fully visible and
+     clickable down to ~1000px by dropping the launcher's visible "Find"
+     label below this breakpoint. The text stays in the accessible name
+     (this is a visually-hidden clip, not display: none/visibility:
+     hidden), so the button keeps announcing "Find Ctrl K" to assistive
+     tech; only the sighted footprint shrinks. */
+  .studio-command-launcher span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
 .studio-nav-panel,
 .editor-panel {
   align-content: start;
@@ -510,10 +649,48 @@ button.button {
   padding: var(--space-xs);
 }
 
-.studio-canvas-board > .studio-site-map-engine,
+/* Was `.studio-canvas-board > .studio-site-map-engine` (direct child): the
+ * studio-pagecanvas-handoff branch wraps the legacy site-map engine (+ canvas)
+ * in an intervening <section class="studio-advanced-canvas-board"
+ * data-studio-mode-panel="advanced"> once a PageCanvas surface is present
+ * (shell/backend_editor_workbench.go RenderBackendEditorWorkbenchContent) —
+ * unconditional now that PageCanvas is the default. The `>` combinator no
+ * longer matches the live DOM at all, so this sizing rule went silently dead.
+ * Loosened to a descendant combinator so it matches regardless of the
+ * wrapper. */
+.studio-canvas-board .studio-site-map-engine,
 .studio-site-map-engine-host .studio-site-map-engine {
   height: calc(var(--studio-stage-height) - 5rem);
   max-height: none;
+}
+
+/* .studio-site-map-canvas is the sibling gosx.CanvasBoard (WebGPU/canvas2d) +
+ * WASM-free surface wrapper (canvas/sitemap_canvas.go
+ * RenderSiteMapCanvasEngine) rendered alongside .studio-site-map-engine inside
+ * the same .studio-advanced-canvas-board wrapper (see the comment above). It
+ * never had a bounded-height rule of its own, so once mounted inside a
+ * VISIBLE .studio-advanced-canvas-board its <canvas> child (a replaced element
+ * with no percentage sizing) and this unbounded section can compound with
+ * whatever the ancestor chain happens to measure at mount/resize time — the
+ * exact self-referential-collapse-or-balloon hazard gosx's client bootstrap
+ * documents (client/js/bootstrap-src/26b-feature-engines-prefix.js
+ * _measuredCanvasCSSBox: "an upstream DOM-nesting change breaks a
+ * descendant-combinator selector the host authored against an older
+ * structure"). Bound it exactly like its sibling so the canvas always
+ * measures a stable, viewport-scaled box and fills it. */
+.studio-site-map-canvas {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: calc(var(--studio-stage-height) - 5rem);
+  max-height: none;
+  overflow: hidden;
+}
+
+.studio-site-map-canvas > canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .studio-site-map-engine__chrome {
@@ -924,13 +1101,26 @@ button.button {
   font-size: var(--text-lg);
 }
 
-.studio-home-inspector__target span,
-.studio-home-inspector__target-status,
+/* Wave 3A (vocabulary pruning, fix (e)): this rule used to also match
+   .studio-home-inspector__target span and .studio-home-inspector__target-
+   status — conflating a full instructional SENTENCE (targetSummary, a bare
+   <span> with no class of its own in panels/home_inspector_panel.go) with
+   genuinely tiny status pills, turning the sentence into small monospace
+   caps too (handoff-30-create-actions-report.md's root-cause finding). The
+   target-status pills are gone now (folded into the single Saved/Unsaved
+   indicator), so this rule is scoped to what's actually left: the brand
+   preview shell's header. */
 .studio-brand-panel__preview-shell > header {
   color: var(--color-muted);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   text-transform: uppercase;
+}
+
+.studio-home-inspector__target span {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: 1.4;
 }
 
 .studio-home-inspector__groups,
@@ -1929,6 +2119,219 @@ button.button {
   gap: var(--space-xs);
 }
 
+/* Gallery resource indexes keep a native table for desktop column/header
+   semantics. At phone widths the table becomes a set of labeled, stacked
+   records: the HTML table and header remain in the accessibility tree while
+   each value gets a readable card row instead of competing for five narrow
+   columns. */
+.admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+  .data-table,
+.admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+  .data-table
+  .table-product,
+.admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+  .data-table
+  .table-product > div {
+  min-width: 0;
+}
+
+.admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+  .data-table
+  .table-product > div {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+  .data-table
+  .table-product > div > :where(strong, span) {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"] {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+  > .panel {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 820px) {
+  .admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+    .data-table {
+    display: block;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  /* Keep the native header available to assistive technology while the
+     visible cards repeat its labels next to each value. */
+  .admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+    .data-table
+    thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+    .data-table
+    tbody {
+    display: grid;
+    gap: var(--space-sm);
+    min-width: 0;
+  }
+
+  .admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+    .data-table
+    tbody
+    tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-xs);
+    min-width: 0;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+    background: var(--color-canvas-soft);
+    padding: var(--space-sm);
+  }
+
+  .admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+    .data-table
+    tbody
+    td {
+    display: grid;
+    grid-template-columns: minmax(5.5rem, auto) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-xs);
+    min-width: 0;
+    max-width: 100%;
+    border: 0;
+    padding: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+    .data-table
+    tbody
+    td::before {
+    content: attr(data-label);
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    line-height: 1.35;
+    text-transform: uppercase;
+  }
+
+  .admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+    .data-table
+    tbody
+    td:first-child {
+    display: block;
+  }
+
+  .admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+    .data-table
+    tbody
+    td:first-child::before {
+    display: block;
+    margin-bottom: var(--space-xs);
+  }
+
+  .admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+    .data-table
+    tbody
+    td:last-child {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    border-top: 1px solid var(--color-line);
+    padding-top: var(--space-xs);
+  }
+
+  .admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+    .data-table
+    tbody
+    td:last-child::before {
+    content: attr(data-label);
+  }
+
+  .admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+    .data-table
+    tbody
+    td:last-child
+    a {
+    display: inline-flex;
+    min-width: calc(var(--space-md) + var(--space-sm));
+    min-height: calc(var(--space-md) + var(--space-sm));
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-card);
+    color: var(--color-accent-strong);
+    font-weight: 700;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.2em;
+  }
+
+  .admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+    .data-table
+    tbody
+    td:last-child
+    a:hover {
+    background: color-mix(in srgb, var(--color-accent) 10%, var(--color-canvas));
+  }
+
+  .admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+    .data-table
+    tbody
+    td:last-child
+    a:focus-visible {
+    background: color-mix(in srgb, var(--color-accent) 10%, var(--color-canvas));
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  .admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+    .data-table
+    tbody
+    td:last-child
+    a:active {
+    background: var(--color-accent);
+    color: var(--color-canvas-soft);
+  }
+
+  .admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+    .data-table
+    .table-product {
+    /* At the narrowest host widths the Work cell is only about 204px wide.
+       Give the copy the full row beneath the thumbnail instead of reserving
+       a second 120px column for it. */
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .admin-page[data-gosx-studio-backend-gallery-index-renderer="gosx-studio"]
+    .data-table
+    .table-product > img {
+    max-width: 100%;
+  }
+}
+
 .admin-page .table-product img {
   aspect-ratio: 1;
   width: var(--size-thumb-sm);
@@ -2056,11 +2459,2055 @@ button.button {
   border-color: var(--color-accent-strong);
 }
 
+/* CMS authoring forms are long by design, but their identity and primary
+   actions must remain in the first working viewport. Keep this correction
+   scoped to the shared Page/Blog renderers and their enhanced submit hook so
+   unrelated admin forms retain their existing cadence. The renderer places
+   one canonical action bar before the fields; this CSS keeps it visible while
+   editing and leaves archive/restore actions in a separate secondary band. */
+.admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"],
+.admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"],
+.admin-page[data-gosx-studio-backend-page-index-renderer="gosx-studio"],
+.admin-page[data-gosx-studio-backend-blog-index-renderer="gosx-studio"] {
+  gap: var(--space-sm);
+}
+
+.admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] > .admin-heading,
+.admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] > .admin-heading,
+.admin-page[data-gosx-studio-backend-page-index-renderer="gosx-studio"] > .admin-heading,
+.admin-page[data-gosx-studio-backend-blog-index-renderer="gosx-studio"] > .admin-heading {
+  max-width: 100%;
+  margin-bottom: 0;
+  gap: var(--space-chip-y);
+}
+
+.admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] > .admin-heading h1,
+.admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] > .admin-heading h1,
+.admin-page[data-gosx-studio-backend-page-index-renderer="gosx-studio"] > .admin-heading h1,
+.admin-page[data-gosx-studio-backend-blog-index-renderer="gosx-studio"] > .admin-heading h1 {
+  max-width: none;
+  font-size: var(--text-xl);
+  line-height: 1.05;
+}
+
+.admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] > .admin-heading p:not(.kicker),
+.admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] > .admin-heading p:not(.kicker),
+.admin-page[data-gosx-studio-backend-page-index-renderer="gosx-studio"] > .admin-heading p:not(.kicker),
+.admin-page[data-gosx-studio-backend-blog-index-renderer="gosx-studio"] > .admin-heading p:not(.kicker) {
+  line-height: 1.3;
+}
+
+/* The shared site shell gives every admin main a spacious page-intro offset.
+   Authoring forms need that space for fields and the selected first block, so
+   tighten only the Page/Blog CMS routes that carry the scoped renderer hooks. */
+.site-shell--admin:has(.admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"]) .site-main,
+.site-shell--admin:has(.admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"]) .site-main,
+.site-shell--admin:has(.admin-page[data-gosx-studio-backend-page-index-renderer="gosx-studio"]) .site-main,
+.site-shell--admin:has(.admin-page[data-gosx-studio-backend-blog-index-renderer="gosx-studio"]) .site-main {
+  padding-top: var(--space-sm);
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] {
+  align-content: start;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-xs) var(--space-sm);
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .field-row:has(> [data-content-editor-format]) {
+  grid-column: auto;
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] .form-error:empty {
+  display: none;
+  min-height: 0;
+}
+
+/* On the desktop authoring surface, keep view-only search beside the save
+   feedback so the first selected block can enter the working viewport. The
+   editor's runtime owns this child order (search, save status, body label,
+   source, toolbar, list); the mobile override below returns to one readable
+   column. */
+.admin-page .admin-form[data-content-editor-enhanced-submit] .content-editor {
+  grid-template-columns: minmax(0, 1fr) minmax(9rem, min(32%, 20rem));
+  column-gap: var(--space-xs);
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] .content-editor
+  > :where(.content-editor__search-controls, [data-content-editor-search-controls]) {
+  grid-column: 1;
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] .content-editor
+  > :where(.content-editor__save-status, [data-content-editor-save-status]) {
+  grid-column: 2;
+  align-self: end;
+}
+
+/* Error states carry a sentence, field diagnostics, and sometimes a recovery
+   link. Keep that message in the full editor track so the compact search /
+   status arrangement cannot collapse its detail column to zero width. Idle,
+   dirty, saving, and saved states retain the compact two-column placement. */
+.admin-page .admin-form[data-content-editor-enhanced-submit] .content-editor:is(
+    [data-content-editor-save-state="offline"],
+    [data-content-editor-save-state="failed"],
+    [data-content-editor-save-state="unconfirmed"],
+    [data-content-editor-save-state="auth"],
+    [data-content-editor-save-state="conflict"]
+  )
+  > :where(.content-editor__save-status, [data-content-editor-save-status]) {
+  grid-column: 1 / -1;
+  align-self: start;
+  justify-self: stretch;
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] .content-editor
+  > :where(label, .content-editor__source, .content-editor__toolbar, .content-block-list, [data-content-editor-list]) {
+  grid-column: 1 / -1;
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .admin-form__primary-actions {
+  position: sticky;
+  z-index: 20;
+  top: var(--space-xs);
+  display: flex;
+  min-width: 0;
+  max-width: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-chip-y) var(--space-xs);
+  grid-column: 1 / -1;
+  margin: calc(var(--space-sm) * -1) calc(var(--space-sm) * -1) var(--space-chip-y);
+  padding: var(--space-chip-y) var(--space-sm);
+  border-bottom: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-panel) 94%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--color-ink) 8%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .admin-form__primary-actions > .button {
+  min-width: 0;
+  min-height: var(--space-md);
+  margin: 0;
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .admin-form__secondary-actions {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-chip-y) var(--space-xs);
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--color-line);
+  padding-top: var(--space-chip-y);
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .edit-preview {
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .edit-preview.edit-preview--text {
+  display: flex;
+  min-height: 0;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .edit-preview.edit-preview--text > div {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-chip-y) var(--space-xs);
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .edit-preview.edit-preview--text strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .admin-form__secondary-actions[data-content-editor-danger-actions="true"] {
+  color: var(--color-danger);
+}
+
+.admin-page .admin-form[data-content-editor-enhanced-submit] > .admin-form__primary-actions > .button--primary {
+  border-color: var(--color-accent-strong);
+  background: var(--color-accent-strong);
+  color: var(--color-canvas-soft);
+}
+
+/* Laptop detail fit: preserve control sizes while tightening only the
+   inter-row rhythm above the first editable block. The index forms keep their
+   established spacing, and mobile keeps its readable single-column cadence. */
+@media (min-width: 821px) {
+  .admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"],
+  .admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] {
+    gap: var(--space-xs);
+  }
+
+  .admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] .admin-form[data-content-editor-enhanced-submit],
+  .admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] .admin-form[data-content-editor-enhanced-submit],
+  .admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] .content-editor,
+  .admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] .content-editor,
+  .admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] .content-block-list,
+  .admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] .content-block-list,
+  .admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] [data-content-editor-list],
+  .admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] [data-content-editor-list] {
+    row-gap: 0.5rem;
+  }
+}
+
+@media (max-width: 820px) {
+  .admin-page .admin-form[data-content-editor-enhanced-submit] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-page .admin-form[data-content-editor-enhanced-submit] .content-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-page .admin-form[data-content-editor-enhanced-submit] .content-editor
+    > :where(.content-editor__search-controls, [data-content-editor-search-controls], .content-editor__save-status, [data-content-editor-save-status]) {
+    grid-column: 1;
+  }
+
+  .admin-page .admin-form[data-content-editor-enhanced-submit] > .admin-form__primary-actions {
+    top: 0;
+    margin-inline: calc(var(--space-sm) * -1);
+    padding-inline: var(--space-sm);
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .admin-page .admin-form[data-content-editor-enhanced-submit] > .admin-form__primary-actions > .button {
+    flex: 1 1 8rem;
+  }
+
+  .admin-page .admin-form[data-content-editor-enhanced-submit] > .admin-form__secondary-actions {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .admin-page .admin-form[data-content-editor-enhanced-submit] > .edit-preview.edit-preview--text {
+    align-items: flex-start;
+  }
+}
+
+/* Modern shared content editor primitives. These rules are intentionally
+   scoped to Studio/admin shells so host storefront rendering stays untouched
+   while Noni admin pages can inherit the shared editor surface after
+   hostruntime/assets/studio.css loads. */
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor * {
+  touch-action: manipulation;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor__toolbar,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__header,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-content-editor-toolbar],
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-content-block-toolbar] {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-chip-y) var(--space-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor__toolbar
+  > *,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-content-editor-toolbar]
+  > *,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__header
+  > *,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-content-block-toolbar]
+  > * {
+  min-width: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor__toolbar
+  :where(button, .button, input, select, output),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-content-editor-toolbar]
+  :where(button, .button, input, select, output),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__header
+  :where(button, .button, select, output),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-content-block-toolbar]
+  :where(button, .button, select, output) {
+  min-height: var(--space-md);
+  max-width: 100%;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor__toolbar
+  :where(output, [data-content-editor-count], [data-content-editor-save-state]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-content-editor-toolbar]
+  :where(output, [data-content-editor-count], [data-content-editor-save-state]) {
+  width: fit-content;
+  color: var(--color-accent-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__search, [data-content-editor-search]) {
+  flex: 1 1 calc(var(--space-3xl) + var(--space-lg));
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__search-controls, [data-content-editor-search-controls]) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  min-width: 0;
+  max-width: 100%;
+  align-items: end;
+  gap: var(--space-chip-y) var(--space-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor__search-label {
+  display: grid;
+  min-width: 0;
+  gap: 0.45rem;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__search-input, [data-content-editor-search]) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__search-clear, [data-content-editor-search-clear]) {
+  display: inline-flex;
+  min-width: var(--space-md);
+  min-height: var(--space-md);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-accent-strong);
+  cursor: pointer;
+  padding: var(--space-chip-y) var(--space-chip-x);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__search-clear, [data-content-editor-search-clear]):hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__search-clear, [data-content-editor-search-clear]):focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-canvas));
+  color: var(--color-ink);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 72%, transparent);
+  outline-offset: 2px;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__search-count, [data-content-editor-search-count]) {
+  display: inline-flex;
+  min-height: var(--space-md);
+  align-items: center;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor__source {
+  min-width: 0;
+  max-width: 100%;
+  min-height: calc(var(--space-3xl) + var(--space-lg));
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block-list,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-content-editor-list] {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block {
+  position: relative;
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  padding: var(--space-xs);
+  scroll-margin: var(--space-md);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block:hover {
+  border-color: var(--color-line-strong);
+  background: color-mix(in srgb, var(--color-panel) 78%, var(--color-canvas-soft));
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 26%, transparent);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block:is(
+    .is-selected,
+    [aria-selected="true"],
+    [data-selected="true"],
+    [data-content-block-selected="true"],
+    [data-content-editor-selected="true"]
+  ) {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-canvas-soft));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 24%, transparent),
+    var(--shadow-control);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block:is(
+    .is-dragging,
+    [data-content-block-dragging="true"],
+    [data-content-editor-drag-preview="true"],
+    [data-dragging="true"]
+  ) {
+  border-color: var(--color-accent);
+  opacity: 0.84;
+  box-shadow: var(--shadow-panel);
+  cursor: grabbing;
+  transform: scale(0.995);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block:is(
+    .is-drop-before,
+    .is-drop-after,
+    [data-drop-position="before"],
+    [data-drop-position="after"],
+    [data-content-editor-drop="before"],
+    [data-content-editor-drop="after"],
+    [data-content-editor-drop-before],
+    [data-content-editor-drop-after],
+    [data-content-block-drop="before"],
+    [data-content-block-drop="after"]
+  )::before {
+  position: absolute;
+  z-index: 1;
+  inset-inline: var(--space-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--space-sm);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-accent-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block:is(
+    .is-drop-before,
+    [data-drop-position="before"],
+    [data-content-editor-drop="before"],
+    [data-content-editor-drop-before],
+    [data-content-block-drop="before"]
+  )::before {
+  content: "Drop before";
+  top: calc(var(--space-xs) * -1);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block:is(
+    .is-drop-after,
+    [data-drop-position="after"],
+    [data-content-editor-drop="after"],
+    [data-content-editor-drop-after],
+    [data-content-block-drop="after"]
+  )::before {
+  content: "Drop after";
+  bottom: calc(var(--space-xs) * -1);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .content-block__drag-handle,
+    .content-block__move,
+    [data-content-drag-handle],
+    [data-content-editor-drag-handle],
+    [data-content-block-handle],
+    [data-content-editor-action],
+    [data-content-editor-move]
+  ) {
+  display: inline-flex;
+  min-width: var(--space-md);
+  min-height: var(--space-md);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-accent-strong);
+  cursor: grab;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  touch-action: none;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-spring);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .content-block__drag-handle,
+    .content-block__move,
+    [data-content-drag-handle],
+    [data-content-editor-drag-handle],
+    [data-content-block-handle],
+    [data-content-editor-action],
+    [data-content-editor-move]
+  ):hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .content-block__drag-handle,
+    .content-block__move,
+    [data-content-drag-handle],
+    [data-content-editor-drag-handle],
+    [data-content-block-handle],
+    [data-content-editor-action],
+    [data-content-editor-move]
+  ):focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-canvas));
+  color: var(--color-ink);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 72%, transparent);
+  outline-offset: 2px;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .content-block__drag-handle,
+    .content-block__move,
+    [data-content-drag-handle],
+    [data-content-editor-drag-handle],
+    [data-content-block-handle],
+    [data-content-editor-action],
+    [data-content-editor-move]
+  ):active,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .content-block__drag-handle,
+    .content-block__move,
+    [data-content-drag-handle],
+    [data-content-editor-drag-handle],
+    [data-content-block-handle],
+    [data-content-editor-action],
+    [data-content-editor-move]
+  )[aria-pressed="true"] {
+  cursor: grabbing;
+  transform: scale(0.96);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.45fr);
+  gap: var(--space-sm);
+  align-items: start;
+  min-width: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__fields,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__field {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__field
+  span {
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__field
+  :where(input, select, textarea) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__preview {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  min-height: calc(var(--space-xl) + var(--space-lg));
+  align-content: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  padding: var(--space-xs);
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__preview
+  :where(h1, h2, h3, p, blockquote, ul, ol, figure) {
+  margin: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__preview
+  :where(h1, h2, h3) {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  line-height: 1.1;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__preview
+  blockquote {
+  border-left: 3px solid var(--color-accent);
+  padding-left: var(--space-xs);
+  color: var(--color-ink-soft);
+  font-family: var(--font-display);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__preview
+  img {
+  width: 100%;
+  max-width: 100%;
+  max-height: calc(var(--space-3xl) + var(--space-lg));
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  object-fit: cover;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__preview-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block:is(.is-folded, [data-content-block-folded="true"])
+  .content-block__body {
+  display: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block
+  :where(details) {
+  min-width: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block
+  :where(summary) {
+  cursor: pointer;
+  color: var(--color-accent-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .content-editor__empty,
+    .content-editor__source-error,
+    [data-content-editor-empty],
+    [data-content-editor-source-error],
+    [data-content-editor-keyboard-help],
+    [data-content-editor-announcement],
+    [data-content-editor-status]
+  ) {
+  display: block;
+  max-width: 100%;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-panel) 80%, var(--color-canvas));
+  padding: var(--space-xs);
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__source-error, [data-content-editor-source-error]) {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+/* ContentEditor puts history controls beside the live block count inside the
+   rendered list, outside each block header. Keep that row a compact control
+   group so the count does not become a full-width panel and push the first
+   selected block below the authoring viewport. */
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__history, [data-content-editor-history]) {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-chip-y);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__history, [data-content-editor-history])
+  :where(button, [data-content-editor-action]) {
+  display: inline-flex;
+  min-width: var(--space-md);
+  min-height: var(--space-md);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-accent-strong);
+  cursor: pointer;
+  padding: var(--space-chip-y) var(--space-chip-x);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__history, [data-content-editor-history])
+  :where(button, [data-content-editor-action]):hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__history, [data-content-editor-history])
+  :where(button, [data-content-editor-action]):focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-canvas));
+  color: var(--color-ink);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 72%, transparent);
+  outline-offset: 2px;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__history, [data-content-editor-history])
+  :where(button, [data-content-editor-action]):disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__history, [data-content-editor-history])
+  :where(.content-editor__status, [data-content-editor-status]) {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.2;
+}
+
+/* Save feedback is part of the editor surface, not an implementation detail
+   hidden in the network layer. ContentEditor creates this node when a host
+   does not provide one, so style both the class and data hook. The explicit
+   two-column layout keeps the short state label distinct from the longer
+   explanation and leaves room for a retry action without the old
+   "ReadyReady" inline-text collision. */
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-status, [data-content-editor-save-status]) {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: var(--space-chip-y) var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-status, [data-content-editor-save-status])
+  > :where(.content-editor__save-errors, .content-editor__save-created-link, .content-editor__save-conflict-link) {
+  grid-column: 1 / -1;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-status, [data-content-editor-save-status])
+  > :where(.content-editor__save-errors) {
+  width: 100%;
+  margin: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-status, [data-content-editor-save-status])
+  > :where(.content-editor__save-errors) > ul {
+  max-width: 100%;
+  margin: 0;
+  padding-inline-start: var(--space-md);
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-status, [data-content-editor-save-status])
+  > :where(.content-editor__save-created-link, .content-editor__save-conflict-link) {
+  display: inline-flex;
+  min-width: var(--space-md);
+  min-height: var(--space-md);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-soft);
+  color: var(--color-accent-strong);
+  padding: var(--space-chip-y) var(--space-chip-x);
+  justify-self: start;
+  white-space: normal;
+  text-decoration: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-status, [data-content-editor-save-status])
+  > :where(.content-editor__save-created-link, .content-editor__save-conflict-link):hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-status, [data-content-editor-save-status])
+  > :where(.content-editor__save-created-link, .content-editor__save-conflict-link):focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-canvas));
+  color: var(--color-ink);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 72%, transparent);
+  outline-offset: 2px;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-label, [data-content-editor-save-label]) {
+  display: inline-flex;
+  min-width: 0;
+  min-height: var(--space-md);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  padding: var(--space-chip-y) var(--space-chip-x);
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-detail, [data-content-editor-save-detail-text]) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-retry, [data-content-editor-save-retry]) {
+  display: inline-flex;
+  min-width: var(--space-md);
+  min-height: var(--space-md);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-soft);
+  color: var(--color-accent-strong);
+  cursor: pointer;
+  padding: var(--space-chip-y) var(--space-chip-x);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-retry, [data-content-editor-save-retry]):hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-retry, [data-content-editor-save-retry]):focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-canvas));
+  color: var(--color-ink);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 72%, transparent);
+  outline-offset: 2px;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.content-editor__save-retry, [data-content-editor-save-retry]):disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Initial ContentEditor markup carries the same short "Ready" copy in its
+   label and detail slots. Keep the status truthful without repeating that
+   word; once dirty/saving/saved/error states are set, the detail remains
+   visible for its useful explanation. */
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="idle"]
+  :where(.content-editor__save-detail, [data-content-editor-save-detail-text]) {
+  display: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="saved"]
+  :where(.content-editor__save-label, [data-content-editor-save-label]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-save-state-value="saved"] {
+  border-color: color-mix(in srgb, var(--color-moss) 44%, var(--color-line));
+  color: var(--color-moss);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="saving"]
+  :where(.content-editor__save-label, [data-content-editor-save-label]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="dirty"]
+  :where(.content-editor__save-label, [data-content-editor-save-label]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="offline"]
+  :where(.content-editor__save-label, [data-content-editor-save-label]) {
+  border-color: color-mix(in srgb, var(--color-accent) 52%, var(--color-line));
+  color: var(--color-accent-strong);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="failed"]
+  :where(.content-editor__save-label, [data-content-editor-save-label]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="unconfirmed"]
+  :where(.content-editor__save-label, [data-content-editor-save-label]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="auth"]
+  :where(.content-editor__save-label, [data-content-editor-save-label]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="conflict"]
+  :where(.content-editor__save-label, [data-content-editor-save-label]) {
+  border-color: color-mix(in srgb, var(--color-danger) 52%, var(--color-line));
+  color: var(--color-danger);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="failed"]
+  :where(.content-editor__save-detail, [data-content-editor-save-detail-text]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="unconfirmed"]
+  :where(.content-editor__save-detail, [data-content-editor-save-detail-text]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="auth"]
+  :where(.content-editor__save-detail, [data-content-editor-save-detail-text]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-editor[data-content-editor-save-state="conflict"]
+  :where(.content-editor__save-detail, [data-content-editor-save-detail-text]) {
+  color: var(--color-danger);
+}
+
+@media (pointer: coarse) {
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(
+      .content-editor__save-retry,
+      [data-content-editor-save-retry],
+      .content-editor__save-created-link,
+      .content-editor__save-conflict-link
+    ) {
+    min-width: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+    min-height: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+  }
+}
+
+@media (max-width: 820px) {
+  /* On narrow screens, failure detail and its actions each receive a full
+     row. This keeps a visible Retry or recovery link from stealing the only
+     readable line from the error message. */
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-editor:is(
+      [data-content-editor-save-state="offline"],
+      [data-content-editor-save-state="failed"],
+      [data-content-editor-save-state="unconfirmed"],
+      [data-content-editor-save-state="auth"],
+      [data-content-editor-save-state="conflict"]
+    )
+    > :where(.content-editor__save-status, [data-content-editor-save-status]) {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-editor:is(
+      [data-content-editor-save-state="offline"],
+      [data-content-editor-save-state="failed"],
+      [data-content-editor-save-state="unconfirmed"],
+      [data-content-editor-save-state="auth"],
+      [data-content-editor-save-state="conflict"]
+    )
+    > :where(.content-editor__save-status, [data-content-editor-save-status])
+    > :where(
+      .content-editor__save-label,
+      [data-content-editor-save-label],
+      .content-editor__save-detail,
+      [data-content-editor-save-detail-text],
+      .content-editor__save-retry,
+      [data-content-editor-save-retry],
+      .content-editor__save-errors,
+      .content-editor__save-created-link,
+      .content-editor__save-conflict-link
+    ) {
+    grid-column: 1;
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-editor:is(
+      [data-content-editor-save-state="offline"],
+      [data-content-editor-save-state="failed"],
+      [data-content-editor-save-state="unconfirmed"],
+      [data-content-editor-save-state="auth"],
+      [data-content-editor-save-state="conflict"]
+    )
+    > :where(.content-editor__save-status, [data-content-editor-save-status])
+    > :where(.content-editor__save-detail, [data-content-editor-save-detail-text], .content-editor__save-errors) {
+    width: 100%;
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-editor:is(
+      [data-content-editor-save-state="offline"],
+      [data-content-editor-save-state="failed"],
+      [data-content-editor-save-state="unconfirmed"],
+      [data-content-editor-save-state="auth"],
+      [data-content-editor-save-state="conflict"]
+    )
+    > :where(.content-editor__save-status, [data-content-editor-save-status])
+    > :where(.content-editor__save-label, [data-content-editor-save-label]) {
+    justify-self: start;
+  }
+}
+
+/* Shared media picker and upload drop zone primitives. Kept separate from the
+   brand-media island classes above because resource forms, content blocks, and
+   host adapters also use the compact .media-picker* contract. */
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.media-picker, [data-media-picker]) {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__toolbar {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__toolbar
+  > * {
+  min-width: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__preview {
+  display: grid;
+  flex: 1 1 calc(var(--size-thumb-md) * 2);
+  grid-template-columns: var(--size-thumb-sm) minmax(0, 1fr);
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.media-picker__preview img, .media-picker__file) {
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  object-fit: cover;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__file {
+  display: grid;
+  place-items: center;
+  color: var(--color-accent-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.media-picker__filename, [data-media-picker-filename]) {
+  display: block;
+  min-width: 0;
+  color: var(--color-ink-soft);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.media-picker__empty, [data-media-picker-empty]) {
+  grid-column: 1 / -1;
+  margin: 0;
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-panel) 74%, var(--color-canvas));
+  padding: var(--space-xs);
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.media-picker__trigger, .media-picker__clear, [data-media-picker-clear]) {
+  width: auto;
+  min-height: var(--space-md);
+  border-radius: var(--radius-pill);
+  color: var(--color-accent-strong);
+  font-size: var(--text-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__panel {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  padding: var(--space-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__panel[hidden] {
+  display: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--size-thumb-md), 1fr));
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  max-height: min(calc(var(--size-thumb-md) * 4), 56vh);
+  overflow: auto;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__asset {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  padding: var(--space-xs);
+  text-align: left;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__asset:hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__asset:focus-visible,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__asset[data-media-asset-selected="true"],
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__asset[aria-selected="true"] {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-canvas-soft));
+  color: var(--color-ink);
+  transform: translateY(calc(var(--space-chip-y) * -1));
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.media-picker__asset img, .media-picker__asset .media-picker__file) {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__asset
+  span:last-child {
+  color: var(--color-ink-soft);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .media-picker__drop-zone,
+    .media-picker__dropzone,
+    [data-media-picker-dropzone],
+    [data-media-upload-dropzone],
+    [data-media-upload-drop-zone],
+    [data-studio-media-upload-drop-zone]
+  ) {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  min-height: calc(var(--space-3xl) + var(--space-md));
+  align-content: center;
+  justify-items: center;
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-panel) 80%, var(--color-canvas));
+  padding: var(--space-sm);
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .media-picker__drop-zone,
+    .media-picker__dropzone,
+    [data-media-picker-dropzone],
+    [data-media-upload-dropzone],
+    [data-media-upload-drop-zone],
+    [data-studio-media-upload-drop-zone]
+  ):hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .media-picker__drop-zone,
+    .media-picker__dropzone,
+    [data-media-picker-dropzone],
+    [data-media-upload-dropzone],
+    [data-media-upload-drop-zone],
+    [data-studio-media-upload-drop-zone]
+  ):focus-within,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload][data-media-drop-active="true"]
+  :where([data-media-upload-drop-zone], [data-media-upload-dropzone]),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    .media-picker__drop-zone,
+    .media-picker__dropzone,
+    [data-media-picker-dropzone],
+    [data-media-upload-dropzone],
+    [data-media-upload-drop-zone],
+    [data-studio-media-upload-drop-zone]
+  ):is(.is-drag-over, [data-drag-over="true"], [data-media-drop-active="true"]) {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-panel));
+  color: var(--color-ink);
+  transform: translateY(calc(var(--space-chip-y) * -1));
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.media-picker__error, [data-media-picker-error], [data-media-upload-error]) {
+  margin: 0;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-canvas));
+  padding: var(--space-xs);
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload] {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload-preview] {
+  width: 100%;
+  max-width: calc(var(--size-thumb-md) * 2);
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  object-fit: cover;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload-preview][hidden],
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload-clear][hidden],
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload-error][hidden] {
+  display: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload-status] {
+  color: var(--color-ink-soft);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload-status][data-media-upload-status-kind="ok"] {
+  color: var(--color-moss);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-media-upload-status][data-media-upload-status-kind="error"] {
+  color: var(--color-danger);
+}
+
+/* The media-lines control is emitted by mediaruntime for Page/Blog gallery
+   fields. Keep the generated list a bounded component: long asset names and
+   URLs may wrap, while the action cluster remains reachable at phone widths.
+   These rules intentionally use the existing media/editor tokens and do not
+   change the host workbench layout. */
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__items {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__item {
+  display: grid;
+  grid-template-columns: var(--size-thumb-sm) minmax(0, 1fr) auto;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  padding: var(--space-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__item
+  :where(img, .media-picker__file) {
+  width: var(--size-thumb-sm);
+  max-width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  object-fit: cover;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__fields {
+  display: grid;
+  gap: var(--space-chip-y);
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__fields
+  :where(strong, small) {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__fields
+  strong {
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__fields
+  small {
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__item-actions,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__actions {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-chip-y);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__item-actions
+  :where(button, .button),
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__actions
+  :where(button, .button) {
+  min-width: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+  min-height: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__item-actions
+  button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-list-editor__raw-toggle {
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(.media-picker__search, .media-picker__status) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__search {
+  width: 100%;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .media-picker__status {
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 820px) {
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-list-editor__item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-list-editor__item
+    :where(img, .media-picker__file) {
+    width: var(--size-thumb-md);
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-list-editor__item-actions,
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-list-editor__actions {
+    justify-content: flex-start;
+  }
+}
+
+/* SectionOrder sits between the preview toolbar and iframe. Keep it compact
+   and readable while preserving the real frame as the primary canvas. */
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order="true"] {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  border-block: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-panel) 78%, var(--color-canvas));
+  padding: var(--space-xs);
+}
+
+/* The lane is an optional second child of .studio-page-canvas. Its presence
+   must not steal the flexible track from the real preview stage: without
+   this selector, the base four-row canvas puts the lane in the 1fr row and
+   leaves the iframe in an auto row with no useful height. Keep the legacy
+   four-child canvas untouched when no lane is rendered. */
+.studio-page-canvas:has(> [data-gosx-studio-section-order="true"]) {
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+}
+
+.studio-page-canvas:has(> [data-gosx-studio-section-order="true"])
+  > [data-gosx-studio-section-order="true"] {
+  grid-row: 2;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.studio-page-canvas:has(> [data-gosx-studio-section-order="true"])
+  > .studio-page-canvas__stage {
+  grid-row: 3;
+}
+
+.studio-page-canvas:has(> [data-gosx-studio-section-order="true"])
+  > .studio-page-canvas__status {
+  grid-row: 4;
+}
+
+.studio-page-canvas:has(> [data-gosx-studio-section-order="true"])
+  > .studio-page-canvas__diagnostic {
+  grid-row: 5;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-enabled="false"] {
+  background: color-mix(in srgb, var(--color-stone) 12%, var(--color-canvas));
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .studio-page-canvas__section-order-header {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-chip-y) var(--space-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .studio-page-canvas__section-order-title {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  line-height: 1.1;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .studio-page-canvas__section-order-guidance {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  line-height: 1.3;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-status="true"] {
+  min-width: 0;
+  color: var(--color-accent-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-state="saving"]
+  [data-gosx-studio-section-order-status="true"] {
+  color: var(--color-accent-strong);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-state="saved"]
+  [data-gosx-studio-section-order-status="true"] {
+  color: var(--color-moss);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-state="error"]
+  [data-gosx-studio-section-order-status="true"] {
+  color: var(--color-danger);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-list="true"] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--space-3xl) + var(--space-xl))), 1fr));
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item] {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: var(--space-chip-y);
+  min-width: 0;
+  align-items: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  padding: var(--space-chip-y);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item]:hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item]:focus-within {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 7%, var(--color-canvas-soft));
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item][aria-selected="true"] {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 24%, transparent);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item][data-gosx-studio-section-order-dragging="true"] {
+  opacity: 0.86;
+  cursor: grabbing;
+  box-shadow: var(--shadow-control);
+  transform: scale(0.99);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item][data-gosx-studio-section-order-locked="true"] {
+  color: var(--color-muted);
+  background: color-mix(in srgb, var(--color-stone) 10%, var(--color-canvas-soft));
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-name="true"] {
+  min-width: 0;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    [data-gosx-studio-section-order-handle="true"],
+    [data-gosx-studio-section-order-move],
+    [data-gosx-studio-section-order-history],
+    [data-gosx-studio-section-order-preview-handle="true"]
+  ) {
+  display: inline-flex;
+  min-width: var(--space-md);
+  min-height: var(--space-md);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-accent-strong);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-spring);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where([data-gosx-studio-section-order-handle="true"], [data-gosx-studio-section-order-preview-handle="true"]) {
+  cursor: grab;
+  touch-action: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    [data-gosx-studio-section-order-handle="true"],
+    [data-gosx-studio-section-order-move],
+    [data-gosx-studio-section-order-history],
+    [data-gosx-studio-section-order-preview-handle="true"]
+  ):hover,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    [data-gosx-studio-section-order-handle="true"],
+    [data-gosx-studio-section-order-move],
+    [data-gosx-studio-section-order-history],
+    [data-gosx-studio-section-order-preview-handle="true"]
+  ):focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-canvas));
+  color: var(--color-ink);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 72%, transparent);
+  outline-offset: 2px;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    [data-gosx-studio-section-order-handle="true"],
+    [data-gosx-studio-section-order-move],
+    [data-gosx-studio-section-order-history],
+    [data-gosx-studio-section-order-preview-handle="true"]
+  ):active {
+  cursor: grabbing;
+  transform: scale(0.96);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  :where(
+    [data-gosx-studio-section-order-handle="true"],
+    [data-gosx-studio-section-order-move],
+    [data-gosx-studio-section-order-history]
+  ):disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  transform: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-controls="true"] {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-chip-y);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item][data-gosx-studio-section-order-drop]::before,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-preview-handle="true"][data-gosx-studio-section-order-drop]::before {
+  position: absolute;
+  z-index: 1;
+  inset-inline: var(--space-chip-y);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--space-sm);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-accent-strong);
+  content: "Drop here";
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item][data-gosx-studio-section-order-drop="before"]::before,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-preview-handle="true"][data-gosx-studio-section-order-drop="before"]::before {
+  content: "Drop before";
+  top: calc(var(--space-xs) * -1);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-item][data-gosx-studio-section-order-drop="after"]::before,
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-preview-handle="true"][data-gosx-studio-section-order-drop="after"]::before {
+  content: "Drop after";
+  bottom: calc(var(--space-xs) * -1);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-overlay="true"] {
+  color: var(--color-accent-strong);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-preview-handle="true"] {
+  box-shadow: var(--shadow-control);
+  opacity: 0.94;
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  [data-gosx-studio-section-order-preview-handle="true"][data-gosx-studio-section-order-dragging="true"] {
+  border-color: var(--color-accent);
+  cursor: grabbing;
+  opacity: 1;
+  transform: scale(0.98);
+}
+
+@media (pointer: coarse) {
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-editor__toolbar
+    :where(button, .button, input, select),
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    [data-content-editor-toolbar]
+    :where(button, .button, input, select),
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(
+      .content-block__drag-handle,
+      .content-block__move,
+      [data-content-drag-handle],
+      [data-content-editor-drag-handle],
+      [data-content-block-handle],
+      [data-content-editor-action],
+      [data-content-editor-move]
+    ),
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(.content-editor__search-clear, [data-content-editor-search-clear]),
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(.media-picker__trigger, .media-picker__clear, [data-media-picker-clear]),
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(
+      [data-media-upload-drop-zone],
+      [data-media-upload-dropzone],
+      [data-media-upload-clear],
+      [data-gosx-studio-section-order-handle="true"],
+      [data-gosx-studio-section-order-move],
+      [data-gosx-studio-section-order-history],
+      [data-gosx-studio-section-order-preview-handle="true"]
+    ) {
+    min-width: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+    min-height: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+  }
+
+  .admin-page .admin-form[data-content-editor-enhanced-submit]
+    > :where(.admin-form__primary-actions, .admin-form__secondary-actions)
+    > .button {
+    min-height: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+  }
+}
+
+@media (max-width: 820px) {
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-block__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-editor__toolbar,
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    [data-content-editor-toolbar],
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-block__header,
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    [data-content-block-toolbar] {
+    align-items: stretch;
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-editor__toolbar
+    :where(button, .button, input, select),
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    [data-content-editor-toolbar]
+    :where(button, .button, input, select) {
+    flex: 1 1 calc(var(--space-3xl) + var(--space-lg));
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-picker__toolbar,
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-picker__preview {
+    align-items: stretch;
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-picker__preview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-picker__toolbar
+    :where(button, .button, input, select) {
+    flex: 1 1 calc(var(--space-3xl) + var(--space-lg));
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    [data-gosx-studio-section-order-list="true"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    [data-gosx-studio-section-order-item] {
+    /* Keep the optional ordering lane compact at phone widths. The controls
+       already receive 44px minimum targets under pointer:coarse; stacking
+       them as full-width rows makes five short section cards consume the
+       viewport before the real preview stage is reachable. */
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    [data-gosx-studio-section-order-item]
+    :where(
+      [data-gosx-studio-section-order-handle="true"],
+      [data-gosx-studio-section-order-move]
+    ) {
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-block,
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(
+      .content-block__drag-handle,
+      .content-block__move,
+      [data-content-drag-handle],
+      [data-content-editor-drag-handle],
+      [data-content-block-handle],
+      [data-content-editor-action],
+      [data-content-editor-move]
+    ),
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .media-picker__asset,
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(
+      .media-picker__drop-zone,
+      .media-picker__dropzone,
+      [data-media-picker-dropzone],
+      [data-media-upload-dropzone],
+      [data-media-upload-drop-zone],
+      [data-studio-media-upload-drop-zone]
+    ),
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    [data-gosx-studio-section-order-item],
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(
+      [data-gosx-studio-section-order-handle="true"],
+      [data-gosx-studio-section-order-move],
+      [data-gosx-studio-section-order-history],
+      [data-gosx-studio-section-order-preview-handle="true"]
+    ) {
+    transition: none;
+    transform: none;
+  }
+
+  /* .admin-page .button carries two class components of specificity in the
+     shared admin base. Repeat that scoped specificity here so the platform
+     guarantee wins over the normal hover transition. */
+  .gosx-studio .button,
+  .gosx-studio-workbench .button,
+  .editor-workbench .button,
+  .admin-page .button {
+    transition: none;
+    transform: none;
+  }
+}
+
 @media (max-width: 820px) {
   .admin-page .panel__header,
   .admin-page .button-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  /* :where() intentionally carries zero specificity. The earlier desktop
+     .admin-page .form-section rule therefore wins unless this mobile
+     override keeps the same concrete selector, leaving SEO's Meta title and
+     Meta image fields cramped into two columns at phone widths. */
+  .admin-page .form-section {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .admin-page :where(.schema-columns, .admin-form, .form-section) {
@@ -2201,6 +4648,122 @@ button.button {
   position: relative;
 }
 
+/* Canonical rendered-page canvas structure. Hosts may restyle these surfaces
+ * with the shared tokens, but mode visibility and safe sizing stay Studio-owned. */
+.studio-page-canvas {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.studio-canvas-shell--page-canvas {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.studio-canvas-shell--page-canvas > .studio-canvas-board:has([data-gosx-studio-page-canvas]) {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.studio-canvas-shell--page-canvas [data-gosx-studio-board-slot] {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+}
+
+.studio-page-canvas__toolbar {
+  position: relative;
+  z-index: 40;
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.studio-page-canvas__routes {
+  display: inline-flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: var(--space-chip-y);
+}
+
+.studio-page-canvas__stage {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  place-items: stretch center;
+  overflow: auto;
+}
+
+.studio-page-canvas__stage > [data-studio-preview-frame] {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 100%;
+  margin-inline: auto;
+  border: 0;
+}
+
+.studio-page-canvas__diagnostic:empty {
+  display: none;
+}
+
+/* The first PageCanvas checkpoint uses the persistent Layers + Inspector rails.
+ * Keep the legacy floating dock out of the rendered page and its toolbar; it
+ * remains available for hosts that still use the legacy preview surface. */
+.studio-page-canvas > [data-gosx-studio-preview-dock] {
+  display: none;
+  pointer-events: none;
+}
+
+.studio-advanced-canvas-board {
+  display: none;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.editor-workbench[data-studio-mode="advanced"] .studio-page-canvas,
+.editor-workbench > [data-studio-workbench][data-studio-mode="advanced"] .studio-page-canvas {
+  display: none;
+}
+
+.editor-workbench[data-studio-mode="advanced"] .studio-advanced-canvas-board,
+.editor-workbench > [data-studio-workbench][data-studio-mode="advanced"] .studio-advanced-canvas-board {
+  display: grid;
+  /* Without an explicit track, a grid container's implicit column defaults
+   * to `auto`, which sizes to its content's min-content width rather than
+   * the available space -- the classic CSS grid "blowout": a child panel
+   * (e.g. Pajaritos's own .studio-site-map-engine, whose
+   * .studio-site-map-engine__viewport uses
+   * `grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr))`) never
+   * shrinks its cards below their combined 18rem minimums, so this
+   * container happily grows past a narrow (e.g. mobile) viewport instead of
+   * clamping to it. minmax(0, 1fr) forces the track to respect the
+   * container's own available width, letting the child's own overflow/grid
+   * rules take over from there. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-xs);
+}
+
+.editor-workbench:not([data-studio-mode="advanced"]) .studio-advanced-canvas-board,
+.editor-workbench > [data-studio-workbench]:not([data-studio-mode="advanced"]) .studio-advanced-canvas-board {
+  display: none;
+}
+
+html[data-gosx-studio-preview-selectable] [data-gosx-studio-preview-tab-stop]:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
 [data-gosx-studio-preview-dock] {
   position: absolute;
   z-index: 30;
@@ -2301,4 +4864,746 @@ button.button {
   .studio-page-list
   a[data-studio-site-group]:not([data-studio-site-group="tools"]) {
   display: none;
+}
+/* Authenticated Studio collaboration */
+.studio-collaboration-panel { min-width: 0; max-width: 100%; overflow: hidden; display: grid; gap: .75rem; }
+.studio-collaboration-panel__head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.studio-collaboration-panel__head output { font-size: .75rem; color: var(--color-text-muted, #64748b); }
+.studio-collaboration-facepile { display: flex; flex-wrap: wrap; gap: .35rem; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.studio-collaboration-avatar { width: 2rem; height: 2rem; border-radius: 999px; display: inline-grid; place-items: center; background: var(--color-accent, #6d5efc); color: #fff; font-size: .7rem; font-weight: 700; }
+.studio-collaboration-conflict { margin: 0; padding: .55rem .65rem; border-radius: .5rem; color: var(--color-danger-text, #991b1b); background: var(--color-danger-soft, #fee2e2); overflow-wrap: anywhere; }
+.studio-collaboration-conflict[hidden] { display: none; }
+.studio-collaboration-panel[data-studio-collab-state="connected"] [data-studio-collab-reconnect] { display: none; }
+.studio-remote-cursor { position: fixed; z-index: 10000; width: .7rem; height: .7rem; pointer-events: none; border: 2px solid #fff; border-radius: 999px; background: var(--color-accent, #6d5efc); transform: translate(-50%, -50%); box-shadow: 0 1px 4px rgba(15, 23, 42, .35); transition: left 45ms linear, top 45ms linear; }
+.studio-remote-selection { outline: 2px solid var(--color-accent, #6d5efc) !important; outline-offset: 2px; }
+.studio-collaboration-panel [data-studio-collab-reconnect]:focus-visible { outline: 2px solid var(--color-accent, #6d5efc); outline-offset: 2px; }
+.studio-visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+
+/* handoff-4 (punch #7 -- presence to top chrome): the toolbar's compact
+   collaborators summary (shell.RenderWorkbenchCollaborationSummary) — a
+   small overlapping-avatar facepile + count, styled to sit inline among
+   the toolbar's other action controls (Save status, Undo/Redo, Preview). */
+.gosx-studio-collab-summary { display: inline-flex; align-items: center; gap: .35rem; border: 1px solid var(--color-line); border-radius: var(--radius-pill); background: var(--color-canvas); padding: .2rem .5rem .2rem .35rem; cursor: pointer; color: var(--color-ink); }
+.gosx-studio-collab-summary:hover, .gosx-studio-collab-summary:focus-visible { border-color: var(--color-accent); outline: 0; }
+.gosx-studio-collab-summary[aria-expanded="true"] { border-color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 8%, var(--color-canvas)); }
+.gosx-studio-collab-summary__facepile { display: flex; margin: 0; padding: 0; list-style: none; }
+.gosx-studio-collab-summary__facepile li { margin-left: -.5rem; }
+.gosx-studio-collab-summary__facepile li:first-child { margin-left: 0; }
+.gosx-studio-collab-summary__facepile .studio-collaboration-avatar { width: 1.5rem; height: 1.5rem; font-size: .6rem; border: 2px solid var(--color-canvas); }
+.gosx-studio-collab-summary__count { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-muted); }
+.gosx-studio-collab-summary[data-studio-collab-state="connected"] { border-color: color-mix(in srgb, var(--color-moss) 46%, var(--color-line)); }
+.gosx-studio-collab-summary[data-studio-collab-state="reconnecting"], .gosx-studio-collab-summary[data-studio-collab-state="offline"] { color: var(--color-muted); }
+@media (prefers-reduced-motion: reduce) { .studio-remote-cursor { transition: none; } }
+
+/* handoff-4 (item 5 -- left rail section-collapse): the small "Hide"/"Show"
+   toggle collapseLeftRailGroups() (hostruntime/assets/workbench_runtime.js)
+   inserts into each [data-studio-rail-group]'s own heading row (Site
+   areas / Sections / Layers). */
+.studio-rail-group-toggle { justify-self: end; border: 1px solid var(--color-line); border-radius: var(--radius-pill); background: var(--color-canvas); color: var(--color-muted); cursor: pointer; padding: .15rem .55rem; font-family: var(--font-mono); font-size: var(--text-xs); text-transform: uppercase; }
+.studio-rail-group-toggle:hover, .studio-rail-group-toggle:focus-visible { border-color: var(--color-accent); color: var(--color-accent-strong); outline: 0; }
+
+/* ---------------------------------------------------------------------- *
+ * UX wave 2A (studio-surface quick wins)
+ * ---------------------------------------------------------------------- */
+
+/* #1 — responsive layout inspector had zero CSS: it rendered as a raw stack
+   of native <select>/<button> block elements with no width constraint,
+   producing thousands of px of unstyled dead space below the canvas.
+   Matches the existing rail-card conventions (border/radius/background from
+   .studio-home-inspector__target etc.) and compacts each property control
+   into a couple of wrapped flex rows instead of 5-6 stacked block rows. */
+[data-studio-responsive-layout-inspector] {
+  display: grid;
+  gap: var(--space-xs);
+  width: 100%;
+  max-width: 56rem;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-canvas-soft) 78%, transparent);
+}
+
+[data-studio-responsive-layout-inspector] > header {
+  display: grid;
+  gap: 0.25rem;
+}
+
+[data-studio-responsive-layout-inspector] > header h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+
+[data-studio-responsive-layout-inspector] > header p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+[data-studio-responsive-layout-inspector] details {
+  border: 1px solid color-mix(in srgb, var(--color-line) 78%, transparent);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-canvas) 60%, transparent);
+  overflow: hidden;
+}
+
+[data-studio-responsive-layout-inspector] summary {
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+}
+
+[data-studio-responsive-layout-inspector] details > form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.5rem;
+  row-gap: 0.15rem;
+  padding: 0.3rem 0.75rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-line) 60%, transparent);
+  line-height: 1.2;
+}
+
+[data-studio-responsive-layout-inspector] details > form label {
+  flex: 0 1 auto;
+  min-width: 5.5rem;
+  font-size: var(--text-xs);
+  color: var(--color-ink-soft);
+  white-space: nowrap;
+}
+
+[data-studio-responsive-layout-inspector] details > form select {
+  flex: 0 0 auto;
+  min-width: 6rem;
+  min-height: 1.5rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  padding: 0.05rem 0.3rem;
+  font-size: var(--text-xs);
+}
+
+[data-studio-responsive-layout-inspector] details > form output {
+  flex: 0 1 auto;
+  min-width: 6rem;
+  font-size: 0.7rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+[data-studio-responsive-layout-inspector] details > form button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.35rem;
+  padding: 0 0.45rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink-soft);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+[data-studio-responsive-layout-inspector] details > form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+[data-studio-responsive-layout-inspector] [data-studio-layout-history] {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 0.3rem;
+}
+
+/* Wave 3A (inspector-presentation, fix (c)): the "Responsive layout" heading
+   plus a one-line summary stay visible outside the (now closed-by-default)
+   details disclosure, so a collapsed panel still reads as "home:hero · 1
+   override" rather than an empty card. */
+.studio-responsive-layout__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-xs);
+}
+
+.studio-responsive-layout__summary {
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Wave 3A (inspector-presentation, fix (a)): the interactions inspector used
+   to render one full "Interactions" header + every allow-listed kind's
+   Effect/Duration/Delay selects, always fully expanded, per canvas target —
+   a host composing 15 targets (editorInteractionsPanels in
+   muddy-noni-commerce) produced ~160 always-visible bare selects with zero
+   card styling. Each target is now a bordered, compact card
+   (studio-interactions-target) with a one-line summary and a
+   closed-by-default disclosure for the actual edit controls, and
+   RenderInteractionsInspector lists them in a responsive multi-column grid
+   so the wasted cream void beside a single narrow column of cards (fix (d))
+   gets used instead of left empty. */
+.studio-interactions-target {
+  display: grid;
+  gap: 0.4rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-canvas-soft) 78%, transparent);
+  padding: var(--space-xs);
+  min-width: 0;
+}
+
+.studio-interactions-target__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.15rem;
+}
+
+.studio-interactions-target__head strong {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+}
+
+.studio-interactions-target__head span {
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-interactions-target__editor {
+  border: 1px solid color-mix(in srgb, var(--color-line) 78%, transparent);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-canvas) 60%, transparent);
+  overflow: hidden;
+}
+
+.studio-interactions-target__editor > summary {
+  cursor: pointer;
+  padding: 0.4rem 0.6rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+}
+
+.studio-interactions-target__editor [data-studio-interaction-card] {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.4rem 0.6rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-line) 60%, transparent);
+}
+
+.studio-interactions-target__editor [data-studio-interaction-card] header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.studio-interactions-target__editor label {
+  font-size: var(--text-xs);
+  color: var(--color-ink-soft);
+}
+
+.studio-interactions-target__editor select,
+.studio-interactions-target__editor input[type="checkbox"] {
+  min-height: 1.9rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  padding: 0.1rem 0.35rem;
+  font-size: var(--text-xs);
+}
+
+.studio-interactions-target__editor button {
+  min-height: 1.8rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink-soft);
+  padding: 0 0.6rem;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.studio-interactions-target__editor [data-studio-interaction-reduced-motion-note] {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
+/* Fix (d) — reclaim the empty right half: with compact cards in hand, flow
+   them into as many columns as fit instead of one narrow column with a wide
+   unused margin beside it. */
+.studio-interactions__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: var(--space-xs);
+  align-items: start;
+}
+
+.studio-interactions__add {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  padding: var(--space-xs);
+}
+
+.studio-interactions__add > summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+}
+
+.studio-interactions__add .studio-interactions-target {
+  margin-top: var(--space-xs);
+}
+
+/* Fix (d) — the direct-edit/interactions/responsive-layout "support node"
+   panels (shell/backend_editor_page.go's backendEditorSupportNodes) render
+   as siblings of the three-zone workbench grid, not inside
+   .editor-sidebar's ~24rem column, so they previously spanned the page's
+   full content width with a single narrow column of controls and a wide
+   cream void beside it. Give the mode-gated wrapper the same bordered-card
+   treatment .editor-panel already has (it inherits the class) plus a frame
+   width cap so it doesn't outgrow the three-zone stage above it.
+
+   Wave 3B (tamarind, fix #1 — width system): `width: 100%` is the actual
+   fix here. Without it, each wrapper's real rendered width came from its own
+   content's intrinsic (max-content) sizing inside .admin-page.editor-page's
+   implicit single-column grid — a plain div, as a stretch-default grid item,
+   should fill that column, but because each wrapper's own children establish
+   their own layout context (a nested `display:grid` per instance below),
+   Chromium sized the wrapper to its content instead of the shared column,
+   producing three unrelated widths on a live seed (483px direct-edit,
+   ~1213px Interactions, full-bleed elsewhere). `width: 100%` makes the
+   wrapper unconditionally fill its column up to --size-studio-support-panel,
+   so every mode-gated support panel (direct-edit stack, Responsive layout,
+   Interactions, the LOOK-gated style/theme panel, flow field editor, shared
+   components) now shares one column width instead of three accidental ones. */
+[data-studio-mode-gate-wrapper="true"] {
+  width: 100%;
+  max-width: var(--size-studio-support-panel, 62.5rem);
+  margin-inline: auto;
+}
+.theme-swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.theme-swatch {
+  display: inline-block;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-canvas) 60%, transparent) inset;
+}
+
+/* #1 — harden the HOME inspector's caller-supplied field-list wrapper so it
+   stays styled even when the host omits the "class" view key (the SSR
+   contract keeps class="" a valid empty-input state — see
+   TestRenderHomeInspectorPanelMinimalKeepsRootAndFields — so we key off the
+   stable data attribute instead of relying on the class string). */
+[data-studio-home-fields-panel] {
+  display: grid;
+  gap: 0.55rem;
+}
+
+/* #5/#12/#13 — one save indicator: the primary Save button is a real <form>
+   submit control (works with no JS), but once gosxstudio:state_runtime.js
+   binds it flips data-gosx-studio-save-button-state on every state change
+   (see hostruntime/assets/state_runtime.js setState()). Hide it once that
+   runtime confirms nothing is dirty so the top bar never shows a static
+   "Saved" indicator sitting next to an always-on "Save changes" button. */
+[data-gosx-studio-save-button][data-gosx-studio-save-button-state="saved"] {
+  display: none;
+}
+
+/* #15 — LOOK scope-card values ("SYSTEM muddy-no…", "DEFAU…") clipped with no
+   min-width/overflow handling. Give each cell room to breathe and truncate
+   politely instead of hard-wrapping/clipping mid-word; the title attribute
+   (see panels/look_panel.go renderLookScopeField) carries the full value. */
+.studio-style-scope__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: var(--space-xs);
+}
+
+.studio-style-scope__grid > span {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.studio-style-scope__grid output {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* #16 — "SHOW IN NAVIGATIONPOSITION": the visibility toggle and the position
+   number field ran together on one line with no separating structure. */
+.studio-navigation-panel__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  margin-top: 0.35rem;
+}
+
+.studio-navigation-panel__toggle,
+.studio-navigation-panel__order {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--text-xs);
+  color: var(--color-ink-soft);
+}
+
+.studio-navigation-panel__order input {
+  width: 4rem;
+}
+
+/* #1 — the brand color-palette/font editor (panels/style_panel.go
+   RenderStylePanel) is the "raw brand color token rows" the review called
+   out: one completely unstyled <div> per token (label + native color swatch
+   + hex mirror + Reset), each falling back to full block-level stacking. */
+[data-gosx-studio-style-panel] {
+  display: grid;
+  gap: 0.4rem;
+  /* Wave 3B (tamarind, fix #1 — width system): matches the direct-edit
+     panel's own width fix above — fill the (now consistently sized,
+     LOOK-gated, see shell/backend_editor_page.go) wrapper instead of capping
+     narrower than it. */
+  width: 100%;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-canvas-soft) 78%, transparent);
+}
+
+[data-gosx-studio-style-panel] form {
+  display: grid;
+  gap: 0.3rem;
+}
+
+[data-gosx-studio-style-color-row],
+[data-gosx-studio-style-font-row] {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+[data-gosx-studio-style-color-row] label,
+[data-gosx-studio-style-font-row] label {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  font-size: var(--text-xs);
+}
+
+[data-gosx-studio-style-color-row] label span,
+[data-gosx-studio-style-font-row] label span {
+  flex: 0 0 6.5rem;
+  color: var(--color-ink-soft);
+}
+
+[data-gosx-studio-style-color-row] input[type="color"] {
+  flex: 0 0 auto;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  background: none;
+}
+
+[data-gosx-studio-style-color-row] input[type="text"],
+[data-gosx-studio-style-font-row] input[type="text"],
+[data-gosx-studio-style-font-row] input[type="url"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  padding: 0.2rem 0.4rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+[data-gosx-studio-style-color-row] button,
+[data-gosx-studio-style-panel] > button {
+  flex: 0 0 auto;
+  min-height: 1.5rem;
+  padding: 0 0.55rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink-soft);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+[data-gosx-studio-style-fonts] {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.2rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-line);
+}
+
+/* #1 — the direct-edit fallback form (panels/direct_edit_panel.go) has no
+   class/host-stable data attribute on its own <form> root (its id is
+   caller-supplied and may repeat across selected targets), so key off the
+   one child every instance carries. Was raw block-stacked
+   label/textarea/readout/Save/Cancel/Undo/Redo — several of these render at
+   once (one per selected canvas target), compounding the HOME dead space.
+
+   Wave 3B (tamarind, fix #1 — width system): a fixed 40rem (640px) cap
+   inside a wrapper now consistently sized to --size-studio-support-panel
+   (62.5rem/1000px, see [data-studio-mode-gate-wrapper]) left a lopsided
+   ~360px cream gutter beside every direct-edit form — the exact "direct-edit
+   marooned, centered in cream" defect the re-score named. `width: 100%`
+   fills the wrapper's own column instead, matching every other support
+   panel (Responsive layout, Interactions, the style/theme panel) at the
+   same width. */
+form:has(> [data-studio-direct-edit-field]) {
+  display: grid;
+  gap: 0.4rem;
+  width: 100%;
+  margin-bottom: var(--space-xs);
+  padding: var(--space-sm);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-canvas-soft) 78%, transparent);
+}
+
+[data-studio-direct-edit-field] {
+  display: grid;
+  gap: 0.25rem;
+}
+
+[data-studio-direct-edit-field] span {
+  color: var(--color-ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+[data-studio-direct-edit-field] textarea {
+  min-height: 3.2rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-soft);
+  padding: 0.5rem 0.6rem;
+  font: inherit;
+  resize: vertical;
+}
+
+[data-studio-style-readout] {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
+form:has(> [data-studio-direct-edit-field]) > button {
+  display: inline-flex;
+  min-height: 1.6rem;
+  margin-right: 0.35rem;
+  justify-self: start;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  padding: 0 0.6rem;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+[data-studio-durable-history] {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
+/* No-code interactions (reveal-on-scroll, hover-focus-state). These rules
+   render on the published/preview page, driven only by the fixed
+   data-gosx-interaction* attribute contract core.Interaction.RenderAttrs
+   produces (interactionruntime toggles data-gosx-interaction-revealed for
+   reveal-on-scroll; hover-focus-state needs no script at all). Every rule
+   below animates opacity/transform only — never display or visibility — so a
+   focusable descendant is never removed from the tab order by an
+   interaction state, and prefers-reduced-motion always collapses every
+   interaction to "content is immediately visible, no animation plays". */
+[data-gosx-interaction="reveal-on-scroll"] {
+  opacity: 0;
+  transform: translateY(0);
+  transition: opacity var(--gosx-interaction-duration, 250ms) ease, transform var(--gosx-interaction-duration, 250ms) ease;
+  transition-delay: var(--gosx-interaction-delay, 0ms);
+}
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-effect="fade-up"] { transform: translateY(1rem); }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-effect="fade-left"] { transform: translateX(1rem); }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-effect="fade-right"] { transform: translateX(-1rem); }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-duration-ms="150"] { --gosx-interaction-duration: 150ms; }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-duration-ms="400"] { --gosx-interaction-duration: 400ms; }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-duration-ms="600"] { --gosx-interaction-duration: 600ms; }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-delay-ms="100"] { --gosx-interaction-delay: 100ms; }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-delay-ms="200"] { --gosx-interaction-delay: 200ms; }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-delay-ms="300"] { --gosx-interaction-delay: 300ms; }
+[data-gosx-interaction="reveal-on-scroll"][data-gosx-interaction-revealed="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* hover-focus-state is pure CSS: :hover and :focus-visible always share one
+   rule per effect, so a keyboard user reaches the exact same treatment a
+   mouse user does — no interaction state may exist for :hover alone. */
+[data-gosx-interaction="hover-focus-state"] {
+  transition: transform var(--gosx-interaction-duration, 250ms) ease, box-shadow var(--gosx-interaction-duration, 250ms) ease, text-decoration-color var(--gosx-interaction-duration, 250ms) ease, filter var(--gosx-interaction-duration, 250ms) ease;
+}
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-duration-ms="150"] { --gosx-interaction-duration: 150ms; }
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-duration-ms="400"] { --gosx-interaction-duration: 400ms; }
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-duration-ms="600"] { --gosx-interaction-duration: 600ms; }
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="lift"]:hover,
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="lift"]:focus-visible {
+  transform: translateY(-0.25rem);
+}
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="glow"]:hover,
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="glow"]:focus-visible {
+  box-shadow: 0 0 0 4px var(--gosx-studio-accent-soft, rgba(109, 94, 252, 0.35));
+}
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="underline"]:hover,
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="underline"]:focus-visible {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.2em;
+}
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="scale"]:hover,
+[data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="scale"]:focus-visible {
+  transform: scale(1.03);
+}
+[data-gosx-interaction="hover-focus-state"]:focus-visible {
+  outline: 2px solid var(--gosx-studio-accent, Highlight);
+  outline-offset: 2px;
+}
+
+/* Platform guarantee, not an authored choice: under prefers-reduced-motion,
+   every interaction collapses to "immediately visible/reachable, no
+   animation plays", regardless of Kind/Effect/duration/delay. */
+@media (prefers-reduced-motion: reduce) {
+  [data-gosx-interaction="reveal-on-scroll"] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  [data-gosx-interaction="hover-focus-state"] {
+    transition: none;
+  }
+  [data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="lift"]:hover,
+  [data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="lift"]:focus-visible,
+  [data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="scale"]:hover,
+  [data-gosx-interaction="hover-focus-state"][data-gosx-interaction-effect="scale"]:focus-visible {
+    transform: none;
+  }
+}
+
+/* Enterprise editor quality guards. These platform overrides keep the
+   existing Paper&Ink surfaces legible in forced-colors mode and ensure
+   reduced-motion users never receive movement or transition-only feedback.
+   The selectors are scoped to Studio/admin surfaces so storefront content is
+   unaffected. */
+@media (forced-colors: active) {
+  :is(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :is(
+      .button,
+      button,
+      input,
+      select,
+      textarea,
+      .content-block,
+      .media-picker__asset,
+      .media-picker__panel,
+      .media-picker__drop-zone,
+      .media-picker__dropzone,
+      [data-media-upload-drop-zone],
+      [data-media-upload-dropzone],
+      .media-list-editor__item,
+      .media-list-editor__raw-toggle,
+      .content-editor__empty,
+      [data-content-editor-empty]
+    ) {
+    forced-color-adjust: auto;
+    border-color: ButtonText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  :is(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :is(
+      button,
+      .button,
+      input,
+      select,
+      textarea,
+      [data-content-drag-handle],
+      [data-content-editor-action],
+      .media-picker__asset,
+      .media-list-editor__raw-toggle
+    ):focus-visible {
+    forced-color-adjust: auto;
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  :is(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :is(
+      .content-block:is(.is-selected, [aria-selected="true"], [data-content-editor-selected="true"]),
+      .media-picker__asset[aria-current="true"],
+      .media-picker__asset[aria-selected="true"],
+      .media-picker__asset[data-media-asset-selected="true"],
+      [data-content-editor-drop-before],
+      [data-content-editor-drop-after]
+    ) {
+    forced-color-adjust: auto;
+    border-color: Highlight;
+    background: Canvas;
+    color: CanvasText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    :where(
+      .button,
+      button,
+      .content-block,
+      .media-picker__asset,
+      .media-picker__drop-zone,
+      .media-picker__dropzone,
+      [data-media-upload-drop-zone],
+      [data-media-upload-dropzone],
+      .media-list-editor__item,
+      .media-list-editor__item-actions button,
+      .media-list-editor__raw-toggle
+    ) {
+    transition: none;
+    transform: none;
+  }
 }

@@ -149,3 +149,150 @@ func TestNormalizePublishReviewDefaults(t *testing.T) {
 		t.Fatalf("unexpected schedule defaults: %#v", review.Schedule)
 	}
 }
+
+// TestPublishChangeSetViewNotSupplied covers the "host hasn't wired
+// Engine.PendingDiff yet" case: Supplied=false must produce ONLY
+// hasChangeSet=false so panels.RenderPublishPanel omits the section rather
+// than rendering a fake/empty one.
+func TestPublishChangeSetViewNotSupplied(t *testing.T) {
+	view := PublishChangeSetView(PublishChangeSet{}, nil)
+	if len(view) != 1 || view["hasChangeSet"] != false {
+		t.Fatalf("expected only hasChangeSet=false for an unsupplied change-set, got %#v", view)
+	}
+}
+
+// TestPublishChangeSetViewEmptySupplied covers the honest "nothing to
+// publish" state: the host DID ask (Supplied=true) and the answer was zero
+// changes, which is different from "did not ask" and must render.
+func TestPublishChangeSetViewEmptySupplied(t *testing.T) {
+	view := PublishChangeSetView(PublishChangeSet{Supplied: true}, nil)
+	if view["hasChangeSet"] != true || view["hasChanges"] != false || view["changeCount"] != 0 {
+		t.Fatalf("unexpected empty-supplied view: %#v", view)
+	}
+	if view["changeSummaryLabel"] != "Nothing to publish — the site matches your draft." {
+		t.Fatalf("unexpected empty-state summary: %#v", view["changeSummaryLabel"])
+	}
+	groups, ok := view["changeGroups"].([]map[string]any)
+	if !ok || len(groups) != 0 {
+		t.Fatalf("expected zero groups for an empty change-set, got %#v", view["changeGroups"])
+	}
+}
+
+// TestPublishChangeSetViewGroupsByScopeInCanonicalOrder proves the grouped
+// section reads Content, Design, Layout, Components, Media, Interactions,
+// Flows in that fixed order regardless of the input slice's order, skips any
+// scope with zero changes, and buckets an unrecognized scope into a trailing
+// "Other" group instead of dropping it.
+func TestPublishChangeSetViewGroupsByScopeInCanonicalOrder(t *testing.T) {
+	when := time.Date(2026, 7, 10, 15, 4, 0, 0, time.UTC)
+	view := PublishChangeSetView(PublishChangeSet{
+		Supplied: true,
+		Changes: []PublishChange{
+			{Scope: PublishChangeScopeFlows, Label: "flows.checkout.route", Before: "/old", BeforeSet: true, After: "/new", AfterSet: true, ActorLabel: "Jane Doe", When: when},
+			{Scope: PublishChangeScopeContent, Label: "site.title", Before: "Old title", BeforeSet: true, After: "New title", AfterSet: true, ActorLabel: "Jane Doe", When: when},
+			{Scope: PublishChangeScope("weird"), Label: "unrecognized.field", After: "value", AfterSet: true},
+		},
+	}, nil)
+	if view["hasChangeSet"] != true || view["hasChanges"] != true || view["changeCount"] != 3 {
+		t.Fatalf("unexpected populated view: %#v", view)
+	}
+	groups, ok := view["changeGroups"].([]map[string]any)
+	if !ok || len(groups) != 3 {
+		t.Fatalf("expected 3 groups (content, flows, other), got %#v", view["changeGroups"])
+	}
+	if groups[0]["scopeKey"] != "content" || groups[0]["scopeLabel"] != "Content" || groups[0]["count"] != 1 {
+		t.Fatalf("expected Content group first (canonical order before Flows), got %#v", groups[0])
+	}
+	if groups[1]["scopeKey"] != "flows" || groups[1]["scopeLabel"] != "Flows" {
+		t.Fatalf("expected Flows group second, got %#v", groups[1])
+	}
+	if groups[2]["scopeKey"] != "other" || groups[2]["scopeLabel"] != "Other" {
+		t.Fatalf("expected an unrecognized scope to land in a trailing Other group, not be dropped, got %#v", groups[2])
+	}
+}
+
+// TestPublishChangeRowViewHonorsBeforeAfterSetHonesty proves a row never
+// fabricates a before/after value when the underlying engine.DraftChange
+// left BeforeSet/AfterSet false (a field with no prior value, or one this
+// edit cleared) -- mirroring engine.OperationChangeSet's own documented
+// honesty discipline -- and that kind classification (added/removed/changed)
+// follows BeforeSet/AfterSet, with actor/when rendered only when supplied.
+func TestPublishChangeRowViewHonorsBeforeAfterSetHonesty(t *testing.T) {
+	when := time.Date(2026, 7, 10, 15, 4, 0, 0, time.UTC)
+	view := PublishChangeSetView(PublishChangeSet{
+		Supplied: true,
+		Changes: []PublishChange{
+			// changed: both sides set.
+			{Scope: PublishChangeScopeStyle, Label: "hero heading color", Before: "#111", BeforeSet: true, After: "#fff", AfterSet: true, ActorLabel: "Jane Doe", When: when},
+			// added: no prior value.
+			{Scope: PublishChangeScopeStyle, Label: "hero heading shadow", After: "0 1px 2px #000", AfterSet: true},
+			// removed/cleared: no next value -- Before must NOT be faked as "" masquerading as a real empty string; After must be absent, not "".
+			{Scope: PublishChangeScopeStyle, Label: "hero heading outline", Before: "1px solid red", BeforeSet: true},
+			// no actor/when supplied at all.
+		},
+	}, time.UTC)
+	groups := view["changeGroups"].([]map[string]any)
+	if len(groups) != 1 || groups[0]["scopeKey"] != "style" || groups[0]["scopeLabel"] != "Design" {
+		t.Fatalf("expected one Design group, got %#v", groups)
+	}
+	rows := groups[0]["changes"].([]map[string]any)
+	if len(rows) != 3 {
+		t.Fatalf("expected 3 rows, got %d: %#v", len(rows), rows)
+	}
+
+	changed := rows[0]
+	if changed["kind"] != "changed" || changed["kindLabel"] != "Changed" {
+		t.Fatalf("expected a both-sides-set row to classify as changed, got %#v", changed)
+	}
+	if changed["hasBefore"] != true || changed["before"] != "#111" || changed["hasAfter"] != true || changed["after"] != "#fff" {
+		t.Fatalf("unexpected before/after on changed row: %#v", changed)
+	}
+	if changed["hasActor"] != true || changed["actorLabel"] != "Jane Doe" {
+		t.Fatalf("expected actor attribution on changed row: %#v", changed)
+	}
+	if changed["hasWhen"] != true || changed["whenLabel"] != "Jul 10, 2026 3:04 PM" || changed["whenMachine"] != "2026-07-10T15:04:00Z" {
+		t.Fatalf("unexpected when formatting on changed row: %#v", changed)
+	}
+
+	added := rows[1]
+	if added["kind"] != "added" || added["kindLabel"] != "Added" {
+		t.Fatalf("expected a no-prior-value row to classify as added, got %#v", added)
+	}
+	if added["hasBefore"] != false || added["before"] != "" {
+		t.Fatalf("expected an added row to have no fabricated before value, got %#v", added)
+	}
+	if added["hasActor"] != false || added["actorLabel"] != "" {
+		t.Fatalf("expected no fabricated actor label when none was supplied, got %#v", added)
+	}
+	if added["hasWhen"] != false || added["whenLabel"] != "" || added["whenMachine"] != "" {
+		t.Fatalf("expected no fabricated when value when none was supplied, got %#v", added)
+	}
+
+	removed := rows[2]
+	if removed["kind"] != "removed" || removed["kindLabel"] != "Removed" {
+		t.Fatalf("expected a no-next-value row to classify as removed, got %#v", removed)
+	}
+	if removed["hasAfter"] != false || removed["after"] != "" {
+		t.Fatalf("expected a removed row to have no fabricated after value, got %#v", removed)
+	}
+	if removed["hasBefore"] != true || removed["before"] != "1px solid red" {
+		t.Fatalf("expected the removed row to keep its real before value, got %#v", removed)
+	}
+}
+
+// TestPublishChangeSetViewDropsBlankLabelChanges mirrors
+// normalizePublishChecks/normalizePublishImpacts' existing discipline: a
+// change with no label is a degenerate/incomplete entry and is silently
+// dropped rather than rendered as a blank row.
+func TestPublishChangeSetViewDropsBlankLabelChanges(t *testing.T) {
+	view := PublishChangeSetView(PublishChangeSet{
+		Supplied: true,
+		Changes: []PublishChange{
+			{Scope: PublishChangeScopeContent, Label: "  ", After: "x", AfterSet: true},
+			{Scope: PublishChangeScopeContent, Label: "site.title", After: "New title", AfterSet: true},
+		},
+	}, nil)
+	if view["changeCount"] != 1 {
+		t.Fatalf("expected the blank-label change to be dropped, got changeCount=%v", view["changeCount"])
+	}
+}

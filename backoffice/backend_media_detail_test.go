@@ -14,6 +14,7 @@ func TestRenderBackendMediaDetailPagePreservesFormContract(t *testing.T) {
 		SaveAction:    "/admin/media/media_1/__actions/save",
 		ArchiveAction: "/admin/media/media_1/__actions/archive",
 		RestoreAction: "/admin/media/media_1/__actions/restore",
+		DeleteAction:  "/admin/media/media_1/__actions/delete",
 		ReplaceAction: "/admin/media/replace",
 		CSRFToken:     "csrf-token",
 		SaveStatus: BackendMediaDetailActionStatus{
@@ -43,6 +44,7 @@ func TestRenderBackendMediaDetailPagePreservesFormContract(t *testing.T) {
 			IsImage:       true,
 			CanArchive:    true,
 			CanRestore:    true,
+			CanDelete:     true,
 			Variants: []BackendMediaDetailVariant{{
 				URL:        "/media/cup-thumb.jpg",
 				Name:       "thumb",
@@ -83,6 +85,7 @@ func TestRenderBackendMediaDetailPagePreservesFormContract(t *testing.T) {
 		`<button class="button button--primary" type="submit">Save media</button>`,
 		`<button class="button button--secondary" type="submit" formaction="/admin/media/media_1/__actions/archive" data-admin-confirm="Archive this media asset? Existing content may still reference this URL.">Archive</button>`,
 		`<button class="button button--secondary" type="submit" formaction="/admin/media/media_1/__actions/restore" data-admin-confirm="Restore this media asset?">Restore</button>`,
+		`<button class="button button--danger" type="submit" formaction="/admin/media/media_1/__actions/delete" data-gosx-studio-media-delete="true" data-admin-confirm="Permanently delete this media asset? This cannot be undone.">Delete permanently</button>`,
 		`<a class="button button--secondary" href="/admin/media" data-gosx-link="true">Back to media</a>`,
 		`<section class="panel"><div class="panel__header"><h2>Replace file</h2></div><form class="admin-form admin-form--single" method="post" action="/admin/media/replace" enctype="multipart/form-data" data-admin-confirm="Replace this media file? Existing references will use the new file.">`,
 		`<input id="replaceFile" name="file" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/x-icon,.ico,.woff,.woff2,.ttf,.otf" />`,
@@ -105,6 +108,7 @@ func TestRenderBackendMediaDetailPagePreservesFormContract(t *testing.T) {
 		`<button class="button button--primary" type="submit">Save media</button>`,
 		`formaction="/admin/media/media_1/__actions/archive"`,
 		`formaction="/admin/media/media_1/__actions/restore"`,
+		`formaction="/admin/media/media_1/__actions/delete"`,
 		`<a class="button button--secondary" href="/admin/media"`,
 		`<section class="panel"><div class="panel__header"><h2>Replace file</h2></div>`,
 	)
@@ -136,6 +140,7 @@ func TestRenderBackendMediaDetailPageDefaultsAreEmptySafe(t *testing.T) {
 		`<label>Used by</label>`,
 		`formaction=""`,
 		`form-status`,
+		`Delete permanently`,
 	} {
 		if strings.Contains(html, notWant) {
 			t.Fatalf("empty media detail renderer should not contain %q:\n%s", notWant, html)

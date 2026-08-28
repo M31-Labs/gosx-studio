@@ -72,6 +72,12 @@ type BackendEditorWorkbenchPanelStackProps = shellpkg.BackendEditorWorkbenchPane
 // Deprecated: use shell.BackendEditorPublishPanelStackProps.
 type BackendEditorPublishPanelStackProps = shellpkg.BackendEditorPublishPanelStackProps
 
+// Deprecated: use shell.WorkbenchPageCanvasRoute.
+type WorkbenchPageCanvasRoute = shellpkg.WorkbenchPageCanvasRoute
+
+// Deprecated: use shell.WorkbenchPageCanvasOptions.
+type WorkbenchPageCanvasOptions = shellpkg.WorkbenchPageCanvasOptions
+
 // Deprecated: use shell.RenderBackendEditorWorkbench.
 func RenderBackendEditorWorkbench(props BackendEditorWorkbenchProps) gosx.Node {
 	return shellpkg.RenderBackendEditorWorkbench(props)
@@ -115,6 +121,11 @@ func RenderBackendEditorWorkbenchContent(props BackendEditorWorkbenchContentProp
 // Deprecated: use shell.RenderBackendEditorWorkbenchPanelStack.
 func RenderBackendEditorWorkbenchPanelStack(props BackendEditorWorkbenchPanelStackProps) gosx.Node {
 	return shellpkg.RenderBackendEditorWorkbenchPanelStack(props)
+}
+
+// Deprecated: use shell.RenderWorkbenchPageCanvas.
+func RenderWorkbenchPageCanvas(options WorkbenchPageCanvasOptions) gosx.Node {
+	return shellpkg.RenderWorkbenchPageCanvas(options)
 }
 
 // Deprecated: use shell.RenderBackendEditorPublishPanelStack.
@@ -491,6 +502,9 @@ type WorkbenchCanvasStatusOptions = shellpkg.WorkbenchCanvasStatusOptions
 // Deprecated: use shell.WorkbenchCommandPaletteOptions.
 type WorkbenchCommandPaletteOptions = shellpkg.WorkbenchCommandPaletteOptions
 
+// Deprecated: use shell.WorkbenchCollaborationSummaryOptions.
+type WorkbenchCollaborationSummaryOptions = shellpkg.WorkbenchCollaborationSummaryOptions
+
 // Deprecated: use shell.RenderWorkbenchToolbar.
 func RenderWorkbenchToolbar(view map[string]any, options WorkbenchToolbarOptions) gosx.Node {
 	return shellpkg.RenderWorkbenchToolbar(view, options)
@@ -544,4 +558,9 @@ func RenderWorkbenchSaveStatus(options WorkbenchSaveStatusOptions) gosx.Node {
 // Deprecated: use shell.RenderWorkbenchHistoryControls.
 func RenderWorkbenchHistoryControls(options WorkbenchHistoryControlsOptions) gosx.Node {
 	return shellpkg.RenderWorkbenchHistoryControls(options)
+}
+
+// Deprecated: use shell.RenderWorkbenchCollaborationSummary.
+func RenderWorkbenchCollaborationSummary(options WorkbenchCollaborationSummaryOptions) gosx.Node {
+	return shellpkg.RenderWorkbenchCollaborationSummary(options)
 }

@@ -624,13 +624,14 @@
     function syncPreviewDock(frame, target, detail) {
       var dock = previewDockForFrame(frame);
       if (!dock || !target) return;
+      var fieldActionLabel = detail.action || previewFieldActionLabel(detail);
       frame.__gosxStudioPreviewDock = dock;
       frame.__gosxStudioPreviewDockTarget = target;
       dock.hidden = false;
       dock.setAttribute("data-gosx-studio-preview-field", detail.field || "");
       dock.setAttribute("data-gosx-studio-preview-block", detail.blockKey || detail.nodeID || "");
       dock.setAttribute("data-gosx-studio-preview-block-label", detail.blockLabel || "");
-      dock.setAttribute("data-gosx-studio-preview-action-label", detail.action || "");
+      dock.setAttribute("data-gosx-studio-preview-action-label", fieldActionLabel || "");
       dock.setAttribute("data-gosx-studio-preview-action-href", detail.actionHref || "");
       dock.setAttribute("data-gosx-studio-preview-action-formaction", detail.actionFormAction || "");
       dock.querySelector("[data-gosx-studio-preview-dock-label]").textContent = detail.label || detail.field || detail.blockKey || "Preview selection";
@@ -642,8 +643,8 @@
       dock.querySelector("[data-gosx-studio-preview-dock-kind]").textContent = dockKindLabel(detail);
       var action = dock.querySelector('[data-gosx-studio-preview-command="field-action"]');
       if (action) {
-        action.textContent = detail.action || (detail.editable === "text" ? "Edit text" : detail.editable === "media" || detail.editable === "image" ? "Media" : detail.editable === "flow" ? "Flow" : detail.editable === "source" ? "Source" : "Open");
-        action.disabled = !detail.field && !detail.action && !detail.actionHref && !detail.actionFormAction;
+        action.textContent = fieldActionLabel || (detail.editable === "media" || detail.editable === "image" ? "Media" : detail.editable === "flow" ? "Flow" : detail.editable === "source" ? "Source" : "Open");
+        action.disabled = !detail.field && !fieldActionLabel && !detail.actionHref && !detail.actionFormAction;
       }
       updatePreviewFieldNavigation(frame, dock, target, detail);
       syncPreviewFieldMap(frame, target, detail);
@@ -875,9 +876,7 @@
 
     function revealInspectorSelection(source, control) {
       if (!source) return;
-      if (form.querySelector('[data-studio-mode-control="content"], [data-studio-mode-panel="content"]')) {
-        setMode("content", { reason: "preview-select" });
-      }
+      setWorkbenchHomeMode("preview-select");
       var target = (source.closest && source.closest(".field-row, [data-studio-field-row]")) || source;
       if (target.scrollIntoView) target.scrollIntoView({ block: "center", behavior: "smooth" });
       window.setTimeout(function () {
@@ -888,7 +887,7 @@
     function applyPreviewSelection(frame, target, detail, options) {
       detail = detail || previewSelectionDetail(target);
       options = options || {};
-      if (!detail.field && !detail.blockKey && !detail.nodeID) return false;
+      if (!detail.field && !detail.blockKey && !detail.nodeID && !detail.pageID) return false;
       clearPreviewSelections();
       clearInspectorSelection();
       var selectedTargets = detail.field ? previewTargets(frame, { field: { source: detail.field, name: detail.field } }) : [];
@@ -1135,9 +1134,52 @@
     function textControlForField(field) {
       var source = inspectorSource(field);
       var control = inspectorControl(source);
-      if (control && "value" in control) return control;
-      if (source && "value" in source) return source;
+      control = valueBearingTextControl(control);
+      if (control) return control;
+      source = valueBearingTextControl(source);
+      if (source) return source;
       return null;
+    }
+
+    function valueBearingTextControl(control) {
+      if (!control || !("value" in control) || control.disabled) return null;
+      var tag = String(control.tagName || "").toLowerCase();
+      var type = String(control.type || "").toLowerCase();
+      if (tag === "input" && type === "hidden") return null;
+      return control;
+    }
+
+    function inlineTextControlForDetail(detail) {
+      if (!detail || detail.editable !== "text" || !detail.field) return null;
+      return textControlForField(detail.field);
+    }
+
+    function previewFieldActionLabel(detail) {
+      if (!detail || detail.editable !== "text" || detail.action) return "";
+      return inlineTextControlForDetail(detail) ? "Edit text" : "Open field";
+    }
+
+    function setWorkbenchHomeMode(reason) {
+      var runtime = window.GoSXStudioWorkbenchRuntime;
+      if (runtime && typeof runtime.setMode === "function") {
+        try {
+          runtime.setMode(form, "home", true);
+          return true;
+        } catch (error) {
+          // Fall back to this legacy host-local setter below.
+        }
+      }
+      setMode("home", { scroll: true, reason: reason || "preview-field" });
+      return false;
+    }
+
+    function revealPreviewField(detail, reason) {
+      detail = detail || {};
+      if (!detail.field) return false;
+      setWorkbenchHomeMode(reason || "preview-field");
+      var source = inspectorSource(detail.field);
+      if (source) revealInspectorSelection(source, inspectorControl(source));
+      return !!source;
     }
 
     function placeCaretAtEnd(doc, node) {
@@ -1182,7 +1224,7 @@
       if (edit.control && "value" in edit.control) edit.control.value = text;
       if (edit.lastText === text) return true;
       edit.lastText = text;
-      setPreviewStatus("dirty", "Draft changed", reason || "inline-text");
+      setPreviewStatus("dirty", "Unsaved edit", reason || "inline-text");
       emitEditorOperation("set_text", {
         mutation: true,
         reason: reason || "inline-text",
@@ -1208,6 +1250,10 @@
       if (!doc) return false;
       var startReason = reason || "preview-dock";
       var control = textControlForField(detail.field);
+      if (!control) {
+        revealPreviewField(detail, startReason);
+        return false;
+      }
       var text = target.textContent || "";
       frame.__gosxStudioInlineEdit = {
         target: target,
@@ -1831,7 +1877,7 @@
 
     form.addEventListener("gosxstudio:save-state", function (event) {
       var detail = event.detail || {};
-      if (detail.state === "dirty") setPreviewStatus("dirty", "Draft changed", detail.reason || "dirty");
+      if (detail.state === "dirty") setPreviewStatus("dirty", "Unsaved edit", detail.reason || "dirty");
       else if (detail.state === "autosaving" || detail.state === "saving") setPreviewStatus("syncing", "Syncing preview", detail.reason || "saving");
       else if (detail.state === "saved") schedulePreviewRefresh(detail.reason || "saved", "");
       else if (detail.state === "error") setPreviewStatus("error", "Preview waiting on save", detail.reason || "error");

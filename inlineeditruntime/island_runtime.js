@@ -59,6 +59,28 @@
   // Marks an overlay we have already wired so a second install() is a no-op.
   var INSTALLED_FLAG = "__gosxInlineEditInstalled";
 
+  // Durable-history opt-in (handoff-31, "one product path"): a host marks an
+  // editable field with DURABLE_ATTR="true" when a durable OperationKind
+  // ledger target already exists for it (e.g. panels/direct_edit_panel.go
+  // already established "hero.headline"/"pages.about.title" as durable
+  // set-field targets). DURABLE_FIELD_ATTR overrides the exact
+  // OperationTarget.Field literal the ledger expects when it differs from
+  // the canvas binding string itself (e.g. a canvas surface's
+  // data-studio-field="home.hero.headline" but the durable ledger's Field is
+  // "hero.headline" — same underlying value, two different addressing
+  // schemes that predate this slice); it defaults to the binding when
+  // absent, which already matches for bindings like "pages.about.title"
+  // that were authored identically on both paths. DURABLE_PAGE_ID_ATTR/
+  // DURABLE_ROUTE_ATTR/DURABLE_COMPONENT_ATTR are the OperationTarget's
+  // remaining addressing fields; a host must render them explicitly (no
+  // guessing) because the durable ledger's PageID convention ("page:home")
+  // does not overlap with PAGE_KEY_ATTR's bare update-page pageKey ("home").
+  var DURABLE_ATTR = "data-gosx-studio-durable-history";
+  var DURABLE_FIELD_ATTR = "data-gosx-studio-durable-field";
+  var DURABLE_PAGE_ID_ATTR = "data-gosx-studio-durable-page-id";
+  var DURABLE_ROUTE_ATTR = "data-gosx-studio-durable-route";
+  var DURABLE_COMPONENT_ATTR = "data-gosx-studio-durable-component";
+
   // isEditableField returns true when el is a non-null element that has a
   // non-empty data-studio-field attribute and contenteditable !== "false".
   function isEditableField(el) {
@@ -183,10 +205,18 @@
     if (!opts || typeof opts.controlForField !== "function") return null;
     try {
       var control = opts.controlForField(field);
-      return control && "value" in control ? control : null;
+      return valueBearingPreviewTextControl(control);
     } catch (error) {
       return null;
     }
+  }
+
+  function valueBearingPreviewTextControl(control) {
+    if (!control || !("value" in control) || control.disabled) return null;
+    var tag = String(control.tagName || "").toLowerCase();
+    var type = String(control.type || "").toLowerCase();
+    if (tag === "input" && type === "hidden") return null;
+    return control;
   }
 
   function previewTextSessionOptions(frame, host) {
@@ -210,7 +240,7 @@
       },
       setDirty: function (reason) {
         if (typeof host.setStatus === "function") {
-          try { host.setStatus("dirty", "Draft changed", reason || "inline-text"); } catch (error) { /* tolerate */ }
+          try { host.setStatus("dirty", "Unsaved edit", reason || "inline-text"); } catch (error) { /* tolerate */ }
         }
         if (typeof host.setDirty === "function") {
           try { host.setDirty(reason || "inline-text"); } catch (error) { /* tolerate */ }
@@ -313,6 +343,7 @@
     if (!doc) return false;
     var startReason = reason || "preview-dock";
     var control = previewTextControl(detail.field, opts);
+    if (!control) return false;
     var text = textOf(target);
     var edit = {
       target: target,
@@ -322,9 +353,12 @@
       control: control,
       originalText: text,
       originalValue: control && "value" in control ? control.value || "" : text,
-      lastText: text
+      lastText: text,
+      hadHref: target.hasAttribute && target.hasAttribute("href"),
+      originalHref: target.hasAttribute && target.hasAttribute("href") ? target.getAttribute("href") || "" : ""
     };
     frame.__gosxStudioInlineEdit = edit;
+    if (edit.hadHref) target.removeAttribute("href");
     target.setAttribute("contenteditable", "plaintext-only");
     target.setAttribute("spellcheck", "true");
     target.setAttribute("data-gosx-studio-inline-editing", "true");
@@ -383,6 +417,7 @@
       });
       emitPreviewTextEvent(opts, "gosxstudio:inline-text-cancel", edit, reason || "cancel", edit.originalValue || "");
     }
+    if (edit.hadHref) edit.target.setAttribute("href", edit.originalHref);
     edit.target.removeAttribute("contenteditable");
     edit.target.removeAttribute("data-gosx-studio-inline-editing");
     if (opts.form && typeof opts.form.removeAttribute === "function") {
@@ -479,6 +514,50 @@
     };
   }
 
+  // durableMetaFromElement reports whether el opts into the durable
+  // collaboration-operation path and, if so, the OperationTarget address to
+  // submit against. enabled is false unless the host explicitly rendered
+  // DURABLE_ATTR="true" — every field that predates this opt-in (or that has
+  // no durable ledger counterpart yet) is completely unaffected.
+  function durableMetaFromElement(el, binding) {
+    if (!el || typeof el.getAttribute !== "function") return { enabled: false };
+    if (String(el.getAttribute(DURABLE_ATTR) || "").toLowerCase() !== "true") return { enabled: false };
+    return {
+      enabled: true,
+      field: el.getAttribute(DURABLE_FIELD_ATTR) || binding,
+      pageId: el.getAttribute(DURABLE_PAGE_ID_ATTR) || "",
+      route: el.getAttribute(DURABLE_ROUTE_ATTR) || "/",
+      componentKey: el.getAttribute(DURABLE_COMPONENT_ATTR) || deriveKeys(binding).component,
+    };
+  }
+
+  // durableOperationRequest builds a schema-1 OperationRequest for a
+  // contenteditable text commit: always kind "set-field", matching the exact
+  // wire shape operationruntime/island_runtime.js's collaborationRequest
+  // builds for the SAME kind, so the server-side decode path is identical
+  // regardless of which client island produced the request.
+  function durableOperationRequest(durable, value) {
+    return {
+      schemaVersion: 1,
+      id: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : (String(Date.now()) + Math.random()),
+      kind: "set-field",
+      target: {
+        route: durable.route || "/",
+        pageId: durable.pageId || "",
+        field: durable.field || "",
+        componentKey: durable.componentKey || "",
+        nodeId: "",
+        property: "",
+        breakpoint: "base",
+        state: "default",
+      },
+      value: value,
+      expectedDocumentRevision: 0,
+      expectedTargetHead: "",
+      historyOperationId: "",
+    };
+  }
+
   // buildBody assembles the application/x-www-form-urlencoded POST payload.
   function buildBody(binding, value, meta) {
     meta = meta || {};
@@ -537,6 +616,24 @@
       else if (fallbackEl === el) { fallbackEl = null; fallbackStart = ""; }
     }
 
+    // cancelEdit reverts el's in-progress text back to the value captured at
+    // focusin (a no-op if it was never focused) and ends the edit without
+    // committing. Escape must never persist a change (see #5: it silently
+    // committed via the trailing blur → commit() before this fix). Clearing
+    // the baseline before blur means the subsequent focusout's commit() sees
+    // "never focused / already committed" and is a guaranteed no-op even if a
+    // caller's own blur handling races this one. Blurring afterward exits
+    // edit mode and returns focus/selection to their pre-edit state without
+    // this module touching any host-owned "selected canvas object" state.
+    function cancelEdit(el) {
+      if (!el) return;
+      var original = startOf(el);
+      if (original === undefined) return; // never focused — nothing to cancel
+      if (textOf(el) !== original) el.textContent = original;
+      clearStart(el);
+      if (typeof el.blur === "function") el.blur();
+    }
+
     // commit persists el's current text if it differs from the captured start.
     // After a commit the new value becomes the baseline so the Enter→blur
     // sequence cannot double-POST the same value.
@@ -554,16 +651,50 @@
       if (hasWeakMap) starts.set(el, value);
       else { fallbackEl = el; fallbackStart = value; }
 
+      // Optional pre-POST hook: lets hosts apply repaint-safe markup surgery
+      // (e.g. muddy's persistRepaintSafe) without that logic living here.
+      // Runs before EITHER commit path below so the visible DOM/painter cache
+      // surgery happens the same way regardless of which one is taken.
+      if (typeof opts.onCommit === "function") {
+        try { opts.onCommit(el, value); } catch (e) { /* never break the commit */ }
+      }
+
+      // Durable dispatch (handoff-31, "one product path"): a field the host
+      // opted in (DURABLE_ATTR="true") with a live, synced collaboration
+      // transport submits through the SAME durable operation protocol
+      // operationruntime/island_runtime.js's direct-edit forms use — the
+      // OperationRecord log, the publish change-set, undo/redo, and
+      // cross-session conflict detection all see this edit. This REPLACES
+      // the legacy save-control POST below for that one commit (never both —
+      // exactly one write per commit). Only when the field is not
+      // durable-enabled, or collaboration is unavailable/not yet synced,
+      // does this fall through to the legacy POST — the same fallback
+      // discipline operationruntime's own submit() already uses, so a
+      // collaboration outage degrades to the old behavior instead of
+      // breaking editing outright.
+      var durable = durableMetaFromElement(el, binding);
+      var collaboration = (typeof window !== "undefined") ? window.GoSXStudioCollaborationRuntime : null;
+      var collaborationReady = durable.enabled && collaboration &&
+        typeof collaboration.available === "function" && collaboration.available() &&
+        typeof collaboration.submit === "function";
+      if (collaborationReady) {
+        var request = durableOperationRequest(durable, value);
+        if (typeof collaboration.expectedHead === "function") request.expectedTargetHead = collaboration.expectedHead(request);
+        collaboration.submit(request).catch(function () {
+          // A rejection (stale head / conflict / transport error) is already
+          // surfaced generically by collabruntime/island_runtime.js's own
+          // rejected() handler (the [data-studio-collab-conflict] banner +
+          // gosxstudio:collaboration-operation-rejected event) — nothing
+          // further to do here, and this must never throw back into the
+          // caller's blur/keydown handler.
+        });
+        return; // Durable path taken: the legacy POST below never fires for this commit.
+      }
+
       // Resolve action + CSRF lazily at commit time so opts can be set after
       // install() and so the managed-form token is always the live value.
       var action = resolveAction(root, opts.action);
       var csrf = resolveCSRF(root, opts.csrfToken);
-
-      // Optional pre-POST hook: lets hosts apply repaint-safe markup surgery
-      // (e.g. muddy's persistRepaintSafe) without that logic living here.
-      if (typeof opts.onCommit === "function") {
-        try { opts.onCommit(el, value); } catch (e) { /* never break the commit */ }
-      }
 
       var doFetch = opts.fetch || (typeof window !== "undefined" ? window.fetch : null);
       if (typeof doFetch !== "function") return;
@@ -610,9 +741,18 @@
     });
 
     root.addEventListener("keydown", function (ev) {
-      if (ev.key !== "Enter" || ev.shiftKey === true) return;
       var el = editableField(ev.target, root);
       if (!el) return;
+      // #5 — Escape cancels the in-progress edit: revert to the pre-edit
+      // value and end editing WITHOUT committing (previously nothing handled
+      // Escape here, so the typed text silently persisted on the next blur —
+      // "Escape doesn't cancel an inline edit" / a silent-commit trust wound).
+      if (ev.key === "Escape") {
+        if (typeof ev.preventDefault === "function") ev.preventDefault();
+        cancelEdit(el);
+        return;
+      }
+      if (ev.key !== "Enter" || ev.shiftKey === true) return;
       // Single-line field: Enter commits rather than inserting a newline.
       if (typeof ev.preventDefault === "function") ev.preventDefault();
       if (typeof el.blur === "function") el.blur(); // blur → focusout → commit()

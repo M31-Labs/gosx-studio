@@ -519,7 +519,9 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectableNodeResolution(t *test
 	for _, fragment := range []string{
 		`function editorPreviewSelectableNode(target)`,
 		`if (!target || !target.closest) return null`,
-		`return target.closest("[data-studio-field], [data-editor-preview], [data-studio-field-source], [data-studio-block-key], [data-studio-node-id]")`,
+		`var selectable = target.closest("[data-studio-field], [data-editor-preview], [data-studio-field-source], [data-studio-block-key], [data-studio-node-id]")`,
+		`var pageOnlyAncestor = selectable !== target && selectable.hasAttribute("data-studio-page-id")`,
+		`return target.matches && target.matches("[data-studio-page-id]") ? target : null`,
 	} {
 		if !strings.Contains(body, fragment) {
 			t.Fatalf("IslandRuntimeJS() missing editor preview selectable-node resolver fragment %q", fragment)
@@ -577,7 +579,9 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDocumentBinding(t *testing.T) {
 	for _, fragment := range []string{
 		`function bindEditorPreviewDocument(form, frame, host)`,
 		`var frameDoc = editorPreviewFrameDocument(frame)`,
-		`if (!frame || !frameDoc || editorPreviewBoundDocument(frame) === frameDoc) return { handled: false, bound: false }`,
+		`if (!frame || !frameDoc)`,
+		`setEditorPreviewDiagnostic(form, "same-origin-unavailable"`,
+		`if (editorPreviewBoundDocument(frame) === frameDoc) return { handled: false, bound: false }`,
 		`setEditorPreviewBoundDocument(frame, frameDoc)`,
 		`frameDoc.documentElement.setAttribute("data-gosx-studio-preview-selectable", "true")`,
 		`function editorPreviewBoundDocument(frame)`,
@@ -641,7 +645,7 @@ func TestPreviewRuntimeIslandJSPreviewFrameLifecycleHandlersRunLocally(t *testin
 	for _, fragment := range []string{
 		`function bindEditorPreviewFrameDocument(form, frame, host)`,
 		`return bindEditorPreviewDocument(form, frame, host)`,
-		`setEditorPreviewStatus(form, "ready", "Ready", "load")`,
+		`setEditorPreviewStatus(form, "ready", "", "load")`,
 		`syncEditorPreviewFrame(form, frame, "load", typeof host.shouldTransportPreviewPatch === "function" ? host.shouldTransportPreviewPatch : null)`,
 		`var route = editorPreviewURL(frame) || frame.getAttribute("src") || ""`,
 		`postEditorPreviewPatch(form, "load-sync", editorPreviewPatchEnvelope("load-sync", { route: route }, null))`,
@@ -910,12 +914,19 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionClearHelper(t *testing.
 		t.Fatal("IslandRuntimeJS() must return a non-empty JS snippet")
 	}
 	for _, fragment := range []string{
-		`window.__gosx_preview_runtime_island_clearSelections = function (form, host)`,
-		`return clearEditorPreviewSelections(form, host);`,
-		`function clearEditorPreviewSelections(form, host)`,
+		`window.__gosx_preview_runtime_island_clearSelections = function (form, host, options)`,
+		`return clearEditorPreviewSelections(form, host, options);`,
+		`function clearEditorPreviewSelections(form, host, options)`,
+		// #5 — Escape must cancel an in-progress inline edit, not commit it.
+		// options.commit defaults to true (the "move to a new selection"
+		// caller below still legitimately commits the prior edit); the
+		// keyboard-Escape caller (hostruntime/assets/workbench_runtime.js)
+		// passes { commit: false } so cancelling reverts instead.
+		`var commit = options.commit !== false`,
+		`var reason = commit ? "clear-selection" : "escape"`,
 		`if (!form) return { handled: false, frames: 0, fieldMaps: 0, markers: 0, chrome: null, docks: null }`,
 		`var frames = editorPreviewFrames(form)`,
-		`editorPreviewHostCall(host, "finishInlineTextEdit", null, frame, true, "clear-selection")`,
+		`editorPreviewHostCall(host, "finishInlineTextEdit", null, frame, commit, reason)`,
 		`var fieldMap = clearEditorPreviewFieldMap(frame)`,
 		`var marker = clearEditorPreviewSelectionMarker(frame)`,
 		`fieldMaps += fieldMap && fieldMap.count ? fieldMap.count : 0`,
@@ -932,8 +943,9 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionClearHelper(t *testing.
 	clearBody := islandJSFunctionBody(t, body, "clearEditorPreviewSelections")
 	for _, ordered := range [][]string{
 		{
+			`var commit = options.commit !== false`,
 			`var frames = editorPreviewFrames(form)`,
-			`editorPreviewHostCall(host, "finishInlineTextEdit", null, frame, true, "clear-selection")`,
+			`editorPreviewHostCall(host, "finishInlineTextEdit", null, frame, commit, reason)`,
 			`var fieldMap = clearEditorPreviewFieldMap(frame)`,
 			`var marker = clearEditorPreviewSelectionMarker(frame)`,
 			`var chrome = clearEditorPreviewSelectionChrome(form)`,
@@ -962,6 +974,30 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionClearHelper(t *testing.
 	}
 }
 
+// TestPreviewRuntimeIslandJSClearSelectionsCommitDefaultsTrue verifies the #5
+// fix: clearEditorPreviewSelections defaults to committing an in-progress
+// inline edit (the "moving to a new selection" caller,
+// applyEditorPreviewSelectionSync, must keep committing the prior edit
+// unchanged) and only cancels/reverts when a caller explicitly passes
+// { commit: false } — the keyboard-Escape path.
+func TestPreviewRuntimeIslandJSClearSelectionsCommitDefaultsTrue(t *testing.T) {
+	body := string(IslandRuntimeJS())
+	clearBody := islandJSFunctionBody(t, body, "clearEditorPreviewSelections")
+	for _, fragment := range []string{
+		`options = options || {}`,
+		`var commit = options.commit !== false`,
+	} {
+		if !strings.Contains(clearBody, fragment) {
+			t.Fatalf("clearEditorPreviewSelections missing commit-default fragment %q in:\n%s", fragment, clearBody)
+		}
+	}
+	// The "apply a new selection" caller must NOT pass a third argument, so it
+	// keeps the default (commit) behavior unchanged.
+	if !strings.Contains(body, `var cleared = clearEditorPreviewSelections(form, host)`) {
+		t.Fatalf("applyEditorPreviewSelectionSync must call clearEditorPreviewSelections(form, host) with no options override:\n%s", body)
+	}
+}
+
 func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionApplyHelper(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	if body == "" {
@@ -975,14 +1011,14 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionApplyHelper(t *testing.
 		`var selection = detail.selection || detail.detail || {}`,
 		`var options = detail.options || {}`,
 		`var host = detail.host || {}`,
-		`if (!selection.field && !selection.blockKey && !selection.nodeID)`,
+		`if (!selection.field && !selection.blockKey && !selection.nodeID && !selection.pageID)`,
 		`var cleared = clearEditorPreviewSelections(form, host)`,
 		`var selectedTargets = selection.field ? editorPreviewPatchTargets(frame, { field: { source: selection.field, name: selection.field } }) : []`,
 		`if (!selectedTargets.length && target) selectedTargets = [target]`,
 		`var marker = applyEditorPreviewSelectionMarker(frame, selectedTargets, true)`,
 		`var applied = editorPreviewHostCall(host, "dispatchPreviewSelectionApply", null, selection, options)`,
 		`if (!applied)`,
-		`var chrome = applyEditorPreviewSelectionChrome(form, frame, selection.field || selection.blockKey || selection.nodeID || "")`,
+		`var chrome = applyEditorPreviewSelectionChrome(form, frame, selection.field || selection.blockKey || selection.nodeID || selection.pageID || "")`,
 		`var dockSelection = editorPreviewDockSelection(selection, applied)`,
 		`var dock = syncEditorPreviewDockSelection(form, frame, selectedTargets[0] || target, dockSelection, host)`,
 		`return { handled: true, applied: applied, targets: selectedTargets, marker: marker, chrome: chrome, dock: dock, cleared: cleared }`,
@@ -996,14 +1032,14 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewSelectionApplyHelper(t *testing.
 	for _, ordered := range [][]string{
 		{
 			`var form = editorPreviewForm(detail, event)`,
-			`if (!selection.field && !selection.blockKey && !selection.nodeID)`,
+			`if (!selection.field && !selection.blockKey && !selection.nodeID && !selection.pageID)`,
 			`var cleared = clearEditorPreviewSelections(form, host)`,
 			`var selectedTargets = selection.field ? editorPreviewPatchTargets(frame, { field: { source: selection.field, name: selection.field } }) : []`,
 			`if (!selectedTargets.length && target) selectedTargets = [target]`,
 			`var marker = applyEditorPreviewSelectionMarker(frame, selectedTargets, true)`,
 			`var applied = editorPreviewHostCall(host, "dispatchPreviewSelectionApply", null, selection, options)`,
 			`if (!applied)`,
-			`var chrome = applyEditorPreviewSelectionChrome(form, frame, selection.field || selection.blockKey || selection.nodeID || "")`,
+			`var chrome = applyEditorPreviewSelectionChrome(form, frame, selection.field || selection.blockKey || selection.nodeID || selection.pageID || "")`,
 			`var dockSelection = editorPreviewDockSelection(selection, applied)`,
 			`var dock = syncEditorPreviewDockSelection(form, frame, selectedTargets[0] || target, dockSelection, host)`,
 		},
@@ -1274,7 +1310,9 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockSelectionSync(t *testing.T) 
 	for _, fragment := range []string{
 		`function editorPreviewDockForFrame(frame)`,
 		`var shell = editorPreviewShellForFrame(frame)`,
-		`dock: shell.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]")`,
+		`var dock = shell.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]")`,
+		`dock = form && form.querySelector("[data-studio-preview-dock], [data-gosx-studio-preview-dock]")`,
+		`dock: dock`,
 		`shell: shell`,
 		`function syncEditorPreviewDockSelection(form, frame, target, selection, host)`,
 		`var dockLookup = editorPreviewDockForFrame(frame)`,
@@ -1282,6 +1320,8 @@ func TestPreviewRuntimeIslandJSOwnsEditorPreviewDockSelectionSync(t *testing.T) 
 		`var shell = dockLookup.shell`,
 		`if (!dock || !target) return { handled: false, dock: dock || null, state: null, bound: false, positioned: false }`,
 		`var normalizedSelection = editorPreviewDockSelection(selection)`,
+		`var hostActionLabel = editorPreviewHostCall(host, "previewFieldActionLabel", "", normalizedSelection)`,
+		`if (hostActionLabel) normalizedSelection.action = hostActionLabel`,
 		`var bindResult = bindEditorPreviewDock(form, frame, dock, host)`,
 		`frame.__gosxStudioPreviewDock = dock`,
 		`frame.__gosxStudioPreviewDockTarget = target`,
@@ -1561,5 +1601,41 @@ func TestPreviewSubscriberScriptIsNonEmpty(t *testing.T) {
 	bundle := Bundle()
 	if strings.Contains(string(bundle), string(subscriber[:min(len(subscriber), 200)])) {
 		t.Fatal("PreviewSubscriberScript() must not be a substring of Bundle() — they ship on different pages")
+	}
+}
+
+func TestIslandRuntimeOwnsPageCanvasRoutingDiagnosticsKeyboardAndRestore(t *testing.T) {
+	script := string(IslandRuntimeJS())
+	for _, fragment := range []string{
+		`button[data-studio-preview-route]`,
+		`refreshEditorPreviewNow(form, "route", route)`,
+		`function diagnoseUnsupportedEditorPreviewNode(form, frame, target)`,
+		`"unsupported-node"`,
+		`"same-origin-unavailable"`,
+		`"stale-selection"`,
+		`data-gosx-studio-preview-tab-stop`,
+		`event.key === "Enter" || event.key === " "`,
+		`function restoreEditorPreviewSelection(form, frame, host)`,
+		`function bindEditorPreviewSelectionRestoreHandshake(form, host)`,
+		`gosxstudio:preview-selection-restore-request`,
+		`gosxstudio:preview-selection-locator-restore`,
+		`gosxstudio:preview-selection-locator-stale`,
+		`detail.route = editorPreviewRouteForFrame(frame)`,
+		`function stopEditorPreviewActivation(event)`,
+		`function editorPreviewActionControl(target)`,
+		`function blockEditorPreviewActionControl(form, frame, event, actionControl)`,
+		`Form submission and navigation are disabled inside the authoring canvas.`,
+		`if (!editorPreviewPointerEventEligible(event))`,
+		`if (editorPreviewInlineEditContains(frame, event.target)) {`,
+		`if (actionControl) event.preventDefault()`,
+		`if (selectionApplied || actionControl)`,
+		`frameDoc.addEventListener("auxclick"`,
+		`frameDoc.addEventListener("submit"`,
+		`"preview-action-blocked"`,
+		`form.dispatchEvent(new CustomEvent("gosxstudio:preview-selection-suspend"`,
+	} {
+		if !strings.Contains(script, fragment) {
+			t.Fatalf("page-canvas runtime missing %q", fragment)
+		}
 	}
 }

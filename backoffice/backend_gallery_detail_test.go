@@ -84,7 +84,7 @@ func TestRenderBackendGalleryDetailPagePreservesFormContract(t *testing.T) {
 		`<button class="button button--secondary" type="submit" formaction="/admin/gallery/work_1/__actions/archive" data-admin-confirm="Archive this gallery work? It will be hidden from public gallery pages.">Archive</button>`,
 		`<a class="button button--secondary" href="/gallery/vase-study?preview=1" data-gosx-link="true">Preview</a>`,
 		`<a class="button button--secondary" href="/admin/gallery" data-gosx-link="true">Back to gallery</a>`,
-		`<script src="/media-picker.js" defer></script>`,
+		`<script src="/_gosx/studio/media-runtime.js" data-gosx-script="managed" data-gosx-script-load="dom" data-gosx-script-loaded="pending" defer></script>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("gallery detail renderer missing %q:\n%s", fragment, html)
@@ -98,7 +98,7 @@ func TestRenderBackendGalleryDetailPagePreservesFormContract(t *testing.T) {
 		`<div class="edit-preview">preview</div>`,
 		`<div class="media-strip media-strip--compact">`,
 		`<button class="button button--primary"`,
-		`<script src="/media-picker.js"`,
+		`<script src="/_gosx/studio/media-runtime.js"`,
 	)
 }
 
@@ -116,7 +116,7 @@ func TestRenderBackendGalleryDetailPageDefaultsAreEmptySafe(t *testing.T) {
 		`<div class="check-row"><label><input type="checkbox" name="published" /> Published</label><label><input type="checkbox" name="featured" /> Featured</label></div>`,
 		`<button class="button button--primary" type="submit">Save gallery work</button>`,
 		`<a class="button button--secondary" href="" data-gosx-link="true">Preview</a>`,
-		`<script src="/media-picker.js" defer></script>`,
+		`<script src="/_gosx/studio/media-runtime.js" data-gosx-script="managed" data-gosx-script-load="dom" data-gosx-script-loaded="pending" defer></script>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("empty gallery detail renderer missing %q:\n%s", fragment, html)

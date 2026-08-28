@@ -57,7 +57,7 @@ func renderHomeLayerSelectionButtons(items []HomeLayerSelectionItem, selectedKey
 		buttons = append(buttons, gosx.El("button", gosx.Attrs(
 			gosx.Attr("type", "button"),
 			gosx.Attr("data-studio-home-layer-pick", item.Key),
-			gosx.Attr("aria-pressed", item.Key == selectedKey),
+			gosx.Attr("aria-pressed", core.BoolAttr(item.Key == selectedKey)),
 		), gosx.Text(item.Label)))
 	}
 	return gosx.El("div", gosx.Attrs(

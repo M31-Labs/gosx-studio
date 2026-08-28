@@ -75,13 +75,14 @@ const BINDING = "home.hero.headline";
 
 const PUBLISH_PANEL = "[data-studio-publish-panel='true']";
 const DRAFT_STATUS = "[data-studio-publish-draft-status='true']";
-// The gsx renderer emits a true bool attribute as a BARE attribute (no ="true"
-// value) and OMITS it entirely when false. So the editor's pending-draft state is
-// signalled by the PRESENCE of data-studio-has-draft on the draft-status line:
-//   • draft pending → [data-studio-has-draft] is present (and the Discard button,
+// Studio's publish panel (panels/publish_panel.go, des-06 boolean-attr
+// convention) ALWAYS emits data-studio-has-draft with an explicit "true" or
+// "false" value — it is never a bare attribute and never omitted. So the
+// editor's pending-draft state must be matched by VALUE, not presence:
+//   • draft pending → [data-studio-has-draft="true"] (and the Discard button,
 //     gated on hasDraft, is rendered);
-//   • no draft      → the attribute is absent (and no Discard button).
-const DRAFT_STATUS_HAS_DRAFT = `${DRAFT_STATUS}[data-studio-has-draft]`;
+//   • no draft      → [data-studio-has-draft="false"] (and no Discard button).
+const DRAFT_STATUS_HAS_DRAFT = `${DRAFT_STATUS}[data-studio-has-draft="true"]`;
 const PUBLISH_BUTTON = "[data-studio-submit-action='publish']";
 const DISCARD_BUTTON = "[data-studio-submit-action='discard']";
 
@@ -312,8 +313,12 @@ async function openEditorToHeroSurface(page: Page, baseURL: string, consoleError
 }
 
 // waitForHeroEditable waits for the injected hero surface to (re)mount into the
-// camera-positioned overlay and become visible.
+// camera-positioned overlay and become visible. Called after the initial editor
+// load AND after every reload (draft/publish/discard cycles), so it must
+// re-reveal the "Advanced" mode panel each time: the legacy site-map/canvas
+// board (which hosts this overlay) resets to hidden on every fresh page load.
 async function waitForHeroEditable(page: Page) {
+  await revealModeIfPresent(page, "advanced");
   const overlayHero = page.locator(OVERLAY_HERO).first();
   await expect(
     overlayHero,

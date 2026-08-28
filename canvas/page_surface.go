@@ -19,6 +19,24 @@ type HomePageSurfaceInput struct {
 	Subhead      string
 	CTALabel     string
 	CTAURL       string
+	// DurableHeadlineField, when non-empty, opts the hero headline's
+	// contenteditable surface into the durable operation protocol
+	// (handoff-31): it is the exact authoring.OperationTarget.Field literal
+	// a host's durable set-field ledger already uses for this value (e.g.
+	// "hero.headline" — see panels/direct_edit_panel.go's own Field for the
+	// SAME value), which is not always identical to this surface's
+	// data-studio-field canvas binding ("home.hero.headline"). Left blank,
+	// the headline keeps its pre-existing legacy save-control-only behavior
+	// unchanged — this is strictly additive/opt-in.
+	DurableHeadlineField string
+	// DurableHeadlinePageID/-Route/-Component are the rest of the durable
+	// OperationTarget address; required together with DurableHeadlineField
+	// (the canvas binding's own "home"/"pages" prefix conventions do not
+	// reliably derive a ledger's PageID/ComponentKey convention, so a host
+	// must supply them explicitly rather than have this package guess).
+	DurableHeadlinePageID    string
+	DurableHeadlineRoute     string
+	DurableHeadlineComponent string
 }
 
 type PageArtboardSurfaceInput struct {
@@ -34,6 +52,18 @@ type PageArtboardSurfaceInput struct {
 	PaletteClass  string
 	CSS           string
 	Components    []PageArtboardComponent
+	// DurableTitleField, when non-empty, opts this page's editable title
+	// into the durable operation protocol (handoff-31) instead of (never in
+	// addition to) the legacy update-page mutation — see
+	// inlineeditruntime/island_runtime.js's durable dispatch: a
+	// durable-enabled commit never also fires the legacy POST. Only a page
+	// whose host has actually wired a durable set-field ledger case for its
+	// title (e.g. "pages.about.title") should set this; a page without one
+	// must leave it blank and keep using update-page, or a durable submit
+	// would be rejected server-side as an unknown target.
+	DurableTitleField     string
+	DurableTitlePageID    string
+	DurableTitleComponent string
 }
 
 type PageArtboardComponent struct {
@@ -54,7 +84,7 @@ func RenderHomePageSurfaceMarkup(input HomePageSurfaceInput) string {
 	b.WriteString(`<section class="hero gosx-style-block-home-hero">`)
 	b.WriteString(`<div class="hero__copy">`)
 	b.WriteString(`<p class="kicker" data-studio-field="tagline" data-studio-editable="text" contenteditable="true">` + html.EscapeString(tagline) + `</p>`)
-	b.WriteString(`<h1 data-studio-field="home.hero.headline" data-studio-editable="text" contenteditable="true">` + html.EscapeString(headline) + `</h1>`)
+	b.WriteString(`<h1 data-studio-field="home.hero.headline" data-studio-editable="text" contenteditable="true"` + durableAttrs(input.DurableHeadlineField, input.DurableHeadlinePageID, input.DurableHeadlineRoute, input.DurableHeadlineComponent) + `>` + html.EscapeString(headline) + `</h1>`)
 	b.WriteString(`<p class="lede" data-studio-field="home.hero.subhead" data-studio-editable="text" contenteditable="true">` + html.EscapeString(subhead) + `</p>`)
 	b.WriteString(`<div class="button-row">`)
 	b.WriteString(`<a class="button button--primary" href="` + html.EscapeString(ctaURL) + `" data-studio-field="home.hero.ctaLabel" data-studio-editable="text" contenteditable="true">` + html.EscapeString(ctaLabel) + `</a>`)
@@ -92,7 +122,7 @@ func RenderPageArtboardSurfaceMarkup(input PageArtboardSurfaceInput) string {
 	b.WriteString(`<header style="display:flex;flex-direction:column;gap:10px;">`)
 	b.WriteString(`<p class="kicker" style="margin:0;text-transform:uppercase;letter-spacing:0;font-size:12px;">` + html.EscapeString(strings.Join(meta, " / ")) + `</p>`)
 	if input.EditableTitle {
-		b.WriteString(`<h1 style="margin:0;font-size:42px;line-height:1.02;" data-studio-field="pages.` + html.EscapeString(pageKey) + `.title" data-studio-field-label="Title" data-studio-editable="text" contenteditable="true" data-studio-operation="update-page" data-studio-page-key="` + html.EscapeString(pageKey) + `" data-studio-page-route="` + html.EscapeString(route) + `">` + html.EscapeString(title) + `</h1>`)
+		b.WriteString(`<h1 style="margin:0;font-size:42px;line-height:1.02;" data-studio-field="pages.` + html.EscapeString(pageKey) + `.title" data-studio-field-label="Title" data-studio-editable="text" contenteditable="true" data-studio-operation="update-page" data-studio-page-key="` + html.EscapeString(pageKey) + `" data-studio-page-route="` + html.EscapeString(route) + `"` + durableAttrs(input.DurableTitleField, input.DurableTitlePageID, route, input.DurableTitleComponent) + `>` + html.EscapeString(title) + `</h1>`)
 	} else {
 		b.WriteString(`<h1 style="margin:0;font-size:42px;line-height:1.02;">` + html.EscapeString(title) + `</h1>`)
 	}
@@ -116,6 +146,23 @@ func RenderPageArtboardSurfaceMarkup(input PageArtboardSurfaceInput) string {
 	b.WriteString(`</article>`)
 	b.WriteString(`</div>`)
 	return b.String()
+}
+
+// durableAttrs renders the inlineeditruntime durable-history opt-in
+// attributes (see island_runtime.js's DURABLE_ATTR/DURABLE_FIELD_ATTR/etc.)
+// for a contenteditable surface field. field being blank means the host has
+// not wired a durable ledger counterpart for this value yet — every
+// attribute is omitted and the field keeps its pre-existing legacy-only
+// behavior unchanged.
+func durableAttrs(field, pageID, route, component string) string {
+	field = strings.TrimSpace(field)
+	if field == "" {
+		return ""
+	}
+	return ` data-gosx-studio-durable-history="true" data-gosx-studio-durable-field="` + html.EscapeString(field) +
+		`" data-gosx-studio-durable-page-id="` + html.EscapeString(strings.TrimSpace(pageID)) +
+		`" data-gosx-studio-durable-route="` + html.EscapeString(strings.TrimSpace(route)) +
+		`" data-gosx-studio-durable-component="` + html.EscapeString(strings.TrimSpace(component)) + `"`
 }
 
 func renderPageArtboardSurfaceInfo(label, value string) string {

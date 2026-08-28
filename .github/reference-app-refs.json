@@ -1,0 +1,5 @@
+{
+  "_comment": "Host repo refs the reference-app editor e2e suite runs against. Branches under review pin their matching host branches; flip both back to main in the same PR that lands after the host PRs merge.",
+  "muddy": "codex/noni-pagecanvas-release",
+  "pajaritos": "codex/pajaritos-pagecanvas-release"
+}

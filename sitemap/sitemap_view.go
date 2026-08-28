@@ -73,7 +73,16 @@ func AuthoringSiteMapView(surface authoring.AuthoringSurface, options SiteMapVie
 	editableControl := AuthoringSiteMapEditableControlView(siteMap.Pages)
 	sources := authoringSiteMapSourceViews(siteMap)
 	blueprints := authoringSiteMapPageBlueprintViews(siteMap.Library.PageBlueprints, options)
+	// The composition workspace palette surfaces every fresh ComponentTemplate
+	// AND every reusable ComponentDefinition available for another instance
+	// (core/instances.go's PaletteEntries() concept) — previously this only
+	// ever read ComponentTemplates, so shared components had no placement
+	// affordance inside SiteMapAuthoringView at all (they lived in a
+	// standalone host companion panel instead). Templates are built first so
+	// existing palette[0]/defaultTemplateKey consumers see no behavior change
+	// when a library declares no shared definitions.
 	palette := AuthoringSiteMapComponentTemplateViews(siteMap.Library.ComponentTemplates, options)
+	palette = append(palette, AuthoringSiteMapComponentDefinitionPaletteViews(siteMap.Library.ComponentDefinitions, siteMap.Pages, selectedPage, hasSelectedPage, options)...)
 	compositionIntents := authoringSiteMapIntentViews(surface.Intents(), options)
 	activeIntentCount := 0
 	if len(blueprints) > 0 {
@@ -634,6 +643,97 @@ func AuthoringSiteMapComponentTemplateViews(templates []core.ComponentTemplate, 
 		})
 	}
 	return out
+}
+
+// AuthoringSiteMapComponentDefinitionPaletteViews projects every reusable
+// ComponentDefinition (core/instances.go) as a placeable composition
+// workspace palette entry, alongside AuthoringSiteMapComponentTemplateViews's
+// fresh-component templates — the piece SiteMapAuthoringView's palette was
+// missing (it only ever read Library.ComponentTemplates). Each entry carries
+// its current attached-instance count (core.Component.IsSharedInstance
+// across every page, matching core.EffectiveComponentControls's own
+// attached/detached contract) and, when a page is selected, a ready-to-submit
+// authoring.AuthoringOperationPlaceInstance mutation (formID/formValues/
+// formInputs) a host can render as a real "place another instance" form —
+// see sitemap's RenderSiteMapAuthoringForms/RenderSiteMapAuthoringPanels,
+// which do exactly that.
+func AuthoringSiteMapComponentDefinitionPaletteViews(definitions []core.ComponentDefinition, pages []core.Page, selectedPage core.Page, hasSelectedPage bool, options SiteMapViewOptions) []map[string]any {
+	counts := authoringSharedInstanceCounts(pages)
+	out := make([]map[string]any, 0, len(definitions))
+	for index, definition := range definitions {
+		definition = definition.Normalize()
+		if definition.Key == "" {
+			continue
+		}
+		categoryKey := workspaceToken(definition.Category)
+		if categoryKey == "" || categoryKey == "node" {
+			categoryKey = "shared"
+		}
+		count := counts[definition.Key]
+		view := map[string]any{
+			"key":                "shared:" + definition.Key,
+			"label":              definition.Label,
+			"summary":            definition.Summary,
+			"category":           definition.Category,
+			"categoryKey":        categoryKey,
+			"gosxComponent":      definition.GoSXComponent,
+			"goSXComponent":      definition.GoSXComponent,
+			"source":             string(definition.Source),
+			"sourceLabel":        core.ComponentSourceLabel(definition.Source),
+			"defaultBinding":     "",
+			"statusLabel":        "Shared",
+			"actionLabel":        "Add another " + definition.Label,
+			"addLabel":           "Add another " + definition.Label,
+			"controls":           AuthoringSiteMapStaticControlViews(definition.Controls),
+			"hasControls":        definition.ControlCount() > 0,
+			"controlLabel":       countLabel(definition.ControlCount(), "field", "fields"),
+			"inputID":            "studioSiteMapSharedDefinition-" + workspaceToken(definition.Key),
+			"inputName":          firstNonEmpty(options.TemplateInputName, "studioComponentTemplateIntent"),
+			"selected":           index == 0,
+			"isShared":           true,
+			"definitionKey":      definition.Key,
+			"instanceCount":      count,
+			"instanceCountValue": strconv.Itoa(count),
+			"instanceCountLabel": countLabel(count, "instance", "instances"),
+			"hasInstances":       count > 0,
+			"formID":             "studioSiteMapPlaceInstanceForm-" + workspaceToken(definition.Key),
+		}
+		if hasSelectedPage {
+			mutation := authoring.AuthoringMutation{
+				Kind:                 authoring.AuthoringOperationPlaceInstance,
+				PageKey:              selectedPage.Key,
+				ComponentTemplateKey: definition.Key,
+			}
+			view["authoringOperation"] = string(mutation.Kind)
+			view["authoringPageKey"] = mutation.PageKey
+			view["authoringDefinitionKey"] = mutation.ComponentTemplateKey
+			view["mutation"] = authoring.AuthoringMutationView(mutation)
+			view["formValues"] = mutation.FormValues()
+			view["formInputs"] = authoring.AuthoringMutationFormInputViews(mutation)
+		}
+		out = append(out, view)
+	}
+	return out
+}
+
+// authoringSharedInstanceCounts counts, for each shared ComponentDefinition
+// key, how many currently-ATTACHED placed instances exist across pages —
+// core.Component.IsSharedInstance()'s own contract (DefinitionKey set, not
+// Detached), the same set core.EffectiveComponentControls fans shared edits
+// out to.
+func authoringSharedInstanceCounts(pages []core.Page) map[string]int {
+	counts := map[string]int{}
+	for _, page := range pages {
+		page = page.Normalize()
+		for _, component := range page.Components {
+			component = component.Normalize()
+			if !component.IsSharedInstance() {
+				continue
+			}
+			counts[component.NormalizedDefinitionKey()]++
+		}
+	}
+	return counts
 }
 
 func authoringSiteMapIntentViews(intents []core.CompositionIntent, options SiteMapViewOptions) []map[string]any {

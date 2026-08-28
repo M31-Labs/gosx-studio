@@ -98,6 +98,55 @@ Override the base URL when running against a different host:
 GOSX_STUDIO_PARITY_BASE_URL=http://localhost:8080 npm test
 ```
 
+## Enterprise editor standalone quality gate
+
+`playwright.enterprise.config.ts` is an opt-in, standalone quality gate. It
+whitelists exactly these nine fixture files: `contenteditorruntime_test.ts`,
+`contenteditor_focus_test.ts`, `contenteditor_pointer_test.ts`,
+`contenteditor_revision_test.ts`, `contenteditor_save_adversarial_test.ts`,
+`enterprise_editor_quality_test.ts`, `mediaruntime_test.ts`,
+`sectionorderruntime_test.ts`, and `state_history_modern_test.ts`. It runs
+serially with one worker in explicit Chromium, Firefox, and WebKit projects;
+`reference_apps*`, `harness.ts`, and server/Noni boots are not included. No
+live auth, consumer server, or Noni checkout is needed because these fixtures
+use local HTML and embedded Studio runtime assets.
+
+Use a local Node 24 runtime (the gate was tested with Node 24.7.0), and run
+`npm ci` once when the checkout has no local dependencies. Use the local
+Playwright browser cache; install only when a requested pinned browser is
+absent:
+
+```bash
+cd /path/to/gosx-studio/parity_e2e
+export PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}
+node --version                 # use Node 24; v24.7.0 was verified
+# Run this once if the local dependency tree is absent:
+npm ci
+./node_modules/.bin/playwright install chromium firefox webkit
+```
+
+List the allowlisted inventory (27 project/file entries) and run the gate with
+an optional unique per-run root. The config derives separate per-project
+runner and quality-artifact directories from that root:
+
+```bash
+GOSX_STUDIO_ENTERPRISE_ARTIFACT_ROOT=../.tiller/scratch/codex/enterprise-polish-20260827/crossbrowser24/run-name \
+  ./node_modules/.bin/playwright test --config=playwright.enterprise.config.ts --list
+
+GOSX_STUDIO_ENTERPRISE_ARTIFACT_ROOT=../.tiller/scratch/codex/enterprise-polish-20260827/crossbrowser24/run-name \
+  ./node_modules/.bin/playwright test --config=playwright.enterprise.config.ts
+```
+
+Without `GOSX_STUDIO_ENTERPRISE_ARTIFACT_ROOT`, the config defaults to the
+ignored `crossbrowser24/` task directory. `QUALITY_ARTIFACT_ROOT` may still be
+provided explicitly for a caller-owned quality root; the quality fixture
+appends the active project name and preserves normal `qa/quality04` paths when
+the opt-in config is not selected. WebKit currently reports
+`CSS.supports("forced-color-adjust", "auto") === false`; the fixture records
+that capability explicitly while retaining focus and reduced-motion checks.
+Playwright WebKit is browser-engine coverage, not proof for Safari releases,
+iOS/WebKit versions, or physical-device behavior.
+
 ## Reference App Authoring E2E
 
 The `reference_apps_authoring_test.ts`,

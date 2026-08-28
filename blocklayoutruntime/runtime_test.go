@@ -481,8 +481,9 @@ func TestIslandRuntimeJSPublishesBindHandleDragGlobal(t *testing.T) {
 	//   - pointerdown on the handle captures the row + key + clientY.
 	//   - pointermove finds the nearest other row by midpoint Y and
 	//     insertBefore-swaps the dragged row above or below it.
-	//   - pointerup / pointercancel removes .is-dragging, calls
-	//     renumber(list, "engine-list"), and reselects the dragged row.
+	//   - pointerup removes .is-dragging and only calls renumber/select when
+	//     the row order changed; pointercancel / Escape restore the initiating
+	//     row's original sibling position without emitting form events.
 	//
 	// IMPORTANT: the legacy implementation uses pointer events — NOT HTML5
 	// native drag events — and the handle selector is
@@ -507,6 +508,15 @@ func TestIslandRuntimeJSPublishesBindHandleDragGlobal(t *testing.T) {
 		"pointermove",
 		"pointerup",
 		"pointercancel",
+		"lostpointercapture",
+		"event.button !== 0",
+		"event.pointerId !== drag.pointerId",
+		"pointerCaptureTarget",
+		"event.key !== \"Escape\"",
+		"initialNextSibling",
+		"drag.row.parentNode !== list",
+		"if (!changed) return",
+		"removeEventListener(\"keydown\"",
 		// Reorder source used on drop — preserves legacy
 		// renumberBlockLayoutList(list, "engine-list") call.
 		"engine-list",

@@ -30,6 +30,16 @@ type WorkspaceSurfaceOptions struct {
 
 func BuildWorkspaceSurface(workspace workbench.Workspace, options WorkspaceSurfaceOptions) WorkspaceSurface {
 	homeKey := normalizeKey(firstNonEmpty(options.HomeKey, "home"))
+	// #17 / handoff-4 (page taxonomy): this nav item links out to the canvas
+	// editor (HomeHref defaults to "/admin/editor") and IS the canvas-root
+	// shortcut. #17 originally suffixed it "(canvas)" because a host could
+	// also list a literal "Home page" record next to it (muddy-noni-commerce
+	// used to prepend exactly that -- a redundant href="/" live-preview
+	// link -- to its own site navigator). handoff-4 removed that host-side
+	// duplicate instead (see muddy-noni-commerce's editorSiteNavigatorView),
+	// so this is now the ONE "Home" entry in the rail; page metadata editing
+	// (the page's title/SEO fields) stays reachable from ADVANCED's Site map
+	// "Page details" card, not as a second top-level sibling here.
 	homeLabel := firstNonEmpty(strings.TrimSpace(options.HomeLabel), "Home")
 	homeHref := firstNonEmpty(strings.TrimSpace(options.HomeHref), "/admin/editor")
 	homeSummary := firstNonEmpty(strings.TrimSpace(options.HomeSummary), "Live canvas and site structure.")
