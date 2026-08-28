@@ -738,11 +738,11 @@ test.describe("GoSXStudioBlockLayoutRuntime parity", () => {
   // handler's "midpoint Y" computation degenerates. The legacy bundle has
   // the same geometric dependency. We instead verify the OBSERVABLE
   // lifecycle of the drag: the bound-attr marker is set, pointerdown on
-  // the handle adds .is-dragging to the row, and pointerup removes it +
-  // fires blockstudio:reorder with source "engine-list". The cross-row
-  // swap is exercised via the moveRow + commitReorder per-call parity
-  // tests above, which already cover the DOM-mutation path.
-  test("v0.5.2 bindHandleDrag: pointerdown/up on [data-block-studio-handle] runs the drag lifecycle", async ({ browser }) => {
+  // the handle adds .is-dragging to the row, and a no-op pointerup removes it
+  // without firing blockstudio:reorder. The cross-row swap remains covered
+  // by the moveRow + commitReorder per-call parity tests above, which exercise
+  // valid DOM-mutation commits.
+  test("v0.5.2 bindHandleDrag: no-op pointerdown/up cleans the drag lifecycle", async ({ browser }) => {
     const handle = await bootCandidate(browser);
     try {
       if (!(await blockListAvailable(handle.page))) {
@@ -803,13 +803,9 @@ test.describe("GoSXStudioBlockLayoutRuntime parity", () => {
       expect(result.isDraggingAfterDown).toBe(true);
       // pointerup branch executed → .is-dragging cleaned up.
       expect(result.firstRowHasIsDragging).toBe(false);
-      // pointerup fired the renumber → blockstudio:reorder dispatched.
-      expect(result.reorderFired).toBeGreaterThan(0);
-      // The drag-drop path renumbers with source "engine-list" — distinct
-      // from "engine-buttons" / "engine-preview" / "engine-init". This
-      // is the cleanest single observable proving bindHandleDrag's pointerup
-      // → renumber(list, "engine-list") wire is correct.
-      expect(result.reorderSource).toBe("engine-list");
+      // A no-op pointerup must not renumber or dispatch blockstudio:reorder.
+      expect(result.reorderFired).toBe(0);
+      expect(result.reorderSource).toBe("");
     } finally {
       await disposeBoot(handle);
     }
