@@ -957,11 +957,13 @@
         class: "content-editor__save-created-link",
         "data-content-editor-save-created-link": "true",
         "data-content-editor-discard": "true",
+        tabindex: "0",
         hidden: true,
         text: "Open saved item"
       });
       status.appendChild(createdLink);
     }
+    createdLink.setAttribute("tabindex", "0");
     var conflictLink = status.querySelector("[data-content-editor-save-conflict-link]");
     if (!conflictLink) {
       conflictLink = el("a", {
@@ -969,11 +971,13 @@
         "data-content-editor-save-conflict-link": "true",
         target: "_blank",
         rel: "noopener",
+        tabindex: "0",
         hidden: true,
         text: "Open current version in new tab"
       });
       status.appendChild(conflictLink);
     }
+    conflictLink.setAttribute("tabindex", "0");
     state.saveStatusNode = status;
     state.saveLabelNode = label;
     state.saveDetailNode = detail;

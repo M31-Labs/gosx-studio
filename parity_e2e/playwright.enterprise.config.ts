@@ -12,6 +12,8 @@ const enterpriseStandaloneFixtures = [
   "mediaruntime_test.ts",
   "sectionorderruntime_test.ts",
   "state_history_modern_test.ts",
+  "gallery_responsive_polish_test.ts",
+  "gesture_cancel_test.ts",
 ];
 
 const taskArtifactRoot = process.env.GOSX_STUDIO_ENTERPRISE_ARTIFACT_ROOT

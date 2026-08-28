@@ -31,6 +31,7 @@ type FixtureOptions = {
   revisionRequired?: boolean;
   siblingRestore?: boolean;
   requiredTitle?: boolean;
+  preRenderedRecoveryLinks?: boolean;
 };
 
 function editorFixtureHTML(key: string, options: FixtureOptions = {}): string {
@@ -42,6 +43,16 @@ function editorFixtureHTML(key: string, options: FixtureOptions = {}): string {
     : "";
   const siblingRestore = options.siblingRestore
     ? `<form id="${escapeHTML(key)}-history" method="post" action="/restoreRevision"><input type="hidden" name="csrf_token" value="test-csrf"><button type="submit" data-studio-submit-action="restoreRevision">Restore ${escapeHTML(key)}</button></form>`
+    : "";
+  const preRenderedRecoveryLinks = options.preRenderedRecoveryLinks
+    ? `<div class="content-editor__save-status" data-content-editor-save-status="true" role="status" aria-live="polite" aria-atomic="true">
+          <span class="content-editor__save-label" data-content-editor-save-label="true">Ready</span>
+          <span class="content-editor__save-detail" data-content-editor-save-detail-text="true">Ready</span>
+          <button type="button" class="content-editor__save-retry" data-content-editor-save-retry="true" hidden>Retry save</button>
+          <div class="content-editor__save-errors" data-content-editor-save-errors="true" aria-label="Save errors" id="${escapeHTML(key)}-save-errors" tabindex="-1" hidden></div>
+          <a class="content-editor__save-created-link" data-content-editor-save-created-link="true" data-content-editor-discard="true" tabindex="-1" hidden>Open saved item</a>
+          <a class="content-editor__save-conflict-link" data-content-editor-save-conflict-link="true" target="_blank" rel="noopener" tabindex="-1" hidden>Open current version in new tab</a>
+        </div>`
     : "";
 
   return `
@@ -57,6 +68,7 @@ function editorFixtureHTML(key: string, options: FixtureOptions = {}): string {
           <option value="mdpp">MDPP</option>
         </select>
         <div class="content-editor" data-content-editor="true" data-content-editor-media-list="${escapeHTML(key)}-media-list">
+          ${preRenderedRecoveryLinks}
           <textarea id="${escapeHTML(key)}-body" name="body" data-content-editor-source="true">${escapeHTML(bodySource())}</textarea>
           <div class="content-editor__toolbar">
             <button type="button" data-content-add="paragraph">Paragraph</button>
@@ -203,7 +215,43 @@ test.describe("@revision content-editor save CAS boundary", () => {
     await expect(currentVersion).toHaveAttribute("href", editorURL);
     await expect(currentVersion).toHaveAttribute("target", "_blank");
     await expect(currentVersion).toHaveAttribute("rel", "noopener");
+    await expect(currentVersion).toHaveAttribute("tabindex", "0");
     await expect(root.locator("[data-content-editor-save-retry]")).toBeHidden();
+  });
+
+  test("normalizes pre-rendered recovery links without replacing their safe attributes", async ({ page }) => {
+    await mountAtURL(page, editorFixtureHTML("pre-rendered", { preRenderedRecoveryLinks: true }));
+
+    const root = page.locator("#form-pre-rendered [data-content-editor]");
+    const status = root.locator("[data-content-editor-save-status]");
+    const createdLink = root.locator("[data-content-editor-save-created-link]");
+    const conflictLink = root.locator("[data-content-editor-save-conflict-link]");
+    await expect(createdLink).toHaveAttribute("tabindex", "0");
+    await expect(createdLink).toHaveAttribute("data-content-editor-discard", "true");
+    await expect(createdLink).toBeHidden();
+    await expect(conflictLink).toHaveAttribute("tabindex", "0");
+    await expect(conflictLink).toHaveAttribute("target", "_blank");
+    await expect(conflictLink).toHaveAttribute("rel", "noopener");
+    await expect(conflictLink).toBeHidden();
+    expect(await status.locator(":scope > a").evaluateAll((nodes) => nodes.map((node) =>
+      node.getAttribute("data-content-editor-save-created-link") === "true" ? "created" : "conflict")))
+      .toEqual(["created", "conflict"]);
+
+    await page.route(saveURL, async (route) => {
+      await route.fulfill(jsonResponse(409, {
+        ok: false,
+        conflict: true,
+        message: "A newer version exists.",
+        values: { expectedRevision: "server-rev-9" },
+      }));
+    });
+    await page.getByRole("button", { name: "Save pre-rendered" }).click();
+    await expect(root).toHaveAttribute("data-content-editor-save-state", "conflict");
+    await expect(conflictLink).toBeVisible();
+    await expect(conflictLink).toHaveAttribute("href", editorURL);
+    await expect(conflictLink).toHaveAttribute("target", "_blank");
+    await expect(conflictLink).toHaveAttribute("rel", "noopener");
+    await expect(conflictLink).toHaveAttribute("tabindex", "0");
   });
 
   test("keeps unmarked hosts and user fields unchanged when a response has token-shaped values", async ({ page }) => {
@@ -251,6 +299,7 @@ test.describe("@revision content-editor save CAS boundary", () => {
     await expect(currentVersion).toHaveAttribute("href", editorURL);
     await expect(currentVersion).toHaveAttribute("target", "_blank");
     await expect(currentVersion).toHaveAttribute("rel", "noopener");
+    await expect(currentVersion).toHaveAttribute("tabindex", "0");
     await expect(root.locator("[data-content-editor-save-retry]")).toBeHidden();
     expect(requestCount).toBe(1);
   });

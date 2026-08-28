@@ -1,6 +1,10 @@
 package backoffice
 
-import "m31labs.dev/gosx"
+import (
+	"strings"
+
+	"m31labs.dev/gosx"
+)
 
 type BackendResourceIndexProps struct {
 	Kicker  string
@@ -90,7 +94,7 @@ func renderBackendResourceTable(table BackendResourceTable, empty string) gosx.N
 		gosx.El("thead", nil,
 			gosx.El("tr", nil, gosx.Fragment(renderBackendResourceTableHeaders(table.Headers)...)),
 		),
-		gosx.El("tbody", nil, gosx.Fragment(renderBackendResourceTableRows(table.Rows)...)),
+		gosx.El("tbody", nil, gosx.Fragment(renderBackendResourceTableRows(table.Headers, table.Rows)...)),
 	)}
 	if len(table.Rows) == 0 && empty != "" {
 		children = append(children, gosx.El("p", gosx.Attrs(gosx.Attr("class", "empty")), gosx.Text(empty)))
@@ -101,22 +105,39 @@ func renderBackendResourceTable(table BackendResourceTable, empty string) gosx.N
 func renderBackendResourceTableHeaders(headers []string) []gosx.Node {
 	nodes := make([]gosx.Node, 0, len(headers))
 	for _, header := range headers {
-		nodes = append(nodes, gosx.El("th", nil, gosx.Text(header)))
+		nodes = append(nodes, gosx.El("th", gosx.Attrs(gosx.Attr("scope", "col")), gosx.Text(header)))
 	}
 	return nodes
 }
 
-func renderBackendResourceTableRows(rows []BackendResourceTableRow) []gosx.Node {
+func renderBackendResourceTableRows(headers []string, rows []BackendResourceTableRow) []gosx.Node {
 	nodes := make([]gosx.Node, 0, len(rows))
 	for _, row := range rows {
 		cells := make([]gosx.Node, 0, len(row.Cells)+1)
-		for _, cell := range row.Cells {
-			cells = append(cells, gosx.El("td", nil, renderBackendResourceTableCell(cell)))
+		for index, cell := range row.Cells {
+			cells = append(cells, gosx.El("td", gosx.Attrs(gosx.Attr("data-label", resourceTableCellLabel(headers, index))), renderBackendResourceTableCell(cell)))
 		}
-		cells = append(cells, gosx.El("td", nil, renderBackendResourceLink(row.Action)))
+		cells = append(cells, gosx.El("td", gosx.Attrs(gosx.Attr("data-label", resourceTableActionLabel(headers))), renderBackendResourceLink(row.Action)))
 		nodes = append(nodes, gosx.El("tr", nil, gosx.Fragment(cells...)))
 	}
 	return nodes
+}
+
+func resourceTableCellLabel(headers []string, index int) string {
+	if index < 0 || index >= len(headers) {
+		return ""
+	}
+	return strings.TrimSpace(headers[index])
+}
+
+func resourceTableActionLabel(headers []string) string {
+	if len(headers) == 0 {
+		return "Actions"
+	}
+	if label := strings.TrimSpace(headers[len(headers)-1]); label != "" {
+		return label
+	}
+	return "Actions"
 }
 
 func renderBackendResourceTableCell(cell BackendResourceTableCell) gosx.Node {
@@ -175,6 +196,7 @@ func renderBackendResourceLink(link BackendResourceLink) gosx.Node {
 	if link.GOSXLink {
 		attrs = append(attrs, gosx.Attr("data-gosx-link", "true"))
 	}
+	attrs = append(attrs, gosx.Attr("tabindex", "0"))
 	return gosx.El("a", gosx.Attrs(attrs...), gosx.Text(link.Label))
 }
 

@@ -4,6 +4,15 @@ import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createServer } from "node:net";
+import {
+  assertResolvedCandidateModule,
+  createCandidateSourceCopy,
+  loadCandidateIdentity,
+  resolveCandidateModuleGraph,
+  withCandidateModuleEnvironment,
+  type CandidateIdentity,
+  type CandidateSourceCopy,
+} from "./reference_apps_candidate_identity";
 
 const workRoot = path.resolve(__dirname, "../..");
 const muddyRepo = process.env.GOSX_STUDIO_MUDDY_REPO ?? path.join(workRoot, "muddy-noni-commerce");
@@ -11,6 +20,12 @@ const pajaritosRepo = process.env.GOSX_STUDIO_PAJARITOS_REPO ?? path.join(workRo
 const defaultGoBin = "/home/draco/go/bin";
 
 let muddyDistBuildPromise: Promise<void> | null = null;
+
+let candidateIdentityLoaded = false;
+let candidateIdentityError: unknown = null;
+let candidateIdentity: CandidateIdentity | null = null;
+const candidateModuleGraphHosts = new Set<string>();
+const candidateSourceCopies = new Map<string, CandidateSourceCopy>();
 
 export type ClickAuthoringOptions = {
   noWaitAfter?: boolean;
@@ -596,13 +611,15 @@ function ensureMuddyDist(): Promise<void> {
 
 async function buildMuddyDist(): Promise<void> {
   const gosxBin = process.env.GOSX_STUDIO_GOSX_BIN ?? "gosx";
+  const buildRepo = candidateSourceRepo(muddyRepo);
   const env = {
     ...process.env,
     GOWORK: "off",
+    ...candidateGoEnvironment(muddyRepo),
     PATH: process.env.GOSX_STUDIO_GOSX_BIN ? process.env.PATH : withPathEntry(process.env.PATH, defaultGoBin),
   };
   await runLoggedCommand(gosxBin, ["build", "--dev", "."], {
-    cwd: muddyRepo,
+    cwd: buildRepo,
     env,
     label: "Muddy GoSX dist build",
   });
@@ -738,6 +755,77 @@ function killProcessGroup(pid: number, signal: NodeJS.Signals) {
   }
 }
 
+function candidateGoEnvironment(hostRepo: string, extraEnv: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const baseEnv = { ...process.env, ...extraEnv };
+  const identity = loadCandidateIdentityOnce(baseEnv);
+  if (!identity) return {};
+
+  const sourceRepo = candidateSourceRepo(hostRepo, baseEnv);
+  const commandEnv = withCandidateModuleEnvironment(baseEnv);
+  console.log(
+    `[gosx-studio candidate] using sourceCopy=${sourceRepo} Module.Replace.Dir=${identity.candidateRepo} candidateSHA=${identity.candidateSHA} host=${path.resolve(hostRepo)}`,
+  );
+  return {
+    GOWORK: commandEnv.GOWORK,
+    ...(commandEnv.GOFLAGS ? { GOFLAGS: commandEnv.GOFLAGS } : {}),
+  };
+}
+
+function loadCandidateIdentityOnce(baseEnv: NodeJS.ProcessEnv): CandidateIdentity | null {
+  if (!candidateIdentityLoaded) {
+    candidateIdentityLoaded = true;
+    try {
+      candidateIdentity = loadCandidateIdentity(baseEnv);
+    } catch (error) {
+      candidateIdentityError = error;
+    }
+  }
+  if (candidateIdentityError) throw candidateIdentityError;
+  return candidateIdentity;
+}
+
+function candidateSourceRepo(hostRepo: string, extraEnv: NodeJS.ProcessEnv = {}): string {
+  const baseEnv = { ...process.env, ...extraEnv };
+  const identity = loadCandidateIdentityOnce(baseEnv);
+  if (!identity) return hostRepo;
+
+  installProcessGroupCleanupOnce();
+  const hostKey = path.resolve(hostRepo);
+  let sourceCopy = candidateSourceCopies.get(hostKey);
+  if (!sourceCopy) {
+    sourceCopy = createCandidateSourceCopy(hostKey, identity);
+    candidateSourceCopies.set(hostKey, sourceCopy);
+  }
+
+  if (!candidateModuleGraphHosts.has(hostKey)) {
+    try {
+      const graph = resolveCandidateModuleGraph(sourceCopy.sourceRepo, baseEnv);
+      assertResolvedCandidateModule(graph, identity);
+      candidateModuleGraphHosts.add(hostKey);
+      console.log(
+        `[gosx-studio candidate] verified module=${graph.Path} Module.Replace.Dir=${identity.candidateRepo} candidateSHA=${identity.candidateSHA} sourceCopy=${sourceCopy.sourceRepo} host=${hostKey}`,
+      );
+    } catch (error) {
+      sourceCopy.dispose();
+      candidateSourceCopies.delete(hostKey);
+      throw error;
+    }
+  }
+  return sourceCopy.sourceRepo;
+}
+
+function cleanupCandidateSourceCopies() {
+  for (const [hostKey, sourceCopy] of candidateSourceCopies) {
+    try {
+      sourceCopy.dispose();
+    } catch (error) {
+      console.error(`[gosx-studio candidate] failed to remove source copy ${sourceCopy.sourceRepo}: ${String(error)}`);
+    }
+    candidateSourceCopies.delete(hostKey);
+  }
+  candidateModuleGraphHosts.clear();
+}
+
 let processGroupCleanupInstalled = false;
 
 // installProcessGroupCleanupOnce registers a last-resort sweep of every
@@ -752,6 +840,7 @@ function installProcessGroupCleanupOnce() {
   const sweep = () => {
     for (const pid of activeProcessGroups) killProcessGroup(pid, "SIGKILL");
     activeProcessGroups.clear();
+    cleanupCandidateSourceCopies();
   };
   process.on("exit", sweep);
   process.on("SIGINT", sweep);
@@ -790,9 +879,15 @@ async function runLoggedCommand(command: string, args: string[], options: Logged
 
 async function startGoServer(request: APIRequestContext, options: ServerOptions): Promise<ServerHandle> {
   installProcessGroupCleanupOnce();
+  const serverCwd = candidateSourceRepo(options.cwd, options.env);
   const proc = spawn("go", ["run", options.command], {
-    cwd: options.cwd,
-    env: { ...process.env, GOWORK: "off", ...options.env },
+    cwd: serverCwd,
+    env: {
+      ...process.env,
+      GOWORK: "off",
+      ...options.env,
+      ...candidateGoEnvironment(options.cwd, options.env),
+    },
     stdio: ["ignore", "pipe", "pipe"],
     detached: true,
   });
@@ -814,8 +909,11 @@ async function startGoServer(request: APIRequestContext, options: ServerOptions)
     baseURL: options.baseURL,
     dataDir: options.tempDir,
     stop: async () => {
-      await stopProcess(proc);
-      cleanupTempDir(options.tempDir);
+      try {
+        await stopProcess(proc);
+      } finally {
+        cleanupTempDir(options.tempDir);
+      }
     },
   };
 }

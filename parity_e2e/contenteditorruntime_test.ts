@@ -836,6 +836,8 @@ test.describe("@smoke GoSXStudioContentEditorRuntime", () => {
       .toBeVisible();
     await expect(page.locator("[data-content-editor-save-created-link]"))
       .toHaveAttribute("href", "http://127.0.0.1:4173/admin/pages/page_1");
+    await expect(page.locator("[data-content-editor-save-created-link]"))
+      .toHaveAttribute("tabindex", "0");
     await expect(page.getByRole("button", { name: "Retry save" })).toBeHidden();
     expect(await page.evaluate(() => (window as unknown as { saveCount?: number }).saveCount)).toBe(1);
 

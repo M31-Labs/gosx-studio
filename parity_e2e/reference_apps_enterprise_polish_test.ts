@@ -23,6 +23,64 @@ const CONFLICT_LAYOUT_LIMITS = {
   desktop: { detailMinWidth: 240, maxHeight: 240 },
   mobile: { detailMinWidth: 180, maxHeight: 360 },
 } as const;
+const GALLERY_INDEX_HEADERS = ["Work", "Year", "Visibility", "Updated", ""];
+const GALLERY_INDEX_LABELS = ["Work", "Year", "Visibility", "Updated", "Actions"];
+const SEEDED_GALLERY_TITLE = "Pressed wall tile study";
+const SEEDED_GALLERY_MATERIALS = "Stoneware, iron wash, clear glaze";
+const SEEDED_GALLERY_ROW_COUNT = 2;
+
+type GalleryIndexBox = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  width: number;
+  height: number;
+};
+
+type GalleryIndexGeometry = {
+  viewportWidth: number;
+  scrollWidth: number;
+  clientWidth: number;
+  bodyScrollWidth: number;
+  tableWidth: number;
+  panel: GalleryIndexBox;
+  table: GalleryIndexBox;
+  row: GalleryIndexBox;
+  workCell: GalleryIndexBox;
+  yearCell: GalleryIndexBox;
+  titleRect: GalleryIndexBox;
+  materialsRect: GalleryIndexBox;
+  titleLines: GalleryIndexBox[];
+  materialLines: GalleryIndexBox[];
+  titleOverlapsYear: boolean;
+  materialsOverlapsYear: boolean;
+  titleFitsWorkCell: boolean;
+  materialsFitWorkCell: boolean;
+  titleReadableWidth: boolean;
+  materialsReadableWidth: boolean;
+  readableWidth: number;
+  nativeTable: boolean;
+  tableDisplay: string;
+  rowDisplay: string;
+  labels: string[];
+  headers: string[];
+  headerScopes: string[];
+  thumbnailWidth: number;
+  editVisible: boolean;
+  editTabIndex: number;
+  editBox: GalleryIndexBox;
+  pageLevelOverflow: boolean;
+};
+
+type GalleryIndexResponsiveEvidence = {
+  originalViewport: { width: number; height: number };
+  samples: Array<{
+    viewport: { width: number; height: number };
+    screenshot: string;
+    geometry: GalleryIndexGeometry;
+  }>;
+};
 
 type PageFormSnapshot = {
   title: string;
@@ -530,6 +588,12 @@ test.describe("@reference-apps enterprise polish acceptance", () => {
       const title = form.locator("input[name='title']").first();
       await expect(mediaPicker, "real Gallery CMS must bind the single-URL chooser").toHaveClass(/media-picker/);
 
+      // The index itself is a real host surface, so verify its responsive table
+      // against the seeded work before opening either media picker. The helper
+      // restores the configured viewport before this test's existing clean/
+      // dirty filter flow begins.
+      const galleryIndexResponsive = await assertGalleryIndexResponsive(page, gallery);
+
       const cleanTitle = await title.inputValue();
       const cleanLines = await mediaLines.inputValue();
       const cleanURL = await mediaURL.inputValue();
@@ -622,6 +686,7 @@ test.describe("@reference-apps enterprise polish acceptance", () => {
           postCount: dirtyPostCount,
         },
         postRequests,
+        galleryIndexResponsive,
         screenshots,
       });
     } finally {
@@ -1136,6 +1201,187 @@ function expectObservedSuccess(result: SaveResult, label: string, oldRevision: s
   expect(nextRevision, `${label} save must rotate values.expectedRevision`).not.toBe(oldRevision);
   if (!nextRevision) throw new Error(`${label} observed save did not expose values.expectedRevision`);
   return nextRevision;
+}
+
+async function readGalleryIndexGeometry(page: Page): Promise<GalleryIndexGeometry> {
+  return page.evaluate(() => {
+    const table = document.querySelector<HTMLTableElement>("table.data-table");
+    const panel = table?.closest<HTMLElement>(".panel");
+    const row = table?.tBodies[0]?.rows[0];
+    const workCell = row?.cells[0];
+    const yearCell = row?.cells[1];
+    const product = workCell?.querySelector<HTMLElement>(".table-product");
+    const info = product?.querySelector<HTMLElement>(":scope > div");
+    const title = info?.querySelector<HTMLElement>(":scope > strong");
+    const materials = info?.querySelector<HTMLElement>(":scope > span");
+    const thumbnail = product?.querySelector<HTMLImageElement>(":scope > img");
+    const edit = row?.querySelector<HTMLAnchorElement>("a[data-gosx-link='true']");
+
+    if (!table || !panel || !row || !workCell || !yearCell || !product || !info || !title || !materials || !thumbnail || !edit) {
+      throw new Error("real Gallery index table markup is incomplete");
+    }
+
+    const box = (element: Element): GalleryIndexBox => {
+      const rect = element.getBoundingClientRect();
+      return {
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      };
+    };
+    const lineBoxes = (element: Element): GalleryIndexBox[] => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return Array.from(range.getClientRects()).map((rect) => ({
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      }));
+    };
+    const overlaps = (a: GalleryIndexBox, b: GalleryIndexBox) =>
+      a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+    const work = box(workCell);
+    const year = box(yearCell);
+    const titleLines = lineBoxes(title);
+    const materialLines = lineBoxes(materials);
+    const titleRect = box(title);
+    const materialsRect = box(materials);
+    const readableWidth = 8 * Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+
+    return {
+      viewportWidth: window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+      tableWidth: box(table).width,
+      panel: box(panel),
+      table: box(table),
+      row: box(row),
+      workCell: work,
+      yearCell: year,
+      titleRect,
+      materialsRect,
+      titleLines,
+      materialLines,
+      titleOverlapsYear: titleLines.some((line) => overlaps(line, year)),
+      materialsOverlapsYear: materialLines.some((line) => overlaps(line, year)),
+      titleFitsWorkCell: titleLines.every((line) => line.left >= work.left - 0.5 && line.right <= work.right + 0.5),
+      materialsFitWorkCell: materialLines.every((line) => line.left >= work.left - 0.5 && line.right <= work.right + 0.5),
+      titleReadableWidth: titleRect.width >= readableWidth,
+      materialsReadableWidth: materialsRect.width >= readableWidth,
+      readableWidth,
+      nativeTable: table instanceof HTMLTableElement,
+      tableDisplay: getComputedStyle(table).display,
+      rowDisplay: getComputedStyle(row).display,
+      labels: Array.from(row.cells, (cell) => cell.getAttribute("data-label") ?? ""),
+      headers: Array.from(table.tHead?.rows[0]?.cells ?? [], (cell) => cell.textContent?.trim() ?? ""),
+      headerScopes: Array.from(table.tHead?.rows[0]?.cells ?? [], (cell) => cell.getAttribute("scope") ?? ""),
+      thumbnailWidth: box(thumbnail).width,
+      editVisible: !!(edit.offsetWidth || edit.offsetHeight || edit.getClientRects().length),
+      editTabIndex: edit.tabIndex,
+      editBox: box(edit),
+      pageLevelOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth || document.body.scrollWidth > document.documentElement.clientWidth,
+    };
+  });
+}
+
+async function assertGalleryIndexResponsive(page: Page, gallery: Locator): Promise<GalleryIndexResponsiveEvidence> {
+  const originalViewport = page.viewportSize();
+  if (!originalViewport) throw new Error("Gallery responsive check requires a configured page viewport");
+
+  const samples: GalleryIndexResponsiveEvidence["samples"] = [];
+  try {
+    for (const viewport of [
+      { width: 320, height: 844 },
+      { width: 390, height: 844 },
+      { width: 1280, height: 800 },
+    ]) {
+      await page.setViewportSize(viewport);
+      const table = gallery.locator("table.data-table").first();
+      const row = table.locator("tbody tr").first();
+      const bodyRows = table.locator("tbody tr");
+      const work = row.locator("td[data-label='Work']").first();
+      const edit = row.locator("a[data-gosx-link='true']").first();
+      await expect(table, `real Gallery index table must be visible at ${viewport.width}px`).toBeVisible();
+      await expect(row, `real seeded Gallery row must be visible at ${viewport.width}px`).toBeVisible();
+      await expect(bodyRows, `real Gallery seed must retain ${SEEDED_GALLERY_ROW_COUNT} rows at ${viewport.width}px`).toHaveCount(SEEDED_GALLERY_ROW_COUNT);
+      await expect(work.locator("strong").first()).toHaveText(SEEDED_GALLERY_TITLE);
+      await expect(work.locator("span").first()).toHaveText(SEEDED_GALLERY_MATERIALS);
+      await expect(edit, `real Gallery Edit action must be visible at ${viewport.width}px`).toBeVisible();
+      await expect(edit).toHaveAttribute("href", /\/admin\/gallery\/[^/]+/);
+
+      const geometry = await readGalleryIndexGeometry(page);
+      expect(geometry.viewportWidth).toBe(viewport.width);
+      expect(geometry.nativeTable, `Gallery index must remain a native table at ${viewport.width}px`).toBe(true);
+      expect(geometry.headers).toEqual(GALLERY_INDEX_HEADERS);
+      expect(geometry.headerScopes).toEqual(["col", "col", "col", "col", "col"]);
+      expect(geometry.labels).toEqual(GALLERY_INDEX_LABELS);
+      expect(geometry.tableDisplay).toBe(viewport.width <= 820 ? "block" : "table");
+      expect(geometry.rowDisplay).toBe(viewport.width <= 820 ? "grid" : "table-row");
+      expect(geometry.pageLevelOverflow, `Gallery page overflow at ${viewport.width}px: ${JSON.stringify(geometry)}`).toBe(false);
+      expect(geometry.scrollWidth, `document overflow at ${viewport.width}px`).toBeLessThanOrEqual(geometry.clientWidth + 1);
+      expect(geometry.bodyScrollWidth, `body overflow at ${viewport.width}px`).toBeLessThanOrEqual(geometry.clientWidth + 1);
+      expect(geometry.panel.left, `Gallery panel must stay inside the viewport at ${viewport.width}px`).toBeGreaterThanOrEqual(-0.5);
+      expect(geometry.panel.right, `Gallery panel must stay inside the viewport at ${viewport.width}px`).toBeLessThanOrEqual(viewport.width + 0.5);
+      expect(geometry.table.left).toBeGreaterThanOrEqual(geometry.panel.left - 0.5);
+      expect(geometry.table.right).toBeLessThanOrEqual(geometry.panel.right + 0.5);
+      expect(geometry.row.left).toBeGreaterThanOrEqual(geometry.table.left - 0.5);
+      expect(geometry.row.right).toBeLessThanOrEqual(geometry.table.right + 0.5);
+      expect(geometry.titleOverlapsYear, `Work title crosses Year at ${viewport.width}px: ${JSON.stringify(geometry)}`).toBe(false);
+      expect(geometry.materialsOverlapsYear, `Work materials cross Year at ${viewport.width}px: ${JSON.stringify(geometry)}`).toBe(false);
+      expect(geometry.titleFitsWorkCell).toBe(true);
+      expect(geometry.materialsFitWorkCell).toBe(true);
+      expect(geometry.titleReadableWidth, `Work title collapsed below ${geometry.readableWidth}px at ${viewport.width}px`).toBe(true);
+      expect(geometry.materialsReadableWidth, `Work materials collapsed below ${geometry.readableWidth}px at ${viewport.width}px`).toBe(true);
+      expect(geometry.thumbnailWidth, `seeded Work thumbnail became too narrow at ${viewport.width}px`).toBeGreaterThanOrEqual(64);
+      expect(geometry.editVisible).toBe(true);
+      expect(geometry.editTabIndex, `Gallery Edit link must remain keyboard reachable at ${viewport.width}px`).toBe(0);
+      expect(geometry.editBox.left).toBeGreaterThanOrEqual(-0.5);
+      expect(geometry.editBox.right).toBeLessThanOrEqual(viewport.width + 0.5);
+
+      const tableRole = gallery.getByRole("table", { includeHidden: true });
+      const rows = table.getByRole("row", { includeHidden: true });
+      const columnHeaders = table.getByRole("columnheader", { includeHidden: true });
+      await expect(tableRole, `Gallery index must expose a table role at ${viewport.width}px`).toHaveCount(1);
+      await expect(rows, `Gallery index must expose native row roles at ${viewport.width}px`).toHaveCount(SEEDED_GALLERY_ROW_COUNT + 1);
+      await expect(columnHeaders, `Gallery index must expose five column roles at ${viewport.width}px`).toHaveCount(5);
+      await expect(table.getByRole("columnheader", { name: "Work", exact: true, includeHidden: true })).toHaveCount(1);
+      await expect(table.getByRole("columnheader", { name: "Year", exact: true, includeHidden: true })).toHaveCount(1);
+      const ariaSnapshot = await table.ariaSnapshot();
+      expect(ariaSnapshot).toContain("table");
+      expect(ariaSnapshot).toContain("row");
+      expect(ariaSnapshot).toContain('columnheader "Work"');
+      expect(ariaSnapshot).toContain('columnheader "Year"');
+
+      // Keep the index capture distinct from the later filter-panel captures.
+      // It runs before either picker is opened and therefore records the real
+      // host shell/table surface at each requested width.
+      const screenshot = await captureScreenshot(page, `gallery-index-real-host-${viewport.width}x${viewport.height}`, viewport.width, viewport.height, false);
+      const galleryHeading = gallery.getByRole("heading", { name: "Gallery works", exact: true }).first();
+      await expect(galleryHeading, `Gallery heading must be available to establish page focus at ${viewport.width}px`).toBeVisible();
+      await galleryHeading.click();
+      let editReachedByTab = false;
+      for (let step = 0; step < 64; step += 1) {
+        await page.keyboard.press("Tab");
+        if (await edit.evaluate((element) => document.activeElement === element)) {
+          editReachedByTab = true;
+          break;
+        }
+      }
+      expect(editReachedByTab, `Gallery Edit link must be reachable by keyboard Tab at ${viewport.width}px`).toBe(true);
+      await expect(edit).toBeFocused();
+      samples.push({ viewport, screenshot, geometry });
+    }
+  } finally {
+    await page.setViewportSize(originalViewport);
+  }
+  return { originalViewport, samples };
 }
 
 async function captureScreenshot(page: Page, label: string, width: number, height: number, fullPage = true): Promise<string> {

@@ -26,6 +26,14 @@ jobs:
         with:
           path: gosx-studio
 
+      - name: Capture gosx-studio candidate SHA
+        id: studio-candidate
+        working-directory: gosx-studio
+        run: |
+          candidate_sha="$(git rev-parse --verify HEAD)"
+          echo "sha=${candidate_sha}" >> "$GITHUB_OUTPUT"
+          echo "gosx-studio candidate SHA: ${candidate_sha}"
+
       - name: Resolve reference app refs
         id: refs
         run: |
@@ -90,11 +98,21 @@ jobs:
         working-directory: gosx-studio/parity_e2e
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium firefox webkit
 
       - name: Type-check parity harness
         working-directory: gosx-studio/parity_e2e
         run: npx tsc --noEmit
+
+      - name: Test candidate identity guard
+        working-directory: gosx-studio/parity_e2e
+        run: npm run test:candidate-identity
+
+      - name: Run shared-runtime browser matrix
+        working-directory: gosx-studio/parity_e2e
+        env:
+          GOSX_STUDIO_ENTERPRISE_ARTIFACT_ROOT: ${{ runner.temp }}/gosx-studio-shared-runtime
+        run: npm run test:shared-runtime
 
       - name: Unit-test gosx-studio
         working-directory: gosx-studio
@@ -113,6 +131,8 @@ jobs:
         working-directory: gosx-studio/parity_e2e
         env:
           GOSX_STUDIO_REFERENCE_APP_E2E: '1'
+          GOSX_STUDIO_CANDIDATE_REPO: ${{ github.workspace }}/gosx-studio
+          GOSX_STUDIO_CANDIDATE_SHA: ${{ steps.studio-candidate.outputs.sha }}
           GOSX_STUDIO_MUDDY_REPO: ${{ github.workspace }}/muddy-noni-commerce
           GOSX_STUDIO_PAJARITOS_REPO: ${{ github.workspace }}/pajaritos-forest-school
         run: npm run test:reference-apps
@@ -123,6 +143,7 @@ jobs:
         with:
           name: reference-app-editor-e2e-artifacts
           path: |
+            ${{ runner.temp }}/gosx-studio-shared-runtime/
             gosx-studio/parity_e2e/playwright-report/
             gosx-studio/parity_e2e/test-results/
           if-no-files-found: ignore
