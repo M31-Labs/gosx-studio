@@ -152,8 +152,9 @@ normal/race reruns, and CMS no-emit now pass. Functional/layout staging
 verification is complete within this bounded evidence; final hardening and
 remaining owner login/content-review/turnover records remain open. Owner login,
 walkthrough, and acceptance are turnover gates only, not prerequisites for the already
-authorized staging deploy. The documentation checkpoint remains pending root
-review. The product remains a structured editor rather than
+authorized staging deploy. The guide and investigation documents are
+checkpointed separately from the runtime source at Studio docs checkpoint
+`4d26a4f2e97191358ee6674061880b4d4dd10c7d`. The product remains a structured editor rather than
 an arbitrary Squarespace-style canvas, and email behavior is unchanged.
 
 This report makes no enterprise certification, penetration test, dependency-CVE
