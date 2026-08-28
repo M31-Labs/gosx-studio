@@ -68,8 +68,9 @@ type Options struct {
 	Resource Resource
 	Document blockstudio.Document
 	Store    Store
-	// Hub, when supplied, must be dedicated to this Room/resource. A shared
-	// Hub would mix handlers and metadata across Room instances.
+	// Deprecated: a supplied Hub is rejected by NewRoom. Omit this field so
+	// NewRoom can create a private Hub; after construction, configure limits on
+	// Room.Hub() before serving the Room.
 	Hub               *hub.Hub
 	ActorResolver     ActorResolver
 	Authorize         AuthorizeFunc
@@ -158,6 +159,9 @@ func NewRoom(options Options) (*Room, error) {
 	if resource.Kind == "" || resource.ID == "" {
 		return nil, fmt.Errorf("studio collab room requires resource kind and id")
 	}
+	if options.Hub != nil {
+		return nil, fmt.Errorf("studio collab room does not accept Options.Hub; omit it so the room can create a private Hub, then configure the private hub via Room.Hub()")
+	}
 	doc := cloneDocument(options.Document)
 	if options.Store != nil {
 		if saved, ok, err := options.Store.LoadDraft(resource); err != nil {
@@ -169,10 +173,7 @@ func NewRoom(options Options) (*Room, error) {
 	if doc.Version <= 0 {
 		doc.Version = 1
 	}
-	h := options.Hub
-	if h == nil {
-		h = hub.New("studio:" + resource.Kind + ":" + resource.ID)
-	}
+	h := hub.New("studio:" + resource.Kind + ":" + resource.ID)
 	room := &Room{
 		resource:          resource,
 		doc:               doc,
@@ -207,6 +208,11 @@ func (r *Room) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.hub.ServeHTTPWithMetadata(w, req, roomActorMetadata(actor))
 }
 
+// Hub returns the Room's private Hub for privileged server-side
+// configuration and inspection. Configure supported limits before serving
+// the Room; never mount this raw Hub as an authenticated endpoint, share it
+// across Rooms, register handlers that override Room handlers, or latch Room
+// payloads on it.
 func (r *Room) Hub() *hub.Hub {
 	return r.hub
 }
@@ -702,7 +708,7 @@ func (r *Room) touchPresenceLocked(actor admincollab.Actor, state PresenceState)
 
 func (r *Room) broadcastLocked(event string, value any) {
 	if r.hub != nil {
-		r.hub.BroadcastWhere(event, value, roomClientAuthorized)
+		r.hub.BroadcastWhere(event, value, r.roomClientAuthorized)
 	}
 }
 

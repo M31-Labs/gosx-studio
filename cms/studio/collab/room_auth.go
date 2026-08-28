@@ -51,13 +51,16 @@ func roomActorFromClient(client *hub.Client) (admincollab.Actor, error) {
 	return normalizeRoomActor(actor)
 }
 
-func roomClientAuthorized(client *hub.Client) bool {
+func (r *Room) roomClientAuthorized(client *hub.Client) bool {
+	if r == nil || r.hub == nil || client == nil || client.Hub != r.hub {
+		return false
+	}
 	_, err := roomActorFromClient(client)
 	return err == nil
 }
 
 func (r *Room) trustedActor(ctx *hub.Context) (admincollab.Actor, bool) {
-	if ctx == nil || ctx.Client == nil {
+	if ctx == nil || ctx.Hub != r.hub || ctx.Client == nil || ctx.Client.Hub != r.hub {
 		return admincollab.Actor{}, false
 	}
 	actor, err := roomActorFromClient(ctx.Client)

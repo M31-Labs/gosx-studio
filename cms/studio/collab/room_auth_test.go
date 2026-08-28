@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"m31labs.dev/gosx-admin/blockstudio"
 	admincollab "m31labs.dev/gosx-admin/blockstudio/collab"
 	"m31labs.dev/gosx/hub"
 )
@@ -54,6 +55,31 @@ func TestRoomServeHTTPRequiresValidActorResolver(t *testing.T) {
 				t.Fatalf("dial err=%v response=%v, want HTTP 403", err, response)
 			}
 		})
+	}
+}
+
+func TestRoomRejectsSuppliedHubBeforeLoadingDraft(t *testing.T) {
+	foreign := hub.New("foreign-shared-hub")
+	foreign.Latch("studio.snapshot")
+	foreign.Broadcast("studio.snapshot", Snapshot{Document: testDocument()})
+	store := &roomAuthStoreProbe{}
+
+	for attempt := 0; attempt < 2; attempt++ {
+		room, err := NewRoom(Options{
+			Resource: Resource{Kind: "page", ID: "home"},
+			Document: testDocument(),
+			Store:    store,
+			Hub:      foreign,
+		})
+		if room != nil {
+			t.Fatalf("attempt %d returned a Room for a supplied Hub", attempt)
+		}
+		if err == nil || !strings.Contains(err.Error(), "Options.Hub") || !strings.Contains(err.Error(), "private Hub") {
+			t.Fatalf("attempt %d error=%v, want actionable supplied-Hub rejection", attempt, err)
+		}
+	}
+	if store.loadCalls != 0 || store.saveCalls != 0 {
+		t.Fatalf("supplied-Hub rejection touched Store: loads=%d saves=%d", store.loadCalls, store.saveCalls)
 	}
 }
 
@@ -112,6 +138,55 @@ func TestRoomRawHubCannotReplayOrReceiveDocuments(t *testing.T) {
 	assertRoomAuthDisconnectedWithoutSnapshot(t, activeRaw)
 	if got := room.Snapshot().Presence; len(got) != 1 || got[0].Actor.ID != actor.ID {
 		t.Fatalf("raw Hub join changed presence: %#v", got)
+	}
+}
+
+func TestRoomInstancesUsePrivateHubsAndIsolateResources(t *testing.T) {
+	actor := roomAuthActor("same-actor", admincollab.ActorHuman, admincollab.CapabilityEdit)
+	roomA, serverA := newRoomAuthPolicyServerForResource(t, Resource{Kind: "page", ID: "alpha"}, actor, nil, nil)
+	roomB, serverB := newRoomAuthPolicyServerForResource(t, Resource{Kind: "page", ID: "beta"}, actor, nil, nil)
+	if roomA.Hub() == roomB.Hub() {
+		t.Fatal("distinct Room instances unexpectedly share a Hub")
+	}
+
+	connectionA, _, err := dialRoomAuth(serverA.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connectionA.Close()
+	_ = readRoomAuthEvent(t, connectionA, "__welcome")
+	roomAuthWrite(t, connectionA, "studio.join", roomAuthJoinMessage{Actor: roomAuthForgedSystemActor(), State: PresenceEditing})
+	_ = readRoomAuthEvent(t, connectionA, "studio.presence")
+	joinedA := readRoomAuthSnapshot(t, connectionA)
+	if joinedA.Resource.ID != "alpha" {
+		t.Fatalf("Room A resource=%q", joinedA.Resource.ID)
+	}
+
+	connectionB, _, err := dialRoomAuth(serverB.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connectionB.Close()
+	welcomeB := readRoomAuthEvent(t, connectionB, "__welcome")
+	clientBID := roomAuthWelcomeClientID(t, welcomeB)
+	roomAuthWrite(t, connectionB, "studio.join", roomAuthJoinMessage{Actor: roomAuthForgedSystemActor(), State: PresenceEditing})
+	_ = readRoomAuthEvent(t, connectionB, "studio.presence")
+	joinedB := readRoomAuthSnapshot(t, connectionB)
+	if joinedB.Resource.ID != "beta" {
+		t.Fatalf("Room B resource=%q", joinedB.Resource.ID)
+	}
+	roomAuthWrite(t, connectionA, "studio.operation", roomAuthOperationMessage{
+		Actor:     roomAuthForgedSystemActor(),
+		Operation: roomAuthSetTextOperation("alpha-write", "Only alpha changes"),
+	})
+	updatedA := readRoomAuthSnapshot(t, connectionA)
+	if got := updatedA.Document.Blocks[0].Values["headline"].String; got != "Only alpha changes" {
+		t.Fatalf("Room A headline=%q", got)
+	}
+	roomB.Hub().Send(clientBID, "room-auth.barrier", map[string]bool{"ready": true})
+	assertNoRoomAuthSnapshotBeforeBarrier(t, connectionB, "room-auth.barrier")
+	if got := roomB.Snapshot().Document.Blocks[0].Values["headline"].String; got != "Welcome" {
+		t.Fatalf("Room B was mutated by Room A operation: headline=%q", got)
 	}
 }
 
@@ -494,19 +569,23 @@ type roomAuthCommentDecisionMessage struct {
 }
 
 func newRoomAuthServer(t *testing.T, actor admincollab.Actor, authorize AuthorizeFunc) (*Room, *httptest.Server) {
-	return newRoomAuthPolicyServer(t, actor, authorize, nil)
+	return newRoomAuthPolicyServerForResource(t, Resource{Kind: "page", ID: "home"}, actor, authorize, nil)
 }
 
 func newRoomAuthPolicyServer(t *testing.T, actor admincollab.Actor, authorize AuthorizeFunc, authorizeDecision AuthorizeDecisionFunc) (*Room, *httptest.Server) {
+	return newRoomAuthPolicyServerForResource(t, Resource{Kind: "page", ID: "home"}, actor, authorize, authorizeDecision)
+}
+
+func newRoomAuthPolicyServerForResource(t *testing.T, resource Resource, actor admincollab.Actor, authorize AuthorizeFunc, authorizeDecision AuthorizeDecisionFunc) (*Room, *httptest.Server) {
 	t.Helper()
 	room, err := NewRoom(Options{
-		Resource: Resource{Kind: "page", ID: "home"},
-		Document: testDocument(),
+		Resource:          resource,
+		Document:          testDocument(),
+		Authorize:         authorize,
+		AuthorizeDecision: authorizeDecision,
 		ActorResolver: func(*http.Request) (admincollab.Actor, error) {
 			return actor, nil
 		},
-		Authorize:         authorize,
-		AuthorizeDecision: authorizeDecision,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -514,6 +593,21 @@ func newRoomAuthPolicyServer(t *testing.T, actor admincollab.Actor, authorize Au
 	server := httptest.NewServer(room)
 	t.Cleanup(server.Close)
 	return room, server
+}
+
+type roomAuthStoreProbe struct {
+	loadCalls int
+	saveCalls int
+}
+
+func (s *roomAuthStoreProbe) LoadDraft(Resource) (blockstudio.Document, bool, error) {
+	s.loadCalls++
+	return blockstudio.Document{}, false, nil
+}
+
+func (s *roomAuthStoreProbe) SaveDraft(Resource, blockstudio.Document) error {
+	s.saveCalls++
+	return nil
 }
 
 func roomAuthActor(id string, kind admincollab.ActorKind, capabilities ...admincollab.Capability) admincollab.Actor {
@@ -581,6 +675,43 @@ func readRoomAuthEvent(t *testing.T, connection *websocket.Conn, want string) hu
 		}
 		if message.Event == want {
 			return message
+		}
+	}
+}
+
+func roomAuthWelcomeClientID(t *testing.T, welcome hub.Message) string {
+	t.Helper()
+	var payload struct {
+		ClientID string `json:"clientId"`
+	}
+	if err := json.Unmarshal(welcome.Data, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.ClientID == "" {
+		t.Fatalf("welcome payload=%s has no client ID", welcome.Data)
+	}
+	return payload.ClientID
+}
+
+func assertNoRoomAuthSnapshotBeforeBarrier(t *testing.T, connection *websocket.Conn, barrier string) {
+	t.Helper()
+	if err := connection.SetReadDeadline(time.Now().Add(3 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		_, data, err := connection.ReadMessage()
+		if err != nil {
+			t.Fatalf("read barrier %s: %v", barrier, err)
+		}
+		var message hub.Message
+		if json.Unmarshal(data, &message) != nil {
+			continue
+		}
+		if message.Event == "studio.snapshot" {
+			t.Fatalf("unexpected cross-room studio.snapshot before barrier: %s", data)
+		}
+		if message.Event == barrier {
+			return
 		}
 	}
 }
