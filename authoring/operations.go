@@ -224,12 +224,38 @@ func (r OperationRequest) Validate() error {
 		if r.Target.Field == "" {
 			return errors.New("field target is required")
 		}
+		if r.Target.Property != "" {
+			return errors.New("set-field cannot target a style property")
+		}
 	case OperationSetStyle, OperationResetStyle:
 		if r.Target.ComponentKey == "" || r.Target.Property == "" {
 			return errors.New("component and property targets are required")
 		}
+		if r.Target.Field != "" {
+			return errors.New("style operation cannot target a content field")
+		}
+		if !IsSupportedStyleProperty(r.Target.Property) {
+			return errors.New("unsupported style property")
+		}
 		if !isSupportedStyleBreakpoint(r.Target.Breakpoint) || !isSupportedStyleState(r.Target.State) {
 			return errors.New("unsupported style scope")
+		}
+		if r.Kind == OperationSetStyle {
+			// Keep the durable request's long-standing empty-value
+			// compatibility: hosts may use a shape-only request while
+			// resolving the current editor value. Any submitted non-empty
+			// value still receives the same server-owned safety checks as the
+			// AuthoringMutation path before persistence.
+			if strings.TrimSpace(r.Value) != "" {
+				if reason := styleValueRejection(r.Value); reason != "" {
+					return fmt.Errorf("invalid style value: %s", reason)
+				}
+			}
+			if strings.TrimSpace(r.Value) != "" && IsResponsiveLayoutProperty(r.Target.Property) {
+				if reason, ok := ValidateLayoutValue(r.Target.Property, r.Value); !ok {
+					return fmt.Errorf("invalid style value: %s", reason)
+				}
+			}
 		}
 	case OperationUndo, OperationRedo:
 		if r.HistoryOperationID == "" {

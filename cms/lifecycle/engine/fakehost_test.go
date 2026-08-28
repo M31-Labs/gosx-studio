@@ -60,6 +60,7 @@ type fakeHost struct {
 	applyPublishCalls int
 	restoreLiveCalls  int
 	snapshotLiveCalls int
+	readinessCalls    int
 }
 
 func newFakeHost(revisions cmsstore.RevisionStore) *fakeHost {
@@ -159,6 +160,7 @@ func (h *fakeHost) DraftDiff(ctx context.Context, ref TargetRef) (lifecycle.Revi
 func (h *fakeHost) Readiness(ctx context.Context, ref TargetRef) ([]Blocker, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	h.readinessCalls++
 	return append([]Blocker(nil), h.blockers[ref]...), nil
 }
 

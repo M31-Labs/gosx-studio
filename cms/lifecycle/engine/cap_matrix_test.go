@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"m31labs.dev/gosx-studio/cms/lifecycle"
 )
 
 // TestCapabilityMatrixDeniesWithoutMatchingCapability is the
 // HANDOFF-PUBLISH-MASTERING-07 slice S7 verification bullet: "cap matrix
-// table test (publish/promote/restore each deny without the matching
+// table test (publish/review/ready/promote/restore each deny without the matching
 // capability)". Each row grants every OTHER capability so the only possible
 // reason for denial is the one capability under test -- proving the gate is
 // exactly the one requireCap check the spec's normative sequence names, not
@@ -28,6 +30,22 @@ func TestCapabilityMatrixDeniesWithoutMatchingCapability(t *testing.T) {
 				host.setLive(ref, map[string]string{"title": "Original"})
 				host.setDraft(ref, map[string]string{"title": "Draft"})
 				_, err := e.Publish(context.Background(), PublishCommand{Target: ref, Actor: actor, OperationID: "op-publish"})
+				return err
+			},
+		},
+		{
+			name: "review denies without CanPublish",
+			caps: withoutCap(full, "publish"),
+			run: func(t *testing.T, e *Engine, host *fakeHost, ref TargetRef, actor Actor) error {
+				_, err := e.Review(context.Background(), ReviewCommand{Target: ref, Actor: actor, Note: "please review"})
+				return err
+			},
+		},
+		{
+			name: "mark-ready denies without CanPublish",
+			caps: withoutCap(full, "publish"),
+			run: func(t *testing.T, e *Engine, host *fakeHost, ref TargetRef, actor Actor) error {
+				_, err := e.MarkReady(context.Background(), ReadyCommand{Target: ref, Actor: actor, Note: "looks good"})
 				return err
 			},
 		},
@@ -63,10 +81,11 @@ func TestCapabilityMatrixDeniesWithoutMatchingCapability(t *testing.T) {
 			if !errors.Is(err, ErrUnauthorized) {
 				t.Fatalf("%s: expected ErrUnauthorized with every OTHER capability granted, got %v (caps=%#v)", tc.name, err, tc.caps)
 			}
-			if host.applyPublishCalls != 0 || host.restoreLiveCalls != 0 || host.snapshotLiveCalls != 0 {
-				t.Fatalf("%s: expected zero host interaction when the matching capability is missing, got apply=%d restore=%d snapshot=%d",
-					tc.name, host.applyPublishCalls, host.restoreLiveCalls, host.snapshotLiveCalls)
+			if host.applyPublishCalls != 0 || host.restoreLiveCalls != 0 || host.snapshotLiveCalls != 0 || host.readinessCalls != 0 {
+				t.Fatalf("%s: expected zero host interaction when the matching capability is missing, got apply=%d restore=%d snapshot=%d readiness=%d",
+					tc.name, host.applyPublishCalls, host.restoreLiveCalls, host.snapshotLiveCalls, host.readinessCalls)
 			}
+			assertNoLifecycleWrites(t, e, ref, tc.name)
 		})
 	}
 }
@@ -86,6 +105,32 @@ func TestCapabilityMatrixSucceedsWithMatchingCapability(t *testing.T) {
 		actor := Actor{ID: "actor-1", Caps: full}
 		if _, err := e.Publish(context.Background(), PublishCommand{Target: ref, Actor: actor, OperationID: "op-publish-ok"}); err != nil {
 			t.Fatalf("expected publish to succeed with CanPublish granted, got %v", err)
+		}
+	})
+
+	t.Run("review succeeds with CanPublish", func(t *testing.T) {
+		e, _ := newTestEngine(t)
+		ref := testTarget()
+		actor := Actor{ID: "actor-1", Caps: full}
+		result, err := e.Review(context.Background(), ReviewCommand{Target: ref, Actor: actor, Note: "please review"})
+		if err != nil {
+			t.Fatalf("expected review to succeed with CanPublish granted, got %v", err)
+		}
+		if result.Decision.Status != lifecycle.DecisionPending {
+			t.Fatalf("expected pending review decision, got %#v", result.Decision)
+		}
+	})
+
+	t.Run("mark-ready succeeds with CanPublish", func(t *testing.T) {
+		e, _ := newTestEngine(t)
+		ref := testTarget()
+		actor := Actor{ID: "actor-1", Caps: full}
+		result, err := e.MarkReady(context.Background(), ReadyCommand{Target: ref, Actor: actor, Note: "looks good"})
+		if err != nil {
+			t.Fatalf("expected mark-ready to succeed with CanPublish granted, got %v", err)
+		}
+		if result.Decision.Status != lifecycle.DecisionApproved {
+			t.Fatalf("expected approved ready decision, got %#v", result.Decision)
 		}
 	})
 
@@ -139,4 +184,23 @@ func withoutCap(caps CapabilitySet, name string) CapabilitySet {
 		caps.CanPromote = false
 	}
 	return caps
+}
+
+func assertNoLifecycleWrites(t *testing.T, e *Engine, ref TargetRef, name string) {
+	t.Helper()
+	ctx := context.Background()
+	decisions, err := e.Ledger.ListPublishDecisions(ctx, lifecycle.LedgerFilter{ResourceKind: ref.ResourceKind, ResourceID: ref.ResourceID})
+	if err != nil {
+		t.Fatalf("%s: list publish decisions: %v", name, err)
+	}
+	if len(decisions) != 0 {
+		t.Fatalf("%s: expected zero ledger publish decisions on denial, got %d", name, len(decisions))
+	}
+	events, err := e.Ledger.ListAuditEvents(ctx, lifecycle.LedgerFilter{ResourceKind: ref.ResourceKind, ResourceID: ref.ResourceID})
+	if err != nil {
+		t.Fatalf("%s: list audit events: %v", name, err)
+	}
+	if len(events) != 0 {
+		t.Fatalf("%s: expected zero ledger audit events on denial, got %d", name, len(events))
+	}
 }

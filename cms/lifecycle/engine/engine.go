@@ -135,8 +135,14 @@ func (e *Engine) PendingDiff(ctx context.Context, ref TargetRef) (DraftPreview, 
 	return preview, nil
 }
 
-// Review opens a review by recording a Pending PublishDecision.
+// Review opens a review by recording a Pending PublishDecision. Review is a
+// publishing-lifecycle write, so it uses the existing server-resolved
+// CanPublish capability and performs that check before touching the ledger.
 func (e *Engine) Review(ctx context.Context, cmd ReviewCommand) (ReviewResult, error) {
+	if err := e.requireCap(cmd.Actor.Caps.CanPublish); err != nil {
+		return ReviewResult{}, err
+	}
+
 	decision, err := e.Ledger.SavePublishDecision(ctx, lifecycle.PublishDecisionInput{
 		ResourceKind: cmd.Target.ResourceKind,
 		ResourceID:   cmd.Target.ResourceID,
@@ -161,9 +167,16 @@ func (e *Engine) Review(ctx context.Context, cmd ReviewCommand) (ReviewResult, e
 	return ReviewResult{Decision: decision}, nil
 }
 
-// MarkReady approves a pending review once readiness is clear. It fails
-// closed with ErrReadiness when a blocking blocker remains.
+// MarkReady approves a pending review once readiness is clear. MarkReady is a
+// publishing-lifecycle write, so it uses the existing server-resolved
+// CanPublish capability and performs that check before asking the host for
+// readiness. It fails closed with ErrReadiness when a blocking blocker
+// remains.
 func (e *Engine) MarkReady(ctx context.Context, cmd ReadyCommand) (ReadyResult, error) {
+	if err := e.requireCap(cmd.Actor.Caps.CanPublish); err != nil {
+		return ReadyResult{}, err
+	}
+
 	gate, err := e.Readiness(ctx, cmd.Target)
 	if err != nil {
 		return ReadyResult{}, err

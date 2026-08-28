@@ -583,6 +583,10 @@ func TestMarkReadyBlockedByReadiness(t *testing.T) {
 	if !errors.As(err, &readinessErr) {
 		t.Fatalf("expected ErrReadiness, got %v", err)
 	}
+	if host.readinessCalls != 1 {
+		t.Fatalf("expected readiness to be checked exactly once, got %d", host.readinessCalls)
+	}
+	assertNoLifecycleWrites(t, e, ref, "mark-ready readiness failure")
 }
 
 func TestPromoteRecordsIntentWithSeedDataFalse(t *testing.T) {

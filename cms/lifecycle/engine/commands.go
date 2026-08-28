@@ -19,7 +19,10 @@ type CapabilitySet struct {
 	CanConfigureProduction bool
 }
 
-// ReviewCommand opens a review (records a Pending PublishDecision).
+// ReviewCommand opens a review (records a Pending PublishDecision). The
+// lifecycle engine requires the actor's existing server-resolved CanPublish
+// capability before recording the decision; callers do not supply a new
+// review-specific authority.
 type ReviewCommand struct {
 	Target TargetRef
 	Actor  Actor
@@ -31,7 +34,9 @@ type ReviewResult struct {
 	Decision lifecycle.PublishDecision
 }
 
-// ReadyCommand approves a review once readiness is clear.
+// ReadyCommand approves a review once readiness is clear. The lifecycle
+// engine requires the actor's existing server-resolved CanPublish capability
+// before querying host readiness or recording the decision.
 type ReadyCommand struct {
 	Target TargetRef
 	Actor  Actor
