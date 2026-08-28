@@ -18,6 +18,18 @@
   var mediaItemID = 0;
   var mediaDragType = "application/x-gosx-studio-media";
   var uploadControllers = [];
+  var supportedImageContentTypes = {
+    "image/avif": true,
+    "image/apng": true,
+    "image/bmp": true,
+    "image/gif": true,
+    "image/jpeg": true,
+    "image/png": true,
+    "image/svg+xml": true,
+    "image/webp": true,
+    "image/x-icon": true,
+    "image/vnd.microsoft.icon": true
+  };
 
   function toArray(list) {
     return Array.prototype.slice.call(list || []);
@@ -44,17 +56,35 @@
   function mediaAssets(list) {
     var seen = {};
     return toArray(list.querySelectorAll("option")).map(function (option) {
-      var url = safeMediaURL(String(option.getAttribute("value") || "").trim());
+      var url = safeMediaURL(String(option.getAttribute("value") || ""));
       if (!url || seen[url]) return null;
       seen[url] = true;
+      var contentType = mediaContentType(option);
       return {
         url: url,
         label: String(option.getAttribute("label") || option.textContent || filename(url)).trim() || filename(url),
         alt: String(option.getAttribute("data-media-alt") || "").trim(),
-        image: imageURL(url),
+        contentType: contentType,
+        image: imageURL(url, contentType),
         kind: fileKind(url)
       };
     }).filter(Boolean);
+  }
+
+  // ContentType is advisory classification metadata from the host. It may
+  // decide whether a known asset gets an image preview, but upload acceptance
+  // and byte sniffing remain host-boundary responsibilities.
+  function mediaContentType(option) {
+    return normalizeMediaContentType(option && option.getAttribute("data-media-content-type"));
+  }
+
+  function normalizeMediaContentType(value) {
+    var type = String(value || "").split(";", 1)[0].trim().toLowerCase();
+    return type;
+  }
+
+  function supportedImageContentType(type) {
+    return supportedImageContentTypes[type] === true;
   }
 
   function filename(url) {
@@ -68,17 +98,47 @@
     return ext && ext.length <= 5 ? ext : "file";
   }
 
-  function imageURL(url) {
-    var clean = String(url || "").split("?")[0].toLowerCase();
-    return /\.(avif|gif|jpe?g|png|svg|webp)$/.test(clean);
+  function imageURL(url, contentType) {
+    var type = normalizeMediaContentType(contentType);
+    if (type) return supportedImageContentType(type);
+    var clean = String(url || "").split("?")[0].split("#")[0].toLowerCase();
+    return /\.(apng|avif|bmp|gif|ico|jpe?g|png|svg|webp)$/.test(clean);
   }
 
-  function safeMediaURL(url) {
-    url = String(url || "").trim();
-    if (!url) return "";
-    if (/^(?:javascript|data|vbscript):/i.test(url)) return "";
-    if (/^(?:https?:)?\/\//i.test(url) || url.charAt(0) === "/" || url.indexOf("./") === 0 || url.indexOf("../") === 0) return url;
-    return /^[A-Za-z0-9._~!$&'()*+,;=:@/-]+(?:[?#][^\s]*)?$/.test(url) ? url : "";
+  // safeMediaURL accepts explicit http(s) URLs and relative references only.
+  // It intentionally rejects protocol-relative, active, mailto/tel, file,
+  // blob, malformed, control-character, and whitespace-bearing destinations.
+  // Parsing uses a synthetic origin and therefore never fetches a URL.
+  function safeMediaURL(rawURL) {
+    var raw = String(rawURL || "");
+    if (!raw || /[\u0000-\u001F\u007F-\u009F]/.test(raw)) return "";
+    var url = raw.trim();
+    if (!url || /\s/.test(url) || url.indexOf("\\") >= 0 || /%(?![0-9A-Fa-f]{2})/.test(url)) return "";
+
+    var scheme = /^([A-Za-z][A-Za-z0-9+.-]*):/.exec(url);
+    if (scheme) {
+      var protocol = scheme[1].toLowerCase();
+      if ((protocol !== "http" && protocol !== "https") || !/^https?:\/\//i.test(url)) return "";
+      // WHATWG URL repairs empty HTTP authorities (for example
+      // https:///asset -> https://asset/). Keep the raw-authority contract
+      // aligned with the Go serializer instead of accepting that repair.
+      var authority = url.slice(scheme[0].length + 2);
+      if (!authority || /^[\/?#]/.test(authority)) return "";
+      try {
+        var absolute = new URL(url);
+        if (!absolute.hostname) return "";
+      } catch (error) {
+        return "";
+      }
+      return url;
+    }
+    if (url.indexOf("//") === 0) return "";
+    try {
+      new URL(url, "https://gosx.invalid/");
+    } catch (error) {
+      return "";
+    }
+    return url;
   }
 
   function clamp(value, min, max) {
@@ -129,7 +189,7 @@
   }
 
   function renderThumb(asset) {
-    if (asset.image) return element("img", { src: asset.url, alt: "" });
+    if (asset.image && asset.url) return element("img", { src: asset.url, alt: "" });
     return element("span", { class: "media-picker__file", text: asset.kind });
   }
 
@@ -168,23 +228,25 @@
   function parseMediaLines(value) {
     return String(value || "").split("\n").map(function (line) {
       var parts = line.split("|");
-      return mediaImage(parts[0], parts.slice(1).join("|"));
+      return mediaImage(safeMediaURL(parts[0]), parts.slice(1).join("|"));
     }).filter(function (image) { return image.url; });
   }
 
   function serializeMediaLines(images) {
     return images.map(function (image) {
-      var url = String((image && image.url) || "").trim();
+      var url = safeMediaURL((image && image.url) || "");
+      if (!url) return "";
       var alt = String((image && image.alt) || "").trim();
       return url + (alt ? " | " + alt : "");
     }).filter(Boolean).join("\n");
   }
 
-  function mediaImage(url, alt) {
+  function mediaImage(url, alt, contentType) {
     return {
       id: "media-item-" + (++mediaItemID),
-      url: String(url || "").trim(),
-      alt: String(alt || "").trim()
+      url: safeMediaURL(url),
+      alt: String(alt || "").trim(),
+      contentType: normalizeMediaContentType(contentType)
     };
   }
 
@@ -250,19 +312,24 @@
     }
 
     function updatePreview() {
-      var value = String(input.value || "").trim();
+      var rawValue = String(input.value || "");
+      var value = safeMediaURL(rawValue);
       syncGridSelection(value);
       preview.textContent = "";
-      if (!value) {
+      if (!rawValue.trim()) {
         preview.appendChild(element("span", { class: "media-picker__empty", text: "No asset selected" }));
         return;
       }
-      var current = assets.filter(function (asset) { return asset.url === value; })[0] || {
-        url: safeMediaURL(value),
-        label: filename(value),
-        image: imageURL(value),
-        kind: fileKind(value)
-      };
+      if (!value) return;
+      var current = assets.filter(function (asset) { return asset.url === value; })[0];
+      if (!current) {
+        current = {
+          url: value,
+          label: filename(value),
+          image: imageURL(value),
+          kind: fileKind(value)
+        };
+      }
       if (!current.url) return;
       preview.appendChild(renderThumb(current));
       preview.appendChild(element("span", { text: current.label }));
@@ -271,7 +338,7 @@
     function renderGrid() {
       var query = search.value.trim();
       var normalizedQuery = query.toLowerCase();
-      var value = String(input.value || "").trim();
+      var value = safeMediaURL(String(input.value || ""));
       grid.textContent = "";
       var matches = assets.filter(function (asset) {
         return !normalizedQuery || asset.label.toLowerCase().indexOf(normalizedQuery) >= 0 || asset.url.toLowerCase().indexOf(normalizedQuery) >= 0 || asset.alt.toLowerCase().indexOf(normalizedQuery) >= 0;
@@ -332,7 +399,8 @@
     if (!textarea || textarea.dataset.mediaLinesBound === "true") return;
     var list = mediaLinesListFor(textarea);
     if (!list) return;
-    var assets = mediaAssets(list).filter(function (asset) { return asset.image; });
+    var allAssets = mediaAssets(list);
+    var assets = allAssets.filter(function (asset) { return asset.image; });
     if (!assets.length) return;
     textarea.dataset.mediaLinesBound = "true";
 
@@ -427,12 +495,15 @@
     }
 
     function assetFor(image) {
-      return assets.filter(function (asset) { return asset.url === image.url; })[0] || {
-        url: image.url,
-        label: filename(image.url),
+      var known = allAssets.filter(function (asset) { return asset.url === image.url; })[0];
+      if (known) return known;
+      var safeURL = safeMediaURL(image.url);
+      return {
+        url: safeURL,
+        label: filename(safeURL),
         alt: image.alt,
-        image: imageURL(image.url),
-        kind: fileKind(image.url)
+        image: imageURL(safeURL, image.contentType),
+        kind: fileKind(safeURL)
       };
     }
 
@@ -498,7 +569,7 @@
         }, renderThumb(asset), element("span", { text: asset.label }));
         attachAssetDrag(button, asset);
         button.addEventListener("click", function () {
-          images.push(mediaImage(asset.url, asset.alt || asset.label));
+          images.push(mediaImage(asset.url, asset.alt || asset.label, asset.contentType));
           syncTextarea();
           renderItems();
           setExpanded(trigger, panel, false);

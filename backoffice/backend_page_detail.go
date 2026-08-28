@@ -41,9 +41,10 @@ type BackendPageDetailActionStatus struct {
 }
 
 type BackendPageDetailMediaAsset struct {
-	URL      string
-	Filename string
-	Alt      string
+	URL         string
+	Filename    string
+	Alt         string
+	ContentType string
 }
 
 type BackendPageDetailValues struct {
@@ -90,11 +91,15 @@ func RenderBackendPageDetailContent(props BackendPageDetailPageProps) gosx.Node 
 func RenderBackendPageDetailMediaDatalist(media []BackendPageDetailMediaAsset) gosx.Node {
 	nodes := make([]gosx.Node, 0, len(media))
 	for _, asset := range media {
-		nodes = append(nodes, gosx.El("option", gosx.Attrs(
+		attrs := []any{
 			gosx.Attr("value", asset.URL),
 			gosx.Attr("label", asset.Filename),
 			gosx.Attr("data-media-alt", asset.Alt),
-		), gosx.Text(asset.Filename)))
+		}
+		if asset.ContentType != "" {
+			attrs = append(attrs, gosx.Attr("data-media-content-type", asset.ContentType))
+		}
+		nodes = append(nodes, gosx.El("option", gosx.Attrs(attrs...), gosx.Text(asset.Filename)))
 	}
 	return gosx.El("datalist", gosx.Attrs(gosx.Attr("id", "page-media-urls")), gosx.Fragment(nodes...))
 }

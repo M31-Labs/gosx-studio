@@ -308,6 +308,19 @@ diverged and should stay separate) is explicitly deferred to a v0.7 decision;
 until then, treat `cms/studio/assets/*.js` and `hostruntime/assets/*.js` as
 two independently-versioned bundles that happen to share names.
 
+The maintained compatibility contract is semantic rather than byte identity:
+both command and state variants retain their public events and
+`data-studio-*`/`data-gosx-studio-*` markup hooks, and both workbench variants
+retain the `GoSXStudioWorkbenchRuntime` bridge plus the shared chrome events
+and selectors for mode, viewport, zoom, rails, activity, focus, and preview
+frames. The permitted workbench divergence is limited to preview/selection/
+inline-edit implementation ownership: `cms/studio` may keep direct preview
+patch, dock, and inline-text behavior, while `hostruntime` may delegate those
+operations to the `FieldRuntime`, `SelectionRuntime`, and `InlineEditRuntime`
+islands through resolver events. Each bundle owns its own release/versioning
+surface; compatibility tests assert these semantic markers and ownership
+boundaries without requiring the bundles to be byte-identical.
+
 ## Release model
 
 The root `studio` package is a deprecated compatibility facade (type aliases

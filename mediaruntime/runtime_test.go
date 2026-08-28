@@ -20,6 +20,7 @@ func TestScriptOwnsSharedMediaPickerAndUploadContracts(t *testing.T) {
 		"data-media-upload-error",
 		"data-media-drop-active",
 		"data-media-picker-status",
+		"data-media-content-type",
 		"data-media-asset-selected",
 		"data-media-item-id",
 		"data-media-list-action",
@@ -30,6 +31,11 @@ func TestScriptOwnsSharedMediaPickerAndUploadContracts(t *testing.T) {
 		"stopPropagation",
 		"gosxstudio:content-editor-render",
 		"new MutationObserver",
+		"normalizeMediaContentType",
+		"supportedImageContentTypes",
+		"safeMediaURL",
+		"https://gosx.invalid/",
+		"%(?![0-9A-Fa-f]{2})",
 	} {
 		if !strings.Contains(script, want) {
 			t.Fatalf("media runtime missing %q", want)

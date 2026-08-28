@@ -7,6 +7,7 @@ import (
 	"m31labs.dev/gosx"
 	"m31labs.dev/gosx-admin/blockstudio"
 	"m31labs.dev/gosx-studio/cms/content"
+	"m31labs.dev/gosx-studio/internal/mediaurl"
 )
 
 type Block map[string]any
@@ -17,6 +18,9 @@ type Context struct {
 	Ref   string
 }
 
+// Hook output is caller-owned. Custom hooks must apply the same explicit URL
+// contract to any src or href they create; built-in block serialization cannot
+// inspect or rewrite arbitrary nodes returned by a hook.
 type Hook func(Context) (gosx.Node, bool)
 
 type Hooks struct {
@@ -51,26 +55,16 @@ func RenderBlock(block Block, hooks Hooks) (gosx.Node, bool) {
 	case boolField(block, "isQuote"):
 		return gosx.El("blockquote", nil, gosx.Text(stringField(block, "text"))), true
 	case boolField(block, "isImage"):
-		return gosx.El("figure", nil, gosx.El("img", gosx.Attrs(
-			gosx.Attr("src", stringField(block, "url")),
-			gosx.Attr("alt", stringField(block, "alt")),
-		))), true
+		return gosx.El("figure", nil, renderImage(stringField(block, "url"), stringField(block, "alt"))), true
 	case boolField(block, "isGallery"):
 		images := mapSliceField(block, "images")
 		children := make([]gosx.Node, 0, len(images))
 		for _, image := range images {
-			children = append(children, gosx.El("img", gosx.Attrs(
-				gosx.Attr("src", stringField(image, "url")),
-				gosx.Attr("alt", stringField(image, "alt")),
-			)))
+			children = append(children, renderImage(stringField(image, "url"), stringField(image, "alt")))
 		}
 		return gosx.El("div", gosx.Attrs(gosx.Attr("class", "media-strip")), gosx.Fragment(children...)), true
 	case boolField(block, "isButton"):
-		return gosx.El("a", gosx.Attrs(
-			gosx.Attr("class", "button button--primary"),
-			gosx.Attr("href", stringField(block, "href")),
-			gosx.Attr("data-gosx-link", "true"),
-		), gosx.Text(stringField(block, "label"))), true
+		return renderButton(stringField(block, "href"), stringField(block, "label")), true
 	case boolField(block, "isProduct"):
 		if hooks.Product != nil {
 			if node, ok := hooks.Product(Context{Block: block, Key: "product", Ref: stringField(block, "productRef")}); ok {
@@ -100,7 +94,43 @@ func stringField(values map[string]any, key string) string {
 	if values == nil {
 		return ""
 	}
-	return strings.TrimSpace(fmt.Sprint(values[key]))
+	value, ok := values[key]
+	if !ok || value == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
+}
+
+func renderImage(rawURL, alt string) gosx.Node {
+	if safeURL, ok := mediaurl.ForImage(rawURL); ok {
+		return gosx.El("img", gosx.Attrs(
+			gosx.Attr("src", safeURL),
+			gosx.Attr("alt", alt),
+		))
+	}
+	label := strings.TrimSpace(alt)
+	if label == "" {
+		label = "Image unavailable"
+	}
+	return gosx.El("span", gosx.Attrs(
+		gosx.Attr("class", "media-fallback"),
+		gosx.Attr("role", "img"),
+		gosx.Attr("aria-label", label),
+	), gosx.Text(label))
+}
+
+func renderButton(rawURL, label string) gosx.Node {
+	if safeURL, ok := mediaurl.ForLink(rawURL); ok {
+		return gosx.El("a", gosx.Attrs(
+			gosx.Attr("class", "button button--primary"),
+			gosx.Attr("href", safeURL),
+			gosx.Attr("data-gosx-link", "true"),
+		), gosx.Text(label))
+	}
+	return gosx.El("span", gosx.Attrs(
+		gosx.Attr("class", "button button--primary"),
+		gosx.Attr("aria-disabled", "true"),
+	), gosx.Text(label))
 }
 
 func boolField(values map[string]any, key string) bool {

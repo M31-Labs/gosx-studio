@@ -46,7 +46,8 @@ func TestRenderWorkbenchPageCanvasOwnsCanonicalFrameRouteViewportAndDiagnostics(
 
 func TestRenderWorkbenchPageCanvasSectionOrderLaneUsesDurableFieldContract(t *testing.T) {
 	html := gosx.RenderHTML(RenderWorkbenchPageCanvas(WorkbenchPageCanvasOptions{
-		URL: "/?gosx-preview=1",
+		URL:          "/?gosx-preview=1",
+		AssetVersion: "release 1",
 		SectionOrder: &WorkbenchPageCanvasSectionOrderOptions{
 			Enabled:          true,
 			Action:           "/admin/editor/__actions/operation",
@@ -80,7 +81,7 @@ func TestRenderWorkbenchPageCanvasSectionOrderLaneUsesDurableFieldContract(t *te
 		`data-studio-target-head="head-order"`,
 		`id="studio-section-order-guidance"`,
 		`aria-describedby="studio-section-order-guidance"`,
-		`<script src="/_gosx/studio/section-order-runtime.js" defer="defer" data-gosx-studio-section-order-runtime="true"></script>`,
+		`<script src="/_gosx/studio/section-order-runtime.js?v=release+1" defer="defer" data-gosx-studio-section-order-runtime="true"></script>`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("page canvas section order missing %q:\n%s", fragment, html)
@@ -91,6 +92,37 @@ func TestRenderWorkbenchPageCanvasSectionOrderLaneUsesDurableFieldContract(t *te
 	}
 	if !strings.Contains(html, `data-gosx-studio-history-operation-id="op-undo"`) {
 		t.Fatalf("page canvas section order must expose undo id:\n%s", html)
+	}
+}
+
+func TestRenderWorkbenchPageCanvasSectionOrderAssetVersionPreservesReleaseURLContract(t *testing.T) {
+	render := func(version string) string {
+		return gosx.RenderHTML(RenderWorkbenchPageCanvas(WorkbenchPageCanvasOptions{
+			URL:          "/?gosx-preview=1",
+			AssetVersion: version,
+			SectionOrder: &WorkbenchPageCanvasSectionOrderOptions{
+				Enabled: true,
+				Items:   []WorkbenchPageCanvasSectionOrderItem{{Key: "hero"}},
+			},
+		}))
+	}
+
+	withoutVersion := render("")
+	if want := `<script src="/_gosx/studio/section-order-runtime.js"`; !strings.Contains(withoutVersion, want) {
+		t.Fatalf("empty asset version must preserve unversioned section-order URL %q:\n%s", want, withoutVersion)
+	}
+	if strings.Contains(withoutVersion, `section-order-runtime.js?v=`) {
+		t.Fatalf("empty asset version must not add a query version:\n%s", withoutVersion)
+	}
+
+	escaped := render(`release 1&beta`)
+	if want := `<script src="/_gosx/studio/section-order-runtime.js?v=release+1%26beta"`; !strings.Contains(escaped, want) {
+		t.Fatalf("asset version must be URL-escaped in section-order URL %q:\n%s", want, escaped)
+	}
+
+	newRelease := render("release-2")
+	if escaped == newRelease || !strings.Contains(newRelease, `section-order-runtime.js?v=release-2`) {
+		t.Fatalf("changing asset version must change the rendered section-order URL:\nold=%s\nnew=%s", escaped, newRelease)
 	}
 }
 

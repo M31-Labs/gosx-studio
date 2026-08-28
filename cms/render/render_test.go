@@ -64,3 +64,52 @@ func TestProductFallbackRendersReference(t *testing.T) {
 		t.Fatalf("expected product fallback paragraph, got %s", html)
 	}
 }
+
+func TestRenderBlockAppliesExplicitImageAndLinkURLContract(t *testing.T) {
+	unsafeImage := gosx.RenderHTML(mustRenderBlock(t, Block{
+		"isImage": true,
+		"url":     "javascript:alert(1)",
+		"alt":     `<Cup & vase>`,
+	}))
+	if strings.Contains(unsafeImage, "javascript:") || strings.Contains(unsafeImage, "<img") {
+		t.Fatalf("unsafe image destination should be inert, got %s", unsafeImage)
+	}
+	for _, want := range []string{
+		`class="media-fallback"`,
+		`role="img"`,
+		`aria-label="&lt;Cup &amp; vase&gt;"`,
+		`&lt;Cup &amp; vase&gt;`,
+	} {
+		if !strings.Contains(unsafeImage, want) {
+			t.Fatalf("inert image fallback missing %q: %s", want, unsafeImage)
+		}
+	}
+
+	unsafeLink := gosx.RenderHTML(mustRenderBlock(t, Block{
+		"isButton": true,
+		"href":     "data:text/html,alert(1)",
+		"label":    `<Buy & learn>`,
+	}))
+	if strings.Contains(unsafeLink, "href=") || strings.Contains(unsafeLink, "data:") {
+		t.Fatalf("unsafe link destination should be inert, got %s", unsafeLink)
+	}
+	for _, want := range []string{`class="button button--primary"`, `aria-disabled="true"`, `&lt;Buy &amp; learn&gt;`} {
+		if !strings.Contains(unsafeLink, want) {
+			t.Fatalf("inert link fallback missing %q: %s", want, unsafeLink)
+		}
+	}
+
+	validLinks := gosx.RenderHTML(Body("[button: Email us | mailto:artist@example.test]", Hooks{}))
+	if !strings.Contains(validLinks, `href="mailto:artist@example.test"`) {
+		t.Fatalf("mailto link should remain supported: %s", validLinks)
+	}
+}
+
+func mustRenderBlock(t *testing.T, block Block) gosx.Node {
+	t.Helper()
+	node, ok := RenderBlock(block, Hooks{})
+	if !ok {
+		t.Fatalf("RenderBlock(%#v) did not render", block)
+	}
+	return node
+}

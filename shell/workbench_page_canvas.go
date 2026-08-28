@@ -40,7 +40,10 @@ type WorkbenchPageCanvasSectionOrderOptions struct {
 }
 
 type WorkbenchPageCanvasOptions struct {
-	View         map[string]any
+	View map[string]any
+	// AssetVersion is the optional host release identity used for runtime
+	// script URLs. An empty value preserves the historical unversioned URL.
+	AssetVersion string
 	Class        string
 	ToolbarClass string
 	FrameClass   string
@@ -107,7 +110,7 @@ func RenderWorkbenchPageCanvas(options WorkbenchPageCanvasOptions) gosx.Node {
 		), gosx.Fragment(toolbarChildren...)),
 	}
 	if options.SectionOrder != nil {
-		canvasChildren = append(canvasChildren, renderWorkbenchPageCanvasSectionOrder(*options.SectionOrder, url))
+		canvasChildren = append(canvasChildren, renderWorkbenchPageCanvasSectionOrder(*options.SectionOrder, url, options.AssetVersion))
 	}
 	canvasChildren = append(canvasChildren,
 		gosx.El("div", gosx.Attrs(
@@ -144,7 +147,7 @@ func RenderWorkbenchPageCanvas(options WorkbenchPageCanvasOptions) gosx.Node {
 	), gosx.Fragment(canvasChildren...))
 }
 
-func renderWorkbenchPageCanvasSectionOrder(options WorkbenchPageCanvasSectionOrderOptions, previewURL string) gosx.Node {
+func renderWorkbenchPageCanvasSectionOrder(options WorkbenchPageCanvasSectionOrderOptions, previewURL, assetVersion string) gosx.Node {
 	route := core.FirstNonEmpty(strings.TrimSpace(options.Route), "/")
 	sourceRoute := core.FirstNonEmpty(strings.TrimSpace(options.SourceRoute), route)
 	pageID := core.FirstNonEmpty(strings.TrimSpace(options.PageID), "home")
@@ -181,7 +184,7 @@ func renderWorkbenchPageCanvasSectionOrder(options WorkbenchPageCanvasSectionOrd
 		renderWorkbenchPageCanvasSectionOrderHistory(options, enabled),
 		renderWorkbenchPageCanvasSectionOrderAdapter(options, route, pageID, field, componentKey),
 		gosx.El("script", gosx.Attrs(
-			gosx.Attr("src", hostruntime.SectionOrderRuntimePath),
+			gosx.Attr("src", hostruntime.AssetHref(hostruntime.SectionOrderRuntimePath, assetVersion)),
 			gosx.Attr("defer", "defer"),
 			gosx.Attr("data-gosx-studio-section-order-runtime", "true"),
 		)),
