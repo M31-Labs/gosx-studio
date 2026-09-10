@@ -48,8 +48,11 @@ type Options struct {
 	SiteDescription string
 	// BaseURL is the public origin, used for canonical and share URLs.
 	BaseURL string
-	// SkipSeed leaves an empty store empty instead of writing starter content.
-	SkipSeed bool
+	// Seed builds a starter site immediately instead of sending the owner
+	// through the setup wizard. Tests and scripted installs use it.
+	Seed bool
+	// SiteKind picks the starter template when Seed is set. See SiteKinds.
+	SiteKind string
 	// AdminPassword protects every /admin path with HTTP basic auth when set.
 	// Leave it empty only for a server bound to localhost.
 	AdminPassword string
@@ -88,9 +91,16 @@ func Open(opts Options) (*Host, error) {
 	}
 
 	host := &Host{store: store, opts: opts}
-	if !opts.SkipSeed {
-		if err := SeedStarterSite(store, opts.SiteTitle, opts.SiteDescription, opts.BaseURL); err != nil {
-			return nil, fmt.Errorf("sitehost: seed starter site: %w", err)
+	// Seeding is the wizard's job. Options.Seed exists so tests and embedders
+	// can skip the wizard and get a site in one call.
+	if opts.Seed && !host.SetupComplete() {
+		if err := host.CompleteSetup(SetupAnswers{
+			SiteTitle: opts.SiteTitle,
+			Tagline:   opts.SiteDescription,
+			Kind:      opts.SiteKind,
+			BaseURL:   opts.BaseURL,
+		}); err != nil {
+			return nil, fmt.Errorf("sitehost: build starter site: %w", err)
 		}
 	}
 	return host, nil
@@ -129,10 +139,12 @@ func (h *Host) Handler() http.Handler {
 		_, _ = w.Write([]byte("ok"))
 	})
 
+	h.mountSetup(mux)
 	h.mountAdmin(mux)
+	h.mountEditor(mux)
 	h.mountPublic(mux)
 
-	return h.guardAdmin(mux)
+	return h.guardAdmin(h.requireSetup(mux))
 }
 
 // settings reads site settings, falling back to the configured defaults so the

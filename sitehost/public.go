@@ -1,9 +1,12 @@
 package sitehost
 
 import (
+	"encoding/json"
 	"net/http"
 	"sort"
 	"strings"
+
+	"m31labs.dev/gosx-studio/cms/lifecycle"
 
 	"m31labs.dev/gosx"
 	"m31labs.dev/gosx-studio/cms/render"
@@ -29,17 +32,69 @@ func (h *Host) handlePublicPage(w http.ResponseWriter, r *http.Request) {
 	h.servePublicSlug(w, r, slug)
 }
 
-// publishedPage returns a page only when it is live. Draft work stays private
-// until the owner publishes it.
+// livePage returns the version of one page a visitor should see.
+//
+// The store keeps a single record per page, and saving a draft moves that
+// record out of the published state and clears PublishedAt. Serving the record
+// directly would mean the first keystroke in the editor takes a live page off
+// the internet. So "is this live?" is answered by the revision ledger, which
+// remembers every publish, rather than by the working record.
+func (h *Host) livePage(page cmsstore.Page) (cmsstore.Page, bool) {
+	if page.State.Publish == cmsstore.PublishStatePublished {
+		return page, true
+	}
+	return h.lastPublishedSnapshot(page.ID)
+}
+
+// lastPublishedSnapshot decodes the newest "page.published" revision.
+func (h *Host) lastPublishedSnapshot(pageID string) (cmsstore.Page, bool) {
+	revisions := h.store.ListRevisions(lifecycle.Filter{
+		ResourceKind: cmsstore.ResourceKindPage,
+		ResourceID:   pageID,
+	})
+	for index := len(revisions) - 1; index >= 0; index-- {
+		revision := revisions[index]
+		if revision.Action != cmsstore.ActionPagePublished || len(revision.Snapshot) == 0 {
+			continue
+		}
+		var page cmsstore.Page
+		if err := json.Unmarshal(revision.Snapshot, &page); err != nil {
+			continue
+		}
+		return page, true
+	}
+	return cmsstore.Page{}, false
+}
+
+// livePages is every page as a visitor currently sees it, home first.
+func (h *Host) livePages() []cmsstore.Page {
+	pages, err := h.store.ListPages(cmsstore.PageFilter{})
+	if err != nil {
+		return nil
+	}
+	live := make([]cmsstore.Page, 0, len(pages))
+	for _, page := range pages {
+		if published, ok := h.livePage(page); ok {
+			live = append(live, published)
+		}
+	}
+	// Home first; everything else keeps the order it was created in, which is
+	// the order the starter template meant them to read.
+	sort.SliceStable(live, func(i, j int) bool {
+		return live[i].Slug == homeSlug && live[j].Slug != homeSlug
+	})
+	return live
+}
+
+// publishedPage resolves a slug against the live versions, so renaming a page
+// in a draft leaves the old address working until the owner publishes.
 func (h *Host) publishedPage(slug string) (cmsstore.Page, bool) {
-	page, ok, err := h.store.PageBySlug(slug)
-	if err != nil || !ok {
-		return cmsstore.Page{}, false
+	for _, page := range h.livePages() {
+		if page.Slug == slug {
+			return page, true
+		}
 	}
-	if page.State.Publish != cmsstore.PublishStatePublished {
-		return cmsstore.Page{}, false
-	}
-	return page, true
+	return cmsstore.Page{}, false
 }
 
 func (h *Host) servePublicSlug(w http.ResponseWriter, r *http.Request, slug string) {
@@ -99,28 +154,9 @@ func (h *Host) servePublicNotFound(w http.ResponseWriter, settings cmsstore.Site
 	h.writeDocument(w, http.StatusNotFound, meta, body)
 }
 
-// navPages lists published pages for the site navigation, home first.
+// navPages lists the pages that appear in the site menu.
 func (h *Host) navPages() []cmsstore.Page {
-	pages, err := h.store.ListPages(cmsstore.PageFilter{})
-	if err != nil {
-		return nil
-	}
-	live := make([]cmsstore.Page, 0, len(pages))
-	for _, page := range pages {
-		if page.State.Publish == cmsstore.PublishStatePublished {
-			live = append(live, page)
-		}
-	}
-	sort.SliceStable(live, func(i, j int) bool {
-		if live[i].Slug == homeSlug {
-			return true
-		}
-		if live[j].Slug == homeSlug {
-			return false
-		}
-		return live[i].Title < live[j].Title
-	})
-	return live
+	return h.livePages()
 }
 
 func (h *Host) renderPublicNav(settings cmsstore.SiteSettings, activeSlug string) gosx.Node {

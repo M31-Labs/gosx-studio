@@ -15,9 +15,11 @@ site).
 go run m31labs.dev/gosx-studio/cmd/gosx-site
 ```
 
-The first run creates a small published website, stores it in one JSON file,
-and prints where to visit and edit it. Nothing else is required: no adapters,
-no host application, no configuration file.
+Open `http://127.0.0.1:8080/admin` and a three-question wizard asks what the
+business is called, what it does, and how people reach it. It then builds a
+real, published website — a bakery gets a menu and a visit page, a consultant
+gets services and about — which you edit and publish from there. Nothing else
+is required: no adapters, no host application, no configuration file.
 
 ```
   Visit your site      http://127.0.0.1:8080/
@@ -25,10 +27,15 @@ no host application, no configuration file.
   Saved in             ./data/site.json
 ```
 
-The back office covers pages, page content, publishing, and the site details
-that appear in search results and shared links. The server binds to localhost
-by default and refuses to listen on a public address unless you set
-`-admin-password`, so it never exposes an unprotected admin area by accident.
+Editing happens on the page itself. The canvas renders the same markup a
+visitor sees; click any text to change it, use the hover controls to move,
+copy, or delete a section, and press `+` between sections to add one. Changes
+save as you type and stay private until you press Publish — a live page keeps
+serving its published version while you work on the next one.
+
+The server binds to localhost by default and refuses to listen on a public
+address unless you set `-admin-password`, so it never exposes an unprotected
+admin area by accident.
 
 `cmd/gosx-site` is the default host: it assembles the `sitehost`, `cms`, and
 `hostruntime` packages into a program that runs. Applications that need more

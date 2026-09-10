@@ -50,7 +50,7 @@ func documentToText(doc blockstudio.Document) string {
 			}
 		case content.BlockButton:
 			label := strings.TrimSpace(instance.Values["label"].String)
-			target := strings.TrimSpace(instance.Values["url"].String)
+			target := strings.TrimSpace(instance.Values["href"].String)
 			if label != "" {
 				lines = append(lines, "["+label+"]("+target+")")
 			}
@@ -88,7 +88,7 @@ func textToDocument(body string) blockstudio.Document {
 		default:
 			if label, target, ok := parseLinkLine(line); ok {
 				blocks = append(blocks, block(order, content.BlockButton,
-					values("label", label, "url", target)))
+					values("label", label, "href", target)))
 				break
 			}
 			blocks = append(blocks, block(order, content.BlockParagraph, values("text", line)))

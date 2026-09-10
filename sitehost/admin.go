@@ -125,7 +125,8 @@ func (h *Host) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 			gosx.El("li", nil, gosx.Text("Add the pages your visitors need, such as services, pricing, or opening hours.")),
 		),
 		gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-actions")),
-			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("href", "/admin/pages")), gosx.Text("Edit your pages")),
+			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("href", h.homeEditHref())), gosx.Text("Edit your home page")),
+			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("href", "/admin/pages")), gosx.Text("All pages")),
 		),
 	)
 
@@ -150,13 +151,7 @@ func (h *Host) sortedPages() []cmsstore.Page {
 		return nil
 	}
 	sort.SliceStable(pages, func(i, j int) bool {
-		if pages[i].Slug == homeSlug {
-			return true
-		}
-		if pages[j].Slug == homeSlug {
-			return false
-		}
-		return pages[i].Title < pages[j].Title
+		return pages[i].Slug == homeSlug && pages[j].Slug != homeSlug
 	})
 	return pages
 }
@@ -183,7 +178,7 @@ func (h *Host) renderAdminPages(w http.ResponseWriter, r *http.Request, status a
 				state, stateLabel = "published", "Live"
 			}
 			rows = append(rows, gosx.El("tr", nil,
-				gosx.El("td", nil, gosx.El("a", gosx.Attrs(gosx.Attr("href", "/admin/pages/"+page.ID)), gosx.Text(page.Title))),
+				gosx.El("td", nil, gosx.El("a", gosx.Attrs(gosx.Attr("href", "/admin/edit/"+page.ID)), gosx.Text(page.Title))),
 				gosx.El("td", nil, gosx.Text(publicPath(page.Slug))),
 				gosx.El("td", nil, gosx.El("span", gosx.Attrs(gosx.Attr("class", "admin-badge"), gosx.Attr("data-state", state)), gosx.Text(stateLabel))),
 			))
@@ -250,16 +245,18 @@ func (h *Host) handleAdminCreatePage(w http.ResponseWriter, r *http.Request) {
 		h.renderAdminPages(w, r, adminStatus{Message: "We couldn't create that page. Try again.", Error: true})
 		return
 	}
-	http.Redirect(w, r, "/admin/pages/"+page.ID, http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/edit/"+page.ID, http.StatusSeeOther)
 }
 
+// handleAdminPageDetail keeps the old form URL working by sending it to the
+// editor. One page, one place to edit it.
 func (h *Host) handleAdminPageDetail(w http.ResponseWriter, r *http.Request) {
 	page, ok, err := h.store.PageByID(r.PathValue("id"))
 	if err != nil || !ok {
 		h.writeAdminNotFound(w, "page")
 		return
 	}
-	h.renderAdminPageDetail(w, page, adminStatus{Message: r.URL.Query().Get("status")})
+	http.Redirect(w, r, "/admin/edit/"+page.ID, http.StatusSeeOther)
 }
 
 func (h *Host) renderAdminPageDetail(w http.ResponseWriter, page cmsstore.Page, status adminStatus) {
@@ -422,11 +419,21 @@ func (h *Host) handleAdminSaveSettings(w http.ResponseWriter, r *http.Request) {
 		h.renderAdminSettings(w, adminStatus{Message: "Give your site a name before saving.", Error: true})
 		return
 	}
+	// Carry existing metadata forward. It holds the setup marker and the
+	// contact details the wizard collected; dropping it would send a
+	// configured site back to the "not set up yet" screen.
+	metadata := cmsstore.Metadata{}
+	if current, ok, err := h.store.SiteSettings(); err == nil && ok {
+		for key, value := range current.Metadata {
+			metadata[key] = value
+		}
+	}
 	input := cmsstore.SiteSettingsInput{
 		Title:       title,
 		Description: strings.TrimSpace(r.PostFormValue("description")),
 		BaseURL:     strings.TrimRight(strings.TrimSpace(r.PostFormValue("baseURL")), "/"),
 		Locale:      "en",
+		Metadata:    metadata,
 	}
 	if _, err := h.store.SaveSiteSettings(input); err != nil {
 		h.renderAdminSettings(w, adminStatus{Message: "We couldn't save those settings. Try again.", Error: true})
@@ -483,4 +490,13 @@ func adminTextareaField(name, label, value, hint string) gosx.Node {
 	}
 	return gosx.El("label", gosx.Attrs(gosx.Attr("class", "admin-field"), gosx.Attr("for", "field-"+name)),
 		gosx.Fragment(nodes...))
+}
+
+// homeEditHref opens the home page in the editor, falling back to the page list
+// on a site that has no home page.
+func (h *Host) homeEditHref() string {
+	if page, ok, err := h.store.PageBySlug(homeSlug); err == nil && ok {
+		return "/admin/edit/" + page.ID
+	}
+	return "/admin/pages"
 }
