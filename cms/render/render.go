@@ -51,7 +51,7 @@ func Blocks(blocks []map[string]any, hooks Hooks) gosx.Node {
 func RenderBlock(block Block, hooks Hooks) (gosx.Node, bool) {
 	switch {
 	case boolField(block, "isHeading"):
-		return gosx.El("h2", nil, gosx.Text(stringField(block, "text"))), true
+		return gosx.El(headingTag(stringField(block, "level")), nil, gosx.Text(stringField(block, "text"))), true
 	case boolField(block, "isQuote"):
 		return gosx.El("blockquote", nil, gosx.Text(stringField(block, "text"))), true
 	case boolField(block, "isImage"):
@@ -162,4 +162,11 @@ func mapSliceField(values map[string]any, key string) []map[string]any {
 		}
 	}
 	return out
+}
+
+// headingTag maps a stored heading level to its tag. An unknown or missing
+// level renders as h2, which is what every heading did before levels were
+// carried through.
+func headingTag(level string) string {
+	return "h" + content.NormalizeHeadingLevel(level)
 }

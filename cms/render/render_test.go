@@ -113,3 +113,49 @@ func mustRenderBlock(t *testing.T, block Block) gosx.Node {
 	}
 	return node
 }
+
+// TestHeadingLevelSurvivesToTheRenderedTag covers the chain that used to drop
+// the author's choice: the block catalog offers H2/H3/H4 and the editor
+// persists "level", but viewBlock did not carry it and RenderBlock hardcoded
+// h2, so every long-form page published as a flat wall of H2s.
+func TestHeadingLevelSurvivesToTheRenderedTag(t *testing.T) {
+	doc := blockstudio.Document{Version: 1, Kind: "body", Blocks: []blockstudio.BlockInstance{
+		{ID: "h2", Key: content.BlockHeading, Enabled: true, Order: 0, Values: blockstudio.Values{
+			"text":  blockstudio.Value{Kind: blockstudio.FieldText, String: "Level two"},
+			"level": blockstudio.Value{Kind: blockstudio.FieldSelect, String: "2"},
+		}},
+		{ID: "h3", Key: content.BlockHeading, Enabled: true, Order: 1, Values: blockstudio.Values{
+			"text":  blockstudio.Value{Kind: blockstudio.FieldText, String: "Level three"},
+			"level": blockstudio.Value{Kind: blockstudio.FieldSelect, String: "3"},
+		}},
+		{ID: "h4", Key: content.BlockHeading, Enabled: true, Order: 2, Values: blockstudio.Values{
+			"text":  blockstudio.Value{Kind: blockstudio.FieldText, String: "Level four"},
+			"level": blockstudio.Value{Kind: blockstudio.FieldSelect, String: "4"},
+		}},
+	}}
+
+	html := gosx.RenderHTML(Document(doc, Hooks{}))
+	for _, want := range []string{
+		"<h2>Level two</h2>",
+		"<h3>Level three</h3>",
+		"<h4>Level four</h4>",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected %q in rendered document: %s", want, html)
+		}
+	}
+}
+
+// TestHeadingWithoutLevelStaysH2 pins the legacy default: bodies parsed from
+// the "## " text syntax carry no level and must keep rendering as h2.
+func TestHeadingWithoutLevelStaysH2(t *testing.T) {
+	doc := blockstudio.Document{Version: 1, Kind: "body", Blocks: []blockstudio.BlockInstance{
+		{ID: "h", Key: content.BlockHeading, Enabled: true, Order: 0, Values: blockstudio.Values{
+			"text": blockstudio.Value{Kind: blockstudio.FieldText, String: "No level"},
+		}},
+	}}
+	html := gosx.RenderHTML(Document(doc, Hooks{}))
+	if !strings.Contains(html, "<h2>No level</h2>") {
+		t.Fatalf("heading without a level must render as h2: %s", html)
+	}
+}

@@ -9,6 +9,32 @@ one editor, one back-office, one portal.
 Reference deployments: **Muddy Noni** (commerce) and **Pajaritos** (school
 site).
 
+## Run a site without writing Go
+
+```sh
+go run m31labs.dev/gosx-studio/cmd/gosx-site
+```
+
+The first run creates a small published website, stores it in one JSON file,
+and prints where to visit and edit it. Nothing else is required: no adapters,
+no host application, no configuration file.
+
+```
+  Visit your site      http://127.0.0.1:8080/
+  Edit your site       http://127.0.0.1:8080/admin
+  Saved in             ./data/site.json
+```
+
+The back office covers pages, page content, publishing, and the site details
+that appear in search results and shared links. The server binds to localhost
+by default and refuses to listen on a public address unless you set
+`-admin-password`, so it never exposes an unprotected admin area by accident.
+
+`cmd/gosx-site` is the default host: it assembles the `sitehost`, `cms`, and
+`hostruntime` packages into a program that runs. Applications that need more
+control still configure the packages directly, as the reference deployments
+do. The default host is a floor, not a ceiling.
+
 Earlier docs described Studio as "the authoring layer, intentionally separate
 from `gosx-cms` and `gosx-admin`." That framing is retired — the code moved
 past it. Studio is the portal; `gosx-admin` is a generic back-office toolkit

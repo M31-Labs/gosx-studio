@@ -267,6 +267,7 @@ func viewBlock(instance blockstudio.BlockInstance) map[string]any {
 		block["text"] = text
 		block["isParagraph"] = false
 		block["isHeading"] = true
+		block["level"] = NormalizeHeadingLevel(valueString(instance.Values["level"]))
 	case BlockQuote:
 		text := valueString(instance.Values["text"])
 		if text == "" {
@@ -377,6 +378,7 @@ func emptyViewBlock() map[string]any {
 		"text":        "",
 		"isParagraph": true,
 		"isHeading":   false,
+		"level":       DefaultHeadingLevel,
 		"isQuote":     false,
 		"isImage":     false,
 		"isGallery":   false,
@@ -516,4 +518,22 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// DefaultHeadingLevel is the level a heading block uses when the author has not
+// chosen one. Bodies parsed from the legacy "## " text syntax carry no level,
+// so they keep rendering as h2.
+const DefaultHeadingLevel = "2"
+
+// NormalizeHeadingLevel clamps a stored heading level to the levels the block
+// catalog offers (see cms/blocks.BodyCatalog's heading definition).
+func NormalizeHeadingLevel(level string) string {
+	switch strings.TrimSpace(level) {
+	case "3":
+		return "3"
+	case "4":
+		return "4"
+	default:
+		return DefaultHeadingLevel
+	}
 }
