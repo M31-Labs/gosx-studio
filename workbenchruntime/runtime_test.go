@@ -3,7 +3,9 @@ package workbenchruntime
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -85,6 +87,34 @@ func TestBridgeShimDelegatesToIslandGlobals(t *testing.T) {
 		if strings.Contains(shim, stale) {
 			t.Fatalf("BridgeShim() contains stale gate/fallback fragment %q:\n%s", stale, shim)
 		}
+	}
+}
+
+func TestLegacyWorkbenchPreviewPatchStylesRetryBeforeFrameDocumentReady(t *testing.T) {
+	path := filepath.Join("..", "cms", "studio", "assets", "workbench_runtime.js")
+	source, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read legacy workbench runtime: %v", err)
+	}
+	body := string(source)
+	for _, want := range []string{
+		`function ensurePreviewPatchStyles(doc)`,
+		`var host = doc.head || doc.documentElement || doc.body;`,
+		`if (!host || !host.appendChild) return false;`,
+		`host.appendChild(style);`,
+		`return true;`,
+		`frame.__gosxStudioPreviewDocument === doc && doc.getElementById("gosx-studio-preview-patch-style")`,
+		`if (!ensurePreviewPatchStyles(doc)) return;`,
+		`if (frame.__gosxStudioPreviewDocument === doc) return;`,
+		`frame.__gosxStudioPreviewDocument = doc;`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("legacy workbench runtime missing preview-document retry contract %q", want)
+		}
+	}
+	if strings.Contains(body, `frame.__gosxStudioPreviewDocument = doc;
+      ensurePreviewPatchStyles(doc);`) {
+		t.Fatalf("bindPreviewDocument must not mark an iframe document as bound before preview patch styles attach")
 	}
 }
 

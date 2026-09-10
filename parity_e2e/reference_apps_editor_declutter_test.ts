@@ -88,7 +88,7 @@ test.describe("@reference-apps Muddy/Noni editor declutter", () => {
     }
   });
 
-  test("a save's full-page reload preserves the active mode and selection (not just rail widths)", async ({ page, request }) => {
+  test("a save preserves the active mode and selection (not just rail widths)", async ({ page, request }) => {
     const server = await startMuddy(request);
     try {
       await page.goto(`${server.baseURL}/admin/editor`, { waitUntil: "domcontentloaded", timeout: 60_000 });
@@ -120,24 +120,24 @@ test.describe("@reference-apps Muddy/Noni editor declutter", () => {
       await checkoutField.fill("Shop the collection");
       await expect(page.locator("[data-gosx-studio-save-button]").first()).toBeVisible();
 
-      // Save an edit: the toolbar's primary Save button submits the whole
-      // shared workbench form via a real (unintercepted) POST to the editor
-      // route itself (gosx's file-action POST target, not a distinct
-      // "/__actions/save" sub-path) + full-page navigation, exactly like
-      // the owner's "interaction fails after an edit" report.
-      const [response] = await Promise.all([
-        page.waitForResponse((res) =>
-          res.request().method() === "POST" &&
-          res.url().includes("/admin/editor") &&
-          !res.url().includes("/__actions/") &&
-          !res.url().includes("client-events")),
-        page.locator("[data-gosx-studio-save-button]").first().click(),
-      ]);
-      expect(response.status()).toBeLessThan(400);
+      // Save through the workbench's canonical action. Install the response
+      // wait before clicking so this assertion is tied to the exact action
+      // contract rather than an incidental POST from the editor page.
+      const saveActionOrigin = new URL(server.baseURL).origin;
+      const responsePromise = page.waitForResponse((res) => {
+        const responseURL = new URL(res.url());
+        return res.request().method() === "POST" &&
+          responseURL.origin === saveActionOrigin &&
+          responseURL.pathname === "/admin/editor/__actions/save" &&
+          res.status() === 200;
+      });
+      await page.locator("[data-gosx-studio-save-button]").first().click();
+      const response = await responsePromise;
+      expect(response.status()).toBe(200);
       await page.waitForLoadState("domcontentloaded");
 
-      // Post-reload: mode, panel visibility, and selection must all survive
-      // — not reset back to the server's default Home/no-selection state.
+      // Post-save: mode, panel visibility, and selection must all survive —
+      // not reset back to the server's default Home/no-selection state.
       const reloadedForm = page.locator("[data-studio-workbench='true']").first();
       await page.waitForFunction(() => "GoSXStudioWorkbenchRuntime" in window, null, { timeout: 20_000 });
       await expect(reloadedForm).toHaveAttribute("data-studio-mode", "advanced");

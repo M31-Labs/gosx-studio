@@ -449,7 +449,35 @@
   function actionFailureMessage(result, fallback) {
     if (result && result.message) return String(result.message);
     if (result && result.data && result.data.message) return String(result.data.message);
+    if (result && result.error) return String(result.error);
+    if (result && result.data && result.data.error) return String(result.data.error);
     return fallback || "Studio action failed";
+  }
+
+  function actionResponseError(message, response, body) {
+    var error = new Error(message || "Studio action failed");
+    error.response = response || null;
+    error.status = response && response.status || 0;
+    error.body = body || null;
+    return error;
+  }
+
+  function actionAuthoringPayload(result) {
+    if (!result || typeof result !== "object" || Array.isArray(result)) return null;
+    var data = result.data && typeof result.data === "object" && !Array.isArray(result.data) ? result.data : result;
+    if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+    if (data.refreshPreview !== undefined || data.previewURL || data.draftID || data.changeCount !== undefined || Array.isArray(data.changes) || Array.isArray(data.fragments) || Array.isArray(data.refreshFragments)) {
+      return result;
+    }
+    return null;
+  }
+
+  function applyActionAuthoringPayload(result, meta) {
+    var payload = actionAuthoringPayload(result);
+    if (!payload) return Promise.resolve(null);
+    var runtime = window.GoSXStudioAuthoringRuntime;
+    if (!runtime || typeof runtime.handleResult !== "function") return Promise.resolve(null);
+    return Promise.resolve(runtime.handleResult(payload, meta || {}));
   }
 
   function dispatchActionResult(form, detail) {
@@ -874,30 +902,46 @@
         }
         var response = payload.response;
         var result = payload.result;
-        if ((response && (response.status === 401 || response.status === 403)) || responseLooksUnauthenticated(response)) return Promise.reject(new Error("Studio action redirected to sign-in"));
-        if (!structuredActionSuccess(response, result)) return Promise.reject(new Error(actionFailureMessage(result, "Studio action failed; no structured success response")));
-        if (redirectLooksUnauthenticated(result && result.redirect)) return Promise.reject(new Error("Studio action redirected to sign-in"));
-        saved = signature;
-        actionErrorSignature = "";
-        lastSavedAt = new Date().toISOString();
-        form.setAttribute("data-gosx-studio-last-saved-at", lastSavedAt);
-        submitting = false;
-        if (isDirty()) {
-          setState(form, "dirty", "action-stale", stateOptions({ actionLabel: label }));
-          scheduleAutosave();
-        } else {
-          setState(form, "saved", "action", stateOptions({ dirtyCount: 0, actionLabel: label }));
-        }
-        dispatchActionResult(form, {
-          ok: true,
+        if (responseLooksUnauthenticated(response) || (response && response.status === 401 && !result)) return Promise.reject(actionResponseError("Studio action redirected to sign-in", response, result));
+        if (!structuredActionSuccess(response, result)) return Promise.reject(actionResponseError(actionFailureMessage(result, "Studio action failed; no structured success response"), response, result));
+        if (redirectLooksUnauthenticated(result && result.redirect)) return Promise.reject(actionResponseError("Studio action redirected to sign-in", response, result));
+        var authoringMeta = {
           action: action,
-          label: label,
           method: method,
+          ok: true,
           status: response.status,
-          redirected: response.redirected,
-          url: response.url || "",
-          result: result || null,
-          submitter: submitterDetail(submitter)
+          form: form,
+          submitter: submitter,
+          isCurrent: function () { return formActive() && submitting; }
+        };
+        return applyActionAuthoringPayload(result, authoringMeta).then(function (authoringHandled) {
+          if (!formActive()) {
+            submitting = false;
+            return;
+          }
+          saved = signature;
+          actionErrorSignature = "";
+          lastSavedAt = new Date().toISOString();
+          form.setAttribute("data-gosx-studio-last-saved-at", lastSavedAt);
+          submitting = false;
+          if (isDirty()) {
+            setState(form, "dirty", "action-stale", stateOptions({ actionLabel: label }));
+            scheduleAutosave();
+          } else {
+            setState(form, "saved", "action", stateOptions({ dirtyCount: 0, actionLabel: label }));
+          }
+          dispatchActionResult(form, {
+            ok: true,
+            action: action,
+            label: label,
+            method: method,
+            status: response.status,
+            redirected: response.redirected,
+            url: response.url || "",
+            result: result || null,
+            authoringHandled: !!authoringHandled,
+            submitter: submitterDetail(submitter)
+          });
         });
       }).catch(function (error) {
         if (!formActive()) {
@@ -907,15 +951,21 @@
         submitting = false;
         actionErrorSignature = formSignature(form);
         setState(form, "error", "action", stateOptions({ actionLabel: label }));
+        var errorBody = error && error.body || null;
+        var errorResponse = error && error.response || null;
+        var errorFieldErrors = errorBody && errorBody.fieldErrors || errorBody && errorBody.data && errorBody.data.fieldErrors || null;
         dispatchActionResult(form, {
           ok: false,
           action: action,
           label: label,
           method: method,
-          status: 0,
-          redirected: false,
-          url: "",
-          error: error && error.message ? error.message : "Studio action failed",
+          status: error && error.status || errorResponse && errorResponse.status || 0,
+          redirected: !!(errorResponse && errorResponse.redirected),
+          url: errorResponse && errorResponse.url || "",
+          error: actionFailureMessage(errorBody, error && error.message ? error.message : "Studio action failed"),
+          result: errorBody,
+          body: errorBody,
+          fieldErrors: errorFieldErrors,
           submitter: submitterDetail(submitter)
         });
       });

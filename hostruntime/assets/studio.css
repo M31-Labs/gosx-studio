@@ -1230,7 +1230,8 @@ button.button {
 .studio-advanced-panel__group-input[value="tools"]:checked ~ [data-studio-advanced-group-slot="tools"],
 .studio-advanced-panel__group-input[value="schema"]:checked ~ [data-studio-advanced-group-slot="schema"],
 .studio-advanced-panel__group-input[value="schedule"]:checked ~ [data-studio-advanced-group-slot="schedule"],
-.studio-advanced-panel__group-input[value="typography"]:checked ~ [data-studio-advanced-group-slot="typography"] {
+.studio-advanced-panel__group-input[value="typography"]:checked ~ [data-studio-advanced-group-slot="typography"],
+.studio-advanced-panel__group-input[value="settings"]:checked ~ [data-studio-advanced-group-slot="settings"] {
   display: grid;
 }
 
@@ -1245,7 +1246,8 @@ button.button {
 .studio-advanced-panel__group-input[value="tools"]:checked ~ .studio-advanced-panel__groups [data-studio-advanced-group-label="tools"],
 .studio-advanced-panel__group-input[value="schema"]:checked ~ .studio-advanced-panel__groups [data-studio-advanced-group-label="schema"],
 .studio-advanced-panel__group-input[value="schedule"]:checked ~ .studio-advanced-panel__groups [data-studio-advanced-group-label="schedule"],
-.studio-advanced-panel__group-input[value="typography"]:checked ~ .studio-advanced-panel__groups [data-studio-advanced-group-label="typography"] {
+.studio-advanced-panel__group-input[value="typography"]:checked ~ .studio-advanced-panel__groups [data-studio-advanced-group-label="typography"],
+.studio-advanced-panel__group-input[value="settings"]:checked ~ .studio-advanced-panel__groups [data-studio-advanced-group-label="settings"] {
   border-color: color-mix(in srgb, var(--color-accent) 58%, var(--color-line));
   background: color-mix(in srgb, var(--color-accent) 12%, var(--color-canvas));
   color: var(--color-accent-strong);
@@ -2749,6 +2751,20 @@ button.button {
 }
 
 :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+  .content-block__header
+  > :where(
+    .content-block__drag-handle,
+    .content-block__move,
+    [data-content-drag-handle],
+    [data-content-editor-drag-handle],
+    [data-content-block-handle],
+    [data-content-editor-action],
+    [data-content-editor-move]
+  ) {
+  min-width: var(--space-md);
+}
+
+:where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
   .content-editor__toolbar
   :where(button, .button, input, select, output),
 :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
@@ -4031,10 +4047,19 @@ button.button {
 /* The lane is an optional second child of .studio-page-canvas. Its presence
    must not steal the flexible track from the real preview stage: without
    this selector, the base four-row canvas puts the lane in the 1fr row and
-   leaves the iframe in an auto row with no useful height. Keep the legacy
-   four-child canvas untouched when no lane is rendered. */
+   leaves the iframe in an auto row with no useful height. The finite lane
+   track keeps its controls reachable through an internal scrollport while
+   reserving a meaningful primary canvas. Keep the legacy four-child canvas
+   untouched when no lane is rendered. */
 .studio-page-canvas:has(> [data-gosx-studio-section-order="true"]) {
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  grid-template-rows:
+    auto
+    minmax(8rem, clamp(8rem, 25vh, 14rem))
+    minmax(clamp(15rem, calc(25vh + 3rem), 16rem), 1fr)
+    auto
+    auto;
+  overflow: auto;
+  scrollbar-gutter: stable;
 }
 
 .studio-page-canvas:has(> [data-gosx-studio-section-order="true"])
@@ -4043,6 +4068,7 @@ button.button {
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .studio-page-canvas:has(> [data-gosx-studio-section-order="true"])
@@ -4371,6 +4397,21 @@ button.button {
     min-height: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
   }
 
+  :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
+    .content-block__header
+    > :where(
+      .content-block__drag-handle,
+      .content-block__move,
+      [data-content-drag-handle],
+      [data-content-editor-drag-handle],
+      [data-content-block-handle],
+      [data-content-editor-action],
+      [data-content-editor-move]
+    ) {
+    min-width: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+    min-height: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));
+  }
+
   .admin-page .admin-form[data-content-editor-enhanced-submit]
     > :where(.admin-form__primary-actions, .admin-form__secondary-actions)
     > .button {
@@ -4379,6 +4420,19 @@ button.button {
 }
 
 @media (max-width: 820px) {
+  /* Preserve the frame as the primary phone surface. The smaller stage floor
+     still leaves the SectionOrder lane scrollable without forcing its cards
+     into the page's only visible row. The optional canvas itself may scroll
+     vertically on short screens, so status and diagnostic rows stay reachable. */
+  .studio-page-canvas:has(> [data-gosx-studio-section-order="true"]) {
+    grid-template-rows:
+      auto
+      minmax(8rem, clamp(8rem, 25vh, 14rem))
+      minmax(clamp(10rem, 20vh, 12rem), 1fr)
+      auto
+      auto;
+  }
+
   :where(.gosx-studio, .gosx-studio-workbench, .editor-workbench, .admin-page)
     .content-block__body {
     grid-template-columns: minmax(0, 1fr);

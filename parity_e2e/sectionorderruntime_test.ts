@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const operationRuntimeJS = readFileSync(
@@ -12,12 +12,58 @@ const sectionOrderRuntimeJS = readFileSync(
   "utf8",
 );
 
-function editorHTML(route = "/", optionalKeys: string[] = []): string {
+const studioCSS = readFileSync(
+  path.resolve(__dirname, "../hostruntime/assets/studio.css"),
+  "utf8",
+);
+
+const defaultSectionKeys = ["hero", "gallery", "contact"];
+
+type FixtureOptions = {
+  optionalKeys?: string[];
+  previewKeys?: string[];
+  previewDelayMs?: number;
+  sectionKeys?: string[];
+  includeStudioLayout?: boolean;
+};
+
+function editorHTML(
+  route = "/",
+  optionalKeys: string[] = [],
+  sectionKeys: string[] = defaultSectionKeys,
+  includeStudioLayout = false,
+): string {
+  const encodedSectionOrder = JSON.stringify(sectionKeys).replace(/"/g, "&quot;");
+  const canvasShellOpen = includeStudioLayout
+    ? `<div class="studio-canvas-shell studio-canvas-shell--page-canvas" data-studio-layout-shell="true" style="height:700px;min-height:0">
+          <div class="studio-canvas-board">
+            <div data-gosx-studio-board-slot="true">`
+    : "";
+  const canvasShellClose = includeStudioLayout
+    ? `</div>
+          </div>
+        </div>`
+    : "";
+  const pageCanvasToolbar = includeStudioLayout
+    ? `<header class="studio-page-canvas__toolbar" data-studio-preview-toolbar="true">
+            <div class="studio-page-canvas__routes">
+              <button type="button" data-studio-preview-route="/">Home</button>
+              <button type="button" data-studio-preview-route="/about">About</button>
+            </div>
+            <output>Page preview</output>
+          </header>`
+    : "";
+  const pageCanvasStatus = includeStudioLayout
+    ? `<output class="studio-page-canvas__status" data-studio-preview-status="true">Preview loaded.</output>
+          <output class="studio-page-canvas__diagnostic" data-studio-preview-diagnostic="true">No preview diagnostics.</output>`
+    : "";
+
   return `
     <main class="editor-workbench" data-gosx-studio-workbench="true">
       <form id="editor-main-form">
         <input type="hidden" name="csrf_token" value="csrf-existing" />
         <input id="editor-text" name="editor_text" value="editable text" />
+        ${canvasShellOpen}
         <section
           class="editor-preview-shell studio-page-canvas"
           data-gosx-studio-preview="true"
@@ -25,6 +71,7 @@ function editorHTML(route = "/", optionalKeys: string[] = []): string {
           data-gosx-studio-preview-url="${route}?gosx-preview=1"
           data-gosx-studio-preview-state="ready"
         >
+          ${pageCanvasToolbar}
           <aside
             data-gosx-studio-section-order="true"
             data-gosx-studio-section-order-enabled="true"
@@ -34,12 +81,12 @@ function editorHTML(route = "/", optionalKeys: string[] = []): string {
           >
             <output data-gosx-studio-section-order-status="true" role="status" aria-live="polite">Drag sections or use Up and Down.</output>
             <ol data-gosx-studio-section-order-list="true">
-              ${["hero", "gallery", "contact"].map((key, index) => `
+              ${sectionKeys.map((key, index) => `
                 <li data-gosx-studio-section-order-item="${key}" data-gosx-studio-section-order-label="${key}" ${optionalKeys.includes(key) ? 'data-gosx-studio-section-order-preview-optional="true"' : ""}>
                   <button type="button" data-gosx-studio-section-order-handle="true" aria-label="Drag ${key}" aria-describedby="studio-section-order-guidance">Drag</button>
                   <span data-gosx-studio-section-order-name="true">${key}</span>
                   <button type="button" data-gosx-studio-section-order-move="up" ${index === 0 ? "disabled" : ""}>Up</button>
-                  <button type="button" data-gosx-studio-section-order-move="down" ${index === 2 ? "disabled" : ""}>Down</button>
+                  <button type="button" data-gosx-studio-section-order-move="down" ${index === sectionKeys.length - 1 ? "disabled" : ""}>Down</button>
                 </li>
               `).join("")}
             </ol>
@@ -59,14 +106,16 @@ function editorHTML(route = "/", optionalKeys: string[] = []): string {
             ></div>
             <script src="/_gosx/studio/section-order-runtime.js" defer data-gosx-studio-section-order-runtime="true"></script>
           </aside>
-          <div data-studio-page-canvas-stage="true">
+          <div class="studio-page-canvas__stage" data-studio-page-canvas-stage="true">
             <iframe title="preview" data-studio-preview-frame="true" src="${route}?gosx-preview=1"></iframe>
           </div>
+          ${pageCanvasStatus}
         </section>
+        ${canvasShellClose}
       </form>
       <form id="ordinary-save">
         <input type="hidden" name="gosx_studio_binding" value="home.sections.order" />
-        <input type="hidden" name="gosx_studio_value" value="[&quot;hero&quot;,&quot;gallery&quot;,&quot;contact&quot;]" />
+        <input type="hidden" name="gosx_studio_value" value="${encodedSectionOrder}" />
       </form>
     </main>
   `;
@@ -92,16 +141,20 @@ function previewHTML(keys: string[] = ["hero", "gallery", "contact"]): string {
 async function loadFixture(
   page: import("@playwright/test").Page,
   route = "/",
-  options: { optionalKeys?: string[]; previewKeys?: string[]; previewDelayMs?: number } = {},
+  options: FixtureOptions = {},
 ) {
+  const sectionKeys = options.sectionKeys ?? defaultSectionKeys;
   await page.route("http://127.0.0.1:4173/_gosx/studio/section-order-runtime.js", async (r) =>
     r.fulfill({ contentType: "text/javascript", body: sectionOrderRuntimeJS }));
   await page.route("http://127.0.0.1:4173/editor", async (r) =>
-    r.fulfill({ contentType: "text/html", body: editorHTML(route, options.optionalKeys) }));
+    r.fulfill({
+      contentType: "text/html",
+      body: editorHTML(route, options.optionalKeys, sectionKeys, options.includeStudioLayout),
+    }));
   await page.route("http://127.0.0.1:4173/**?gosx-preview=1**", async (r) =>
     {
       if (options.previewDelayMs) await new Promise((resolve) => setTimeout(resolve, options.previewDelayMs));
-      await r.fulfill({ contentType: "text/html", body: previewHTML(options.previewKeys) });
+      await r.fulfill({ contentType: "text/html", body: previewHTML(options.previewKeys ?? sectionKeys) });
     });
   await page.goto("http://127.0.0.1:4173/editor");
   await page.addScriptTag({ content: operationRuntimeJS });
@@ -179,6 +232,189 @@ async function dragHandleToItem(
   await page.mouse.down();
   await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + (targetHalf === "top" ? 4 : targetBox.height - 4), { steps: 6 });
   await page.mouse.up();
+}
+
+type SectionOrderLayoutBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type SectionOrderLayoutSnapshot = {
+  canvas: SectionOrderLayoutBox;
+  lane: SectionOrderLayoutBox;
+  stage: SectionOrderLayoutBox;
+  frame: SectionOrderLayoutBox;
+  status: SectionOrderLayoutBox;
+  diagnostic: SectionOrderLayoutBox;
+  laneClientHeight: number;
+  laneScrollHeight: number;
+  laneScrollTop: number;
+  canvasClientHeight: number;
+  canvasScrollHeight: number;
+  canvasScrollWidth: number;
+  canvasClientWidth: number;
+  documentScrollWidth: number;
+  viewportWidth: number;
+};
+
+async function sectionOrderLayoutSnapshot(page: import("@playwright/test").Page): Promise<SectionOrderLayoutSnapshot> {
+  return page.evaluate(() => {
+    const required = (selector: string): HTMLElement => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) throw new Error(`missing layout fixture element: ${selector}`);
+      return element;
+    };
+    const box = (element: HTMLElement): SectionOrderLayoutBox => {
+      const rect = element.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    };
+    const canvas = required(".studio-page-canvas");
+    const lane = required("[data-gosx-studio-section-order='true']");
+    const stage = required(".studio-page-canvas__stage");
+    const frame = required("[data-studio-preview-frame]");
+    const status = required(".studio-page-canvas__status");
+    const diagnostic = required(".studio-page-canvas__diagnostic");
+    return {
+      canvas: box(canvas),
+      lane: box(lane),
+      stage: box(stage),
+      frame: box(frame),
+      status: box(status),
+      diagnostic: box(diagnostic),
+      laneClientHeight: lane.clientHeight,
+      laneScrollHeight: lane.scrollHeight,
+      laneScrollTop: lane.scrollTop,
+      canvasClientHeight: canvas.clientHeight,
+      canvasScrollHeight: canvas.scrollHeight,
+      canvasScrollWidth: canvas.scrollWidth,
+      canvasClientWidth: canvas.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+    };
+  });
+}
+
+async function expectSectionOrderControlsReachableWithTab(page: import("@playwright/test").Page) {
+  const controls = page.locator("[data-gosx-studio-section-order='true'] button:not([disabled])");
+  const expected = await controls.evaluateAll((nodes) => {
+    const signature = (element: Element): string => {
+      const item = element.closest("[data-gosx-studio-section-order-item]")?.getAttribute("data-gosx-studio-section-order-item") ?? "history";
+      const action = element.getAttribute("data-gosx-studio-section-order-handle") === "true"
+        ? "handle"
+        : element.getAttribute("data-gosx-studio-section-order-move") ??
+          element.getAttribute("data-gosx-studio-section-order-history") ??
+          "control";
+      return `${item}:${action}`;
+    };
+    return nodes.map(signature);
+  });
+  expect(expected.length).toBeGreaterThan(0);
+  expect(new Set(expected).size, "enabled SectionOrder controls should have unique signatures").toBe(expected.length);
+  const expectedSet = new Set(expected);
+
+  // Start from the real preceding form control and let the browser's native
+  // sequential focus navigation discover every enabled lane control. This is
+  // intentionally not locator.focus(): the assertion covers actual Tab order
+  // and the lane's own scroll-into-view behavior.
+  await page.locator("#editor-text").click();
+  const visited = new Set<string>();
+  const nonButtonFocusStops: Array<{
+    tagName: string;
+    id: string;
+    role: string | null;
+    className: string;
+    hasTabIndexAttribute: boolean;
+    tabIndex: number;
+    laneScrollTop: number;
+  }> = [];
+  const unexpectedButtons: Array<{
+    signature: string;
+    enabled: boolean;
+    isExpectedLaneButton: boolean;
+    insideLane: boolean;
+    visible: boolean;
+    laneScrollTop: number;
+  }> = [];
+  let maximumLaneScrollTop = 0;
+  const maxTabs = expected.length * 3 + 16;
+  let tabsPressed = 0;
+  const expectedControlsVisited = () => expected.every((signature) => visited.has(signature));
+  for (; tabsPressed < maxTabs && !expectedControlsVisited(); tabsPressed += 1) {
+    await page.keyboard.press("Tab");
+    const state = await page.evaluate(() => {
+      const active = document.activeElement;
+      const lane = active?.closest<HTMLElement>("[data-gosx-studio-section-order='true']");
+      if (!(active instanceof HTMLElement) || !lane) return null;
+      const item = active.closest("[data-gosx-studio-section-order-item]")?.getAttribute("data-gosx-studio-section-order-item") ?? "history";
+      const action = active.getAttribute("data-gosx-studio-section-order-handle") === "true"
+        ? "handle"
+        : active.getAttribute("data-gosx-studio-section-order-move") ??
+          active.getAttribute("data-gosx-studio-section-order-history") ??
+          "control";
+      const laneRect = lane.getBoundingClientRect();
+      const activeRect = active.getBoundingClientRect();
+      const insideLane = activeRect.top >= laneRect.top - 1 && activeRect.bottom <= laneRect.bottom + 1;
+      const visible = activeRect.width > 0 && activeRect.height > 0 && insideLane;
+      if (!(active instanceof HTMLButtonElement)) {
+        return {
+          kind: "container" as const,
+          tagName: active.tagName,
+          id: active.id,
+          role: active.getAttribute("role"),
+          className: typeof active.className === "string" ? active.className : "",
+          hasTabIndexAttribute: active.hasAttribute("tabindex"),
+          tabIndex: active.tabIndex,
+          laneScrollTop: lane.scrollTop,
+        };
+      }
+      return {
+        kind: "button" as const,
+        signature: `${item}:${action}`,
+        enabled: !active.disabled,
+        isExpectedLaneButton: active.matches("[data-gosx-studio-section-order='true'] button:not([disabled])"),
+        insideLane,
+        visible,
+        laneScrollTop: lane.scrollTop,
+      };
+    });
+    if (!state) continue;
+    if (state.kind === "container") {
+      nonButtonFocusStops.push(state);
+      maximumLaneScrollTop = Math.max(maximumLaneScrollTop, state.laneScrollTop);
+      continue;
+    }
+    expect(state.insideLane, `Tab focus should reveal ${state.signature} inside the SectionOrder lane`).toBe(true);
+    expect(state.visible, `Tab focus should land on a visible SectionOrder button: ${state.signature}`).toBe(true);
+    maximumLaneScrollTop = Math.max(maximumLaneScrollTop, state.laneScrollTop);
+    if (!state.enabled || !state.isExpectedLaneButton || !expectedSet.has(state.signature)) {
+      unexpectedButtons.push(state);
+      continue;
+    }
+    visited.add(state.signature);
+  }
+
+  const viewport = page.viewportSize();
+  const viewportLabel = viewport ? `${viewport.width}x${viewport.height}` : "unknown";
+  writeFileSync(
+    test.info().outputPath(`section-order-focus-traversal-${viewportLabel}.json`),
+    `${JSON.stringify({
+      viewport,
+      expected,
+      visited: [...visited],
+      nonButtonFocusStops,
+      unexpectedButtons,
+      tabsPressed,
+      maxTabs,
+      maximumLaneScrollTop,
+    }, null, 2)}\n`,
+    "utf8",
+  );
+
+  expect(unexpectedButtons, "Tab traversal should not reach an unexpected enabled SectionOrder button").toEqual([]);
+  expect([...visited].sort(), `Tab traversal should cover every expected button; non-button stops: ${JSON.stringify(nonButtonFocusStops)}`).toEqual([...expected].sort());
+  expect(maximumLaneScrollTop, "Tab traversal should scroll the long SectionOrder lane").toBeGreaterThan(0);
 }
 
 test.describe("@smoke GoSXStudio section order runtime", () => {
@@ -605,5 +841,104 @@ test.describe("@smoke GoSXStudio section order runtime", () => {
       JSON.stringify({ present: true, value: JSON.stringify(["hero", "gallery", "contact"]) }),
     ]);
     await expect(page.locator("#ordinary-save [name='gosx_studio_value']")).toHaveValue(JSON.stringify(["hero", "gallery", "contact"]));
+  });
+
+  test("real Studio CSS caps the SectionOrder lane and reserves a meaningful PageCanvas", async ({ page, browser }, testInfo) => {
+    const sectionKeys = Array.from({ length: 24 }, (_, index) => `section-${index + 1}`);
+    await loadFixture(page, "/", {
+      includeStudioLayout: true,
+      sectionKeys,
+      previewKeys: sectionKeys,
+    });
+    await page.addStyleTag({ content: studioCSS });
+
+    writeFileSync(
+      testInfo.outputPath("section-order-layout-browser-identity.json"),
+      `${JSON.stringify({
+        browserVersion: browser.version(),
+        nodePlatform: process.platform,
+        navigatorPlatform: await page.evaluate(() => navigator.platform),
+        userAgent: await page.evaluate(() => navigator.userAgent),
+      }, null, 2)}\n`,
+      "utf8",
+    );
+
+    const shell = page.locator("[data-studio-layout-shell='true']");
+    await expect(shell).toBeVisible();
+    const viewports = [
+      { width: 1280, height: 820, shellHeight: 700, minimumStage: 240 },
+      { width: 390, height: 844, shellHeight: 760, minimumStage: 160 },
+      { width: 320, height: 844, shellHeight: 760, minimumStage: 160 },
+      { width: 1280, height: 480, shellHeight: 360, minimumStage: 240, shortHeight: true },
+    ];
+
+    for (const viewport of viewports) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await shell.evaluate((node, height) => {
+        (node as HTMLElement).style.height = `${height}px`;
+      }, viewport.shellHeight);
+      await page.locator("[data-gosx-studio-section-order='true']").evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      await page.evaluate(() => window.scrollTo(0, 0));
+
+      const snapshot = await sectionOrderLayoutSnapshot(page);
+      const viewportLabel = `${viewport.width}x${viewport.height}`;
+      const saveEvidence = async (phase: string, geometry: SectionOrderLayoutSnapshot) => {
+        const evidence = {
+          phase,
+          viewport: {
+            width: viewport.width,
+            height: viewport.height,
+            shellHeight: viewport.shellHeight,
+          },
+          geometry,
+        };
+        writeFileSync(
+          testInfo.outputPath(`section-order-layout-${viewportLabel}-${phase}.json`),
+          `${JSON.stringify(evidence, null, 2)}\n`,
+          "utf8",
+        );
+        await page.screenshot({
+          path: testInfo.outputPath(`section-order-layout-${viewportLabel}-${phase}.png`),
+          fullPage: false,
+        });
+      };
+      await saveEvidence("before", snapshot);
+      expect(snapshot.stage.height, `${viewport.width}px PageCanvas stage should remain meaningful`).toBeGreaterThanOrEqual(viewport.minimumStage - 0.5);
+      expect(snapshot.frame.height, `${viewport.width}px preview frame should fill the stage`).toBeGreaterThanOrEqual(snapshot.stage.height - 1);
+      expect(snapshot.lane.height, `${viewport.width}px SectionOrder lane should stay capped`).toBeLessThanOrEqual(224.5);
+      expect(snapshot.laneScrollHeight, `${viewport.width}px SectionOrder lane should scroll its long list`).toBeGreaterThan(snapshot.laneClientHeight);
+      expect(snapshot.laneScrollTop, `${viewport.width}px SectionOrder lane should start at its top before Tab traversal`).toBe(0);
+      const lastEnabledControlBelowLane = await page.locator("[data-gosx-studio-section-order='true'] button:not([disabled])").last().evaluate((node) => {
+        const lane = node.closest<HTMLElement>("[data-gosx-studio-section-order='true']");
+        if (!lane) return false;
+        const laneRect = lane.getBoundingClientRect();
+        const controlRect = node.getBoundingClientRect();
+        return controlRect.bottom > laneRect.bottom + 1;
+      });
+      expect(lastEnabledControlBelowLane, `${viewport.width}px fixture should require lane scrolling to reach its final enabled control`).toBe(true);
+      expect(snapshot.canvasScrollWidth, `${viewport.width}px PageCanvas should not overflow horizontally`).toBeLessThanOrEqual(snapshot.canvasClientWidth + 0.5);
+      expect(snapshot.documentScrollWidth, `${viewport.width}px fixture should not overflow the viewport`).toBeLessThanOrEqual(snapshot.viewportWidth + 0.5);
+
+      if (viewport.shortHeight) {
+        expect(snapshot.canvasScrollHeight, "short PageCanvas should expose intentional vertical scrolling").toBeGreaterThan(snapshot.canvasClientHeight);
+        await page.locator(".studio-page-canvas__diagnostic").scrollIntoViewIfNeeded();
+        await saveEvidence("after-short-scroll", await sectionOrderLayoutSnapshot(page));
+      }
+
+      const visibleSnapshot = viewport.shortHeight ? await sectionOrderLayoutSnapshot(page) : snapshot;
+
+      for (const [label, box] of [["status", visibleSnapshot.status], ["diagnostic", visibleSnapshot.diagnostic]] as const) {
+        expect(box.width, `${viewport.width}px ${label} should remain visible`).toBeGreaterThan(0);
+        expect(box.height, `${viewport.width}px ${label} should remain visible`).toBeGreaterThan(0);
+        expect(box.x, `${viewport.width}px ${label} should stay inside PageCanvas`).toBeGreaterThanOrEqual(visibleSnapshot.canvas.x - 1);
+        expect(box.x + box.width, `${viewport.width}px ${label} should stay inside PageCanvas`).toBeLessThanOrEqual(visibleSnapshot.canvas.x + visibleSnapshot.canvas.width + 1);
+        expect(box.y + box.height, `${viewport.width}px ${label} should not be clipped`).toBeLessThanOrEqual(visibleSnapshot.canvas.y + visibleSnapshot.canvas.height + 1);
+      }
+
+      await expectSectionOrderControlsReachableWithTab(page);
+      await saveEvidence("after-tab", await sectionOrderLayoutSnapshot(page));
+    }
   });
 });

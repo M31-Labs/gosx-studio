@@ -82,27 +82,46 @@
   var selectionOperationCounter = 0;
 
   function frame(callback) {
-    if (window.requestAnimationFrame) {
-      window.requestAnimationFrame(callback);
-      return;
+    if (typeof window.requestAnimationFrame === "function") {
+      return { id: window.requestAnimationFrame(callback), raf: true };
     }
-    window.setTimeout(callback, 16);
+    return { id: window.setTimeout(callback, 16), raf: false };
   }
 
   function frameTask(callback) {
     var queued = false;
     var lastArgs = null;
     var lastThis = null;
-    return function () {
+    var active = true;
+    var pendingFrame = null;
+    var task = function () {
+      if (!active) return;
       lastArgs = arguments;
       lastThis = this;
       if (queued) return;
       queued = true;
-      frame(function () {
+      pendingFrame = frame(function () {
+        pendingFrame = null;
         queued = false;
+        if (!active) return;
         callback.apply(lastThis, lastArgs || []);
       });
     };
+    task.cancel = function () {
+      active = false;
+      if (pendingFrame) {
+        if (pendingFrame.raf && typeof window.cancelAnimationFrame === "function") {
+          window.cancelAnimationFrame(pendingFrame.id);
+        } else if (!pendingFrame.raf && typeof window.clearTimeout === "function") {
+          window.clearTimeout(pendingFrame.id);
+        }
+        pendingFrame = null;
+      }
+      queued = false;
+      lastArgs = null;
+      lastThis = null;
+    };
+    return task;
   }
 
   function selectionReducedMotion() {
@@ -205,6 +224,10 @@
     return scope.querySelector ? scope.querySelector("[data-studio-workbench]") : null;
   }
 
+  function selectionContains(node) {
+    return !doc.contains || doc.contains(node);
+  }
+
   // Set a shared signal value through the WASM bridge, if available. The
   // bridge exposes window.__gosx_set_shared_signal_json(name, valueJSON)
   // after the runtime boots; before then the call is a no-op (the legacy
@@ -222,12 +245,113 @@
 
   function bindSelectionSurfaceIsland(root) {
     var form = editorWorkbench(root);
-    if (!form || form.dataset.gosxStudioSelectionIslandBound === "true") return;
+    if (!form) return;
+    var previousController = form.__gosxStudioSelectionIslandController;
+    if (previousController && !previousController.disposed) {
+      if (previousController.refresh) previousController.refresh();
+      return;
+    }
+    if (previousController && previousController.dispose) previousController.dispose();
+    // A stale marker can survive a host-side partial teardown without the
+    // controller expando. Treat it as recoverable state rather than allowing
+    // a replacement bind to become permanently inert.
+    if (form.dataset.gosxStudioSelectionIslandBound === "true") {
+      form.removeAttribute("data-gosx-studio-selection-island-bound");
+    }
+
+    var disposed = false;
+    var cleanupFns = [];
+    var timerIDs = [];
+    var lifecycleObserver = null;
+    var commandPaletteNode = null;
+    var commandPaletteHandler = null;
+
+    function listen(target, type, handler, options) {
+      if (!target || !target.addEventListener) return;
+      var listener = target === form ? function (event) {
+        if (disposed || !selectionContains(form)) return;
+        handler(event);
+      } : handler;
+      target.addEventListener(type, listener, options);
+      cleanupFns.push(function () {
+        if (target.removeEventListener) target.removeEventListener(type, listener, options);
+      });
+    }
+
+    function schedule(callback, delay) {
+      if (disposed || !window.setTimeout) return null;
+      var id = null;
+      function forgetTimer() {
+        var index = timerIDs.indexOf(id);
+        if (index >= 0) timerIDs.splice(index, 1);
+      }
+      id = window.setTimeout(function () {
+        forgetTimer();
+        if (disposed || !selectionContains(form)) return;
+        callback();
+      }, delay);
+      timerIDs.push(id);
+      return id;
+    }
+
+    function clearCommandPaletteBinding() {
+      if (commandPaletteNode && commandPaletteHandler && commandPaletteNode.removeEventListener) {
+        commandPaletteNode.removeEventListener("gosxstudio:command", commandPaletteHandler);
+      }
+      if (commandPaletteNode) {
+        commandPaletteNode.removeAttribute("data-gosx-studio-selection-island-commands-bound");
+      }
+      commandPaletteNode = null;
+      commandPaletteHandler = null;
+    }
+
+    function dispose() {
+      if (disposed) return;
+      disposed = true;
+      if (lifecycleObserver) lifecycleObserver.disconnect();
+      for (var i = 0; i < timerIDs.length; i++) {
+        if (window.clearTimeout) window.clearTimeout(timerIDs[i]);
+      }
+      timerIDs = [];
+      if (refreshCanvas && refreshCanvas.cancel) refreshCanvas.cancel();
+      clearCommandPaletteBinding();
+      for (var j = cleanupFns.length - 1; j >= 0; j--) cleanupFns[j]();
+      cleanupFns = [];
+      form.removeAttribute("data-gosx-studio-selection-island-bound");
+      if (form.__gosxStudioSelectionIslandController && form.__gosxStudioSelectionIslandController.dispose === dispose) {
+        delete form.__gosxStudioSelectionIslandController;
+      }
+    }
+
+    var controller = {
+      dispose: dispose,
+      refresh: function () {
+        if (!disposed) bindCommandPaletteCommands();
+      },
+      get disposed() { return disposed; }
+    };
+    form.__gosxStudioSelectionIslandController = controller;
     form.dataset.gosxStudioSelectionIslandBound = "true";
 
     var refreshCanvas = frameTask(function () {
+      if (disposed || !selectionContains(form)) return;
       window.dispatchEvent(new Event("resize"));
     });
+
+    if (window.MutationObserver && doc.documentElement) {
+      lifecycleObserver = new MutationObserver(function () {
+        if (!selectionContains(form)) {
+          dispose();
+          return;
+        }
+        // Fragment replacement may keep the form node alive while replacing
+        // only the command palette. Reconcile that child binding on every
+        // structural mutation so the old node becomes inert and the new one
+        // receives exactly one listener.
+        bindCommandPaletteCommands();
+      });
+      lifecycleObserver.observe(doc.documentElement, { childList: true, subtree: true });
+    }
 
     function setReadout(selector, value) {
       Array.prototype.forEach.call(form.querySelectorAll(selector), function (node) {
@@ -1076,8 +1200,8 @@
       if (source && source.scrollIntoView) {
         source.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
       }
-      window.setTimeout(function () {
-        if (control && control.focus) control.focus({ preventScroll: true });
+      schedule(function () {
+        if (control && selectionContains(control) && control.focus) control.focus({ preventScroll: true });
       }, reduced ? 0 : 120);
     }
 
@@ -1102,8 +1226,8 @@
       if (scrollTarget && scrollTarget.scrollIntoView) {
         scrollTarget.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
       }
-      window.setTimeout(function () {
-        if (target.control && target.control.focus) target.control.focus({ preventScroll: true });
+      schedule(function () {
+        if (target.control && selectionContains(target.control) && target.control.focus) target.control.focus({ preventScroll: true });
       }, reduced ? 0 : 120);
       return true;
     }
@@ -1181,8 +1305,8 @@
       if (row.scrollIntoView) {
         row.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
       }
-      window.setTimeout(function () {
-        if (row.focus) row.focus({ preventScroll: true });
+      schedule(function () {
+        if (selectionContains(row) && row.focus) row.focus({ preventScroll: true });
       }, reduced ? 0 : 120);
     }
 
@@ -1331,9 +1455,14 @@
 
     function bindCommandPaletteCommands() {
       var node = form.querySelector("[data-studio-command-palette]");
-      if (!node || node.dataset.gosxStudioSelectionIslandCommandsBound === "true") return;
+      if (node === commandPaletteNode && commandPaletteHandler) return;
+      clearCommandPaletteBinding();
+      if (!node) return;
+      commandPaletteNode = node;
       node.dataset.gosxStudioSelectionIslandCommandsBound = "true";
-      node.addEventListener("gosxstudio:command", function (event) {
+      commandPaletteHandler = function (event) {
+        if (disposed || !selectionContains(form) || !commandPaletteNode || event.currentTarget !== commandPaletteNode ||
+          commandPaletteNode.isConnected === false || form.querySelector("[data-studio-command-palette]") !== commandPaletteNode) return;
         var detail = event.detail || {};
         var kind = detail.kind || "";
         var target = detail.target || "";
@@ -1344,7 +1473,8 @@
         if (kind === "insert" && runInsertTarget(detail.target, detail.label)) {
           if (event.preventDefault) event.preventDefault();
         }
-      });
+      };
+      node.addEventListener("gosxstudio:command", commandPaletteHandler);
     }
 
     function updateSelection(key) {
@@ -1381,7 +1511,8 @@
     }
 
     // Wire up all five sub-behaviors against the workbench form.
-    form.addEventListener("click", function (event) {
+    listen(form, "click", function (event) {
+      if (disposed || !selectionContains(form)) return;
       var selectionAction = event.target.closest && event.target.closest("[data-studio-selection-action]");
       if (selectionAction && form.contains(selectionAction)) {
         event.preventDefault();
@@ -1414,69 +1545,73 @@
       }
     });
 
-    form.addEventListener("click", function (event) {
+    listen(form, "click", function (event) {
+      if (disposed || !selectionContains(form)) return;
       var row = event.target.closest && event.target.closest("[data-block-studio-block]");
       if (row && form.contains(row)) updateSelection(row.getAttribute("data-block-studio-block"));
     });
-    form.addEventListener("focusin", function (event) {
+    listen(form, "focusin", function (event) {
+      if (disposed || !selectionContains(form)) return;
       var row = event.target.closest && event.target.closest("[data-block-studio-block]");
       if (row && form.contains(row)) updateSelection(row.getAttribute("data-block-studio-block"));
       var workspaceTarget = workspaceTargetFromEvent(event);
       if (workspaceTarget) setWorkspaceSelection(workspaceTarget, false);
     });
-    doc.addEventListener("blockstudio:select", function (event) {
-      if (doc.contains(form)) updateSelection(event.detail && event.detail.key);
+    listen(doc, "blockstudio:select", function (event) {
+      if (!disposed && selectionContains(form)) updateSelection(event.detail && event.detail.key);
     });
-    doc.addEventListener("studio:field-select", function (event) {
-      if (!doc.contains(form)) return;
+    listen(doc, "studio:field-select", function (event) {
+      if (disposed || !selectionContains(form)) return;
       setFieldFocus(event.detail, event.detail && event.detail.source !== "preview");
     });
-    doc.addEventListener("studio:inline-edit-start", function (event) {
-      if (!doc.contains(form)) return;
+    listen(doc, "studio:inline-edit-start", function (event) {
+      if (disposed || !selectionContains(form)) return;
       setFieldFocus(event.detail, false);
     });
-    doc.addEventListener("gosxstudio:workbench-mode-change", function (event) {
-      if (!doc.contains(form)) return;
+    listen(doc, "gosxstudio:workbench-mode-change", function (event) {
+      if (disposed || !selectionContains(form)) return;
       if (event.detail && event.detail.form && event.detail.form !== form) return;
       var mode = event.detail && event.detail.mode || form.getAttribute("data-studio-mode") || "";
       if (mode === "advanced") ensureWorkspaceSelection();
       else if (form.getAttribute("data-studio-workspace-selection")) updateSelection("");
       updateStyleScope();
     });
-    doc.addEventListener("gosxstudio:workbench-viewport-change", function (event) {
-      if (!doc.contains(form)) return;
+    listen(doc, "gosxstudio:workbench-viewport-change", function (event) {
+      if (disposed || !selectionContains(form)) return;
       if (event.detail && event.detail.form && event.detail.form !== form) return;
       updateStyleScope();
     });
-    doc.addEventListener("gosxstudio:workbench-style-state-change", function (event) {
-      if (!doc.contains(form)) return;
+    listen(doc, "gosxstudio:workbench-style-state-change", function (event) {
+      if (disposed || !selectionContains(form)) return;
       if (event.detail && event.detail.form && event.detail.form !== form) return;
       updateStyleScope();
     });
-    form.addEventListener("focusin", function (event) {
+    listen(form, "focusin", function (event) {
+      if (disposed || !selectionContains(form)) return;
       var input = event.target && event.target.closest && event.target.closest("[data-studio-field-source]");
       if (input && form.contains(input)) {
         setFieldFocus({ field: input.getAttribute("data-studio-field-source") || "" }, false);
       }
     });
-    form.addEventListener("change", function (event) {
+    listen(form, "change", function (event) {
+      if (disposed || !selectionContains(form)) return;
       if (event.target && event.target.closest && event.target.closest("[data-editor-block-visible]")) {
         updateSelection(selectedKey());
       }
     });
-    form.addEventListener("gosxstudio:preview-action", mirrorPreviewActionSelection);
-    form.addEventListener("gosxstudio:preview-selection-detail-resolve", resolvePreviewSelectionDetail);
-    form.addEventListener("gosxstudio:preview-selection-apply", applyPreviewSelectionState);
-    form.addEventListener("gosxstudio:preview-selection-clear", clearPreviewSelectionState);
-	form.addEventListener("gosxstudio:preview-selection-suspend", suspendPreviewSelectionState);
-    form.addEventListener("gosxstudio:preview-selection-locator-restore", restorePreviewSelectionLocator);
-    form.addEventListener("gosxstudio:preview-selection-locator-stale", clearStalePreviewSelectionLocator);
-    form.addEventListener("gosxstudio:preview-field-target-resolve", resolvePreviewFieldTarget);
-    form.addEventListener("gosxstudio:preview-field-reveal", revealPreviewField);
-    form.addEventListener("gosxstudio:preview-field-navigation-commit", emitPreviewFieldNavigation);
-    form.addEventListener("gosxstudio:preview-field-action-resolve", resolvePreviewFieldAction);
-    form.addEventListener("gosxstudio:preview-field-action-submit", submitPreviewFieldAction);
-    form.addEventListener("gosxstudio:preview-dock-action-resolve", resolvePreviewDockAction);
+    listen(form, "gosxstudio:preview-action", mirrorPreviewActionSelection);
+    listen(form, "gosxstudio:preview-selection-detail-resolve", resolvePreviewSelectionDetail);
+    listen(form, "gosxstudio:preview-selection-apply", applyPreviewSelectionState);
+    listen(form, "gosxstudio:preview-selection-clear", clearPreviewSelectionState);
+    listen(form, "gosxstudio:preview-selection-suspend", suspendPreviewSelectionState);
+    listen(form, "gosxstudio:preview-selection-locator-restore", restorePreviewSelectionLocator);
+    listen(form, "gosxstudio:preview-selection-locator-stale", clearStalePreviewSelectionLocator);
+    listen(form, "gosxstudio:preview-field-target-resolve", resolvePreviewFieldTarget);
+    listen(form, "gosxstudio:preview-field-reveal", revealPreviewField);
+    listen(form, "gosxstudio:preview-field-navigation-commit", emitPreviewFieldNavigation);
+    listen(form, "gosxstudio:preview-field-action-resolve", resolvePreviewFieldAction);
+    listen(form, "gosxstudio:preview-field-action-submit", submitPreviewFieldAction);
+    listen(form, "gosxstudio:preview-dock-action-resolve", resolvePreviewDockAction);
 
     bindCommandPaletteCommands();
     if (form.getAttribute("data-studio-mode") === "advanced") ensureWorkspaceSelection();

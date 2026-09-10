@@ -159,6 +159,15 @@ async function expectPreviewGate(page: Page, app: ReferenceAppGate) {
   expect(box, `${app.name} preview frame should have a visible box`).toBeTruthy();
   expect(box?.width ?? 0).toBeGreaterThan(240);
   expect(box?.height ?? 0).toBeGreaterThan(120);
+  const hasSectionOrder = await page.locator("[data-gosx-studio-section-order='true']").count() > 0;
+  if (hasSectionOrder) {
+    // The broad >120px guard remains the cross-app contract above. The
+    // SectionOrder PageCanvas has an explicit, responsive stage floor so its
+    // populated preview remains the primary surface instead of a strip under
+    // the ordering lane.
+    const meaningfulMinimum = (page.viewportSize()?.width ?? 0) <= 820 ? 160 : 240;
+    expect(box?.height ?? 0, `${app.name} SectionOrder preview should retain meaningful room`).toBeGreaterThanOrEqual(meaningfulMinimum - 0.5);
+  }
   const screenshot = await frame.screenshot();
   expect(screenshot.length, `${app.name} preview frame should render non-empty pixels`).toBeGreaterThan(1_000);
 }

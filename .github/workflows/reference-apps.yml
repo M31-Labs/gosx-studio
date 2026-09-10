@@ -108,10 +108,19 @@ jobs:
         working-directory: gosx-studio/parity_e2e
         run: npm run test:candidate-identity
 
+      - name: Test shared-runtime fixture contract
+        working-directory: gosx-studio/parity_e2e
+        run: npm run test:fixture-contract
+
+      - name: Test reference-app browser and published-case contracts
+        working-directory: gosx-studio/parity_e2e
+        run: npm run test:reference-browser-contract
+
       - name: Run shared-runtime browser matrix
         working-directory: gosx-studio/parity_e2e
         env:
           GOSX_STUDIO_ENTERPRISE_ARTIFACT_ROOT: ${{ runner.temp }}/gosx-studio-shared-runtime
+          QUALITY_ARTIFACT_ROOT: ${{ runner.temp }}/gosx-studio-shared-runtime/quality
         run: npm run test:shared-runtime
 
       - name: Unit-test gosx-studio
@@ -135,6 +144,9 @@ jobs:
           GOSX_STUDIO_CANDIDATE_SHA: ${{ steps.studio-candidate.outputs.sha }}
           GOSX_STUDIO_MUDDY_REPO: ${{ github.workspace }}/muddy-noni-commerce
           GOSX_STUDIO_PAJARITOS_REPO: ${{ github.workspace }}/pajaritos-forest-school
+          GOSX_STUDIO_REFERENCE_APP_ARTIFACT_ROOT: ${{ runner.temp }}/gosx-studio-reference-app-editor
+          GOSX_STUDIO_ENTERPRISE_ARTIFACT_ROOT: ${{ runner.temp }}/gosx-studio-reference-app-editor/enterprise
+          QUALITY_ARTIFACT_ROOT: ${{ runner.temp }}/gosx-studio-reference-app-editor/quality
         run: npm run test:reference-apps
 
       - name: Upload Playwright artifacts on failure
@@ -144,7 +156,272 @@ jobs:
           name: reference-app-editor-e2e-artifacts
           path: |
             ${{ runner.temp }}/gosx-studio-shared-runtime/
+            ${{ runner.temp }}/gosx-studio-reference-app-editor/
             gosx-studio/parity_e2e/playwright-report/
             gosx-studio/parity_e2e/test-results/
+            gosx-studio/.tiller/scratch/codex/modern-editor-20260827/qa/
+            gosx-studio/.tiller/scratch/codex/enterprise-polish-20260827/integration08/
+            gosx-studio/.tiller/scratch/codex/enterprise-polish-20260827/qa/quality04/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  reference-apps-browser-matrix:
+    name: Reference apps / ${{ matrix.browser }} (candidate; supplemental Linux CI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - name: Checkout gosx-studio
+        uses: actions/checkout@v4
+        with:
+          path: gosx-studio
+
+      - name: Capture gosx-studio candidate SHA
+        id: studio-candidate
+        working-directory: gosx-studio
+        run: |
+          candidate_sha="$(git rev-parse --verify HEAD)"
+          echo "sha=${candidate_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve reference app refs
+        id: refs
+        run: |
+          echo "muddy=$(jq -r '.muddy' gosx-studio/.github/reference-app-refs.json)" >> "$GITHUB_OUTPUT"
+          echo "pajaritos=$(jq -r '.pajaritos' gosx-studio/.github/reference-app-refs.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout gosx
+        uses: actions/checkout@v4
+        with:
+          repository: odvcencio/gosx
+          token: ${{ secrets.CI_GITHUB_TOKEN || github.token }}
+          path: gosx
+
+      - name: Checkout gosx-admin
+        uses: actions/checkout@v4
+        with:
+          repository: odvcencio/gosx-admin
+          token: ${{ secrets.CI_GITHUB_TOKEN || github.token }}
+          path: gosx-admin
+
+      - name: Checkout Muddy/Noni
+        uses: actions/checkout@v4
+        with:
+          repository: odvcencio/muddy-noni-commerce
+          token: ${{ secrets.CI_GITHUB_TOKEN || github.token }}
+          ref: ${{ steps.refs.outputs.muddy }}
+          path: muddy-noni-commerce
+
+      - name: Checkout Pajaritos
+        uses: actions/checkout@v4
+        with:
+          repository: odvcencio/pajaritos-forest-school
+          token: ${{ secrets.CI_GITHUB_TOKEN || github.token }}
+          ref: ${{ steps.refs.outputs.pajaritos }}
+          path: pajaritos-forest-school
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: gosx-studio/go.mod
+          cache-dependency-path: |
+            gosx-studio/go.sum
+            gosx/go.sum
+            gosx-admin/go.sum
+            muddy-noni-commerce/go.sum
+            pajaritos-forest-school/go.sum
+
+      - name: Install gosx CLI
+        working-directory: gosx
+        run: |
+          go install ./cmd/gosx
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: gosx-studio/parity_e2e/package-lock.json
+
+      - name: Install candidate browser-matrix dependencies
+        working-directory: gosx-studio/parity_e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Type-check candidate browser-matrix harness
+        working-directory: gosx-studio/parity_e2e
+        run: npx tsc --noEmit
+
+      - name: Test candidate identity and fixture contracts
+        working-directory: gosx-studio/parity_e2e
+        run: |
+          npm run test:candidate-identity
+          npm run test:fixture-contract
+          npm run test:reference-browser-contract
+
+      - name: Run candidate reference-app browser matrix
+        working-directory: gosx-studio/parity_e2e
+        env:
+          GOSX_STUDIO_CANDIDATE_REPO: ${{ github.workspace }}/gosx-studio
+          GOSX_STUDIO_CANDIDATE_SHA: ${{ steps.studio-candidate.outputs.sha }}
+          GOSX_STUDIO_MUDDY_REPO: ${{ github.workspace }}/muddy-noni-commerce
+          GOSX_STUDIO_PAJARITOS_REPO: ${{ github.workspace }}/pajaritos-forest-school
+          GOSX_STUDIO_REFERENCE_APP_ARTIFACT_ROOT: ${{ runner.temp }}/gosx-studio-reference-app-${{ matrix.browser }}
+          GOSX_STUDIO_ENTERPRISE_ARTIFACT_ROOT: ${{ runner.temp }}/gosx-studio-reference-app-${{ matrix.browser }}/enterprise
+          QUALITY_ARTIFACT_ROOT: ${{ runner.temp }}/gosx-studio-reference-app-${{ matrix.browser }}/quality
+        run: npm run test:reference-apps-browser -- --project=${{ matrix.browser }}
+
+      - name: Upload candidate browser-matrix artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reference-app-browser-${{ matrix.browser }}-artifacts
+          path: |
+            ${{ runner.temp }}/gosx-studio-reference-app-${{ matrix.browser }}/
+            gosx-studio/parity_e2e/playwright-report/
+            gosx-studio/parity_e2e/test-results/
+            gosx-studio/.tiller/scratch/codex/modern-editor-20260827/qa/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  released-consumer:
+    name: Released Noni consumer / ${{ matrix.browser }} (published, no overlay; supplemental Linux CI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - name: Checkout gosx-studio harness
+        uses: actions/checkout@v4
+        with:
+          path: gosx-studio
+
+      - name: Validate committed released-consumer contract
+        id: released-contract
+        working-directory: gosx-studio
+        shell: bash
+        run: |
+          set -euo pipefail
+          contract=.github/reference-app-release-contract.json
+          test -f "$contract"
+          test "$(jq -r '.mode' "$contract")" = "published-no-overlay"
+          test "$(jq -r '.studio.module' "$contract")" = "m31labs.dev/gosx-studio"
+          host_repository="$(jq -r '.host.repository' "$contract")"
+          test "$host_repository" = "odvcencio/muddy-noni-commerce"
+          host_sha="$(jq -r '.host.sha' "$contract")"
+          test "$host_sha" = "$(jq -r '.host.ref' "$contract")"
+          [[ "$host_sha" =~ ^[0-9a-fA-F]{40}$ ]]
+          studio_version="$(jq -r '.studio.version' "$contract")"
+          [[ "$studio_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.+-]*)?$ ]]
+          studio_origin="$(jq -r '.studio.origin' "$contract")"
+          [[ "$studio_origin" =~ ^[0-9a-fA-F]{40}$ ]]
+          {
+            echo "host_sha=$host_sha"
+            echo "studio_version=$studio_version"
+            echo "studio_origin=$studio_origin"
+          } >> "$GITHUB_OUTPUT"
+          echo "Released contract: host=$host_repository@$host_sha Studio=$studio_version origin=$studio_origin"
+
+      - name: Checkout released Muddy/Noni host
+        uses: actions/checkout@v4
+        with:
+          repository: odvcencio/muddy-noni-commerce
+          token: ${{ secrets.CI_GITHUB_TOKEN || github.token }}
+          ref: ${{ steps.released-contract.outputs.host_sha }}
+          path: muddy-noni-commerce
+
+      - name: Assert released host checkout and capture module hashes
+        id: released_host_modules
+        working-directory: muddy-noni-commerce
+        shell: bash
+        env:
+          EXPECTED_HOST_SHA: ${{ steps.released-contract.outputs.host_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse --verify HEAD)" = "$EXPECTED_HOST_SHA"
+          test -f go.mod
+          test -f go.sum
+          sha256sum go.mod go.sum > "$RUNNER_TEMP/gosx-studio-released-host-modules.sha256"
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: muddy-noni-commerce/go.mod
+          cache-dependency-path: muddy-noni-commerce/go.sum
+
+      - name: Install released GoSX CLI
+        run: |
+          go install m31labs.dev/gosx/cmd/gosx@v0.53.8
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: gosx-studio/parity_e2e/package-lock.json
+
+      - name: Install released-consumer harness dependencies
+        working-directory: gosx-studio/parity_e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Type-check released-consumer harness
+        working-directory: gosx-studio/parity_e2e
+        run: npx tsc --noEmit
+
+      - name: Test released identity guard
+        working-directory: gosx-studio/parity_e2e
+        run: npm run test:released-identity
+
+      - name: Test shared-runtime fixture contract
+        working-directory: gosx-studio/parity_e2e
+        run: npm run test:fixture-contract
+
+      - name: Test reference-app browser and published-case contracts
+        working-directory: gosx-studio/parity_e2e
+        run: npm run test:reference-browser-contract
+
+      - name: Run published no-overlay Noni consumer workflows
+        working-directory: gosx-studio/parity_e2e
+        env:
+          GOSX_STUDIO_RELEASED_CONSUMER: '1'
+          GOSX_STUDIO_RELEASED_VERSION: ${{ steps.released-contract.outputs.studio_version }}
+          GOSX_STUDIO_RELEASED_ORIGIN: ${{ steps.released-contract.outputs.studio_origin }}
+          GOSX_STUDIO_EXPECTED_MODULE_VERSION: ${{ steps.released-contract.outputs.studio_version }}
+          GOSX_STUDIO_MUDDY_REPO: ${{ github.workspace }}/muddy-noni-commerce
+          GOSX_STUDIO_REFERENCE_APP_ARTIFACT_ROOT: ${{ runner.temp }}/gosx-studio-released-consumer-${{ matrix.browser }}
+          GOSX_STUDIO_ENTERPRISE_ARTIFACT_ROOT: ${{ runner.temp }}/gosx-studio-released-consumer-${{ matrix.browser }}/enterprise
+          QUALITY_ARTIFACT_ROOT: ${{ runner.temp }}/gosx-studio-released-consumer-${{ matrix.browser }}/quality
+        run: npm run test:released-consumer -- --config=playwright.reference-apps.config.ts --project=${{ matrix.browser }}
+
+      - name: Verify released host module files stayed unchanged
+        if: always() && steps.released_host_modules.outcome == 'success'
+        working-directory: muddy-noni-commerce
+        run: |
+          set -euo pipefail
+          sha256sum -c "$RUNNER_TEMP/gosx-studio-released-host-modules.sha256"
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Upload released-consumer artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reference-app-released-consumer-${{ matrix.browser }}-artifacts
+          path: |
+            ${{ runner.temp }}/gosx-studio-released-consumer-${{ matrix.browser }}/
+            ${{ runner.temp }}/gosx-studio-released-host-modules.sha256
+            gosx-studio/parity_e2e/playwright-report/
+            gosx-studio/parity_e2e/test-results/
+            gosx-studio/.tiller/scratch/codex/modern-editor-20260827/qa/
           if-no-files-found: ignore
           retention-days: 7

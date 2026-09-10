@@ -1,18 +1,34 @@
 import { expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createServer } from "node:net";
 import {
+  CandidateSourceCopyLeaseBook,
   assertResolvedCandidateModule,
+  assertReferenceAppIdentityStable,
+  type CandidateSourceCopyLease,
+  type CandidateSourceCopyLeaseStatus,
+  CANDIDATE_REPO_ENV,
+  CANDIDATE_SHA_ENV,
   createCandidateSourceCopy,
   loadCandidateIdentity,
   resolveCandidateModuleGraph,
   withCandidateModuleEnvironment,
   type CandidateIdentity,
   type CandidateSourceCopy,
+  type ReferenceAppIdentitySnapshot,
 } from "./reference_apps_candidate_identity";
+import {
+  assertReleasedRepositoryModule,
+  loadReleasedIdentity,
+  RELEASED_CONSUMER_ENV,
+  RELEASED_ORIGIN_ENV,
+  RELEASED_VERSION_ENV,
+  withReleasedModuleEnvironment,
+  type ReleasedIdentity,
+} from "./reference_apps_released_identity";
 
 const workRoot = path.resolve(__dirname, "../..");
 const muddyRepo = process.env.GOSX_STUDIO_MUDDY_REPO ?? path.join(workRoot, "muddy-noni-commerce");
@@ -21,11 +37,31 @@ const defaultGoBin = "/home/draco/go/bin";
 
 let muddyDistBuildPromise: Promise<void> | null = null;
 
-let candidateIdentityLoaded = false;
-let candidateIdentityError: unknown = null;
-let candidateIdentity: CandidateIdentity | null = null;
+const referenceAppIdentityEnvironmentKeys = [
+  CANDIDATE_REPO_ENV,
+  CANDIDATE_SHA_ENV,
+  RELEASED_CONSUMER_ENV,
+  RELEASED_VERSION_ENV,
+  RELEASED_ORIGIN_ENV,
+  "GOFLAGS",
+  "GOWORK",
+] as const;
+
+type ReferenceAppProcessIdentity = {
+  candidateIdentity: CandidateIdentity | null;
+  releasedIdentity: ReleasedIdentity | null;
+  snapshot: ReferenceAppIdentitySnapshot;
+};
+
+let referenceAppProcessIdentity: ReferenceAppProcessIdentity | null = null;
 const candidateModuleGraphHosts = new Set<string>();
 const candidateSourceCopies = new Map<string, CandidateSourceCopy>();
+const candidateSourceCopyLeases = new CandidateSourceCopyLeaseBook();
+
+type ReleasedHostModuleSnapshot = {
+  goMod: Buffer;
+  goSum: Buffer;
+};
 
 export type ClickAuthoringOptions = {
   noWaitAfter?: boolean;
@@ -533,7 +569,70 @@ export function authoringParam(response: { request(): { postData(): string | nul
   return match?.[1] ?? null;
 }
 
+function referenceAppIdentityEnvironmentFingerprint(env: NodeJS.ProcessEnv): string {
+  return JSON.stringify(referenceAppIdentityEnvironmentKeys.map((key) => [key, env[key] ?? null]));
+}
+
+function rejectPerCallReferenceAppOverrides(overrides: NodeJS.ProcessEnv): void {
+  const overridden = referenceAppIdentityEnvironmentKeys.filter((key) =>
+    Object.prototype.hasOwnProperty.call(overrides, key),
+  );
+  if (overridden.length > 0) {
+    throw new Error(
+      `reference-app identity/overlay environment cannot be overridden per start call: ${overridden.join(", ")}`,
+    );
+  }
+}
+
+function assertReferenceAppProcessIdentity(baseEnv: NodeJS.ProcessEnv): ReferenceAppProcessIdentity {
+  const environmentFingerprint = referenceAppIdentityEnvironmentFingerprint(baseEnv);
+  if (
+    referenceAppProcessIdentity &&
+    referenceAppProcessIdentity.snapshot.environmentFingerprint !== environmentFingerprint
+  ) {
+    throw new Error(
+      `reference-app identity environment drift detected across calls; process mode is immutable (captured ${referenceAppProcessIdentity.snapshot.environmentFingerprint}, received ${environmentFingerprint})`,
+    );
+  }
+
+  const releasedIdentity = loadReleasedIdentity(baseEnv);
+  const candidateIdentity = releasedIdentity ? null : loadCandidateIdentity(baseEnv);
+  const snapshot: ReferenceAppIdentitySnapshot = {
+    mode: releasedIdentity ? "released" : candidateIdentity ? "candidate" : "unconfigured",
+    environmentFingerprint,
+    ...(candidateIdentity
+      ? { candidateRepo: candidateIdentity.candidateRepo, candidateSHA: candidateIdentity.candidateSHA }
+      : {}),
+    ...(releasedIdentity
+      ? { releasedVersion: releasedIdentity.version, releasedOrigin: releasedIdentity.origin }
+      : {}),
+  };
+
+  if (referenceAppProcessIdentity) {
+    assertReferenceAppIdentityStable(referenceAppProcessIdentity.snapshot, snapshot);
+  }
+
+  // Run the same canonical overlay checks at the process boundary, before a
+  // dist promise, source copy, or Go child can be created.
+  if (releasedIdentity) {
+    withReleasedModuleEnvironment(baseEnv);
+  } else if (candidateIdentity) {
+    withCandidateModuleEnvironment(baseEnv);
+  }
+
+  if (!referenceAppProcessIdentity) {
+    referenceAppProcessIdentity = { candidateIdentity, releasedIdentity, snapshot };
+  }
+  return referenceAppProcessIdentity;
+}
+
+function assertReferenceAppStartEnvironment(overrides: NodeJS.ProcessEnv = {}): ReferenceAppProcessIdentity {
+  rejectPerCallReferenceAppOverrides(overrides);
+  return assertReferenceAppProcessIdentity({ ...process.env, ...overrides });
+}
+
 export async function startMuddy(request: APIRequestContext, extraEnv?: Record<string, string>): Promise<ServerHandle> {
+  assertReferenceAppStartEnvironment(extraEnv);
   await ensureMuddyDist();
   const port = await freePort();
   const tempDir = mkdtempSync(path.join(tmpdir(), "gosx-studio-muddy-e2e-"));
@@ -558,6 +657,7 @@ export async function startMuddy(request: APIRequestContext, extraEnv?: Record<s
 }
 
 export async function startMuddyCollaboration(request: APIRequestContext, extraEnv?: Record<string, string>): Promise<ServerHandle> {
+  assertReferenceAppStartEnvironment(extraEnv);
   await ensureMuddyDist();
   const port = await freePort();
   const tempDir = mkdtempSync(path.join(tmpdir(), "gosx-studio-muddy-collab-e2e-"));
@@ -600,6 +700,7 @@ export async function startMuddyCanvasHTMLSurfaceCollaboration(request: APIReque
 }
 
 function ensureMuddyDist(): Promise<void> {
+  assertReferenceAppProcessIdentity(process.env);
   if (!muddyDistBuildPromise) {
     muddyDistBuildPromise = buildMuddyDist().catch((error) => {
       muddyDistBuildPromise = null;
@@ -611,18 +712,41 @@ function ensureMuddyDist(): Promise<void> {
 
 async function buildMuddyDist(): Promise<void> {
   const gosxBin = process.env.GOSX_STUDIO_GOSX_BIN ?? "gosx";
-  const buildRepo = candidateSourceRepo(muddyRepo);
-  const env = {
+  const baseEnv = {
     ...process.env,
-    GOWORK: "off",
-    ...candidateGoEnvironment(muddyRepo),
     PATH: process.env.GOSX_STUDIO_GOSX_BIN ? process.env.PATH : withPathEntry(process.env.PATH, defaultGoBin),
   };
-  await runLoggedCommand(gosxBin, ["build", "--dev", "."], {
-    cwd: buildRepo,
-    env,
-    label: "Muddy GoSX dist build",
-  });
+  const processIdentity = assertReferenceAppProcessIdentity(baseEnv);
+  const publishedIdentity = processIdentity.releasedIdentity;
+  const buildRepo = publishedIdentity ? muddyRepo : candidateSourceRepo(muddyRepo);
+  const env = publishedIdentity
+    ? withReleasedModuleEnvironment(baseEnv)
+    : {
+        ...baseEnv,
+        GOWORK: "off",
+        ...candidateGoEnvironment(muddyRepo, baseEnv),
+      };
+  const moduleSnapshot = publishedIdentity ? captureReleasedHostModuleSnapshot(muddyRepo) : null;
+  try {
+    if (publishedIdentity) {
+      assertReleasedHostModuleGraph(muddyRepo, publishedIdentity, env, "before Muddy GoSX dist build");
+      assertReleasedHostModuleSnapshot(muddyRepo, moduleSnapshot!, "before Muddy GoSX dist build");
+    }
+    await runLoggedCommand(gosxBin, ["build", "--dev", "."], {
+      cwd: buildRepo,
+      env,
+      label: "Muddy GoSX dist build",
+      candidateSourceCopyHostKey: processIdentity.candidateIdentity ? path.resolve(muddyRepo) : undefined,
+    });
+    if (publishedIdentity) {
+      assertReleasedHostModuleGraph(muddyRepo, publishedIdentity, env, "after Muddy GoSX dist build");
+      assertReleasedHostModuleSnapshot(muddyRepo, moduleSnapshot!, "after Muddy GoSX dist build");
+    }
+  } finally {
+    if (publishedIdentity) {
+      assertReleasedHostModuleSnapshot(muddyRepo, moduleSnapshot!, "Muddy GoSX dist build cleanup");
+    }
+  }
 }
 
 function withPathEntry(currentPath: string | undefined, entry: string): string {
@@ -677,6 +801,7 @@ export async function startMuddyCanvasHTMLSurface(request: APIRequestContext): P
 }
 
 export async function startPajaritos(request: APIRequestContext): Promise<ServerHandle> {
+  assertReferenceAppStartEnvironment();
   const port = await freePort();
   const tempDir = mkdtempSync(path.join(tmpdir(), "gosx-studio-pajaritos-e2e-"));
   return startGoServer(request, {
@@ -692,6 +817,7 @@ export async function startPajaritos(request: APIRequestContext): Promise<Server
       PAJARITOS_MOCK_AUTH: "1",
     },
     tempDir,
+    allowCandidateModuleUpdates: true,
   });
 }
 
@@ -701,12 +827,21 @@ type ServerOptions = {
   baseURL: string;
   env: Record<string, string>;
   tempDir: string;
+  /**
+   * Pajaritos' reviewed ref can need dependency metadata updates after the
+   * candidate Studio replacement is applied. Only a helper-owned candidate
+   * source copy may use `go run -mod=mod`; released or real host checkouts
+   * remain read-only and never receive this flag.
+   */
+  allowCandidateModuleUpdates?: boolean;
 };
 
 type LoggedCommandOptions = {
   cwd: string;
   env: NodeJS.ProcessEnv;
   label: string;
+  /** Keep a helper-owned candidate source copy leased through this build. */
+  candidateSourceCopyHostKey?: string;
 };
 
 // ── Orphaned-process-group prevention ───────────────────────────────────────
@@ -731,10 +866,10 @@ type LoggedCommandOptions = {
 // just one process — reaches `go run` AND its compiled-binary child in one
 // signal, however the group leader dies (graceful or SIGKILL).
 //
-// `activeProcessGroups` tracks every live group so a process-level SIGINT/
-// SIGTERM/exit on the Playwright/Node runner itself (a mid-test abort) also
-// sweeps every still-tracked group as a last resort, even if a test's own
-// `finally`/`afterAll` never gets to call `stop()`.
+// `activeProcessGroups` tracks every known group until an ESRCH probe proves
+// it gone, so a process-level SIGINT/SIGTERM/exit on the Playwright/Node
+// runner itself (a mid-test abort) can sweep every still-tracked group even if
+// a test's own `finally`/`afterAll` never gets to call `stop()`.
 const activeProcessGroups = new Set<number>();
 
 function trackProcessGroup(pid: number | undefined) {
@@ -742,22 +877,26 @@ function trackProcessGroup(pid: number | undefined) {
 }
 
 function untrackProcessGroup(pid: number | undefined) {
-  if (pid !== undefined) activeProcessGroups.delete(pid);
+  if (pid !== undefined && candidateSourceCopyLeaseStatus(pid) === "gone") {
+    activeProcessGroups.delete(pid);
+  }
 }
 
 function killProcessGroup(pid: number, signal: NodeJS.Signals) {
   try {
     process.kill(-pid, signal);
-  } catch {
-    // ESRCH: the group is already gone (process exited/reaped on its own,
-    // or this is a stale entry from a group we already killed). Cleanup is
-    // best-effort here — never throw out of a shutdown path.
+  } catch (error) {
+    // ESRCH means the group is already gone. Other failures are deliberately
+    // not treated as termination evidence; cleanup remains conservative.
+    if ((error as NodeJS.ErrnoException).code !== "ESRCH") {
+      console.error(`[gosx-studio process] could not signal process group ${pid}: ${String(error)}`);
+    }
   }
 }
 
 function candidateGoEnvironment(hostRepo: string, extraEnv: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   const baseEnv = { ...process.env, ...extraEnv };
-  const identity = loadCandidateIdentityOnce(baseEnv);
+  const identity = assertReferenceAppProcessIdentity(baseEnv).candidateIdentity;
   if (!identity) return {};
 
   const sourceRepo = candidateSourceRepo(hostRepo, baseEnv);
@@ -771,22 +910,48 @@ function candidateGoEnvironment(hostRepo: string, extraEnv: NodeJS.ProcessEnv = 
   };
 }
 
-function loadCandidateIdentityOnce(baseEnv: NodeJS.ProcessEnv): CandidateIdentity | null {
-  if (!candidateIdentityLoaded) {
-    candidateIdentityLoaded = true;
-    try {
-      candidateIdentity = loadCandidateIdentity(baseEnv);
-    } catch (error) {
-      candidateIdentityError = error;
-    }
-  }
-  if (candidateIdentityError) throw candidateIdentityError;
-  return candidateIdentity;
+function assertReleasedHostModuleGraph(
+  hostRepo: string,
+  identity: ReleasedIdentity,
+  env: NodeJS.ProcessEnv,
+  phase: string,
+) {
+  const graph = assertReleasedRepositoryModule(hostRepo, identity, env, phase);
+  console.log(
+    `[gosx-studio released] phase=${phase} module=${graph.Path} version=${graph.Version} origin=${graph.Origin?.Hash} noReplace=true host=${path.resolve(hostRepo)}`,
+  );
 }
 
-function candidateSourceRepo(hostRepo: string, extraEnv: NodeJS.ProcessEnv = {}): string {
+function captureReleasedHostModuleSnapshot(hostRepo: string): ReleasedHostModuleSnapshot {
+  const root = path.resolve(hostRepo);
+  return {
+    goMod: readFileSync(path.join(root, "go.mod")),
+    goSum: readFileSync(path.join(root, "go.sum")),
+  };
+}
+
+function assertReleasedHostModuleSnapshot(
+  hostRepo: string,
+  snapshot: ReleasedHostModuleSnapshot,
+  phase: string,
+): void {
+  const root = path.resolve(hostRepo);
+  const current = {
+    goMod: readFileSync(path.join(root, "go.mod")),
+    goSum: readFileSync(path.join(root, "go.sum")),
+  };
+  if (!current.goMod.equals(snapshot.goMod) || !current.goSum.equals(snapshot.goSum)) {
+    throw new Error(`${phase}: released host go.mod/go.sum changed; refusing a mutated consumer checkout`);
+  }
+}
+
+function candidateSourceRepo(
+  hostRepo: string,
+  extraEnv: NodeJS.ProcessEnv = {},
+  allowModuleUpdates = false,
+): string {
   const baseEnv = { ...process.env, ...extraEnv };
-  const identity = loadCandidateIdentityOnce(baseEnv);
+  const identity = assertReferenceAppProcessIdentity(baseEnv).candidateIdentity;
   if (!identity) return hostRepo;
 
   installProcessGroupCleanupOnce();
@@ -799,31 +964,96 @@ function candidateSourceRepo(hostRepo: string, extraEnv: NodeJS.ProcessEnv = {})
 
   if (!candidateModuleGraphHosts.has(hostKey)) {
     try {
-      const graph = resolveCandidateModuleGraph(sourceCopy.sourceRepo, baseEnv);
+      const graph = resolveCandidateModuleGraph(sourceCopy.sourceRepo, baseEnv, allowModuleUpdates);
       assertResolvedCandidateModule(graph, identity);
       candidateModuleGraphHosts.add(hostKey);
       console.log(
         `[gosx-studio candidate] verified module=${graph.Path} Module.Replace.Dir=${identity.candidateRepo} candidateSHA=${identity.candidateSHA} sourceCopy=${sourceCopy.sourceRepo} host=${hostKey}`,
       );
     } catch (error) {
-      sourceCopy.dispose();
-      candidateSourceCopies.delete(hostKey);
+      // A source copy may already be serving another reference-app process.
+      // Never remove that shared copy because a later graph assertion failed;
+      // only dispose an unused copy that this call created before any handle
+      // could retain it.
+      if (candidateSourceCopyLeases.canDispose(hostKey)) {
+        try {
+          sourceCopy.dispose();
+          candidateSourceCopies.delete(hostKey);
+        } catch (cleanupError) {
+          // CandidateSourceCopy.dispose remains retryable after a failed
+          // removal. Keep the map entry so a later sweep can retry the exact
+          // helper-owned path instead of losing ownership information.
+          console.error(
+            `[gosx-studio candidate] retaining source copy after graph failure cleanup: ${sourceCopy.sourceRepo} (${String(cleanupError)})`,
+          );
+        }
+      }
       throw error;
     }
   }
   return sourceCopy.sourceRepo;
 }
 
-function cleanupCandidateSourceCopies() {
-  for (const [hostKey, sourceCopy] of candidateSourceCopies) {
-    try {
-      sourceCopy.dispose();
-    } catch (error) {
-      console.error(`[gosx-studio candidate] failed to remove source copy ${sourceCopy.sourceRepo}: ${String(error)}`);
-    }
-    candidateSourceCopies.delete(hostKey);
+function retainCandidateSourceCopy(hostKey: string, processGroupId?: number): CandidateSourceCopyLease {
+  return candidateSourceCopyLeases.retain(hostKey, processGroupId);
+}
+
+function candidateSourceCopyLeaseStatus(processGroupId: number | undefined): CandidateSourceCopyLeaseStatus {
+  // A pending lease has no process group yet; releasing it after a spawn
+  // failure is safe because no child can still be using the source copy.
+  if (processGroupId === undefined) return "gone";
+  try {
+    process.kill(-processGroupId, 0);
+    return "live";
+  } catch (error) {
+    // Only ESRCH proves that the complete process group is absent. EPERM and
+    // all other errors remain unknown so a cleanup sweep cannot race a live
+    // build/server or delete its source copy underneath it.
+    return (error as NodeJS.ErrnoException).code === "ESRCH" ? "gone" : "unknown";
   }
-  candidateModuleGraphHosts.clear();
+}
+
+let candidateSourceCleanupRequested = false;
+let candidateSourceCleanupInProgress = false;
+
+function releaseCandidateSourceCopyLease(lease: CandidateSourceCopyLease): void {
+  const status = candidateSourceCopyLeaseStatus(lease.processGroupId);
+  if (!candidateSourceCopyLeases.release(lease, status)) return;
+  if (candidateSourceCleanupRequested) cleanupCandidateSourceCopies();
+}
+
+function cleanupCandidateSourceCopies() {
+  candidateSourceCleanupRequested = true;
+  if (candidateSourceCleanupInProgress) return;
+  candidateSourceCleanupInProgress = true;
+  try {
+    // Process-group entries stay tracked until an ESRCH check proves the
+    // group is gone. A SIGKILL request alone is not evidence of termination.
+    for (const pid of [...activeProcessGroups]) {
+      if (candidateSourceCopyLeaseStatus(pid) === "gone") activeProcessGroups.delete(pid);
+    }
+
+    for (const [hostKey, sourceCopy] of candidateSourceCopies) {
+      if (!candidateSourceCopyLeases.canDispose(hostKey)) {
+        console.error(
+          `[gosx-studio candidate] retaining shared source copy while ${candidateSourceCopyLeases.activeCount(hostKey)} active build/server lease(s) remain: ${sourceCopy.sourceRepo}`,
+        );
+        continue;
+      }
+      try {
+        sourceCopy.dispose();
+      } catch (error) {
+        console.error(`[gosx-studio candidate] failed to remove source copy ${sourceCopy.sourceRepo}: ${String(error)}`);
+        // dispose() intentionally remains retryable after a removal failure;
+        // retain the map entry and exact path for a later sweep.
+        continue;
+      }
+      candidateSourceCopies.delete(hostKey);
+    }
+    candidateModuleGraphHosts.clear();
+  } finally {
+    candidateSourceCleanupInProgress = false;
+  }
 }
 
 let processGroupCleanupInstalled = false;
@@ -839,7 +1069,10 @@ function installProcessGroupCleanupOnce() {
   processGroupCleanupInstalled = true;
   const sweep = () => {
     for (const pid of activeProcessGroups) killProcessGroup(pid, "SIGKILL");
-    activeProcessGroups.clear();
+    // Keep groups tracked until a later event/sweep can positively observe
+    // ESRCH. On abrupt synchronous Node exit no later retry is possible, so
+    // an active group may retain its exact source-copy path; this is reported
+    // rather than falsely claiming all owned copies were removed.
     cleanupCandidateSourceCopies();
   };
   process.on("exit", sweep);
@@ -849,12 +1082,22 @@ function installProcessGroupCleanupOnce() {
 
 async function runLoggedCommand(command: string, args: string[], options: LoggedCommandOptions): Promise<void> {
   installProcessGroupCleanupOnce();
-  const proc = spawn(command, args, {
-    cwd: options.cwd,
-    env: options.env,
-    stdio: ["ignore", "pipe", "pipe"],
-    detached: true,
-  });
+  const candidateLease = options.candidateSourceCopyHostKey
+    ? retainCandidateSourceCopy(options.candidateSourceCopyHostKey)
+    : null;
+  let proc: ChildProcess;
+  try {
+    proc = spawn(command, args, {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
+    });
+  } catch (error) {
+    if (candidateLease) releaseCandidateSourceCopyLease(candidateLease);
+    throw error;
+  }
+  if (candidateLease) candidateLease.processGroupId = proc.pid;
   trackProcessGroup(proc.pid);
   const stdout: string[] = [];
   const stderr: string[] = [];
@@ -864,10 +1107,12 @@ async function runLoggedCommand(command: string, args: string[], options: Logged
   return new Promise((resolve, reject) => {
     proc.on("error", (error) => {
       untrackProcessGroup(proc.pid);
+      if (candidateLease) releaseCandidateSourceCopyLease(candidateLease);
       reject(new Error(`${options.label} failed to start: ${error.message}\n\nstdout:\n${stdout.join("")}\n\nstderr:\n${stderr.join("")}`));
     });
     proc.on("exit", (code, signal) => {
       untrackProcessGroup(proc.pid);
+      if (candidateLease) releaseCandidateSourceCopyLease(candidateLease);
       if (code === 0) {
         resolve();
         return;
@@ -878,31 +1123,115 @@ async function runLoggedCommand(command: string, args: string[], options: Logged
 }
 
 async function startGoServer(request: APIRequestContext, options: ServerOptions): Promise<ServerHandle> {
+  const baseEnv = { ...process.env, ...options.env };
+  rejectPerCallReferenceAppOverrides(options.env);
+  const processIdentity = assertReferenceAppProcessIdentity(baseEnv);
+  const publishedIdentity = processIdentity.releasedIdentity;
+  const candidateIdentityForServer = processIdentity.candidateIdentity;
   installProcessGroupCleanupOnce();
-  const serverCwd = candidateSourceRepo(options.cwd, options.env);
-  const proc = spawn("go", ["run", options.command], {
-    cwd: serverCwd,
-    env: {
-      ...process.env,
-      GOWORK: "off",
-      ...options.env,
-      ...candidateGoEnvironment(options.cwd, options.env),
-    },
-    stdio: ["ignore", "pipe", "pipe"],
-    detached: true,
-  });
+
+  let serverCwd = options.cwd;
+  let serverEnv: NodeJS.ProcessEnv;
+  let candidateCopyActive = false;
+  const candidateCopyHostKey = candidateIdentityForServer ? path.resolve(options.cwd) : null;
+  let candidateSourceLease: CandidateSourceCopyLease | null = null;
+  let moduleSnapshot: ReleasedHostModuleSnapshot | null = null;
+  try {
+    serverCwd = publishedIdentity
+      ? options.cwd
+      : candidateSourceRepo(options.cwd, options.env, options.allowCandidateModuleUpdates === true);
+    candidateCopyActive = candidateIdentityForServer !== null && path.resolve(serverCwd) !== path.resolve(options.cwd);
+    if (options.allowCandidateModuleUpdates && candidateIdentityForServer && !candidateCopyActive) {
+      throw new Error("candidate module updates require a helper-owned source copy; refusing to run in the real host checkout");
+    }
+    serverEnv = publishedIdentity
+      ? withReleasedModuleEnvironment(baseEnv)
+      : {
+          ...baseEnv,
+          GOWORK: "off",
+          ...candidateGoEnvironment(options.cwd, options.env),
+        };
+    if (publishedIdentity) {
+      moduleSnapshot = captureReleasedHostModuleSnapshot(options.cwd);
+      assertReleasedHostModuleGraph(options.cwd, publishedIdentity, serverEnv, "before reference-app go run");
+      assertReleasedHostModuleSnapshot(options.cwd, moduleSnapshot, "before reference-app go run");
+    }
+    if (candidateIdentityForServer) {
+      assertResolvedCandidateModule(
+        resolveCandidateModuleGraph(serverCwd, serverEnv, options.allowCandidateModuleUpdates === true && candidateCopyActive),
+        candidateIdentityForServer,
+      );
+    }
+  } catch (error) {
+    // This includes the candidate graph assertion so every pre-spawn failure
+    // removes the fresh per-test data directory. A shared candidate source
+    // copy is retained by candidateSourceRepo when another live handle uses
+    // it; only its own active-handle lease may release it later.
+    cleanupTempDir(options.tempDir);
+    throw error;
+  }
+  const goRunArgs = ["run"];
+  if (options.allowCandidateModuleUpdates && candidateCopyActive) goRunArgs.push("-mod=mod");
+  goRunArgs.push(options.command);
+  // Retain the shared copy before spawn so a shutdown sweep cannot remove it
+  // in the small pre-spawn window. The lease is released only after a later
+  // process-group check proves ESRCH (or immediately when spawn never starts).
+  if (candidateCopyHostKey && candidateCopyActive) {
+    candidateSourceLease = retainCandidateSourceCopy(candidateCopyHostKey);
+  }
+  let proc: ChildProcess;
+  try {
+    proc = spawn("go", goRunArgs, {
+      cwd: serverCwd,
+      env: serverEnv,
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
+    });
+  } catch (error) {
+    if (candidateSourceLease) releaseCandidateSourceCopyLease(candidateSourceLease);
+    cleanupTempDir(options.tempDir);
+    throw error;
+  }
+  if (candidateSourceLease) candidateSourceLease.processGroupId = proc.pid;
   trackProcessGroup(proc.pid);
+  proc.once("error", () => {
+    untrackProcessGroup(proc.pid);
+    if (candidateSourceLease) releaseCandidateSourceCopyLease(candidateSourceLease);
+  });
+  proc.once("exit", () => {
+    untrackProcessGroup(proc.pid);
+    if (candidateSourceLease) releaseCandidateSourceCopyLease(candidateSourceLease);
+  });
   const logs: string[] = [];
   proc.stdout?.on("data", (chunk: Buffer) => logs.push(chunk.toString()));
   proc.stderr?.on("data", (chunk: Buffer) => logs.push(chunk.toString()));
 
   try {
     await waitForServer(request, options.baseURL);
+    if (publishedIdentity) {
+      assertReleasedHostModuleGraph(options.cwd, publishedIdentity, serverEnv, "after reference-app go run");
+      assertReleasedHostModuleSnapshot(options.cwd, moduleSnapshot!, "after reference-app go run");
+    }
+    if (candidateIdentityForServer) {
+      assertResolvedCandidateModule(
+        resolveCandidateModuleGraph(serverCwd, serverEnv, options.allowCandidateModuleUpdates === true && candidateCopyActive),
+        candidateIdentityForServer,
+      );
+    }
     await warmEditor(request, options.baseURL);
   } catch (error) {
+    let failure = String(error);
+    if (publishedIdentity) {
+      try {
+        assertReleasedHostModuleSnapshot(options.cwd, moduleSnapshot!, "reference-app go run failure cleanup");
+      } catch (snapshotError) {
+        failure += `\n\n${String(snapshotError)}`;
+      }
+    }
     await stopProcess(proc);
+    if (candidateSourceLease) releaseCandidateSourceCopyLease(candidateSourceLease);
     cleanupTempDir(options.tempDir);
-    throw new Error(`${String(error)}\n\nServer logs:\n${logs.join("")}`);
+    throw new Error(`${failure}\n\nServer logs:\n${logs.join("")}`);
   }
 
   return {
@@ -912,7 +1241,14 @@ async function startGoServer(request: APIRequestContext, options: ServerOptions)
       try {
         await stopProcess(proc);
       } finally {
-        cleanupTempDir(options.tempDir);
+        try {
+          if (publishedIdentity) {
+            assertReleasedHostModuleSnapshot(options.cwd, moduleSnapshot!, "reference-app go run stop");
+        }
+      } finally {
+          if (candidateSourceLease) releaseCandidateSourceCopyLease(candidateSourceLease);
+          cleanupTempDir(options.tempDir);
+        }
       }
     },
   };

@@ -24,6 +24,54 @@ export type CandidateIdentity = {
   candidateSHA: string;
 };
 
+export type CandidateSourceCopyLeaseStatus = "live" | "unknown" | "gone";
+
+export type CandidateSourceCopyLease = {
+  hostKey: string;
+  processGroupId?: number;
+  released: boolean;
+};
+
+/**
+ * Track source-copy consumers independently. A lease can be released only
+ * after its process group is positively known to be gone; a signal request,
+ * permission error, or unknown process state must retain the copy.
+ */
+export class CandidateSourceCopyLeaseBook {
+  private readonly leases = new Map<string, Set<CandidateSourceCopyLease>>();
+
+  retain(hostKey: string, processGroupId?: number): CandidateSourceCopyLease {
+    const lease: CandidateSourceCopyLease = { hostKey, processGroupId, released: false };
+    const hostLeases = this.leases.get(hostKey) ?? new Set<CandidateSourceCopyLease>();
+    hostLeases.add(lease);
+    this.leases.set(hostKey, hostLeases);
+    return lease;
+  }
+
+  release(lease: CandidateSourceCopyLease, status: CandidateSourceCopyLeaseStatus): boolean {
+    if (lease.released || status !== "gone") return false;
+    lease.released = true;
+    const hostLeases = this.leases.get(lease.hostKey);
+    if (!hostLeases) return true;
+    hostLeases.delete(lease);
+    if (hostLeases.size === 0) this.leases.delete(lease.hostKey);
+    return true;
+  }
+
+  hasActive(hostKey: string): boolean {
+    return (this.leases.get(hostKey)?.size ?? 0) > 0;
+  }
+
+  /** A graph-failure or shutdown path may dispose only when no consumer remains. */
+  canDispose(hostKey: string): boolean {
+    return !this.hasActive(hostKey);
+  }
+
+  activeCount(hostKey: string): number {
+    return this.leases.get(hostKey)?.size ?? 0;
+  }
+}
+
 export type GoModuleGraph = {
   Path?: string;
   Dir?: string;
@@ -41,6 +89,64 @@ export type CandidateSourceCopy = {
   /** Remove only this helper-owned copy; safe to call more than once. */
   dispose: () => void;
 };
+
+export type CandidateSourceCopyOptions = {
+  /**
+   * Permit the recursive copier only for an explicitly synthetic, non-Git
+   * fixture. Production/reference-app callers must leave this false so a
+   * failed Git file listing cannot silently produce a partial copy.
+   */
+  allowNonGitFixture?: boolean;
+  /** Deterministic removal hook used only by the synthetic cleanup regression. */
+  removeSourceRepo?: (sourceRepo: string) => void;
+};
+
+export type ReferenceAppIdentityMode = "candidate" | "released" | "unconfigured";
+
+export type ReferenceAppIdentitySnapshot = {
+  mode: ReferenceAppIdentityMode;
+  environmentFingerprint: string;
+  candidateRepo?: string;
+  candidateSHA?: string;
+  releasedVersion?: string;
+  releasedOrigin?: string;
+};
+
+/**
+ * Compare the immutable identity captured by one process with a later call.
+ * The harness deliberately compares the environment fingerprint first: a
+ * caller cannot switch between candidate, released, and unconfigured modes
+ * after any helper has started resolving/building a reference app.
+ */
+export function assertReferenceAppIdentityStable(
+  expected: ReferenceAppIdentitySnapshot,
+  actual: ReferenceAppIdentitySnapshot,
+): void {
+  if (expected.environmentFingerprint !== actual.environmentFingerprint) {
+    throw new Error(
+      `reference-app identity environment drift detected; process mode is immutable (captured ${expected.environmentFingerprint}, received ${actual.environmentFingerprint})`,
+    );
+  }
+  if (expected.mode !== actual.mode) {
+    throw new Error(
+      `reference-app identity mode changed from ${expected.mode} to ${actual.mode}; one process cannot mix modes`,
+    );
+  }
+
+  const fields: Array<keyof Omit<ReferenceAppIdentitySnapshot, "mode" | "environmentFingerprint">> = [
+    "candidateRepo",
+    "candidateSHA",
+    "releasedVersion",
+    "releasedOrigin",
+  ];
+  for (const field of fields) {
+    if ((expected[field] ?? "") !== (actual[field] ?? "")) {
+      throw new Error(
+        `reference-app identity changed for ${field}; process mode is immutable (captured ${expected[field] ?? "<unset>"}, received ${actual[field] ?? "<unset>"})`,
+      );
+    }
+  }
+}
 
 const excludedDirectoryNames = new Set([
   ".ferrous-wheel-build",
@@ -68,7 +174,13 @@ const safeEnvironmentExamples = new Set([".env.example", ".env.sample", ".env.te
  */
 export function loadCandidateIdentity(env: NodeJS.ProcessEnv = process.env): CandidateIdentity | null {
   const configuredRepo = env[CANDIDATE_REPO_ENV]?.trim();
-  if (!configuredRepo) return null;
+  const configuredSHA = env[CANDIDATE_SHA_ENV]?.trim();
+  if (!configuredRepo) {
+    if (configuredSHA) {
+      throw new Error(`${CANDIDATE_REPO_ENV} is required when ${CANDIDATE_SHA_ENV} is set`);
+    }
+    return null;
+  }
 
   const candidateRepo = resolveDirectory(configuredRepo, `${CANDIDATE_REPO_ENV} candidate repository`);
   const modulePath = readModulePath(path.join(candidateRepo, "go.mod"));
@@ -78,7 +190,7 @@ export function loadCandidateIdentity(env: NodeJS.ProcessEnv = process.env): Can
     );
   }
 
-  const expectedSHA = env[CANDIDATE_SHA_ENV]?.trim();
+  const expectedSHA = configuredSHA;
   if (isCI(env) && !expectedSHA) {
     throw new Error(`${CANDIDATE_SHA_ENV} is required when ${CANDIDATE_REPO_ENV} is set in CI`);
   }
@@ -146,13 +258,15 @@ export function assertCandidateSHA(expectedSHA: string, actualSHA: string): void
  * to resolve inside the copied tree.
  *
  * Only tracked and non-ignored working-tree files are copied when the host is
- * a Git checkout. The fallback recursive copier is for synthetic test hosts.
- * Runtime state, caches, secrets, and generated output are excluded in both
- * modes. The caller owns the returned copy and must dispose it after use.
+ * a Git checkout. The recursive fallback is disabled unless the caller
+ * explicitly marks the host as a synthetic non-Git fixture. Runtime state,
+ * caches, secrets, and generated output are excluded in both modes. The
+ * caller owns the returned copy and must dispose it after use.
  */
 export function createCandidateSourceCopy(
   hostRepo: string,
   identity: CandidateIdentity,
+  options: CandidateSourceCopyOptions = {},
 ): CandidateSourceCopy {
   const sourceRoot = resolveDirectory(hostRepo, "reference app repository");
   const sourceModfile = path.join(sourceRoot, "go.mod");
@@ -171,10 +285,13 @@ export function createCandidateSourceCopy(
     path.dirname(sourceRoot),
     `.${path.basename(sourceRoot)}.gosx-studio-candidate-${process.pid}-${randomUUID()}`,
   );
+  const removeSourceRepo = options.removeSourceRepo ?? ((target: string) => {
+    rmSync(target, { force: true, recursive: true });
+  });
 
   mkdirSync(sourceRepo);
   try {
-    copyWorkingTree(sourceRoot, sourceRepo);
+    copyWorkingTree(sourceRoot, sourceRepo, options.allowNonGitFixture === true);
     const copiedModfile = path.join(sourceRepo, "go.mod");
     if (!existsSync(copiedModfile)) {
       throw new Error(`candidate source copy did not contain go.mod: ${sourceRepo}`);
@@ -187,7 +304,13 @@ replace ${STUDIO_MODULE_PATH} => ${quoteGoString(identity.candidateRepo)}
 `;
     writeFileSync(copiedModfile, body, "utf8");
   } catch (error) {
-    rmSync(sourceRepo, { force: true, recursive: true });
+    try {
+      removeSourceRepo(sourceRepo);
+    } catch (cleanupError) {
+      throw new Error(
+        `${String(error)}\nfailed to remove incomplete candidate source copy ${sourceRepo}: ${String(cleanupError)}`,
+      );
+    }
     throw error;
   }
 
@@ -197,8 +320,8 @@ replace ${STUDIO_MODULE_PATH} => ${quoteGoString(identity.candidateRepo)}
     sourceRepo,
     dispose: () => {
       if (disposed) return;
+      removeSourceRepo(sourceRepo);
       disposed = true;
-      rmSync(sourceRepo, { force: true, recursive: true });
     },
   };
 }
@@ -224,11 +347,15 @@ export function withCandidateModuleEnvironment(baseEnv: NodeJS.ProcessEnv): Node
 export function resolveCandidateModuleGraph(
   sourceRepo: string,
   baseEnv: NodeJS.ProcessEnv = process.env,
+  allowModuleUpdates = false,
 ): GoModuleGraph {
   const sourceRoot = resolveDirectory(sourceRepo, "candidate source repository");
+  const args = ["list"];
+  if (allowModuleUpdates) args.push("-mod=mod");
+  args.push("-m", "-json", STUDIO_MODULE_PATH);
   const result = execFileSync(
     "go",
-    ["list", "-m", "-json", STUDIO_MODULE_PATH],
+    args,
     {
       cwd: sourceRoot,
       env: withCandidateModuleEnvironment(baseEnv),
@@ -310,11 +437,16 @@ function quoteGoString(value: string): string {
   return JSON.stringify(value);
 }
 
-function copyWorkingTree(sourceRoot: string, destinationRoot: string): void {
+function copyWorkingTree(sourceRoot: string, destinationRoot: string, allowNonGitFixture: boolean): void {
   const gitFiles = listGitWorkingTreeFiles(sourceRoot);
   if (gitFiles) {
     for (const relativeFile of gitFiles) copyWorkingTreeFile(sourceRoot, destinationRoot, relativeFile);
     return;
+  }
+  if (!allowNonGitFixture) {
+    throw new Error(
+      `cannot enumerate the reference-app Git working tree at ${sourceRoot}; refusing recursive candidate-copy fallback (only explicit non-Git fixtures may opt in)`,
+    );
   }
   copyDirectory(sourceRoot, destinationRoot, "");
 }
@@ -331,8 +463,27 @@ function listGitWorkingTreeFiles(sourceRoot: string): string[] | null {
       },
     );
     return output.split("\0").filter(Boolean);
-  } catch {
+  } catch (error) {
+    if (isGitCheckout(sourceRoot)) {
+      throw new Error(
+        `git ls-files failed for Git checkout ${sourceRoot}; refusing recursive candidate-copy fallback: ${String(error)}`,
+      );
+    }
     return null;
+  }
+}
+
+function isGitCheckout(sourceRoot: string): boolean {
+  try {
+    return execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
+      cwd: sourceRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim() === "true";
+  } catch {
+    // A .git directory/file is still an explicit checkout marker when Git
+    // itself cannot answer (for example, a damaged index or worktree file).
+    return existsSync(path.join(sourceRoot, ".git"));
   }
 }
 

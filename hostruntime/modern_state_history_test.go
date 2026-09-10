@@ -65,6 +65,10 @@ func TestModernStateRuntimeTreatsClientActionFailuresAsDirty(t *testing.T) {
 		`function structuredActionSuccess(response, result)`,
 		`redirected to sign-in`,
 		`actionFailureMessage(result, "Studio action failed; no structured success response")`,
+		`function actionResponseError(message, response, body)`,
+		`error.body = body || null`,
+		`errorFieldErrors`,
+		`body: errorBody`,
 		`structuredActionSuccess(response, result)`,
 		`no structured success response`,
 		`setState(form, "dirty", "action-stale"`,
@@ -72,6 +76,23 @@ func TestModernStateRuntimeTreatsClientActionFailuresAsDirty(t *testing.T) {
 	} {
 		if !strings.Contains(script, want) {
 			t.Fatalf("state runtime missing truthful client-action handling fragment %q", want)
+		}
+	}
+}
+
+func TestModernStateRuntimeBridgesStructuredLifecycleResultsToAuthoringRuntime(t *testing.T) {
+	script := string(StateRuntimeScript())
+	for _, want := range []string{
+		`function actionAuthoringPayload(result)`,
+		`Array.isArray(data.fragments)`,
+		`function applyActionAuthoringPayload(result, meta)`,
+		`window.GoSXStudioAuthoringRuntime`,
+		`typeof runtime.handleResult !== "function"`,
+		`return applyActionAuthoringPayload(result, authoringMeta).then(function (authoringHandled)`,
+		`authoringHandled: !!authoringHandled`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("state runtime missing lifecycle authoring bridge fragment %q", want)
 		}
 	}
 }

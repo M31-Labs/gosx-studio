@@ -132,7 +132,13 @@
     var revision = data.documentRevision;
     var head = data.targetHead;
     if (revision !== undefined && revision !== null && revision !== "") {
-      revision = String(revision);
+      var currentRevision = Number(form.getAttribute("data-studio-document-revision") || "0");
+      var nextRevision = Number(revision);
+      if (Number.isFinite(currentRevision) && Number.isFinite(nextRevision) && nextRevision < currentRevision) {
+        revision = String(currentRevision);
+      } else {
+        revision = String(revision);
+      }
       form.setAttribute("data-studio-document-revision", revision);
       form.querySelectorAll("[name='gosx_studio_expected_revision']").forEach(function (node) { node.value = revision; });
     }
@@ -187,6 +193,7 @@
   function runtime(form) {
     var selected = { route: form.getAttribute("data-studio-target-route") || "/", pageId: form.getAttribute("data-studio-target-page-id") || "", field: form.getAttribute("data-studio-target-field") || "", componentKey: form.getAttribute("data-studio-target-component") || "" };
     var targetHeads = {};
+    var targetQueues = {};
     function targetKey(target, extra) {
       extra = extra || {};
       // controlKey addresses one named sub-key WITHIN a componentKey/pageId
@@ -200,49 +207,76 @@
       // collaboration) and this form's own updateHistoryButtons/undo-redo
       // association, but must stay consistent with the same target-identity
       // discipline.
-      return [target.route || "/", target.pageId || "", target.field || "", extra.componentKey || target.componentKey || "", extra.controlKey || target.controlKey || "", extra.property || target.property || "", extra.breakpoint || target.breakpoint || "base", extra.state || target.state || "default"].join("|");
+      return [extra.route || target.route || "/", extra.pageId || target.pageId || "", extra.field || target.field || "", extra.componentKey || target.componentKey || "", extra.controlKey || target.controlKey || "", extra.property || target.property || "", extra.breakpoint || target.breakpoint || "base", extra.state || target.state || "default"].join("|");
     }
     function setSelection(detail) { selected = detail || null; form.dispatchEvent(new CustomEvent("gosxstudio:operation-selection", { bubbles: true, detail: selected })); }
     function request(kind, value, extra) {
       extra = extra || {};
       var target = selected || {};
       var effectiveKey = targetKey(target, extra);
-      var expectedHead = extra.head;
-      if (expectedHead === undefined) expectedHead = targetHeads[effectiveKey] || "";
-      // The form cursor belongs to its selected content target. Style/reset
-      // scopes have independent target heads and must start empty (or use the
-      // per-target map), otherwise a prior headline save falsely conflicts.
-      // set-interaction/remove-interaction share this same form-level seed
-      // (handoff-31): an already-attached interaction's Save/Remove after a
-      // fresh page load must start from the host-rendered current head, not
-      // a blank in-memory cursor, or it would falsely conflict against its
-      // own real state the first time either button is clicked post-load.
-      if (expectedHead === "" && (kind === "set-field" || kind === "set-interaction" || kind === "remove-interaction") && effectiveKey === targetKey(target, {})) expectedHead = form.getAttribute("data-studio-target-head") || "";
-      if (expectedHead === "" && form.hasAttribute("data-studio-layout-control")) expectedHead = form.getAttribute("data-studio-target-head") || "";
-      var payload = { gosx_studio_operation: kind, gosx_studio_operation_id: extra.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()), gosx_studio_page_route: extra.route || target.route || "/", gosx_studio_page_key: extra.pageId || target.pageId || target.page || "", gosx_studio_component_key: extra.componentKey || target.componentKey || target.blockKey || "", gosx_studio_binding: extra.field || target.field || "", gosx_studio_value: value || "", gosx_studio_style_property: extra.property || target.property || "", gosx_studio_style_value: value || "", gosx_studio_breakpoint: extra.breakpoint || target.breakpoint || "base", gosx_studio_state: extra.state || target.state || "default", gosx_studio_expected_revision: extra.revision || form.getAttribute("data-studio-document-revision") || "0", gosx_studio_expected_target_head: expectedHead, gosx_studio_history_operation_id: extra.historyOperationId || "",
-        // Instance/interaction/flow durable operation addressing + typed
-        // settings (see DURABLE_FIELD_BY_KIND / durableValue above). Unused
-        // (left "") by every kind that predates those families.
-        gosx_studio_control_key: extra.controlKey || "", gosx_studio_component_template_key: extra.definitionKey || "",
-        gosx_studio_flow_key: extra.flowKey || "", gosx_studio_flow_action_key: extra.flowActionKey || "", gosx_studio_flow_action_label: extra.flowActionLabel || "",
-        gosx_studio_flow_field_name: extra.flowFieldName || "", gosx_studio_flow_field_label: extra.flowFieldLabel || "", gosx_studio_flow_field_required: extra.required ? "true" : "",
-        gosx_studio_control_kind: extra.controlKind || "",
-        gosx_studio_interaction_key: extra.interactionKey || "", gosx_studio_interaction_kind: extra.interactionKind || "", gosx_studio_interaction_effect: extra.interactionEffect || "",
-        gosx_studio_interaction_duration_ms: extra.durationMs || "", gosx_studio_interaction_delay_ms: extra.delayMs || "", gosx_studio_interaction_once: extra.once ? "true" : "" };
-      if (extra.expectedTargetValue !== undefined && extra.expectedTargetValue !== null) {
-        payload.gosx_studio_expected_target_value = JSON.stringify(extra.expectedTargetValue);
+      function buildPayload() {
+        var expectedHead = extra.head;
+        if (expectedHead === undefined) expectedHead = targetHeads[effectiveKey] || "";
+        // The form cursor belongs to its selected content target. Style/reset
+        // scopes have independent target heads and must start empty (or use the
+        // per-target map), otherwise a prior headline save falsely conflicts.
+        // set-interaction/remove-interaction share this same form-level seed
+        // (handoff-31): an already-attached interaction's Save/Remove after a
+        // fresh page load must start from the host-rendered current head, not
+        // a blank in-memory cursor, or it would falsely conflict against its
+        // own real state the first time either button is clicked post-load.
+        if (expectedHead === "" && (kind === "set-field" || kind === "set-interaction" || kind === "remove-interaction") && effectiveKey === targetKey(target, {})) expectedHead = form.getAttribute("data-studio-target-head") || "";
+        if (expectedHead === "" && form.hasAttribute("data-studio-layout-control")) expectedHead = form.getAttribute("data-studio-target-head") || "";
+        var payload = { gosx_studio_operation: kind, gosx_studio_operation_id: extra.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()), gosx_studio_page_route: extra.route || target.route || "/", gosx_studio_page_key: extra.pageId || target.pageId || target.page || "", gosx_studio_component_key: extra.componentKey || target.componentKey || target.blockKey || "", gosx_studio_binding: extra.field || target.field || "", gosx_studio_value: value || "", gosx_studio_style_property: extra.property || target.property || "", gosx_studio_style_value: value || "", gosx_studio_breakpoint: extra.breakpoint || target.breakpoint || "base", gosx_studio_state: extra.state || target.state || "default", gosx_studio_expected_revision: extra.revision || form.getAttribute("data-studio-document-revision") || "0", gosx_studio_expected_target_head: expectedHead, gosx_studio_history_operation_id: extra.historyOperationId || "",
+          // Instance/interaction/flow durable operation addressing + typed
+          // settings (see DURABLE_FIELD_BY_KIND / durableValue above). Unused
+          // (left "") by every kind that predates those families.
+          gosx_studio_control_key: extra.controlKey || "", gosx_studio_component_template_key: extra.definitionKey || "",
+          gosx_studio_flow_key: extra.flowKey || "", gosx_studio_flow_action_key: extra.flowActionKey || "", gosx_studio_flow_action_label: extra.flowActionLabel || "",
+          gosx_studio_flow_field_name: extra.flowFieldName || "", gosx_studio_flow_field_label: extra.flowFieldLabel || "", gosx_studio_flow_field_required: extra.required ? "true" : "",
+          gosx_studio_control_kind: extra.controlKind || "",
+          gosx_studio_interaction_key: extra.interactionKey || "", gosx_studio_interaction_kind: extra.interactionKind || "", gosx_studio_interaction_effect: extra.interactionEffect || "",
+          gosx_studio_interaction_duration_ms: extra.durationMs || "", gosx_studio_interaction_delay_ms: extra.delayMs || "", gosx_studio_interaction_once: extra.once ? "true" : "" };
+        if (extra.expectedTargetValue !== undefined && extra.expectedTargetValue !== null) {
+          payload.gosx_studio_expected_target_value = JSON.stringify(extra.expectedTargetValue);
+        }
+        return payload;
       }
-      return submit(form, payload, target, extra).then(function (response) {
-        if (!response.ok) throw new Error("Operation failed (" + response.status + ")");
-        return response.clone().json().catch(function () { return {}; }).then(function (body) {
-          updateCursors(form, body);
-          var bodyData = resultData(body);
-          if (bodyData.targetHead !== undefined) targetHeads[effectiveKey] = String(bodyData.targetHead || "");
-          updateHistoryButtons(form, kind, body);
-          form.dispatchEvent(new CustomEvent("gosxstudio:operation-committed", { bubbles: true, detail: { kind: kind, response: response, body: body } }));
-          return response;
+      var run = function () {
+        var payload = buildPayload();
+        return submit(form, payload, target, extra).then(function (response) {
+          return response.clone().json().catch(function () { return {}; }).then(function (body) {
+            if (!response.ok) {
+              updateCursors(form, body);
+              var errorData = resultData(body);
+              if (errorData.targetHead !== undefined) targetHeads[effectiveKey] = String(errorData.targetHead || "");
+              var error = new Error("Operation failed (" + response.status + ")");
+              error.response = response;
+              error.status = response.status;
+              error.body = body;
+              throw error;
+            }
+            updateCursors(form, body);
+            var bodyData = resultData(body);
+            if (bodyData.targetHead !== undefined) targetHeads[effectiveKey] = String(bodyData.targetHead || "");
+            updateHistoryButtons(form, kind, body);
+            form.dispatchEvent(new CustomEvent("gosxstudio:operation-committed", { bubbles: true, detail: { kind: kind, response: response, body: body } }));
+            return response;
+          });
         });
-      }).catch(function (error) { form.dispatchEvent(new CustomEvent("gosxstudio:operation-error", { bubbles: true, detail: { error: error } })); throw error; });
+      };
+      var previous = targetQueues[effectiveKey] || Promise.resolve();
+      var queued = previous.then(run);
+      var tracked = queued.then(function (response) {
+        if (targetQueues[effectiveKey] === tracked) delete targetQueues[effectiveKey];
+        return response;
+      }, function (error) {
+        if (targetQueues[effectiveKey] === tracked) delete targetQueues[effectiveKey];
+        form.dispatchEvent(new CustomEvent("gosxstudio:operation-error", { bubbles: true, detail: { error: error, response: error && error.response, status: error && error.status || 0, body: error && error.body || null } }));
+        throw error;
+      });
+      targetQueues[effectiveKey] = tracked;
+      return tracked;
     }
     return { select: setSelection, commit: request, cancel: function () { form.dispatchEvent(new CustomEvent("gosxstudio:operation-cancel", { bubbles: true })); }, undo: function (id) { return request("undo", "", { historyOperationId: id }); }, redo: function (id) { return request("redo", "", { historyOperationId: id }); } };
   }

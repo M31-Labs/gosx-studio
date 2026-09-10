@@ -26,6 +26,9 @@
     flow: "Flow"
   };
   var HISTORY_LIMIT = 80;
+  var POINTER_DRAG_THRESHOLD = 8;
+  var POINTER_SCROLL_EDGE = 40;
+  var POINTER_SCROLL_STEP = 16;
   var editorStates = new WeakMap();
   var editorInstanceID = 0;
 
@@ -383,6 +386,7 @@
       saveDetail: "",
       selectedID: "",
       dragging: null,
+      pointerDrag: null,
       keyboardDragID: "",
       internalSourceWrite: false,
       history: [],
@@ -510,6 +514,10 @@
     }
 
     state.list.addEventListener("dragstart", function (event) {
+      // A primary mouse pointer can still enter the browser's native HTML5
+      // drag path. Clear the pending pointer fallback before native dragstart
+      // owns the gesture so one physical drag cannot commit twice.
+      cancelPointerDrag(state, { focus: false });
       if (String(state.searchQuery || "").trim()) {
         event.preventDefault();
         return;
@@ -571,6 +579,13 @@
       endDrag(state);
     });
 
+    // Native HTML5 drag remains the desktop compatibility path. Pointer
+    // fallback listens only to an explicit handle and activates after a
+    // threshold so list scrolling and text selection never become a drag.
+    state.list.addEventListener("pointerdown", function (event) {
+      beginPointerDrag(state, event);
+    });
+
     state.root.addEventListener("click", function (event) {
       var target = event.target;
       var row = target && target.closest ? target.closest("[data-content-block-id]") : null;
@@ -609,6 +624,11 @@
             handleSubmit(state, { submitter: submitter, preventDefault: function () {} });
           }
         }
+        return;
+      }
+      if (event.key === "Escape" && state.pointerDrag) {
+        event.preventDefault();
+        cancelPointerDrag(state);
         return;
       }
       if (isTextEditingTarget(event.target)) return;
@@ -751,6 +771,418 @@
         var current = state.root.querySelector('[data-content-block-id="' + cssEscape(id) + '"] [data-content-drag-handle]');
         if (document.activeElement !== current) cancelKeyboardDrag(state, id);
       }, 0);
+    });
+  }
+
+  function finitePointerCoordinate(value) {
+    return typeof value === "number" && isFinite(value);
+  }
+
+  function pointerType(event) {
+    var value = String(event && event.pointerType || "mouse").toLowerCase();
+    return value || "mouse";
+  }
+
+  function pointerMovedPastThreshold(drag, event) {
+    if (!drag || !event || !finitePointerCoordinate(event.clientX) || !finitePointerCoordinate(event.clientY)) return false;
+    var dx = event.clientX - drag.startX;
+    var dy = event.clientY - drag.startY;
+    return dx * dx + dy * dy >= POINTER_DRAG_THRESHOLD * POINTER_DRAG_THRESHOLD;
+  }
+
+  function pointerSourceRow(state, drag) {
+    if (!state || !drag || !drag.id || !state.list || !state.list.querySelector) return null;
+    var row = state.list.querySelector('[data-content-block-id="' + cssEscape(drag.id) + '"]');
+    if (!row || !state.list.contains(row)) return null;
+    return row;
+  }
+
+  function pointerOwnsEditor(state, drag) {
+    if (!state || !drag || state.pointerDrag !== drag || !editorStillActive(state)) return false;
+    if (state.format.value !== "blocks" || state.sourceState === "invalid") return false;
+    if (String(state.searchQuery || "").trim()) return false;
+    // A replacement/source edit while a pointer is held must win over the
+    // stale gesture. This prevents an old handle from reordering a new draft.
+    if (state.source.value !== drag.initialSource) return false;
+    if (!drag.row || !drag.handle || drag.row.isConnected === false || drag.handle.isConnected === false) return false;
+    if (!state.list.contains(drag.row) || !state.list.contains(drag.handle)) return false;
+    var currentRow = pointerSourceRow(state, drag);
+    if (!currentRow || currentRow !== drag.row) return false;
+    return currentRow.querySelector("[data-content-drag-handle]") === drag.handle;
+  }
+
+  function prefersReducedMotion() {
+    if (typeof window.matchMedia !== "function") return false;
+    try {
+      return window.matchMedia("(prefers-reduced-motion: reduce)").matches === true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function scrollableElement(element) {
+    if (!element || element === document.body || element === document.documentElement) return null;
+    var style;
+    try {
+      style = window.getComputedStyle(element);
+    } catch (error) {
+      style = null;
+    }
+    var overflowX = style ? String(style.overflowX || style.overflow || "") : "";
+    var overflowY = style ? String(style.overflowY || style.overflow || "") : "";
+    var canX = /(auto|scroll|overlay)/i.test(overflowX) && element.scrollWidth > element.clientWidth + 1;
+    var canY = /(auto|scroll|overlay)/i.test(overflowY) && element.scrollHeight > element.clientHeight + 1;
+    if (!canX && !canY) return null;
+    return { element: element, canX: canX, canY: canY };
+  }
+
+  function pointerScrollTarget(state) {
+    var current = state && state.list ? state.list : null;
+    while (current) {
+      var candidate = scrollableElement(current);
+      if (candidate) return candidate;
+      current = current.parentElement;
+    }
+    var scrollingElement = document.scrollingElement || document.documentElement;
+    return scrollingElement && scrollingElement.scrollHeight > scrollingElement.clientHeight + 1
+      ? { element: scrollingElement, canX: scrollingElement.scrollWidth > scrollingElement.clientWidth + 1, canY: true, window: true }
+      : { element: null, canX: false, canY: false, window: true };
+  }
+
+  function pointerScrollDirection(state, drag) {
+    if (!drag || !finitePointerCoordinate(drag.lastX) || !finitePointerCoordinate(drag.lastY)) return null;
+    var target = pointerScrollTarget(state);
+    var element = target && target.element;
+    var bounds;
+    if (element && !target.window) {
+      bounds = element.getBoundingClientRect();
+    } else {
+      bounds = {
+        left: 0,
+        top: 0,
+        right: window.innerWidth || document.documentElement.clientWidth || 0,
+        bottom: window.innerHeight || document.documentElement.clientHeight || 0
+      };
+    }
+    var dx = 0;
+    var dy = 0;
+    var insideViewport = drag.lastX >= bounds.left && drag.lastX <= bounds.right
+      && drag.lastY >= bounds.top && drag.lastY <= bounds.bottom;
+    if (target && target.canX) {
+      if (insideViewport && drag.lastX <= bounds.left + POINTER_SCROLL_EDGE && element.scrollLeft > 0) dx = -1;
+      else if (insideViewport && drag.lastX >= bounds.right - POINTER_SCROLL_EDGE && element.scrollLeft < element.scrollWidth - element.clientWidth - 1) dx = 1;
+    }
+    if (target && target.canY) {
+      if (insideViewport && drag.lastY <= bounds.top + POINTER_SCROLL_EDGE && element.scrollTop > 0) dy = -1;
+      else if (insideViewport && drag.lastY >= bounds.bottom - POINTER_SCROLL_EDGE && element.scrollTop < element.scrollHeight - element.clientHeight - 1) dy = 1;
+    }
+    return dx || dy ? { target: target, dx: dx, dy: dy } : null;
+  }
+
+  function stopPointerAutoScroll(drag) {
+    if (!drag || drag.autoScrollFrame == null) return;
+    if (drag.autoScrollFrameKind === "raf" && typeof window.cancelAnimationFrame === "function") window.cancelAnimationFrame(drag.autoScrollFrame);
+    else if (typeof window.clearTimeout === "function") window.clearTimeout(drag.autoScrollFrame);
+    drag.autoScrollFrame = null;
+    drag.autoScrollFrameKind = "";
+  }
+
+  function updatePointerDropAfterScroll(state, drag) {
+    var target = pointerDropTarget(state, drag, { clientX: drag.lastX, clientY: drag.lastY });
+    if (target.valid) applyDropIndicator(state, target);
+    else clearDropIndicators(state);
+  }
+
+  function runPointerAutoScroll(state, drag) {
+    drag.autoScrollFrame = null;
+    drag.autoScrollFrameKind = "";
+    if (!pointerOwnsEditor(state, drag) || !drag.started) {
+      cancelPointerDrag(state);
+      return;
+    }
+    var direction = pointerScrollDirection(state, drag);
+    if (!direction) return;
+    var element = direction.target.element;
+    if (element) {
+      // Direct assignment is intentional under reduced motion: no smooth
+      // animation is introduced, while the visible scroll remains bounded.
+      if (direction.dx) element.scrollLeft += direction.dx * POINTER_SCROLL_STEP;
+      if (direction.dy) element.scrollTop += direction.dy * POINTER_SCROLL_STEP;
+    } else if (typeof window.scrollBy === "function") {
+      window.scrollBy(direction.dx * POINTER_SCROLL_STEP, direction.dy * POINTER_SCROLL_STEP);
+    }
+    updatePointerDropAfterScroll(state, drag);
+    schedulePointerAutoScroll(state, drag);
+  }
+
+  function schedulePointerAutoScroll(state, drag) {
+    if (!drag || drag.autoScrollFrame != null || !pointerScrollDirection(state, drag)) return;
+    if (typeof window.requestAnimationFrame === "function") {
+      drag.autoScrollFrameKind = "raf";
+      drag.autoScrollFrame = window.requestAnimationFrame(function () { runPointerAutoScroll(state, drag); });
+    } else if (typeof window.setTimeout === "function") {
+      drag.autoScrollFrameKind = "timeout";
+      drag.autoScrollFrame = window.setTimeout(function () { runPointerAutoScroll(state, drag); }, 16);
+    }
+  }
+
+  function updatePointerAutoScroll(state, drag, event) {
+    if (!drag || !event || !drag.started) return;
+    if (finitePointerCoordinate(event.clientX)) drag.lastX = event.clientX;
+    if (finitePointerCoordinate(event.clientY)) drag.lastY = event.clientY;
+    if (pointerScrollDirection(state, drag)) schedulePointerAutoScroll(state, drag);
+    else stopPointerAutoScroll(drag);
+  }
+
+  function installPointerRemovalObserver(state, drag) {
+    if (typeof MutationObserver !== "function" || !document.documentElement) return;
+    drag.observer = new MutationObserver(function (records) {
+      var removed = false;
+      Array.prototype.some.call(records || [], function (record) {
+        var recordRemoved = Array.prototype.some.call(record && record.removedNodes || [], function (node) {
+          if (!node) return false;
+          if (node === state.root || node === drag.row || node === drag.handle) return true;
+          return typeof node.contains === "function" && (node.contains(state.root) || node.contains(drag.row) || node.contains(drag.handle));
+        });
+        if (recordRemoved) removed = true;
+        return recordRemoved;
+      });
+      if (removed || !pointerOwnsEditor(state, drag)) cancelPointerDrag(state);
+    });
+    drag.observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  function removePointerRemovalObserver(drag) {
+    if (!drag || !drag.observer) return;
+    drag.observer.disconnect();
+    drag.observer = null;
+  }
+
+  function pointerDropTarget(state, drag, event) {
+    var target = null;
+    var hasCoordinates = finitePointerCoordinate(event && event.clientX) && finitePointerCoordinate(event && event.clientY);
+    if (hasCoordinates && typeof document.elementFromPoint === "function") {
+      try {
+        target = document.elementFromPoint(event.clientX, event.clientY);
+      } catch (error) {
+        target = null;
+      }
+      // Pointer capture retargets event.target to the handle. Resolve the
+      // row from viewport coordinates instead, and treat a missing point as
+      // outside rather than accidentally dropping back on the source row.
+      if (!target) return { valid: false };
+      target = { target: target, clientY: event.clientY };
+    } else {
+      target = event;
+    }
+    var drop = dropTarget(state, target);
+    if (drop.valid && drag && drop.id === drag.id) return { valid: false };
+    return drop;
+  }
+
+  function installPointerListeners(state, drag) {
+    var listeners = {
+      move: function (event) { handlePointerMove(state, event); },
+      up: function (event) { handlePointerUp(state, event); },
+      cancel: function (event) { handlePointerCancel(state, event); },
+      keydown: function (event) {
+        if (event && event.key === "Escape") {
+          event.preventDefault();
+          cancelPointerDrag(state);
+        }
+      },
+      // Focus leaving the page is a real departure, so clear transient drag
+      // state without pulling focus back onto the handle the user left.
+      blur: function () { cancelPointerDrag(state, { focus: false }); },
+      visibility: function () { cancelPointerDrag(state, { focus: false }); }
+    };
+    drag.listeners = listeners;
+    document.addEventListener("pointermove", listeners.move, true);
+    document.addEventListener("pointerup", listeners.up, true);
+    document.addEventListener("pointercancel", listeners.cancel, true);
+    document.addEventListener("keydown", listeners.keydown, true);
+    document.addEventListener("visibilitychange", listeners.visibility, true);
+    window.addEventListener("blur", listeners.blur, true);
+  }
+
+  function removePointerListeners(drag) {
+    if (!drag || !drag.listeners) return;
+    var listeners = drag.listeners;
+    document.removeEventListener("pointermove", listeners.move, true);
+    document.removeEventListener("pointerup", listeners.up, true);
+    document.removeEventListener("pointercancel", listeners.cancel, true);
+    document.removeEventListener("keydown", listeners.keydown, true);
+    document.removeEventListener("visibilitychange", listeners.visibility, true);
+    window.removeEventListener("blur", listeners.blur, true);
+    drag.listeners = null;
+  }
+
+  function releasePointerCapture(drag) {
+    if (!drag || !drag.handle || typeof drag.handle.releasePointerCapture !== "function") return;
+    try {
+      if (typeof drag.handle.hasPointerCapture !== "function" || drag.handle.hasPointerCapture(drag.pointerId)) {
+        drag.handle.releasePointerCapture(drag.pointerId);
+      }
+    } catch (error) {
+      // Capture may already have been lost or the handle may have been
+      // replaced by a host render. Cleanup remains complete either way.
+    }
+  }
+
+  function capturePointer(drag) {
+    if (!drag || !drag.handle || typeof drag.handle.setPointerCapture !== "function") return;
+    try {
+      drag.handle.setPointerCapture(drag.pointerId);
+    } catch (error) {
+      // Some synthetic/older pointer implementations do not expose active
+      // capture. Document listeners still provide the fallback lifecycle.
+    }
+  }
+
+  function clearPointerDragVisuals(state, drag) {
+    clearDropIndicators(state);
+    var row = pointerSourceRow(state, drag);
+    if (row) row.removeAttribute("data-content-editor-drag-preview");
+    if (state.root) {
+      state.root.removeAttribute("data-content-editor-pointer-dragging");
+      state.root.removeAttribute("data-content-editor-pointer-type");
+      state.root.removeAttribute("data-content-editor-pointer-source");
+      state.root.removeAttribute("data-content-editor-pointer-reduced-motion");
+    }
+  }
+
+  function finishPointerDrag(state, options) {
+    var drag = state && state.pointerDrag;
+    if (!drag) return false;
+    options = options || {};
+    state.pointerDrag = null;
+    removePointerListeners(drag);
+    stopPointerAutoScroll(drag);
+    removePointerRemovalObserver(drag);
+    clearPointerDragVisuals(state, drag);
+    releasePointerCapture(drag);
+    if (options.restoreSelection !== false && editorStillActive(state)) syncSelection(state, drag.previousSelectedID);
+    if (options.focus !== false && editorStillActive(state)) {
+      if (!focusHandle(state, drag.id)) focusMutationTarget(state, drag.previousSelectedID);
+    }
+    return true;
+  }
+
+  function cancelPointerDrag(state, options) {
+    return finishPointerDrag(state, options);
+  }
+
+  function beginPointerReorder(state, drag, event) {
+    if (!pointerOwnsEditor(state, drag) || drag.started) return false;
+    drag.started = true;
+    drag.row = pointerSourceRow(state, drag);
+    drag.row.setAttribute("data-content-editor-drag-preview", "true");
+    state.root.setAttribute("data-content-editor-pointer-dragging", "true");
+    state.root.setAttribute("data-content-editor-pointer-type", drag.pointerType);
+    state.root.setAttribute("data-content-editor-pointer-source", drag.id);
+    state.root.setAttribute("data-content-editor-pointer-reduced-motion", prefersReducedMotion() ? "true" : "false");
+    syncSelection(state, drag.id);
+    // Keep the browser's desktop HTML5 drag negotiation untouched for mouse;
+    // touch and pen need explicit capture to receive release/cancel outside
+    // the handle while the pointer fallback owns the gesture.
+    if (drag.pointerType !== "mouse") capturePointer(drag);
+    // Leave mouse defaults alone until native HTML5 dragstart has had a
+    // chance to claim the gesture. Touch and pen have no dependable native
+    // drag path, so suppress their post-threshold click/scroll defaults.
+    if (event && event.cancelable && drag.pointerType !== "mouse") event.preventDefault();
+    return true;
+  }
+
+  function beginPointerDrag(state, event) {
+    if (!event || state.pointerDrag || state.dragging || state.keyboardDragID) return;
+    if (event.button != null && event.button !== 0) return;
+    var handle = event.target && event.target.closest ? event.target.closest("[data-content-drag-handle]") : null;
+    if (!handle || !state.list.contains(handle)) return;
+    if (String(state.searchQuery || "").trim() || state.format.value !== "blocks" || state.sourceState === "invalid") return;
+    var row = handle.closest("[data-content-block-id]");
+    if (!row || !state.list.contains(row)) return;
+    var id = row.getAttribute("data-content-block-id") || "";
+    if (!id || blockIndex(state, id) < 0) return;
+    var drag = {
+      id: id,
+      row: row,
+      handle: handle,
+      pointerId: event.pointerId,
+      pointerType: pointerType(event),
+      startX: finitePointerCoordinate(event.clientX) ? event.clientX : 0,
+      startY: finitePointerCoordinate(event.clientY) ? event.clientY : 0,
+      started: false,
+      initialSource: state.source.value,
+      previousSelectedID: state.selectedID,
+      listeners: null
+    };
+    state.pointerDrag = drag;
+    installPointerListeners(state, drag);
+    installPointerRemovalObserver(state, drag);
+  }
+
+  function handlePointerMove(state, event) {
+    var drag = state.pointerDrag;
+    if (!drag || !event || event.pointerId !== drag.pointerId) return;
+    if (!pointerOwnsEditor(state, drag)) {
+      cancelPointerDrag(state);
+      return;
+    }
+    if (!drag.started) {
+      if (!pointerMovedPastThreshold(drag, event)) return;
+      if (!beginPointerReorder(state, drag, event)) return;
+    }
+    if (event.cancelable && drag.pointerType !== "mouse") event.preventDefault();
+    var target = pointerDropTarget(state, drag, event);
+    if (target.valid) applyDropIndicator(state, target);
+    else clearDropIndicators(state);
+    updatePointerAutoScroll(state, drag, event);
+  }
+
+  function pointerTargetChangesOrder(state, drag, target) {
+    if (!target || !target.valid || !drag) return false;
+    var from = blockIndex(state, drag.id);
+    var to = blockIndex(state, target.id);
+    if (from < 0 || to < 0 || drag.id === target.id) return false;
+    if (target.position === "after") to += 1;
+    if (from < to) to -= 1;
+    return from !== to;
+  }
+
+  function handlePointerUp(state, event) {
+    var drag = state.pointerDrag;
+    if (!drag || !event || event.pointerId !== drag.pointerId) return;
+    if (!drag.started || !pointerOwnsEditor(state, drag)) {
+      cancelPointerDrag(state);
+      return;
+    }
+    if (event.cancelable) event.preventDefault();
+    var target = pointerDropTarget(state, drag, event);
+    if (!pointerTargetChangesOrder(state, drag, target)) {
+      cancelPointerDrag(state);
+      return;
+    }
+    // Clear all transient state before render/rebind so release of capture or
+    // a synchronous host listener cannot re-enter and commit the same drop.
+    finishPointerDrag(state, { restoreSelection: false, focus: false });
+    reorderBlock(state, drag.id, target.id, target.position);
+    if (editorStillActive(state) && !focusHandle(state, drag.id)) focusMutationTarget(state, drag.id);
+  }
+
+  function handlePointerCancel(state, event) {
+    var drag = state.pointerDrag;
+    if (!drag || !event || event.pointerId !== drag.pointerId) return;
+    cancelPointerDrag(state);
+  }
+
+  function bindPointerHandle(state, handle, id) {
+    handle.addEventListener("blur", function () {
+      var drag = state.pointerDrag;
+      if (drag && drag.handle === handle && drag.id === id) cancelPointerDrag(state, { focus: false });
+    });
+    handle.addEventListener("lostpointercapture", function (event) {
+      var drag = state.pointerDrag;
+      if (drag && drag.id === id && drag.pointerId === event.pointerId) cancelPointerDrag(state);
     });
   }
 
@@ -1963,7 +2395,11 @@
       var bodyID = editorDOMID(state, "body", block.id);
       var collapseButton = el("button", { type: "button", class: "home-section-move", "aria-label": collapsed ? "Expand block" : "Collapse block", "aria-expanded": collapsed ? "false" : "true", "aria-controls": bodyID, "data-content-editor-collapse": "true", "data-content-editor-block": block.id, text: collapsed ? "Expand" : "Collapse" });
       var handle = el("button", { type: "button", class: "home-section-handle", "aria-label": "Move block", "aria-pressed": state.keyboardDragID === block.id ? "true" : "false", "data-content-drag-handle": "true", draggable: "true", text: "Drag" });
+      // Keep touch-action scoped to the explicit handle even when a host's
+      // broad `.content-editor *` rule has greater selector specificity.
+      handle.style.touchAction = "none";
       bindKeyboardHandle(state, handle, block.id);
+      bindPointerHandle(state, handle, block.id);
       var header = el("div", { class: "content-block__header" },
         handle,
         typeSelect,

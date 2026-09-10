@@ -48,6 +48,80 @@ func TestEnterpriseEditorPolishControlsUseAccessibleTargetSizes(t *testing.T) {
 	}
 }
 
+func TestEnterpriseEditorPolishHeaderControlsKeepMinimumAfterToolbarShrink(t *testing.T) {
+	css := string(Stylesheet())
+	headerControlSelector := `.content-block__header
+  > :where(`
+	baseStart := strings.Index(css, headerControlSelector)
+	if baseStart < 0 {
+		t.Fatalf("scoped content-block header control selector missing")
+	}
+	shrinkStart := strings.Index(css, `.content-block__header
+  > *,`)
+	if shrinkStart < 0 || baseStart <= shrinkStart {
+		t.Fatalf("scoped header minimum must follow the generic min-width reset")
+	}
+	baseEnd := strings.Index(css[baseStart:], "}")
+	if baseEnd < 0 {
+		t.Fatal("scoped header minimum rule is not closed")
+	}
+	baseRule := css[baseStart : baseStart+baseEnd]
+	for _, want := range []string{
+		`.content-block__drag-handle`,
+		`.content-block__move`,
+		`[data-content-drag-handle]`,
+		`[data-content-editor-action]`,
+		`min-width: var(--space-md);`,
+	} {
+		if !strings.Contains(baseRule, want) {
+			t.Fatalf("scoped header minimum rule missing %q", want)
+		}
+	}
+
+	coarseStart := strings.LastIndex(css, "@media (pointer: coarse) {")
+	if coarseStart < 0 {
+		t.Fatal("content editor coarse-pointer media query missing")
+	}
+	coarseHeaderSelector := `.content-block__header
+    > :where(`
+	coarseHeaderStart := strings.Index(css[coarseStart:], coarseHeaderSelector)
+	if coarseHeaderStart < 0 {
+		t.Fatal("coarse-pointer scoped header control selector missing")
+	}
+	coarseHeaderStart += coarseStart
+	coarseGenericStart := strings.Index(css[coarseStart:], `[data-content-editor-action],`)
+	if coarseGenericStart < 0 || coarseHeaderStart <= coarseStart+coarseGenericStart {
+		t.Fatal("coarse scoped header minimum must follow the generic coarse control rule")
+	}
+	coarseEnd := strings.Index(css[coarseHeaderStart:], "}")
+	if coarseEnd < 0 {
+		t.Fatal("coarse-pointer scoped header minimum rule is not closed")
+	}
+	coarseRule := css[coarseHeaderStart : coarseHeaderStart+coarseEnd]
+	for _, want := range []string{
+		"min-width: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));",
+		"min-height: calc(var(--space-md) + var(--space-sm) + var(--space-chip-y));",
+	} {
+		if !strings.Contains(coarseRule, want) {
+			t.Fatalf("coarse-pointer scoped header minimum must retain the enlarged target expression %q", want)
+		}
+	}
+}
+
+func TestEnterpriseEditorPolishAdvancedGroupsHaveRevealAndSelectedLabelSelectors(t *testing.T) {
+	css := string(Stylesheet())
+	groups := []string{"flows", "tools", "schema", "schedule", "typography", "settings"}
+	for _, group := range groups {
+		reveal := `.studio-advanced-panel__group-input[value="` + group + `"]:checked ~ [data-studio-advanced-group-slot="` + group + `"]`
+		selectedLabel := `.studio-advanced-panel__group-input[value="` + group + `"]:checked ~ .studio-advanced-panel__groups [data-studio-advanced-group-label="` + group + `"]`
+		for _, want := range []string{reveal, selectedLabel} {
+			if !strings.Contains(css, want) {
+				t.Fatalf("Advanced group %q selector missing %q", group, want)
+			}
+		}
+	}
+}
+
 func TestEnterpriseEditorPolishReducedMotionDisablesSharedSurfaceTransitions(t *testing.T) {
 	css := string(Stylesheet())
 	marker := "/* Enterprise editor quality guards."

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "mode": "published-no-overlay",
+  "studio": {
+    "module": "m31labs.dev/gosx-studio",
+    "version": "v0.6.2-0.20260828060955-cb313609fb1d",
+    "origin": "cb313609fb1d28937a110dab97698491a05e5030"
+  },
+  "host": {
+    "repository": "odvcencio/muddy-noni-commerce",
+    "ref": "532f8e45968b4c9fbf771569e65f5e04e9ed91da",
+    "sha": "532f8e45968b4c9fbf771569e65f5e04e9ed91da"
+  }
+}

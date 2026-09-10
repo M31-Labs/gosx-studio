@@ -50,6 +50,7 @@
     if (!hasKeys(data) && looksLikeAuthoringData(result, meta)) {
       data = result;
     }
+    if (!hasKeys(data)) return null;
     if (!looksLikeAuthoringData(data, meta)) return null;
     if (result.message && !data.message) data.message = String(result.message);
     return data;
@@ -279,6 +280,33 @@
         try { block[call[0]](call[1]); } catch (e) {}
       }
     });
+    var operation = window.GoSXStudioOperationRuntime || {};
+    if (typeof operation.bind === "function") {
+      try { operation.bind(root); } catch (e) {}
+    }
+    var content = window.GoSXStudioContentEditorRuntime || {};
+    if (typeof content.init === "function") {
+      try { content.init(root); } catch (e) {}
+    }
+    var sitemap = window.GoSXStudioSiteMapRuntime || {};
+    if (typeof sitemap.bindAll === "function") {
+      try { sitemap.bindAll(root); } catch (e) {}
+    }
+    var media = window.GoSXStudioMediaRuntime || {};
+    if (typeof media.init === "function") {
+      try { media.init(root); } catch (e) {}
+    }
+    var style = window.GoSXStudioStyleRuntime || {};
+    [
+      ["bindTheme", root],
+      ["bindWorkbench", root],
+      ["bindCSS", root],
+      ["bindFonts", root]
+    ].forEach(function (call) {
+      if (typeof style[call[0]] === "function") {
+        try { style[call[0]](call[1]); } catch (e) {}
+      }
+    });
     var selection = window.GoSXStudioSelectionRuntime || {};
     if (typeof selection.bind === "function") {
       try { selection.bind(root); } catch (e) {}
@@ -311,6 +339,11 @@
 
   function writeSaveFeedback(message) {
     message = String(message || "").trim();
+    var blocked = roots().some(function (root) {
+      var state = root.getAttribute && root.getAttribute(STATE_ATTR);
+      return state === "dirty" || state === "pending" || state === "error";
+    });
+    if (blocked) return;
     if (message) {
       queryAll("[data-gosx-studio-save-detail]").forEach(function (node) {
         node.textContent = message;
@@ -360,7 +393,138 @@
     return true;
   }
 
-  function applyFragmentDocument(sourceDoc, specs) {
+  function focusSelector(node) {
+    if (!node || !node.getAttribute) return "";
+    var id = String(node.getAttribute("id") || "").trim();
+    if (id) return "#" + selectorValue(id);
+    var binding = String(node.getAttribute("data-gosx-studio-authoring-binding") || node.getAttribute("data-studio-field") || "").trim();
+    if (binding) return attrSelector("data-gosx-studio-authoring-binding", binding) + ", " + attrSelector("data-studio-field", binding);
+    var name = String(node.getAttribute("name") || "").trim();
+    if (name) return "[name=\"" + selectorValue(name) + "\"]";
+    return "";
+  }
+
+  function captureFocus() {
+    var active = doc.activeElement;
+    if (!active || active === doc.body || active === doc.documentElement) return null;
+    var selector = focusSelector(active);
+    if (!selector) return null;
+    return {
+      selector: selector,
+      start: typeof active.selectionStart === "number" ? active.selectionStart : null,
+      end: typeof active.selectionEnd === "number" ? active.selectionEnd : null
+    };
+  }
+
+  function restoreFocus(snapshot) {
+    if (!snapshot || !snapshot.selector) return;
+    var target = queryAll(snapshot.selector, doc)[0];
+    if (!target || typeof target.focus !== "function") return;
+    try {
+      target.focus({ preventScroll: true });
+    } catch (e) {
+      target.focus();
+    }
+    if (snapshot.start !== null && typeof target.setSelectionRange === "function") {
+      try {
+        target.setSelectionRange(snapshot.start, snapshot.end === null ? snapshot.start : snapshot.end);
+      } catch (e) {}
+    }
+  }
+
+  function mutableControlSelector(node) {
+    if (!node || !node.getAttribute) return "";
+    var id = String(node.getAttribute("id") || "").trim();
+    if (id) return "#" + selectorValue(id);
+    var binding = String(node.getAttribute("data-gosx-studio-authoring-binding") || node.getAttribute("data-studio-field") || "").trim();
+    if (binding) return attrSelector("data-gosx-studio-authoring-binding", binding) + ", " + attrSelector("data-studio-field", binding);
+    var name = String(node.getAttribute("name") || "").trim();
+    if (name) return "[name=\"" + selectorValue(name) + "\"]";
+    return "";
+  }
+
+  function mutableControlState(node) {
+    if (!node || node.disabled) return null;
+    var tag = String(node.tagName || "").toLowerCase();
+    if (tag !== "input" && tag !== "textarea" && tag !== "select") return null;
+    var type = String(node.type || "").toLowerCase();
+    if (type === "hidden" || type === "submit" || type === "button" || type === "reset" || type === "file") return null;
+    var selector = mutableControlSelector(node);
+    if (!selector) return null;
+    return {
+      selector: selector,
+      value: "value" in node ? String(node.value) : "",
+      checked: "checked" in node ? !!node.checked : null
+    };
+  }
+
+  function captureMutableControls(root) {
+    var snapshot = {};
+    queryAll("input, textarea, select", root || doc).forEach(function (node) {
+      var state = mutableControlState(node);
+      if (state) snapshot[state.selector] = state;
+    });
+    return snapshot;
+  }
+
+  function changedMutableControls(root, baseline) {
+    baseline = baseline || {};
+    var changed = {};
+    Object.keys(baseline).forEach(function (selector) {
+      var current = mutableControlState(queryAll(selector, root || doc)[0]);
+      var before = baseline[selector];
+      if (!current || !before) return;
+      if (current.value !== before.value || current.checked !== before.checked) changed[selector] = current;
+    });
+    return changed;
+  }
+
+  function restoreMutableControls(snapshot) {
+    snapshot = snapshot || {};
+    var count = 0;
+    Object.keys(snapshot).forEach(function (selector) {
+      var state = snapshot[selector];
+      var node = queryAll(selector, doc)[0];
+      if (!node) return;
+      if ("checked" in node && state.checked !== null) node.checked = !!state.checked;
+      if ("value" in node) {
+        node.value = state.value;
+        node.setAttribute("value", state.value);
+      }
+      var form = closest(node, "form");
+      if (form && form.setAttribute) {
+        form.setAttribute(FORM_STATE_ATTR, "dirty");
+        if (form.removeAttribute) form.removeAttribute(FORM_PENDING_ATTR);
+      }
+      count += 1;
+    });
+    return count;
+  }
+
+  function markPreservedEditsDirty() {
+    var write = function () {
+      roots().forEach(function (root) {
+        root.setAttribute(STATE_ATTR, "dirty");
+        setOptionalAttr(root, MESSAGE_ATTR, "Unsaved changes");
+      });
+      queryAll("[data-gosx-studio-save-state='true']").forEach(function (node) {
+        node.textContent = "Unsaved";
+      });
+      queryAll("[data-gosx-studio-save-detail]").forEach(function (node) {
+        node.textContent = "Unsaved changes";
+      });
+    };
+    write();
+    if (typeof window.setTimeout === "function") {
+      window.setTimeout(write, 0);
+      window.setTimeout(write, 100);
+    }
+  }
+
+  function applyFragmentDocument(sourceDoc, specs, meta) {
+    meta = meta || {};
+    var focus = captureFocus();
+    var changedControls = changedMutableControls(doc, meta.submittedControls);
     var count = 0;
     specs.forEach(function (spec) {
       var current = queryAll(spec.selector, doc);
@@ -370,23 +534,28 @@
         if (replaceFragment(current[index], fresh[index], spec.mode)) count += 1;
       }
     });
-    if (count > 0) remountEditorRuntimes(doc);
+    if (count > 0) {
+      remountEditorRuntimes(doc);
+      meta.preservedEditCount = restoreMutableControls(changedControls);
+      restoreFocus(focus);
+    }
     return count;
   }
 
   function emitFragmentRefresh(data, specs, url, count) {
     if (typeof window.CustomEvent !== "function" || typeof doc.dispatchEvent !== "function") return;
-    doc.dispatchEvent(new CustomEvent("gosxstudio:fragments-refresh", {
-      detail: {
-        url: url,
-        count: count,
-        selectors: specs.map(function (spec) { return spec.selector; }),
-        result: data
-      }
-    }));
+    var detail = {
+      url: url,
+      count: count,
+      selectors: specs.map(function (spec) { return spec.selector; }),
+      result: data
+    };
+    doc.dispatchEvent(new CustomEvent("gosxstudio:fragments-refresh", { detail: detail }));
+    doc.dispatchEvent(new CustomEvent("gosxstudio:fragments-refreshed", { detail: detail }));
   }
 
-  function refreshFragments(data) {
+  function refreshFragments(data, meta) {
+    meta = meta || {};
     var specs = fragmentSpecs(data);
     if (!specs.length) return Promise.resolve(0);
     var url = fragmentRefreshURL(data);
@@ -405,8 +574,9 @@
         emitFragmentRefresh(data, specs, url, 0);
         return 0;
       }
+      if (meta.isCurrent && !meta.isCurrent()) return 0;
       var parsed = new DOMParser().parseFromString(html, "text/html");
-      var count = applyFragmentDocument(parsed, specs);
+      var count = applyFragmentDocument(parsed, specs, meta);
       emitFragmentRefresh(data, specs, url, count);
       return count;
     }, function () {
@@ -454,6 +624,7 @@
   function handlePayload(result, meta) {
     meta = meta || {};
     if (meta.ok === false) return null;
+    if (meta.isCurrent && !meta.isCurrent()) return null;
     result = toObject(result);
     if (result.ok === false) return null;
     var data = dataFromResult(result, meta);
@@ -461,9 +632,11 @@
     var change = firstChange(data);
     var previewCount = refreshPreview(data);
     var finish = function (fragmentCount) {
+      if (meta.isCurrent && !meta.isCurrent()) return null;
       var selectedCount = selectChange(change);
       markWorkbench(data, change, selectedCount);
       markSourcePanel(data, change, meta.sourcePanel);
+      if (meta.preservedEditCount > 0) markPreservedEditsDirty();
       emitResult(data, meta, change, selectedCount, previewCount, fragmentCount);
       return {
         result: data,
@@ -475,7 +648,7 @@
     };
     var specs = fragmentSpecs(data);
     if (specs.length) {
-      return refreshFragments(data).then(finish);
+      return refreshFragments(data, meta).then(finish);
     }
     return finish(0);
   }
@@ -568,14 +741,6 @@
     updateReorderPanel(data, panel);
   }
 
-  function formSubmitTarget(form, submitter) {
-    return String(
-      submitter && submitter.getAttribute && submitter.getAttribute("formtarget")
-      || form && form.getAttribute && form.getAttribute("target")
-      || ""
-    ).trim();
-  }
-
   function formSubmissionMethod(form, submitter) {
     return String(
       submitter && submitter.getAttribute && submitter.getAttribute("formmethod")
@@ -601,10 +766,17 @@
   }
 
   function serializeForm(form, submitter) {
-    var formData = new FormData(form);
+    var formData;
+    var capturedSubmitter = false;
+    try {
+      formData = submitter ? new FormData(form, submitter) : new FormData(form);
+      capturedSubmitter = !!submitter;
+    } catch (e) {
+      formData = new FormData(form);
+    }
     var submitterName = submitter && (submitter.name || (submitter.getAttribute && submitter.getAttribute("name")));
     var submitterValue = submitter && (submitter.value || (submitter.getAttribute && submitter.getAttribute("value")) || "");
-    if (submitterName && !formData.has(submitterName)) {
+    if (submitterName && !capturedSubmitter) {
       formData.append(submitterName, submitterValue);
     }
     return formData;
@@ -624,10 +796,33 @@
     };
   }
 
+  function submitBaselineState(form) {
+    if (!form) return { pending: null, state: null };
+    if (!form.__gosxStudioAuthoringSubmitBaseline) {
+      form.__gosxStudioAuthoringSubmitBaseline = captureFormState(form);
+    }
+    return form.__gosxStudioAuthoringSubmitBaseline;
+  }
+
+  function clearSubmitBaselineState(form) {
+    if (form) form.__gosxStudioAuthoringSubmitBaseline = null;
+  }
+
   function setFormPending(form) {
     if (!form || !form.setAttribute) return;
+    clearFieldErrors(form);
+    if (form.removeAttribute) {
+      form.removeAttribute("data-gosx-studio-authoring-error-message");
+      form.removeAttribute("data-gosx-studio-authoring-error-status");
+    }
     form.setAttribute(FORM_PENDING_ATTR, "true");
     form.setAttribute(FORM_STATE_ATTR, "pending");
+  }
+
+  function setFormDirty(form) {
+    if (!form || !form.setAttribute) return;
+    form.setAttribute(FORM_STATE_ATTR, "dirty");
+    if (form.removeAttribute) form.removeAttribute(FORM_PENDING_ATTR);
   }
 
   function restoreFormState(form, previous) {
@@ -649,6 +844,99 @@
     if (!form || !form.setAttribute) return;
     form.setAttribute(FORM_STATE_ATTR, "error");
     if (form.removeAttribute) form.removeAttribute(FORM_PENDING_ATTR);
+  }
+
+  function errorMessage(result, status) {
+    result = toObject(result);
+    var message = String(result.message || (result.data && result.data.message) || "").trim();
+    if (message) return message;
+    if (status === 409) return "This edit conflicts with a newer change.";
+    if (status === 422) return "Please correct the highlighted fields.";
+    return "This edit could not be saved.";
+  }
+
+  function errorFieldErrors(result) {
+    result = toObject(result);
+    var errors = toObject(result.fieldErrors);
+    if (hasKeys(errors)) return errors;
+    return toObject(result.data && result.data.fieldErrors);
+  }
+
+  function clearFieldErrors(form) {
+    if (!form || !form.querySelectorAll) return;
+    queryAll("[data-gosx-studio-authoring-field-error]", form).forEach(function (node) {
+      node.removeAttribute("data-gosx-studio-authoring-field-error");
+      node.removeAttribute("aria-invalid");
+    });
+    queryAll("[data-gosx-studio-field-error-for]", form).forEach(function (node) {
+      node.textContent = "";
+      node.setAttribute("hidden", "hidden");
+    });
+    if (form.removeAttribute) form.removeAttribute("data-gosx-studio-authoring-field-errors");
+  }
+
+  function markFieldErrors(form, fieldErrors) {
+    fieldErrors = toObject(fieldErrors);
+    clearFieldErrors(form);
+    if (!form || !hasKeys(fieldErrors)) return;
+    try {
+      form.setAttribute("data-gosx-studio-authoring-field-errors", JSON.stringify(fieldErrors));
+    } catch (e) {}
+    Object.keys(fieldErrors).forEach(function (name) {
+      var message = String(fieldErrors[name] || "").trim();
+      queryAll("[name=\"" + selectorValue(name) + "\"]", form).forEach(function (node) {
+        node.setAttribute("aria-invalid", "true");
+        node.setAttribute("data-gosx-studio-authoring-field-error", message);
+      });
+      queryAll("[data-gosx-studio-field-error-for=\"" + selectorValue(name) + "\"]", form).forEach(function (node) {
+        node.textContent = message;
+        node.removeAttribute("hidden");
+      });
+    });
+  }
+
+  function applySubmitError(form, result, meta) {
+    meta = meta || {};
+    var message = errorMessage(result, meta.status || 0);
+    var fieldErrors = errorFieldErrors(result);
+    setFormError(form);
+    if (form && form.setAttribute) {
+      form.setAttribute("data-gosx-studio-authoring-error-message", message);
+      form.setAttribute("data-gosx-studio-authoring-error-status", String(meta.status || 0));
+    }
+    roots().forEach(function (root) {
+      root.setAttribute(STATE_ATTR, "error");
+      setOptionalAttr(root, MESSAGE_ATTR, message);
+    });
+    queryAll("[data-gosx-studio-save-state='true']").forEach(function (node) {
+      node.textContent = "Error";
+    });
+    queryAll("[data-gosx-studio-save-detail]").forEach(function (node) {
+      node.textContent = message;
+    });
+    markFieldErrors(form, fieldErrors);
+    if (typeof window.CustomEvent === "function" && typeof doc.dispatchEvent === "function") {
+      doc.dispatchEvent(new CustomEvent("gosxstudio:authoring-error", {
+        detail: {
+          action: meta.action || "",
+          method: meta.method || "",
+          status: meta.status || 0,
+          message: message,
+          fieldErrors: fieldErrors,
+          result: toObject(result)
+        }
+      }));
+    }
+  }
+
+  function nextSubmitSequence(form) {
+    if (!form) return 0;
+    form.__gosxStudioAuthoringSubmitSequence = (form.__gosxStudioAuthoringSubmitSequence || 0) + 1;
+    return form.__gosxStudioAuthoringSubmitSequence;
+  }
+
+  function currentSubmitSequence(form, sequence) {
+    return !form || form.__gosxStudioAuthoringSubmitSequence === sequence;
   }
 
   function formNavigationURL(url, formData) {
@@ -689,15 +977,33 @@
   function submitAuthoringManagedForm(form, submitter) {
     var method = formSubmissionMethod(form, submitter);
     var action = formSubmissionAction(form, submitter) || window.location.href;
-    var url = new URL(action, window.location.href);
+    var url;
+    try {
+      url = new URL(action, window.location.href);
+    } catch (e) {
+      setFormError(form);
+      return;
+    }
     var formData = serializeForm(form, submitter);
-    var previous = captureFormState(form);
+    var previous = submitBaselineState(form);
+    var submittedControls = captureMutableControls(form);
     var csrfToken = formCSRFToken(formData);
     var sourcePanel = sourcePanelForSubmitter(submitter);
+    var sequence = nextSubmitSequence(form);
 
     setFormPending(form);
 
+    if ((method !== "GET" && method !== "POST") || !isSameOrigin(url.href)) {
+      applySubmitError(form, {
+        ok: false,
+        message: "This edit cannot be submitted from inside the editor."
+      }, { action: url.href, method: method, status: 0 });
+      clearSubmitBaselineState(form);
+      return;
+    }
+
     if (method === "GET") {
+      if (!currentSubmitSequence(form, sequence)) return;
       handlePayload({
         ok: true,
         data: {
@@ -705,8 +1011,21 @@
           previewURL: formNavigationURL(url, formData).href,
           refreshPreview: true
         }
-      }, { action: url.href, method: method, ok: true, sourcePanel: sourcePanel });
-      restoreFormState(form, previous);
+      }, {
+        action: url.href,
+        method: method,
+        ok: true,
+        sourcePanel: sourcePanel,
+        submittedControls: submittedControls,
+        isCurrent: function () { return currentSubmitSequence(form, sequence); }
+      });
+      if (hasKeys(changedMutableControls(form, submittedControls))) {
+        setFormDirty(form);
+        markPreservedEditsDirty();
+      } else {
+        restoreFormState(form, previous);
+      }
+      clearSubmitBaselineState(form);
       return;
     }
 
@@ -718,33 +1037,62 @@
         "X-CSRF-Token": csrfToken
       },
       body: formData,
+      credentials: "same-origin",
       redirect: "follow"
     }).then(function (response) {
       return parseJSONResponse(response).then(function (result) {
         return { response: response, result: result };
       });
     }).then(function (payload) {
-      handlePayload(payload.result, {
+      if (!currentSubmitSequence(form, sequence)) return;
+      if (!payload.response || !payload.response.ok) {
+        applySubmitError(form, payload.result, {
+          action: url.href,
+          method: method,
+          status: payload.response ? payload.response.status : 0
+        });
+        clearSubmitBaselineState(form);
+        return;
+      }
+      var meta = {
         action: url.href,
         method: method,
-        ok: payload.response && payload.response.ok,
+        ok: true,
         status: payload.response ? payload.response.status : 0,
-        sourcePanel: sourcePanel
+        sourcePanel: sourcePanel,
+        submittedControls: submittedControls,
+        isCurrent: function () { return currentSubmitSequence(form, sequence); }
+      };
+      return Promise.resolve(handlePayload(payload.result, meta)).then(function (handled) {
+        if (!currentSubmitSequence(form, sequence)) return;
+        if (!handled) {
+          applySubmitError(form, {
+            ok: false,
+            message: "Studio action failed; no structured authoring response.",
+            result: payload.result
+          }, { action: url.href, method: method, status: payload.response ? payload.response.status : 0 });
+          clearSubmitBaselineState(form);
+          return;
+        }
+        if (meta.preservedEditCount > 0 || hasKeys(changedMutableControls(form, submittedControls))) {
+          setFormDirty(form);
+          markPreservedEditsDirty();
+        } else {
+          restoreFormState(form, previous);
+        }
+        clearSubmitBaselineState(form);
       });
-      restoreFormState(form, previous);
     }, function () {
+      if (!currentSubmitSequence(form, sequence)) return;
       setFormError(form);
+      clearSubmitBaselineState(form);
     });
   }
 
   function shouldHandleAuthoringForm(form, event) {
     if (!form || !form.hasAttribute || !form.hasAttribute(MANAGED_FORM_ATTR)) return false;
     if (event && event.defaultPrevented) return false;
-    var submitter = event && event.submitter ? event.submitter : null;
-    if (formSubmitTarget(form, submitter)) return false;
-    var method = formSubmissionMethod(form, submitter);
-    if (method !== "GET" && method !== "POST") return false;
-    return isSameOrigin(formSubmissionAction(form, submitter) || window.location.href);
+    return true;
   }
 
   function handleAuthoringFormSubmit(event) {

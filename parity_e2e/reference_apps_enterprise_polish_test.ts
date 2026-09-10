@@ -17,7 +17,24 @@ const DEFAULT_INTEGRATION_ROOT = path.resolve(__dirname, "../.tiller/scratch/cod
 const INTEGRATION_ROOT = path.resolve(
   process.env.GOSX_STUDIO_ENTERPRISE_ARTIFACT_ROOT?.trim() || DEFAULT_INTEGRATION_ROOT,
 );
-const EXPECTED_MODULE_VERSION = process.env.GOSX_STUDIO_EXPECTED_MODULE_VERSION?.trim() || "";
+function enabledFlag(value: string | undefined): boolean {
+  return /^(?:1|true)$/i.test(value?.trim() || "");
+}
+
+const RELEASED_CONSUMER_MODE = enabledFlag(process.env.GOSX_STUDIO_RELEASED_CONSUMER);
+const CANDIDATE_REPO_CONFIGURED = Boolean(process.env.GOSX_STUDIO_CANDIDATE_REPO?.trim());
+const configuredExpectedModuleVersion = process.env.GOSX_STUDIO_EXPECTED_MODULE_VERSION?.trim() || "";
+if (!RELEASED_CONSUMER_MODE && configuredExpectedModuleVersion) {
+  throw new Error("GOSX_STUDIO_EXPECTED_MODULE_VERSION is only valid in published/no-overlay mode");
+}
+const EXPECTED_MODULE_VERSION = RELEASED_CONSUMER_MODE
+  ? configuredExpectedModuleVersion || process.env.GOSX_STUDIO_RELEASED_VERSION?.trim() || ""
+  : "";
+const ASSET_CONTRACT_MODE = RELEASED_CONSUMER_MODE
+  ? "published-no-overlay"
+  : CANDIDATE_REPO_CONFIGURED
+    ? "candidate-source-copy"
+    : "unconfigured";
 const FIXTURE_DEPLOYMENT_VERSION = "test-deployment-20260827";
 const CONFLICT_LAYOUT_LIMITS = {
   desktop: { detailMinWidth: 240, maxHeight: 240 },
@@ -817,6 +834,11 @@ test.describe("@reference-apps enterprise polish acceptance", () => {
   });
 
   test("fresh managed Content navigation loads versioned runtime assets once", async ({ page, request }) => {
+    if (!RELEASED_CONSUMER_MODE && !CANDIDATE_REPO_CONFIGURED) {
+      throw new Error(
+        "managed asset contract requires GOSX_STUDIO_CANDIDATE_REPO for candidate mode or GOSX_STUDIO_RELEASED_CONSUMER=1 with a released contract",
+      );
+    }
     const server = await startMuddyCollaboration(request, { MUDDY_ASSET_VERSION: FIXTURE_DEPLOYMENT_VERSION });
     const capturedAssetRequests: string[] = [];
     const onRequest = (browserRequest: { method: () => string; url: () => string }) => {
@@ -874,6 +896,7 @@ test.describe("@reference-apps enterprise polish acceptance", () => {
       await expectRuntimeSingleton(page, firstContentRuntime, firstMediaRuntime, "managed Page revisit");
 
       writeEvidence("page-cms-managed-assets", {
+        mode: ASSET_CONTRACT_MODE,
         pageID,
         expectedModuleVersion: EXPECTED_MODULE_VERSION || null,
         capturedAssetRequests,
@@ -988,9 +1011,11 @@ async function assertManagedAssetURLs(
     expect(matches.length, `${assetPath} must render a same-origin canonical managed script`).toBeGreaterThan(0);
     expect(matches.every((script) => script.loadMode === "dom"), `${assetPath} must retain the managed DOM loading marker`).toBe(true);
     expect(matches.every((script) => script.loaded === "pending" || script.loaded === "true"), `${assetPath} must use pending/true executable markers`).toBe(true);
-    expect(matches.every((script) => script.releaseKey.length > 0), `${assetPath} must use a nonempty ?v= release key: ${JSON.stringify(rendered)}`).toBe(true);
-    if (EXPECTED_MODULE_VERSION) {
-      expect(matches.every((script) => script.releaseKey === EXPECTED_MODULE_VERSION), `${assetPath} must match GOSX_STUDIO_EXPECTED_MODULE_VERSION`).toBe(true);
+    if (RELEASED_CONSUMER_MODE) {
+      expect(EXPECTED_MODULE_VERSION, "published/no-overlay mode must provide the exact released Studio version").toMatch(/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.+-]*)?$/);
+      expect(matches.every((script) => script.releaseKey === EXPECTED_MODULE_VERSION), `${assetPath} must match the exact published Studio version ${EXPECTED_MODULE_VERSION}`).toBe(true);
+    } else {
+      expect(matches.every((script) => script.releaseKey === ""), `${assetPath} must remain canonical and unversioned in candidate source-copy mode: ${JSON.stringify(rendered)}`).toBe(true);
     }
     const executed = matches.filter((script) => script.loaded === "true").length;
     if (requireFreshRequests) {
@@ -1005,6 +1030,11 @@ async function assertManagedAssetURLs(
   expect(new Set(renderedKeys).size, "content and media managed scripts must share one release key").toBe(1);
   const releaseKey = renderedKeys[0] || "";
   expect(FIXTURE_DEPLOYMENT_VERSION).not.toBe(releaseKey);
+  if (RELEASED_CONSUMER_MODE) {
+    expect(releaseKey).toBe(EXPECTED_MODULE_VERSION);
+  } else {
+    expect(releaseKey, "candidate source-copy managed assets must not fabricate a published module version").toBe("");
+  }
   const fetched: Array<{ path: string; url: string; status: number; releaseKey: string }> = [];
   for (const assetPath of paths) {
     const script = selected[assetPath][0];
@@ -1013,8 +1043,9 @@ async function assertManagedAssetURLs(
     expect(response.status(), `${assetPath} canonical managed asset should be fetchable`).toBe(200);
     expect(responseURL.origin).toBe(origin);
     expect(responseURL.pathname).toBe(assetPath);
-    expect(responseURL.searchParams.get("v"), `${assetPath} fetched URL must retain the release key`).toBe(releaseKey);
-    fetched.push({ path: assetPath, url: response.url(), status: response.status(), releaseKey: responseURL.searchParams.get("v") || "" });
+    const fetchedReleaseKey = responseURL.searchParams.get("v") || "";
+    expect(fetchedReleaseKey, `${assetPath} fetched URL must retain the release key`).toBe(releaseKey);
+    fetched.push({ path: assetPath, url: response.url(), status: response.status(), releaseKey: fetchedReleaseKey });
   }
 
   const captured = capturedRequestURLs.map((raw) => {
@@ -1024,18 +1055,17 @@ async function assertManagedAssetURLs(
   if (requireFreshRequests) {
     const contentRequests = captured.filter((entry) => entry.path === CONTENT_RUNTIME_PATH && new URL(entry.url, baseURL).origin === origin);
     expect(contentRequests.length, `${CONTENT_RUNTIME_PATH} must be requested during the fresh signed-in Content navigation`).toBeGreaterThan(0);
-    expect(contentRequests.every((entry) => entry.releaseKey.length > 0), `${CONTENT_RUNTIME_PATH} browser requests must not use an unversioned legacy URL`).toBe(true);
-    expect(contentRequests.every((entry) => entry.releaseKey === releaseKey), `${CONTENT_RUNTIME_PATH} browser requests must use the module release key`).toBe(true);
-    if (EXPECTED_MODULE_VERSION) expect(contentRequests.every((entry) => entry.releaseKey === EXPECTED_MODULE_VERSION)).toBe(true);
+    expect(
+      contentRequests.every((entry) => entry.releaseKey === releaseKey),
+      `${CONTENT_RUNTIME_PATH} requests must retain the ${ASSET_CONTRACT_MODE} managed release key`,
+    ).toBe(true);
 
     const mediaRequests = captured.filter((entry) => entry.path === MEDIA_RUNTIME_PATH && new URL(entry.url, baseURL).origin === origin);
     const allowedMediaKeys = new Set([releaseKey, FIXTURE_DEPLOYMENT_VERSION]);
     expect(mediaRequests.length, `${MEDIA_RUNTIME_PATH} must be requested during the fresh signed-in Content navigation`).toBeGreaterThan(0);
-    expect(mediaRequests.every((entry) => entry.releaseKey.length > 0), `${MEDIA_RUNTIME_PATH} browser requests must not use an unversioned legacy URL`).toBe(true);
     expect(mediaRequests.every((entry) => allowedMediaKeys.has(entry.releaseKey)), `${MEDIA_RUNTIME_PATH} browser requests must use only the managed module or outer deployment release key`).toBe(true);
-    expect(mediaRequests.some((entry) => entry.releaseKey === releaseKey), `${MEDIA_RUNTIME_PATH} must request the module-keyed managed runtime on Pages`).toBe(true);
+    expect(mediaRequests.some((entry) => entry.releaseKey === releaseKey), `${MEDIA_RUNTIME_PATH} must request the ${ASSET_CONTRACT_MODE} module-keyed managed runtime on Pages`).toBe(true);
     expect(mediaRequests.some((entry) => entry.releaseKey === FIXTURE_DEPLOYMENT_VERSION), `${MEDIA_RUNTIME_PATH} must request the outer admin deployment-keyed runtime`).toBe(true);
-    if (EXPECTED_MODULE_VERSION) expect(mediaRequests.some((entry) => entry.releaseKey === EXPECTED_MODULE_VERSION)).toBe(true);
   }
 
   return {

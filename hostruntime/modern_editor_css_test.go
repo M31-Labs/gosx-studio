@@ -119,7 +119,12 @@ func TestModernSectionOrderUsesItsOwnIntrinsicTrack(t *testing.T) {
 	css := string(Stylesheet())
 	for _, want := range []string{
 		`.studio-page-canvas:has(> [data-gosx-studio-section-order="true"])`,
-		`grid-template-rows: auto auto minmax(0, 1fr) auto auto;`,
+		`grid-template-rows:
+    auto
+    minmax(8rem, clamp(8rem, 25vh, 14rem))
+    minmax(clamp(15rem, calc(25vh + 3rem), 16rem), 1fr)
+    auto
+    auto;`,
 		`> [data-gosx-studio-section-order="true"] {`,
 		`grid-row: 2;`,
 		`> .studio-page-canvas__stage {`,

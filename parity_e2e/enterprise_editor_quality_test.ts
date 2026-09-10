@@ -717,4 +717,185 @@ test.describe("@quality enterprise Page CMS editor polish", () => {
     expect(timing.blockCount).toBe(100);
     expect(timing.totalMs).toBeGreaterThanOrEqual(0);
   });
+
+  test("embedded Advanced SEO group preserves native radio semantics at desktop and mobile widths", async ({ page }, testInfo: TestInfo) => {
+    // Contract source: panels/advanced_panel.go:248-300 and
+    // panels/advanced_panel_test.go:18-43. Keep this fixture renderer-shaped:
+    // six sibling radios, the associated label radiogroup, and six populated
+    // direct sibling slots. The only stylesheet loaded below is studio.css;
+    // no host app stylesheet or runtime is involved.
+    const groups = [
+      { key: "flows", inputID: "studioAdvancedGroupFlows", label: "Flows", summary: "Contact and request forms." },
+      { key: "tools", inputID: "studioAdvancedGroupTools", label: "Tools", summary: "Back-office destinations." },
+      { key: "schema", inputID: "studioAdvancedGroupSchema", label: "Fields", summary: "Workspace field details." },
+      { key: "schedule", inputID: "studioAdvancedGroupSchedule", label: "Schedule", summary: "Calendar availability details." },
+      { key: "typography", inputID: "studioAdvancedGroupTypography", label: "Fonts", summary: "Fonts and custom CSS." },
+      { key: "settings", inputID: "studioAdvancedGroupSettings", label: "SEO", summary: "SEO, domains, and integrations." },
+    ] as const;
+
+    const groupInputs = groups.map((group) => `
+      <input class="studio-advanced-panel__group-input" id="${group.inputID}" type="radio" name="studioAdvancedGroup" value="${group.key}"${group.key === "flows" ? " checked" : ""} aria-label="${group.label}" />
+    `).join("");
+    const groupLabels = groups.map((group) => `
+      <label class="studio-advanced-panel__group" for="${group.inputID}" data-studio-advanced-group-label="${group.key}"><strong>${group.label}</strong><small>${group.summary}</small></label>
+    `).join("");
+    const groupSlots = groups.map((group) => {
+      const body = group.key === "settings"
+        ? `<label for="advanced-settings-title">SEO title</label><input id="advanced-settings-title" name="seoTitle" value="Search-ready title" />`
+        : `<button id="advanced-${group.key}-control" type="button">${group.label} control</button>`;
+      return `
+        <section class="studio-advanced-panel__group-slot" data-studio-advanced-group-slot="${group.key}" data-studio-advanced-group-selected="${group.key === "flows" ? "true" : "false"}">
+          <header><h3>${group.label}</h3><p>${group.summary}</p></header>
+          <div class="studio-advanced-panel__group-body" data-studio-advanced-group-body="${group.key}">${body}</div>
+        </section>
+      `;
+    }).join("");
+
+    const appearance = async (selector: string): Promise<Record<string, string>> => page.locator(selector).evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        borderColor: style.borderColor,
+        backgroundColor: style.backgroundColor,
+        color: style.color,
+        boxShadow: style.boxShadow,
+        outlineStyle: style.outlineStyle,
+        outlineWidth: style.outlineWidth,
+        outlineColor: style.outlineColor,
+        outlineOffset: style.outlineOffset,
+      };
+    });
+
+    for (const viewport of [
+      { name: "1280", width: 1280, height: 800 },
+      { name: "390", width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      const outputDirectory = path.dirname(testInfo.outputPath(`advanced-seo-${viewport.name}.json`));
+      mkdirSync(outputDirectory, { recursive: true });
+      await page.setContent(`
+        <!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>${studioCSS}</style>
+          </head>
+          <body>
+            <button id="advanced-before" type="button">Before Advanced groups</button>
+            <section class="editor-panel editor-panel--advanced-studio studio-advanced-panel" data-studio-advanced-panel="true" data-studio-mode-panel="advanced" data-studio-panel="advanced" data-studio-engine-source="gosx" data-studio-advanced-group-active="flows" data-gosx-studio-advanced-panel-renderer="gosx-studio">
+              <header class="studio-advanced-panel__head"><div><p class="kicker">Advanced</p><h2>Tool drawer</h2><p>Keep tools grouped.</p></div></header>
+              ${groupInputs}
+              <div class="studio-advanced-panel__groups" role="radiogroup" aria-label="Advanced groups">${groupLabels}</div>
+              ${groupSlots}
+            </section>
+          </body>
+        </html>
+      `);
+
+      await expect(page.locator("style")).toHaveCount(1);
+      await expect(page.locator("script")).toHaveCount(0);
+      await expect(page.locator("[style]")).toHaveCount(0);
+
+      const radios = page.locator(".studio-advanced-panel > input.studio-advanced-panel__group-input");
+      await expect(radios).toHaveCount(groups.length);
+      await expect(page.locator(".studio-advanced-panel__groups[role='radiogroup']")).toHaveCount(1);
+      await expect(page.locator(".studio-advanced-panel__group-slot")).toHaveCount(groups.length);
+      expect(await radios.evaluateAll((inputs) => inputs.map((input) => input.id))).toEqual(groups.map((group) => group.inputID));
+
+      const selectedSlotAttrs = async (): Promise<Array<string | null>> => page.locator(".studio-advanced-panel__group-slot").evaluateAll((slots) => slots.map((slot) => slot.getAttribute("data-studio-advanced-group-selected")));
+      const initialSelectedSlotAttrs = await selectedSlotAttrs();
+      const flowsRadio = page.locator("#studioAdvancedGroupFlows");
+      const settingsRadio = page.locator("#studioAdvancedGroupSettings");
+      const flowsLabel = page.locator("[data-studio-advanced-group-label='flows']");
+      const settingsLabel = page.locator("[data-studio-advanced-group-label='settings']");
+      const flowsSlot = page.locator("[data-studio-advanced-group-slot='flows']");
+      const settingsSlot = page.locator("[data-studio-advanced-group-slot='settings']");
+
+      await expect(flowsRadio).toBeChecked();
+      await expect(flowsSlot).toBeVisible();
+      for (const group of groups.filter((group) => group.key !== "flows")) {
+        await expect(page.locator(`[data-studio-advanced-group-slot='${group.key}']`)).toBeHidden();
+      }
+      const flowSelectedAppearance = await appearance("[data-studio-advanced-group-label='flows']");
+      const settingsUnselectedAppearance = await appearance("[data-studio-advanced-group-label='settings']");
+      expect(flowSelectedAppearance).not.toEqual(settingsUnselectedAppearance);
+      await expect(page.locator("#advanced-settings-title")).toBeHidden();
+      await assertNoPageOverflow(page, `${viewport.name} Advanced flows`);
+      const initialScreenshot = testInfo.outputPath(`advanced-seo-${viewport.name}-flows.png`);
+      await page.screenshot({ path: initialScreenshot, fullPage: false });
+
+      await expect(settingsLabel).toBeVisible();
+      await settingsLabel.click();
+      await expect(settingsRadio).toBeChecked();
+      await expect(settingsSlot).toBeVisible();
+      await expect(flowsSlot).toBeHidden();
+      await expect(page.locator("#advanced-settings-title")).toBeVisible();
+      await expect.poll(() => appearance("[data-studio-advanced-group-label='settings']")).toEqual(flowSelectedAppearance);
+      const settingsSelectedAppearance = await appearance("[data-studio-advanced-group-label='settings']");
+      await assertNoPageOverflow(page, `${viewport.name} Advanced SEO click`);
+      const settingsScreenshot = testInfo.outputPath(`advanced-seo-${viewport.name}-settings-click.png`);
+      await page.screenshot({ path: settingsScreenshot, fullPage: false });
+
+      await flowsLabel.click();
+      await expect(flowsRadio).toBeChecked();
+      await expect(flowsSlot).toBeVisible();
+      await expect(settingsSlot).toBeHidden();
+      await expect(page.locator("#advanced-settings-title")).toBeHidden();
+
+      const precedingControl = page.locator("#advanced-before");
+      await precedingControl.click();
+      await expect(precedingControl).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(flowsRadio).toBeFocused();
+      for (let index = 0; index < groups.length - 1; index += 1) {
+        await page.keyboard.press("ArrowRight");
+      }
+      await expect(settingsRadio).toBeChecked();
+      await expect(settingsRadio).toBeFocused();
+      await expect(settingsSlot).toBeVisible();
+      await expect(flowsSlot).toBeHidden();
+      const nativeRadioFocusEvidence = await settingsRadio.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          matchesFocusVisible: element.matches(":focus-visible"),
+          outlineStyle: style.outlineStyle,
+          outlineWidth: style.outlineWidth,
+          outlineColor: style.outlineColor,
+          outlineOffset: style.outlineOffset,
+        };
+      });
+      expect(nativeRadioFocusEvidence.matchesFocusVisible).toBe(true);
+      await page.keyboard.press("Tab");
+      await expect(page.locator("#advanced-settings-title")).toBeFocused();
+      await expect(page.locator("#advanced-flows-control")).not.toBeFocused();
+      expect(await page.evaluate(() => document.activeElement?.id)).toBe("advanced-settings-title");
+      expect(await selectedSlotAttrs()).toEqual(initialSelectedSlotAttrs);
+      await assertNoPageOverflow(page, `${viewport.name} Advanced SEO keyboard`);
+      const keyboardScreenshot = testInfo.outputPath(`advanced-seo-${viewport.name}-settings-keyboard.png`);
+      await page.screenshot({ path: keyboardScreenshot, fullPage: false });
+      const evidencePath = testInfo.outputPath(`advanced-seo-${viewport.name}.json`);
+      mkdirSync(path.dirname(evidencePath), { recursive: true });
+      writeFileSync(evidencePath, JSON.stringify({
+        test: testInfo.title,
+        viewport,
+        sourceContract: "panels/advanced_panel.go:248-300; panels/advanced_panel_test.go:18-43",
+        styleSheets: await page.locator("style").count(),
+        scripts: await page.locator("script").count(),
+        radioIDs: await radios.evaluateAll((inputs) => inputs.map((input) => input.id)),
+        selectedSlotAttrs: await selectedSlotAttrs(),
+        labelAppearance: {
+          flowsSelected: flowSelectedAppearance,
+          settingsUnselected: settingsUnselectedAppearance,
+          settingsSelected: settingsSelectedAppearance,
+        },
+        nativeRadioFocusEvidence,
+        settingsFocusedAfterNativeTab: await page.evaluate(() => document.activeElement?.id === "advanced-settings-title"),
+        screenshots: {
+          initial: initialScreenshot,
+          settingsClick: settingsScreenshot,
+          settingsKeyboard: keyboardScreenshot,
+        },
+      }, null, 2) + "\n", "utf8");
+    }
+  });
 });

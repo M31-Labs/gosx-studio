@@ -274,7 +274,9 @@
     }
 
     function ensurePreviewPatchStyles(doc) {
-      if (!doc || doc.getElementById("gosx-studio-preview-patch-style")) return;
+      if (!doc || doc.getElementById("gosx-studio-preview-patch-style")) return true;
+      var host = doc.head || doc.documentElement || doc.body;
+      if (!host || !host.appendChild) return false;
       var style = doc.createElement("style");
       style.id = "gosx-studio-preview-patch-style";
       style.textContent = [
@@ -287,7 +289,8 @@
         "[data-gosx-studio-inline-editing]{outline:3px solid currentColor;outline-offset:5px;caret-color:currentColor;}",
         "[data-gosx-studio-inline-editing]:focus{outline-offset:7px;}"
       ].join("");
-      (doc.head || doc.documentElement).appendChild(style);
+      host.appendChild(style);
+      return true;
     }
 
     function previewTargets(frame, patch) {
@@ -1381,9 +1384,10 @@
 
     function bindPreviewDocument(frame) {
       var doc = frameDocument(frame);
-      if (!doc || frame.__gosxStudioPreviewDocument === doc) return;
+      if (!doc || (frame.__gosxStudioPreviewDocument === doc && doc.getElementById("gosx-studio-preview-patch-style"))) return;
+      if (!ensurePreviewPatchStyles(doc)) return;
+      if (frame.__gosxStudioPreviewDocument === doc) return;
       frame.__gosxStudioPreviewDocument = doc;
-      ensurePreviewPatchStyles(doc);
       if (doc.documentElement) doc.documentElement.setAttribute("data-gosx-studio-preview-selectable", "true");
       var repositionDock = frameTask(function () {
         updatePreviewDockPosition(frame);

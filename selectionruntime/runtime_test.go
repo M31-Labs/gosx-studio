@@ -178,7 +178,7 @@ func TestSelectionRuntimeIslandOwnsInsertBlockDispatch(t *testing.T) {
 func TestSelectionRuntimeIslandMirrorsPreviewActionSelectionTelemetry(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	for _, contract := range []string{
-		`form.addEventListener("gosxstudio:preview-action", mirrorPreviewActionSelection);`,
+		`listen(form, "gosxstudio:preview-action", mirrorPreviewActionSelection);`,
 		`function mirrorPreviewActionSelection(event)`,
 		`function previewDockActionEnvelope(action, detail)`,
 		`actionLabel: detail.actionLabel || detail.action || ""`,
@@ -229,7 +229,7 @@ func TestSelectionRuntimeIslandMirrorsPreviewActionSelectionTelemetry(t *testing
 func TestSelectionRuntimeIslandOwnsPreviewFieldNavigationTelemetry(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	for _, contract := range []string{
-		`form.addEventListener("gosxstudio:preview-field-navigation-commit", emitPreviewFieldNavigation);`,
+		`listen(form, "gosxstudio:preview-field-navigation-commit", emitPreviewFieldNavigation);`,
 		`function emitPreviewFieldNavigation(event)`,
 		`function previewFieldNavigationEnvelope(detail, navigation)`,
 		`reason: navigation.reason || "field-navigation"`,
@@ -282,7 +282,7 @@ func TestSelectionRuntimeIslandOwnsPreviewFieldNavigationTelemetry(t *testing.T)
 func TestSelectionRuntimeIslandOwnsPreviewFieldActionResolve(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	for _, contract := range []string{
-		`form.addEventListener("gosxstudio:preview-field-action-resolve", resolvePreviewFieldAction);`,
+		`listen(form, "gosxstudio:preview-field-action-resolve", resolvePreviewFieldAction);`,
 		`function resolvePreviewFieldAction(event)`,
 		`function previewFieldActionEnvelope(detail)`,
 		`var envelope = event.detail || {};`,
@@ -335,7 +335,7 @@ func TestSelectionRuntimeIslandOwnsPreviewFieldActionResolve(t *testing.T) {
 func TestSelectionRuntimeIslandOwnsPreviewFieldActionSubmit(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	for _, contract := range []string{
-		`form.addEventListener("gosxstudio:preview-field-action-submit", submitPreviewFieldAction);`,
+		`listen(form, "gosxstudio:preview-field-action-submit", submitPreviewFieldAction);`,
 		`function isFormSubmitControl(node)`,
 		`function fieldActionSubmitter(source, formAction)`,
 		`function submitPreviewFieldAction(event)`,
@@ -383,7 +383,7 @@ func TestSelectionRuntimeIslandOwnsPreviewFieldActionSubmit(t *testing.T) {
 func TestSelectionRuntimeIslandOwnsPreviewDockActionResolve(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	for _, contract := range []string{
-		`form.addEventListener("gosxstudio:preview-dock-action-resolve", resolvePreviewDockAction);`,
+		`listen(form, "gosxstudio:preview-dock-action-resolve", resolvePreviewDockAction);`,
 		`function resolvePreviewDockAction(event)`,
 		`function previewDockActionEnvelope(action, detail)`,
 		`var envelope = event.detail || {};`,
@@ -430,7 +430,7 @@ func TestSelectionRuntimeIslandOwnsPreviewDockActionResolve(t *testing.T) {
 func TestSelectionRuntimeIslandOwnsPreviewSelectionApply(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	for _, contract := range []string{
-		`form.addEventListener("gosxstudio:preview-selection-detail-resolve", resolvePreviewSelectionDetail);`,
+		`listen(form, "gosxstudio:preview-selection-detail-resolve", resolvePreviewSelectionDetail);`,
 		`function resolvePreviewSelectionDetail(event)`,
 		`var node = envelope.target;`,
 		`if (!node || !node.closest)`,
@@ -459,7 +459,7 @@ func TestSelectionRuntimeIslandOwnsPreviewSelectionApply(t *testing.T) {
 		`function previewBlockLabel(node, fallback)`,
 		`node.getAttribute("data-studio-block-label") || node.getAttribute("data-studio-node-label") || node.getAttribute("aria-label") || ""`,
 		`node.querySelector && node.querySelector("[data-studio-block-title], h1, h2, h3, strong")`,
-		`form.addEventListener("gosxstudio:preview-selection-apply", applyPreviewSelectionState);`,
+		`listen(form, "gosxstudio:preview-selection-apply", applyPreviewSelectionState);`,
 		`function applyPreviewSelectionState(event)`,
 		`function inferPreviewEditableKind(source, control)`,
 		`source.getAttribute("data-studio-field-editable") || source.getAttribute("data-studio-editable") || ""`,
@@ -510,8 +510,8 @@ func TestSelectionRuntimeIslandOwnsPreviewSelectionApply(t *testing.T) {
 func TestSelectionRuntimeIslandOwnsPreviewFieldTargetReveal(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	for _, contract := range []string{
-		`form.addEventListener("gosxstudio:preview-field-target-resolve", resolvePreviewFieldTarget);`,
-		`form.addEventListener("gosxstudio:preview-field-reveal", revealPreviewField);`,
+		`listen(form, "gosxstudio:preview-field-target-resolve", resolvePreviewFieldTarget);`,
+		`listen(form, "gosxstudio:preview-field-reveal", revealPreviewField);`,
 		`function previewFieldTarget(detail)`,
 		`var field = typeof detail === "string" ? detail : (detail.field || (detail.detail && detail.detail.field) || "");`,
 		`var source = fieldSource(field);`,
@@ -526,7 +526,7 @@ func TestSelectionRuntimeIslandOwnsPreviewFieldTargetReveal(t *testing.T) {
 		`var row = target.source.closest ? target.source.closest(".field-row, [data-studio-field-row]") : null;`,
 		`var scrollTarget = row || target.source;`,
 		`scrollTarget.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });`,
-		`if (target.control && target.control.focus) target.control.focus({ preventScroll: true });`,
+		`if (target.control && selectionContains(target.control) && target.control.focus) target.control.focus({ preventScroll: true });`,
 		`}, reduced ? 0 : 120);`,
 		`function resolvePreviewFieldTarget(event)`,
 		`envelope.result = previewFieldTarget(envelope.detail || envelope);`,
@@ -548,7 +548,7 @@ func TestSelectionRuntimeIslandOwnsPreviewFieldTargetReveal(t *testing.T) {
 func TestSelectionRuntimeIslandOwnsPreviewSelectionClear(t *testing.T) {
 	body := string(IslandRuntimeJS())
 	for _, contract := range []string{
-		`form.addEventListener("gosxstudio:preview-selection-clear", clearPreviewSelectionState);`,
+		`listen(form, "gosxstudio:preview-selection-clear", clearPreviewSelectionState);`,
 		`function clearPreviewSelectionState(event)`,
 		`clearPreviewInspectorSelection();`,
 		`target.removeAttribute("data-gosx-studio-inspector-selected");`,

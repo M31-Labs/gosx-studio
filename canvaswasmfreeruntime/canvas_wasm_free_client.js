@@ -49,6 +49,22 @@
   // browser's trailing synthetic click for that drag — ignore it so a drag never
   // also picks.
   var CLICK_AFTER_DRAG_MS = 320;
+  var CONTROLLER_PROPERTY = "__gosxStudioCanvasWASMFreeController";
+  var GLOBAL_BOUND_FLAG = "data-gosx-canvas-wasm-free-client-bound";
+  var CLIENT_STATE_PROPERTY = "__gosxStudioCanvasWASMFreeClientState";
+  var existingClientState = window[CLIENT_STATE_PROPERTY];
+  // Script tags can be re-evaluated by fragment loaders or a hot-reload
+  // bridge. Reuse the first runtime's registry/API so its global listener
+  // continues to own the same mounted canvases; creating a second closure
+  // here would make the new API blind to old controllers while the old
+  // document listener kept dispatching to them.
+  if (existingClientState && typeof existingClientState.mountAll === "function") {
+    existingClientState.mountAll();
+    if (existingClientState.api) window.GoSXStudioCanvasWASMFreeClientRuntime = existingClientState.api;
+    return;
+  }
+  var mountedCanvases = [];
+  var canvasLifecycleObserver = null;
 
   function clampZoom(z) {
     if (!(z > 0)) return 1;
@@ -86,6 +102,34 @@
   // boardRoot resolves the DOM site-map board (the selection sink).
   function boardRoot() {
     return document.querySelector(BOARD);
+  }
+
+  function canvasContains(node) {
+    return !document.contains || document.contains(node);
+  }
+
+  function stopCanvasLifecycleObserver() {
+    if (!canvasLifecycleObserver) return;
+    canvasLifecycleObserver.disconnect();
+    canvasLifecycleObserver = null;
+  }
+
+  function ensureCanvasLifecycleObserver() {
+    if (canvasLifecycleObserver || !window.MutationObserver || !document.documentElement) return;
+    canvasLifecycleObserver = new MutationObserver(function () {
+      // One bounded observer services every mounted canvas. A copy keeps the
+      // walk stable while disposal removes entries from mountedCanvases.
+      mountedCanvases.slice().forEach(function (canvas) {
+        var controller = canvas[CONTROLLER_PROPERTY];
+        if (!canvasContains(canvas)) {
+          if (controller && controller.dispose) controller.dispose();
+          return;
+        }
+        if (controller && controller.refresh) controller.refresh();
+      });
+      if (!mountedCanvases.length) stopCanvasLifecycleObserver();
+    });
+    canvasLifecycleObserver.observe(document.documentElement, { childList: true, subtree: true });
   }
 
   function runtime() {
@@ -321,17 +365,125 @@
 
   function mountCanvas(canvas) {
     if (!(canvas instanceof HTMLCanvasElement)) return;
-    if (canvas.getAttribute(BOUND_FLAG) === "true") return;
+    var previousController = canvas[CONTROLLER_PROPERTY];
+    if (previousController && !previousController.disposed) {
+      if (previousController.refresh) previousController.refresh();
+      return;
+    }
+    if (previousController && previousController.dispose) previousController.dispose();
+    // A cloned replacement carries attributes but not the controller
+    // expando. Reclaim that stale marker so a fresh mount is not skipped.
+    if (canvas.getAttribute(BOUND_FLAG) === "true") canvas.removeAttribute(BOUND_FLAG);
     canvas.setAttribute(BOUND_FLAG, "true");
 
     var section = canvas.closest("section") || canvas.parentElement || document;
     var host = canvas.parentElement || section;
     var ctx = null;
     var renderer = null;
+    var disposed = false;
+    var cleanupFns = [];
+    var frameHandle = null;
+    var routeTimer = null;
+    var controlAPI = null;
     var renderRoute = "pending";
     var routeReason = "";
     var ROUTE_DEADLINE_MS = 2500;
     var routeDeadline = now() + ROUTE_DEADLINE_MS;
+
+    function listen(target, type, handler, options) {
+      if (!target || !target.addEventListener) return;
+      target.addEventListener(type, handler, options);
+      cleanupFns.push(function () {
+        if (target.removeEventListener) target.removeEventListener(type, handler, options);
+      });
+    }
+
+    function cancelFrame() {
+      if (frameHandle === null) return;
+      var pending = frameHandle;
+      frameHandle = null;
+      if (pending.raf) {
+        var cancel = window.cancelAnimationFrame;
+        if (typeof cancel === "function") cancel.call(window, pending.id);
+      } else if (window.clearTimeout) {
+        window.clearTimeout(pending.id);
+      }
+    }
+
+    function scheduleFrame(callback) {
+      if (disposed) return null;
+      // render() can be reached by both the route timeout and the normal
+      // compositor loop. Never replace an already queued callback: doing so
+      // loses the first handle and leaves an un-cancellable render loop.
+      if (frameHandle !== null) return frameHandle.id;
+      var pending = { id: null, raf: false };
+      frameHandle = pending;
+      if (typeof window.requestAnimationFrame === "function") {
+        pending.raf = true;
+        pending.id = window.requestAnimationFrame(function () {
+          if (frameHandle !== pending) return;
+          frameHandle = null;
+          if (!disposed) callback();
+        });
+        return pending.id;
+      }
+      pending.id = window.setTimeout(function () {
+        if (frameHandle !== pending) return;
+        frameHandle = null;
+        if (!disposed) callback();
+      }, 16);
+      return pending.id;
+    }
+
+    function dispose() {
+      if (disposed) return;
+      disposed = true;
+      cancelPointer();
+      if (routeTimer !== null && window.clearTimeout) window.clearTimeout(routeTimer);
+      routeTimer = null;
+      cancelFrame();
+      for (var j = cleanupFns.length - 1; j >= 0; j--) cleanupFns[j]();
+      cleanupFns = [];
+      if (renderer && typeof renderer.dispose === "function") {
+        try { renderer.dispose(); } catch (error) { /* tolerate renderer teardown */ }
+      }
+      renderer = null;
+      if (htmlOverlay && htmlOverlay.parentElement) htmlOverlay.parentElement.removeChild(htmlOverlay);
+      if (panelHost && panelHost.parentElement) panelHost.parentElement.removeChild(panelHost);
+      if (canvas[CONTROLLER_PROPERTY] && canvas[CONTROLLER_PROPERTY].dispose === dispose) {
+        delete canvas[CONTROLLER_PROPERTY];
+      }
+      if (canvas.__gosxStudioCanvasWASMFree === controlAPI) delete canvas.__gosxStudioCanvasWASMFree;
+      if (canvas.GoSXStudioCanvasWasmFree === controlAPI) delete canvas.GoSXStudioCanvasWasmFree;
+      canvas.removeAttribute(BOUND_FLAG);
+      var index = mountedCanvases.indexOf(canvas);
+      if (index >= 0) mountedCanvases.splice(index, 1);
+      if (!mountedCanvases.length) stopCanvasLifecycleObserver();
+    }
+
+    function refresh() {
+      if (disposed) return;
+      if (!canvasContains(canvas)) {
+        dispose();
+        return;
+      }
+      var nextSection = canvas.closest("section") || canvas.parentElement || document;
+      var nextHost = canvas.parentElement || nextSection;
+      if (nextSection === section && nextHost === host) return;
+      // A connected canvas may move between authoring fragments without being
+      // replaced. Recreate the owner so bundle lookup, overlays, panel host,
+      // timers, and listeners all follow the new section/parent context.
+      dispose();
+      mountCanvas(canvas);
+    }
+
+    canvas[CONTROLLER_PROPERTY] = {
+      dispose: dispose,
+      refresh: refresh,
+      get disposed() { return disposed; }
+    };
+    mountedCanvases.push(canvas);
+    ensureCanvasLifecycleObserver();
     // Timer-based safety net for the WebGPU->Canvas2D fallback. The rAF render
     // loop only evaluates routeDeadline when it runs, but requestAnimationFrame
     // callbacks are driven by the compositor's BeginFrame — and a hung GPU /
@@ -341,7 +493,8 @@
     // setTimeout runs on the main-thread event loop independent of the
     // compositor, so it forces the Canvas2D fallback even when rAF is dead. The
     // guard makes a late fire (route already resolved) a no-op.
-    setTimeout(function() {
+    routeTimer = window.setTimeout(function() {
+      routeTimer = null;
       if (disposed || renderRoute !== "pending") return;
       markFallback("webgpu-init-timeout");
       markDirty();
@@ -360,7 +513,6 @@
     };
 
     var dirty = true;
-    var disposed = false;
     var selectedID = "";
     var htmlOverlay = null;
     var panelHost = null;
@@ -527,7 +679,8 @@
         }
         // Delegate click-to-select: walk up from the clicked child to the
         // nearest element carrying data-gosx-html-key, then call applySingle.
-        ov.addEventListener("click", function (ev) {
+        listen(ov, "click", function (ev) {
+          if (disposed || !canvasContains(canvas)) return;
           var el = ev.target;
           while (el && el !== ov) {
             var key = el.getAttribute("data-gosx-html-key");
@@ -667,6 +820,10 @@
 
     function render() {
       if (disposed) return;
+      if (!canvasContains(canvas)) {
+        dispose();
+        return;
+      }
       var size = cssSize();
       if (dirty) {
         var composed = composeBundle();
@@ -691,7 +848,7 @@
               markFallback("missing-static-webgpu-bundle");
             }
           } else if (renderRoute !== "2d-fallback") {
-            requestAnimationFrame(render);
+            scheduleFrame(render);
             return;
           }
         }
@@ -699,12 +856,12 @@
         if (!paintedWebGPU) {
           if (!p) {
             // Painter script not yet evaluated — retry next frame.
-            requestAnimationFrame(render);
+            scheduleFrame(render);
             return;
           }
           var activeCtx = ensure2DContext();
           if (!activeCtx) {
-            requestAnimationFrame(render);
+            scheduleFrame(render);
             return;
           }
           var dpr = resizeBackingStore(size);
@@ -740,10 +897,11 @@
         }
         dirty = false;
       }
-      requestAnimationFrame(render);
+      scheduleFrame(render);
     }
 
     function markDirty() {
+      if (disposed || !canvasContains(canvas)) return;
       dirty = true;
     }
 
@@ -762,13 +920,24 @@
     // both "click fires" and "click suppressed" without leaking to a later tap.
     var lastDragEndAt = 0;
 
+    function cancelPointer() {
+      var capturedPointerId = pointerId;
+      dragging = false;
+      marquee = false;
+      pointerId = null;
+      moved = 0;
+      if (capturedPointerId !== null) {
+        try { canvas.releasePointerCapture(capturedPointerId); } catch (e) { /* tolerate stale capture */ }
+      }
+    }
+
     function localPoint(ev) {
       var rect = canvas.getBoundingClientRect();
       return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
     }
 
-    canvas.addEventListener("pointerdown", function (ev) {
-      if (ev.button !== 0) return;
+    listen(canvas, "pointerdown", function (ev) {
+      if (disposed || !canvasContains(canvas) || dragging || ev.button !== 0) return;
       var pt = localPoint(ev);
       dragging = true;
       marquee = ev.shiftKey === true;
@@ -784,8 +953,8 @@
       ev.preventDefault();
     });
 
-    canvas.addEventListener("pointermove", function (ev) {
-      if (!dragging || (pointerId !== null && ev.pointerId !== pointerId)) return;
+    listen(canvas, "pointermove", function (ev) {
+      if (disposed || !canvasContains(canvas) || !dragging || (pointerId !== null && ev.pointerId !== pointerId)) return;
       var pt = localPoint(ev);
       var dx = pt.x - lastX;
       var dy = pt.y - lastY;
@@ -803,7 +972,7 @@
     });
 
     function endPointer(ev) {
-      if (!dragging) return;
+      if (disposed || !canvasContains(canvas) || !dragging) return;
       if (pointerId !== null && ev.pointerId !== pointerId) return;
       dragging = false;
       try { canvas.releasePointerCapture(pointerId); } catch (e) { /* tolerate */ }
@@ -813,6 +982,7 @@
 
       if (marquee) {
         marquee = false;
+        pointerId = null;
         if (!b) return;
         // A marquee that barely moved is really a shift-click → let the click
         // handler own it (a single pick), so a stray shift never clears.
@@ -832,15 +1002,24 @@
       if (moved > CLICK_SLOP) {
         lastDragEndAt = now();
       }
+      pointerId = null;
     }
 
-    canvas.addEventListener("pointerup", endPointer);
-    canvas.addEventListener("pointercancel", function (ev) {
-      if (!dragging) return;
-      if (pointerId !== null && ev.pointerId !== pointerId) return;
-      dragging = false;
-      marquee = false;
-      try { canvas.releasePointerCapture(pointerId); } catch (e) { /* tolerate */ }
+    listen(canvas, "pointerup", endPointer);
+    listen(canvas, "pointercancel", function (ev) {
+      if (disposed || !canvasContains(canvas) || !dragging) return;
+      if (pointerId !== null && ev.pointerId !== undefined && ev.pointerId !== pointerId) return;
+      cancelPointer();
+    });
+
+    listen(canvas, "lostpointercapture", function (ev) {
+      if (disposed || !canvasContains(canvas) || !dragging) return;
+      if (pointerId !== null && ev.pointerId !== undefined && ev.pointerId !== pointerId) return;
+      cancelPointer();
+    });
+    listen(window, "blur", cancelPointer);
+    listen(document, "visibilitychange", function () {
+      if (document.visibilityState === "hidden") cancelPointer();
     });
 
     // Pick on a real click. A `click` fires only when pointerdown+up land on the
@@ -851,7 +1030,8 @@
     // quirks under synthesized input and matches native click semantics. A
     // shift-click with no drag falls through here too → a single pick, which is
     // the felt-right behavior (an empty marquee is a no-op, not a clear).
-    canvas.addEventListener("click", function (ev) {
+    listen(canvas, "click", function (ev) {
+      if (disposed || !canvasContains(canvas)) return;
       // Ignore the trailing synthetic click the browser emits right after a
       // pan/marquee drag (so a drag never also picks).
       if (now() - lastDragEndAt < CLICK_AFTER_DRAG_MS) return;
@@ -869,7 +1049,8 @@
     });
 
     // ---- Wheel (zoom toward cursor) ----
-    canvas.addEventListener("wheel", function (ev) {
+    listen(canvas, "wheel", function (ev) {
+      if (disposed || !canvasContains(canvas)) return;
       var pt = localPoint(ev);
       var size = cssSize();
       // deltaY > 0 (scroll down / pinch out) zooms OUT → factor < 1.
@@ -880,7 +1061,8 @@
     }, { passive: false });
 
     // ---- Keyboard (arrow nav + escape clear) ----
-    canvas.addEventListener("keydown", function (ev) {
+    listen(canvas, "keydown", function (ev) {
+      if (disposed || !canvasContains(canvas)) return;
       var dir = "";
       switch (ev.key) {
         case "ArrowUp": dir = "up"; break;
@@ -910,19 +1092,19 @@
 
     // Re-paint after an authoring fragment refresh (inline bundle may have been
     // swapped); also re-seed nothing — the JS camera is preserved across refreshes.
-    document.addEventListener("gosxstudio:fragments-refreshed", markDirty);
-    window.addEventListener("resize", markDirty);
-    window.addEventListener("beforeunload", function () { disposed = true; });
+    listen(document, "gosxstudio:fragments-refreshed", markDirty);
+    listen(window, "resize", markDirty);
+    listen(window, "beforeunload", dispose);
 
     // Status hook so the live e2e can assert this client mounted and drive a
     // deterministic camera/selection without reaching into the closure.
-    var controlAPI = {
+    controlAPI = {
       camera: function () { return { x: cam.x, y: cam.y, z: cam.z }; },
-      setCamera: function (x, y, z) { cam.x = x; cam.y = y; cam.z = clampZoom(z); markDirty(); },
-      screenToWorld: function (sx, sy) { var s = cssSize(); return screenToWorld(sx, sy, cam, s.w, s.h); },
-      bundle: bundleNow,
-      pickAt: function (sx, sy) { var s = cssSize(); var w = screenToWorld(sx, sy, cam, s.w, s.h); return pickWorld(bundleNow(), w.x, w.y); },
-      selected: function () { return selectedID; },
+      setCamera: function (x, y, z) { if (disposed) return; cam.x = x; cam.y = y; cam.z = clampZoom(z); markDirty(); },
+      screenToWorld: function (sx, sy) { if (disposed) return null; var s = cssSize(); return screenToWorld(sx, sy, cam, s.w, s.h); },
+      bundle: function () { return disposed ? null : bundleNow(); },
+      pickAt: function (sx, sy) { if (disposed) return null; var s = cssSize(); var w = screenToWorld(sx, sy, cam, s.w, s.h); return pickWorld(bundleNow(), w.x, w.y); },
+      selected: function () { return disposed ? "" : selectedID; },
       repaint: markDirty,
     };
     canvas.__gosxStudioCanvasWASMFree = controlAPI;
@@ -932,9 +1114,16 @@
   }
 
   function mountAll() {
+    for (var i = mountedCanvases.length - 1; i >= 0; i--) {
+      var oldCanvas = mountedCanvases[i];
+      if (canvasContains(oldCanvas)) continue;
+      var oldController = oldCanvas[CONTROLLER_PROPERTY];
+      if (oldController && oldController.dispose) oldController.dispose();
+      else mountedCanvases.splice(i, 1);
+    }
     var canvases = document.querySelectorAll(CANVAS);
-    for (var i = 0; i < canvases.length; i++) {
-      mountCanvas(canvases[i]);
+    for (var j = 0; j < canvases.length; j++) {
+      mountCanvas(canvases[j]);
     }
   }
 
@@ -942,13 +1131,20 @@
   // owning the canvas (vs the WASM canvas path).
   document.documentElement.setAttribute("data-gosx-canvas-wasm-free-client", "true");
   var api = { mountAll: mountAll };
+  window[CLIENT_STATE_PROPERTY] = { api: api, mountAll: mountAll };
   window.GoSXStudioCanvasWASMFreeClientRuntime = api;
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", mountAll);
-  } else {
-    mountAll();
+  var globalBound = document.documentElement.getAttribute
+    ? document.documentElement.getAttribute(GLOBAL_BOUND_FLAG)
+    : null;
+  if (globalBound !== "true") {
+    if (document.documentElement.setAttribute) document.documentElement.setAttribute(GLOBAL_BOUND_FLAG, "true");
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", mountAll);
+    } else {
+      mountAll();
+    }
+    // Re-scan after structural fragment refreshes that may re-insert the canvas.
+    document.addEventListener("gosxstudio:fragments-refreshed", mountAll);
   }
-  // Re-scan after structural fragment refreshes that may re-insert the canvas.
-  document.addEventListener("gosxstudio:fragments-refreshed", mountAll);
 })();

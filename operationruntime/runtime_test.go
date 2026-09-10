@@ -156,3 +156,25 @@ func TestRuntimeCarriesOptionalExpectedTargetValue(t *testing.T) {
 		}
 	}
 }
+
+func TestRuntimeSerializesOperationResponsesPerTarget(t *testing.T) {
+	script := string(Script())
+	for _, want := range []string{
+		`var targetQueues = {}`,
+		`function buildPayload()`,
+		`var previous = targetQueues[effectiveKey] || Promise.resolve()`,
+		`var queued = previous.then(run)`,
+		`var payload = buildPayload()`,
+		`if (targetQueues[effectiveKey] === tracked) delete targetQueues[effectiveKey]`,
+		`targetQueues[effectiveKey] = tracked`,
+		`nextRevision < currentRevision`,
+		`extra.field || target.field || ""`,
+		`var errorData = resultData(body)`,
+		`error.body = body`,
+		`status: error && error.status || 0`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("runtime missing per-target operation queue %q:\n%s", want, script)
+		}
+	}
+}

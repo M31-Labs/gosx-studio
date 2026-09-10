@@ -50,11 +50,10 @@
   // frame — schedule a callback at next animation frame (mirrors
   // studio-engines.js:75 helper).
   function frame(callback) {
-    if (window.requestAnimationFrame) {
-      window.requestAnimationFrame(callback);
-      return;
+    if (typeof window.requestAnimationFrame === "function") {
+      return { id: window.requestAnimationFrame(callback), raf: true };
     }
-    window.setTimeout(callback, 16);
+    return { id: window.setTimeout(callback, 16), raf: false };
   }
 
   // frameTask — coalesces calls into a single rAF dispatch with the last
@@ -63,16 +62,36 @@
     var queued = false;
     var lastArgs = null;
     var lastThis = null;
-    return function () {
+    var active = true;
+    var pendingFrame = null;
+    var task = function () {
+      if (!active) return;
       lastArgs = arguments;
       lastThis = this;
       if (queued) return;
       queued = true;
-      frame(function () {
+      pendingFrame = frame(function () {
+        pendingFrame = null;
         queued = false;
+        if (!active) return;
         callback.apply(lastThis, lastArgs || []);
       });
     };
+    task.cancel = function () {
+      active = false;
+      if (pendingFrame) {
+        if (pendingFrame.raf && typeof window.cancelAnimationFrame === "function") {
+          window.cancelAnimationFrame(pendingFrame.id);
+        } else if (!pendingFrame.raf && typeof window.clearTimeout === "function") {
+          window.clearTimeout(pendingFrame.id);
+        }
+        pendingFrame = null;
+      }
+      queued = false;
+      lastArgs = null;
+      lastThis = null;
+    };
+    return task;
   }
 
   // editorWorkbench — resolve the [data-editor-workbench] form (or root if
@@ -81,6 +100,81 @@
   function editorWorkbench(root) {
     if (root && root.matches && root.matches("[data-editor-workbench]")) return root;
     return doc.querySelector("[data-editor-workbench]");
+  }
+
+  function workbenchContains(node) {
+    return !doc.contains || doc.contains(node);
+  }
+
+  // Each workbench form can be serviced by both public bind methods. Keep one
+  // lifecycle observer per form and let each method register its own cleanup;
+  // a fragment replacement then disposes every controller exactly once.
+  var workbenchLifecycleProperty = "__gosxStudioWorkbenchLifecycle";
+
+  function activeRailGestureFor(form) {
+    var lifecycle = form && form[workbenchLifecycleProperty];
+    var gesture = lifecycle && lifecycle.activeRailGesture;
+    if (!lifecycle || lifecycle.disposed || !gesture || gesture.done || gesture.form !== form) return null;
+    return gesture;
+  }
+
+  function workbenchLifecycle(form) {
+    var existing = form[workbenchLifecycleProperty];
+    if (existing && !existing.disposed) {
+      if (!workbenchContains(form)) existing.dispose();
+      else return existing;
+    }
+    var lifecycle = {
+      disposed: false,
+      controllers: Object.create(null),
+      observer: null,
+      canvasRefreshTask: null,
+      activeRailGesture: null,
+      register: function (name, controller) {
+        if (this.disposed || this.controllers[name]) return false;
+        this.controllers[name] = controller;
+        return true;
+      },
+      get: function (name) {
+        return this.disposed ? null : this.controllers[name] || null;
+      },
+      dispose: function () {
+        if (this.disposed) return;
+        this.disposed = true;
+        var controllers = this.controllers;
+        this.controllers = Object.create(null);
+        Object.keys(controllers).forEach(function (name) {
+          try {
+            var controller = controllers[name];
+            if (controller && typeof controller.dispose === "function") controller.dispose();
+            else if (typeof controller === "function") controller();
+          } catch (error) { /* best effort teardown */ }
+        });
+        if (this.canvasRefreshTask && this.canvasRefreshTask.cancel) this.canvasRefreshTask.cancel();
+        this.canvasRefreshTask = null;
+        if (this.observer) this.observer.disconnect();
+        if (form[workbenchLifecycleProperty] === this) delete form[workbenchLifecycleProperty];
+      }
+    };
+    form[workbenchLifecycleProperty] = lifecycle;
+    if (window.MutationObserver && doc.documentElement) {
+      lifecycle.observer = new MutationObserver(function () {
+        if (!workbenchContains(form)) {
+          lifecycle.dispose();
+          return;
+        }
+        // Keep one observer per form, but let each registered controller
+        // reconcile its own child bindings after an inner fragment swap.
+        Object.keys(lifecycle.controllers).forEach(function (name) {
+          var controller = lifecycle.controllers[name];
+          if (controller && typeof controller.refresh === "function") {
+            try { controller.refresh(); } catch (error) { /* best effort refresh */ }
+          }
+        });
+      });
+      lifecycle.observer.observe(doc.documentElement, { childList: true, subtree: true });
+    }
+    return lifecycle;
   }
 
   // workbenchStage — resolve the [data-studio-stage] surface inside the
@@ -122,6 +216,14 @@
     return { min: min, max: max, fallback: fallback };
   }
 
+  function inlineStylePropertyPresent(element, property) {
+    if (!element || !element.style) return false;
+    for (var i = 0; i < element.style.length; i++) {
+      if (element.style.item(i) === property) return true;
+    }
+    return false;
+  }
+
   // railSidebar — resolve the [data-studio-sidebar='<side>'] element inside
   // the form. Used by currentRailWidth as a getBoundingClientRect fallback
   // when the CSS variable hasn't been set yet.
@@ -157,10 +259,17 @@
   // refreshWorkbenchCanvas — dispatch a window resize on the next rAF so
   // canvas engines recompute their layout. Used by syncViewport / syncZoom /
   // setStyleState / toggleRail / toggleFocus / toggleActivity / setMode.
-  function refreshWorkbenchCanvas() {
-    frame(function () {
-      window.dispatchEvent(new Event("resize"));
-    });
+  function refreshWorkbenchCanvas(form) {
+    if (!form || !workbenchContains(form)) return;
+    var lifecycle = workbenchLifecycle(form);
+    if (!lifecycle || lifecycle.disposed) return;
+    if (!lifecycle.canvasRefreshTask) {
+      lifecycle.canvasRefreshTask = frameTask(function () {
+        if (lifecycle.disposed || !workbenchContains(form)) return;
+        window.dispatchEvent(new Event("resize"));
+      });
+    }
+    lifecycle.canvasRefreshTask();
   }
 
   // reducedMotion — preference probe used by setMode's scrollIntoView.
@@ -213,28 +322,75 @@
   // the server-rendered default.
   function restoreWorkbenchWorkingState(form, stage) {
     var state = readWorkbenchWorkingState();
+    var disposed = false;
+    var selectionObserver = null;
+    var boundStage = null;
+    var saveScrollSoon = null;
+    var stageScrollHandler = null;
+    var restoreScroll = null;
     if (state.selection) {
       form.setAttribute("data-studio-selection", state.selection);
     }
-    if (stage && (state.scrollTop || state.scrollLeft)) {
-      frame(function () {
-        if (state.scrollTop) stage.scrollTop = state.scrollTop;
-        if (state.scrollLeft) stage.scrollLeft = state.scrollLeft;
-      });
-    }
+
     if (window.MutationObserver) {
-      new MutationObserver(function () {
+      selectionObserver = new MutationObserver(function () {
+        if (disposed || !workbenchContains(form)) return;
         var selection = form.getAttribute("data-studio-selection") || "";
-        writeWorkbenchWorkingState({ selection: selection });
-      }).observe(form, { attributes: true, attributeFilter: ["data-studio-selection"] });
-    }
-    if (stage) {
-      var saveScrollSoon = frameTask(function () {
-        writeWorkbenchWorkingState({ scrollTop: stage.scrollTop, scrollLeft: stage.scrollLeft });
+        state.selection = selection;
+        writeWorkbenchWorkingState({ selection: state.selection });
       });
-      stage.addEventListener("scroll", saveScrollSoon, { passive: true });
+      selectionObserver.observe(form, { attributes: true, attributeFilter: ["data-studio-selection"] });
     }
-    return state;
+
+    function unbindStage() {
+      if (boundStage && stageScrollHandler) {
+        boundStage.removeEventListener("scroll", stageScrollHandler, { passive: true });
+      }
+      if (saveScrollSoon && saveScrollSoon.cancel) saveScrollSoon.cancel();
+      if (restoreScroll && restoreScroll.cancel) restoreScroll.cancel();
+      boundStage = null;
+      saveScrollSoon = null;
+      stageScrollHandler = null;
+      restoreScroll = null;
+    }
+
+    function bindStage(nextStage) {
+      if (disposed || boundStage === nextStage) return;
+      unbindStage();
+      boundStage = nextStage || null;
+      if (!boundStage) return;
+      saveScrollSoon = frameTask(function () {
+        if (disposed || !workbenchContains(form) || nextStage.isConnected === false || boundStage !== nextStage || workbenchStage(form) !== nextStage) return;
+        state.scrollTop = nextStage.scrollTop;
+        state.scrollLeft = nextStage.scrollLeft;
+        writeWorkbenchWorkingState({ scrollTop: state.scrollTop, scrollLeft: state.scrollLeft });
+      });
+      stageScrollHandler = function () {
+        if (disposed || !workbenchContains(form) || nextStage.isConnected === false || boundStage !== nextStage || workbenchStage(form) !== nextStage) return;
+        saveScrollSoon();
+      };
+      boundStage.addEventListener("scroll", stageScrollHandler, { passive: true });
+      if (state.scrollTop || state.scrollLeft) {
+        restoreScroll = frameTask(function () {
+          if (disposed || !workbenchContains(form) || boundStage !== nextStage) return;
+          if (state.scrollTop) nextStage.scrollTop = state.scrollTop;
+          if (state.scrollLeft) nextStage.scrollLeft = state.scrollLeft;
+        });
+        restoreScroll();
+      }
+    }
+
+    bindStage(stage);
+    return {
+      state: state,
+      refresh: bindStage,
+      dispose: function () {
+        if (disposed) return;
+        disposed = true;
+        unbindStage();
+        if (selectionObserver) selectionObserver.disconnect();
+      }
+    };
   }
 
   // Workbench label maps — exact mirror of studio-engines.js:242-265.
@@ -368,49 +524,259 @@
   // stack pointer or keyboard listeners.
   function bindRailResizersIsland(root) {
     var form = editorWorkbench(root);
-    var stage = workbenchStage(form);
-    if (!form || !stage) return;
-    Array.prototype.forEach.call(form.querySelectorAll("[data-studio-resizer]"), function (handle) {
-      if (handle.dataset.gosxStudioResizerIslandBound === "true") return;
+    if (!form || !workbenchContains(form)) return;
+    var lifecycle = workbenchLifecycle(form);
+    var existing = lifecycle.get("railResizers");
+    if (existing) {
+      existing.refresh();
+      return;
+    }
+    var disposed = false;
+    var handleBindings = [];
+    var activeGesture = null;
+
+    function listen(target, type, handler, options) {
+      target.addEventListener(type, handler, options);
+      return function () {
+        target.removeEventListener(type, handler, options);
+      };
+    }
+
+    function removeGestureListeners(gesture) {
+      doc.removeEventListener("pointermove", gesture.move);
+      doc.removeEventListener("pointerup", gesture.finish);
+      doc.removeEventListener("pointercancel", gesture.cancel);
+      doc.removeEventListener("keydown", gesture.escape);
+      window.removeEventListener("blur", gesture.cancelWindow);
+      doc.removeEventListener("visibilitychange", gesture.cancelVisibility);
+    }
+
+    function restoreGestureWidth(gesture) {
+      if (!gesture || !gesture.form) return;
+      var property = railWidthProperty(gesture.side);
+      var inlineWidth = gesture.startInlineWidth;
+      if (inlineWidth && inlineWidth.present) {
+        gesture.form.style.setProperty(property, inlineWidth.value, inlineWidth.priority);
+      } else {
+        gesture.form.style.removeProperty(property);
+      }
+      var handle = gesture.handle;
+      if (!handle || !gesture.form.contains(handle)) {
+        handle = gesture.form.querySelector("[data-studio-resizer='" + attrValue(gesture.side) + "']");
+      }
+      if (!handle) return;
+      if (gesture.startAriaValue && gesture.startAriaValue.present) {
+        handle.setAttribute("aria-valuenow", gesture.startAriaValue.value || "");
+      } else {
+        handle.removeAttribute("aria-valuenow");
+      }
+    }
+
+    function gestureHasCurrentOwnership(gesture) {
+      if (!gesture || !gesture.form || !gesture.stage || !gesture.handle) return false;
+      if (!workbenchContains(gesture.form) || !gesture.form.contains(gesture.stage) || !gesture.form.contains(gesture.handle)) return false;
+      if (gesture.stage.isConnected === false || gesture.handle.isConnected === false) return false;
+      if (workbenchStage(gesture.form) !== gesture.stage) return false;
+      return gesture.form.querySelector("[data-studio-resizer='" + attrValue(gesture.side) + "']") === gesture.handle;
+    }
+
+    function finishGesture(gesture, committed, pointerEvent) {
+      if (!gesture || gesture.done || activeGesture !== gesture) return;
+      if (pointerEvent && pointerEvent.pointerId !== undefined && pointerEvent.pointerId !== gesture.pointerId) return;
+      gesture.done = true;
+      // Clear ownership before releasePointerCapture: a synchronous
+      // lostpointercapture callback must observe an already-finished gesture.
+      if (activeGesture === gesture) activeGesture = null;
+      if (lifecycle.activeRailGesture === gesture) lifecycle.activeRailGesture = null;
+      removeGestureListeners(gesture);
+      if (gesture.handle.classList) gesture.handle.classList.remove("is-resizing");
+      try {
+        if (gesture.handle.releasePointerCapture) gesture.handle.releasePointerCapture(gesture.pointerId);
+      } catch (error) { /* tolerate stale pointer capture during teardown */ }
+      if (committed) {
+        var width = pointerEvent && pointerEvent.clientX !== undefined
+          ? gesture.widthFor(pointerEvent)
+          : currentRailWidthIsland(gesture.form, gesture.side, gesture.handle);
+        setRailWidthIsland(gesture.form, gesture.side, width, gesture.handle, true);
+      } else {
+        // Cancellation is deliberately silent: the in-progress change is
+        // rolled back and no commit event reaches saveLayout. Recompute the
+        // live canvas after restoring the width so a refresh that already ran
+        // during the drag cannot leave the canvas laid out for stale geometry.
+        restoreGestureWidth(gesture);
+        if (!disposed && workbenchContains(gesture.form)) refreshWorkbenchCanvas(gesture.form);
+      }
+    }
+
+    function cancelGesture(gesture) {
+      finishGesture(gesture, false, null);
+    }
+
+    function dispose() {
+      if (disposed) return;
+      disposed = true;
+      if (activeGesture) cancelGesture(activeGesture);
+      for (var i = handleBindings.length - 1; i >= 0; i--) {
+        handleBindings[i].dispose();
+      }
+      handleBindings = [];
+      form.removeAttribute("data-gosx-studio-resizers-island-bound");
+    }
+
+    function bindHandle(handle, stage) {
+      for (var existingIndex = 0; existingIndex < handleBindings.length; existingIndex++) {
+        if (handleBindings[existingIndex].handle === handle) return;
+      }
+      if (handle.dataset.gosxStudioResizerIslandBound === "true") {
+        // A marker without an entry belongs to a previous controller that
+        // was interrupted before its expando cleanup. Reclaim it safely.
+        handle.removeAttribute("data-gosx-studio-resizer-island-bound");
+      }
       handle.dataset.gosxStudioResizerIslandBound = "true";
-      handle.addEventListener("pointerdown", function (event) {
-        if (event.button !== 0) return;
+      var pointerdown = function (event) {
+        if (disposed || !workbenchContains(form) || !form.contains(handle) || activeGesture || event.button !== 0) return;
+        if (!stage || workbenchStage(form) !== stage) return;
         event.preventDefault();
         var side = handle.getAttribute("data-studio-resizer");
         var rect = stage.getBoundingClientRect();
-        handle.classList.add("is-resizing");
-        if (handle.setPointerCapture) handle.setPointerCapture(event.pointerId);
+        var gesture;
         function widthFor(pointerEvent) {
           return side === "left" ? pointerEvent.clientX - rect.left : rect.right - pointerEvent.clientX;
         }
+        gesture = {
+          form: form,
+          handle: handle,
+          side: side,
+          stage: stage,
+          rect: rect,
+          pointerId: event.pointerId,
+          widthFor: widthFor,
+          startWidth: currentRailWidthIsland(form, side, handle),
+          startInlineWidth: {
+            present: inlineStylePropertyPresent(form, railWidthProperty(side)),
+            value: form.style.getPropertyValue(railWidthProperty(side)),
+            priority: form.style.getPropertyPriority(railWidthProperty(side))
+          },
+          startAriaValue: {
+            present: handle.hasAttribute("aria-valuenow"),
+            value: handle.getAttribute("aria-valuenow")
+          },
+          done: false,
+        };
+        activeGesture = gesture;
+        lifecycle.activeRailGesture = gesture;
+        handle.classList.add("is-resizing");
         function move(pointerEvent) {
+          if (disposed || gesture.done || activeGesture !== gesture || pointerEvent.pointerId !== gesture.pointerId) return;
+          if (!gestureHasCurrentOwnership(gesture)) {
+            cancelGesture(gesture);
+            return;
+          }
           setRailWidthIsland(form, side, widthFor(pointerEvent), handle, false);
         }
         function finish(pointerEvent) {
-          handle.classList.remove("is-resizing");
-          if (pointerEvent && pointerEvent.clientX !== undefined) {
-            setRailWidthIsland(form, side, widthFor(pointerEvent), handle, true);
-          } else {
-            emitWorkbenchRailWidth(form, side, currentRailWidthIsland(form, side, handle), true);
+          if (disposed) return;
+          if (!gestureHasCurrentOwnership(gesture)) {
+            cancelGesture(gesture);
+            return;
           }
-          doc.removeEventListener("pointermove", move);
-          doc.removeEventListener("pointerup", finish);
-          doc.removeEventListener("pointercancel", finish);
+          finishGesture(gesture, true, pointerEvent);
         }
+        function cancel(pointerEvent) {
+          if (disposed) return;
+          finishGesture(gesture, false, pointerEvent);
+        }
+        function escape(escapeEvent) {
+          if (disposed || gesture.done || activeGesture !== gesture || escapeEvent.key !== "Escape") return;
+          escapeEvent.preventDefault();
+          cancelGesture(gesture);
+        }
+        function cancelWindow() {
+          if (disposed || gesture.done || activeGesture !== gesture) return;
+          cancelGesture(gesture);
+        }
+        function cancelVisibility() {
+          if (disposed || gesture.done || activeGesture !== gesture || doc.visibilityState !== "hidden") return;
+          cancelGesture(gesture);
+        }
+        gesture.move = move;
+        gesture.finish = finish;
+        gesture.cancel = cancel;
+        gesture.escape = escape;
+        gesture.cancelWindow = cancelWindow;
+        gesture.cancelVisibility = cancelVisibility;
         setRailWidthIsland(form, side, widthFor(event), handle, false);
         doc.addEventListener("pointermove", move);
         doc.addEventListener("pointerup", finish);
-        doc.addEventListener("pointercancel", finish);
-      });
-      handle.addEventListener("keydown", function (event) {
+        doc.addEventListener("pointercancel", cancel);
+        doc.addEventListener("keydown", escape);
+        window.addEventListener("blur", cancelWindow);
+        doc.addEventListener("visibilitychange", cancelVisibility);
+        try {
+          if (handle.setPointerCapture) handle.setPointerCapture(event.pointerId);
+        } catch (error) {
+          // Synthetic or stale pointer IDs may not be capturable. Document
+          // lifecycle listeners remain authoritative for the active gesture.
+        }
+      };
+      var removePointerDown = listen(handle, "pointerdown", pointerdown);
+      var keydown = function (event) {
+        if (disposed || !workbenchContains(form) || !form.contains(handle)) return;
+        if (event.key === "Escape") {
+          if (activeGesture && activeGesture.handle === handle) {
+            event.preventDefault();
+            cancelGesture(activeGesture);
+          }
+          return;
+        }
         if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
         event.preventDefault();
         var side = handle.getAttribute("data-studio-resizer");
         var step = event.shiftKey ? 48 : 24;
         var delta = event.key === "ArrowRight" ? step : -step;
         setRailWidthIsland(form, side, currentRailWidthIsland(form, side, handle) + (side === "left" ? delta : -delta), handle, true);
+      };
+      var removeKeydown = listen(handle, "keydown", keydown);
+      var lostPointerCapture = function (event) {
+        if (!activeGesture || activeGesture.handle !== handle) return;
+        if (event.pointerId !== undefined && event.pointerId !== activeGesture.pointerId) return;
+        cancelGesture(activeGesture);
+      };
+      var removeLostPointerCapture = listen(handle, "lostpointercapture", lostPointerCapture);
+      var binding = {
+        handle: handle,
+        stage: stage,
+        dispose: function () {
+          if (activeGesture && activeGesture.handle === handle) cancelGesture(activeGesture);
+          removePointerDown();
+          removeKeydown();
+          removeLostPointerCapture();
+          handle.removeAttribute("data-gosx-studio-resizer-island-bound");
+        }
+      };
+      handleBindings.push(binding);
+    }
+
+    function refresh() {
+      if (disposed || !workbenchContains(form)) return;
+      var stage = workbenchStage(form);
+      for (var i = handleBindings.length - 1; i >= 0; i--) {
+        var binding = handleBindings[i];
+        if (!form.contains(binding.handle) || !workbenchContains(binding.handle) || binding.stage !== stage) {
+          binding.dispose();
+          handleBindings.splice(i, 1);
+        }
+      }
+      if (!stage) return;
+      Array.prototype.forEach.call(form.querySelectorAll("[data-studio-resizer]"), function (handle) {
+        bindHandle(handle, stage);
       });
-    });
+    }
+
+    var controller = { dispose: dispose, refresh: refresh };
+    if (!lifecycle.register("railResizers", controller)) return;
+    form.dataset.gosxStudioResizersIslandBound = "true";
+    refresh();
   }
 
   window.__gosx_workbench_runtime_island_bindRailResizers = bindRailResizersIsland;
@@ -466,15 +832,52 @@
   // rail-width-change/commit events, applies the persisted layout, and
   // seeds the workbench mode / viewport / zoom on initial bind.
   //
-  // Idempotency: per-form
-  // [data-gosx-studio-workbench-chrome-island-bound] so repeated host
-  // calls do not stack delegated click or layout listeners.
+  // Idempotency: one chrome controller per form; its child command-palette
+  // binding is reconciled independently after inner fragment replacement so
+  // repeated host calls do not stack delegated click or layout listeners.
   function bindChromeIsland(root) {
     var form = editorWorkbench(root);
-    if (!form || form.dataset.gosxStudioWorkbenchChromeIslandBound === "true") return;
+    if (!form || !workbenchContains(form)) return;
+    var lifecycle = workbenchLifecycle(form);
+    var existing = lifecycle.get("chrome");
+    if (existing) {
+      existing.refresh();
+      return;
+    }
+    var disposed = false;
+    var cleanupFns = [];
+    var saveLayoutSoon = null;
+    var workingStateBinding = null;
+    var commandPaletteBinding = null;
+    function listen(target, type, handler, options) {
+      target.addEventListener(type, handler, options);
+      cleanupFns.push(function () {
+        target.removeEventListener(type, handler, options);
+      });
+    }
+    function refresh() {
+      if (disposed || !workbenchContains(form)) return;
+      if (workingStateBinding) workingStateBinding.refresh(workbenchStage(form));
+      if (commandPaletteBinding) commandPaletteBinding.refresh();
+    }
+    function dispose() {
+      if (disposed) return;
+      disposed = true;
+      if (saveLayoutSoon && saveLayoutSoon.cancel) saveLayoutSoon.cancel();
+      if (commandPaletteBinding) commandPaletteBinding.dispose();
+      if (workingStateBinding) workingStateBinding.dispose();
+      for (var i = cleanupFns.length - 1; i >= 0; i--) cleanupFns[i]();
+      cleanupFns = [];
+      form.removeAttribute("data-gosx-studio-workbench-chrome-island-bound");
+    }
+    if (!lifecycle.register("chrome", { dispose: dispose, refresh: refresh })) return;
     form.dataset.gosxStudioWorkbenchChromeIslandBound = "true";
-    var saveLayoutSoon = frameTask(saveLayoutIsland);
-    form.addEventListener("click", function (event) {
+    saveLayoutSoon = frameTask(function (targetForm) {
+      if (disposed || !workbenchContains(targetForm)) return;
+      saveLayoutIsland(targetForm);
+    });
+    listen(form, "click", function (event) {
+      if (disposed || !workbenchContains(form)) return;
       var mode = event.target.closest("[data-studio-mode-control]");
       if (mode && form.contains(mode)) {
         event.preventDefault();
@@ -517,21 +920,27 @@
         toggleActivityIsland(form);
       }
     });
-    doc.addEventListener("gosxstudio:rail-width-change", function (event) {
-      if (!doc.contains(form)) return;
+    listen(doc, "gosxstudio:rail-width-change", function (event) {
+      if (disposed || !workbenchContains(form)) return;
       if (event.detail && event.detail.form && event.detail.form !== form) return;
-      saveLayoutSoon(form);
-      refreshWorkbenchCanvas();
+      // A pointer gesture owns its active-side width until it commits. The
+      // live change still refreshes the canvas, but serializing it would make
+      // a later cancel durable. Independent layout saves use the captured
+      // pre-drag width in saveLayoutIsland instead.
+      var activeGesture = activeRailGestureFor(form);
+      if (!activeGesture || !event.detail || event.detail.side !== activeGesture.side) saveLayoutSoon(form);
+      refreshWorkbenchCanvas(form);
     });
-    doc.addEventListener("gosxstudio:rail-width-commit", function (event) {
-      if (!doc.contains(form)) return;
+    listen(doc, "gosxstudio:rail-width-commit", function (event) {
+      if (disposed || !workbenchContains(form)) return;
       if (event.detail && event.detail.form && event.detail.form !== form) return;
       saveLayoutIsland(form);
-      refreshWorkbenchCanvas();
+      refreshWorkbenchCanvas(form);
     });
     applyWorkbenchLayout(form);
     var stage = workbenchStage(form);
-    var workingState = restoreWorkbenchWorkingState(form, stage);
+    workingStateBinding = restoreWorkbenchWorkingState(form, stage);
+    var workingState = workingStateBinding.state;
     setModeIsland(form, workingState.mode || form.getAttribute("data-studio-mode") || "home", false);
     if (!form.hasAttribute("data-studio-left")) form.setAttribute("data-studio-left", "open");
     if (!form.hasAttribute("data-studio-right")) form.setAttribute("data-studio-right", "open");
@@ -539,7 +948,8 @@
     if (!form.hasAttribute("data-studio-activity-state")) form.setAttribute("data-studio-activity-state", "open");
     syncWorkbenchRailButtons(form);
     syncWorkbenchActivityButtons(form);
-    bindCommandPaletteIsland(form);
+    commandPaletteBinding = bindCommandPaletteIsland(form);
+    commandPaletteBinding.refresh();
     syncViewportIsland(form, "desktop");
     var canvas = form.querySelector("[data-studio-canvas]");
     syncZoomIsland(form, canvas ? canvas.getAttribute("data-studio-canvas-zoom") || "fit" : "fit");
@@ -611,7 +1021,7 @@
       node.textContent = workbenchViewportLabels[viewport] || viewport.charAt(0).toUpperCase() + viewport.slice(1);
     });
     emitWorkbenchChange("viewport-change", form, { viewport: viewport });
-    refreshWorkbenchCanvas();
+    refreshWorkbenchCanvas(form);
   }
 
   window.__gosx_workbench_runtime_island_syncViewport = syncViewportIsland;
@@ -676,7 +1086,7 @@
       scope.setAttribute("data-style-valid", form.getAttribute("data-studio-style-valid") !== "false" ? "true" : "false");
     });
     emitWorkbenchChange("style-state-change", form, { state: state });
-    refreshWorkbenchCanvas();
+    refreshWorkbenchCanvas(form);
   }
 
   window.__gosx_workbench_runtime_island_setStyleState = setStyleStateIsland;
@@ -697,7 +1107,7 @@
       button.setAttribute("aria-pressed", button.getAttribute("data-studio-zoom") === zoom ? "true" : "false");
     });
     emitWorkbenchChange("zoom-change", form, { zoom: zoom });
-    refreshWorkbenchCanvas();
+    refreshWorkbenchCanvas(form);
   }
 
   window.__gosx_workbench_runtime_island_syncZoom = syncZoomIsland;
@@ -729,7 +1139,7 @@
     form.setAttribute("data-studio-" + side, workbenchRailState(form, side) === "open" ? "collapsed" : "open");
     syncWorkbenchRailButtons(form);
     emitWorkbenchChange("rail-change", form, { side: side, state: workbenchRailState(form, side) });
-    refreshWorkbenchCanvas();
+    refreshWorkbenchCanvas(form);
   }
 
   window.__gosx_workbench_runtime_island_toggleRail = toggleRailIsland;
@@ -744,7 +1154,7 @@
     form.setAttribute("data-studio-focus", form.getAttribute("data-studio-focus") === "true" ? "false" : "true");
     syncWorkbenchRailButtons(form);
     emitWorkbenchChange("focus-change", form, { focus: form.getAttribute("data-studio-focus") === "true" });
-    refreshWorkbenchCanvas();
+    refreshWorkbenchCanvas(form);
   }
 
   window.__gosx_workbench_runtime_island_toggleFocus = toggleFocusIsland;
@@ -761,7 +1171,7 @@
     syncWorkbenchActivityButtons(form);
     saveLayoutIsland(form);
     emitWorkbenchChange("activity-change", form, { state: workbenchActivityState(form) });
-    refreshWorkbenchCanvas();
+    refreshWorkbenchCanvas(form);
   }
 
   // toggleActivity(form) — mirrors toggleWorkbenchActivity at
@@ -784,9 +1194,16 @@
   function saveLayoutIsland(form) {
     if (!form) return;
     try {
+      var leftWidth = form.style.getPropertyValue("--studio-left-width");
+      var rightWidth = form.style.getPropertyValue("--studio-right-width");
+      var activeGesture = activeRailGestureFor(form);
+      if (activeGesture) {
+        if (activeGesture.side === "left") leftWidth = activeGesture.startInlineWidth.value;
+        else if (activeGesture.side === "right") rightWidth = activeGesture.startInlineWidth.value;
+      }
       window.localStorage.setItem(workbenchLayoutStorageKey, JSON.stringify({
-        left: form.style.getPropertyValue("--studio-left-width"),
-        right: form.style.getPropertyValue("--studio-right-width"),
+        left: leftWidth,
+        right: rightWidth,
         activity: form.getAttribute("data-studio-activity-state")
       }));
     } catch (error) {
@@ -803,21 +1220,50 @@
   // toggleFocus). Used internally by bindChromeIsland; not exposed as a
   // public island global because the legacy contract didn't expose it.
   function bindCommandPaletteIsland(form) {
-    var node = form.querySelector("[data-studio-command-palette]");
-    if (!node || node.dataset.gosxStudioWorkbenchCommandsIslandBound === "true") return;
-    node.dataset.gosxStudioWorkbenchCommandsIslandBound = "true";
-    node.addEventListener("gosxstudio:command", function (event) {
-      var detail = event.detail || {};
-      var kind = detail.kind || "";
-      var target = detail.target || "";
-      if (kind === "mode") setModeIsland(form, target, true);
-      else if (kind === "viewport") activateViewportIsland(form, target);
-      else if (kind === "zoom") activateZoomIsland(form, target);
-      else if (kind === "toggle") {
-        if (target === "left" || target === "right") toggleRailIsland(form, target);
-        else if (target === "activity") toggleActivityIsland(form);
-        else if (target === "focus") toggleFocusIsland(form);
+    var disposed = false;
+    var node = null;
+    var handler = null;
+
+    function clear() {
+      if (node && handler) node.removeEventListener("gosxstudio:command", handler);
+      if (node) node.removeAttribute("data-gosx-studio-workbench-commands-island-bound");
+      node = null;
+      handler = null;
+    }
+
+    function refresh() {
+      if (disposed || !workbenchContains(form)) return;
+      var next = form.querySelector("[data-studio-command-palette]");
+      if (next === node && handler) return;
+      clear();
+      if (!next) return;
+      node = next;
+      node.dataset.gosxStudioWorkbenchCommandsIslandBound = "true";
+      handler = function (event) {
+        if (disposed || !workbenchContains(form) || !node || event.currentTarget !== node ||
+          node.isConnected === false || form.querySelector("[data-studio-command-palette]") !== node) return;
+        var detail = event.detail || {};
+        var kind = detail.kind || "";
+        var target = detail.target || "";
+        if (kind === "mode") setModeIsland(form, target, true);
+        else if (kind === "viewport") activateViewportIsland(form, target);
+        else if (kind === "zoom") activateZoomIsland(form, target);
+        else if (kind === "toggle") {
+          if (target === "left" || target === "right") toggleRailIsland(form, target);
+          else if (target === "activity") toggleActivityIsland(form);
+          else if (target === "focus") toggleFocusIsland(form);
+        }
+      };
+      node.addEventListener("gosxstudio:command", handler);
+    }
+
+    return {
+      refresh: refresh,
+      dispose: function () {
+        if (disposed) return;
+        disposed = true;
+        clear();
       }
-    });
+    };
   }
 })();
