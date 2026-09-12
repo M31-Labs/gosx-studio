@@ -46,6 +46,7 @@
     var kind = el.getAttribute("data-block") || "paragraph";
     var textNode = el.querySelector("[data-text]");
     var payload = { kind: kind, text: textNode ? serializeText(textNode) : "" };
+    if (el.getAttribute("data-phone") === "hide") payload.phone = "hide";
     if (kind === "section") {
       var style = el.querySelector("[data-section-style]");
       payload.style = style ? style.value : "plain";
@@ -323,6 +324,7 @@
     wrapper.setAttribute("tabindex", "0");
 
     wrapper.appendChild(makeTools());
+    wrapper.appendChild(makeBadge());
     if (kind === "heading") wrapper.appendChild(makeLevels("2"));
     wrapper.appendChild(makeInner(kind));
     wrapper.appendChild(makeInsertPoint());
@@ -337,8 +339,17 @@
     tools.appendChild(toolBtn("up", "↑", "Move up"));
     tools.appendChild(toolBtn("down", "↓", "Move down"));
     tools.appendChild(toolBtn("duplicate", "⧉", "Make a copy"));
+    tools.appendChild(toolBtn("phone", "📱", "Hide on phones"));
     tools.appendChild(toolBtn("delete", "✕", "Delete"));
     return tools;
+  }
+
+  function makeBadge() {
+    var badge = document.createElement("span");
+    badge.className = "ed-block__badge";
+    badge.setAttribute("contenteditable", "false");
+    badge.textContent = "Hidden on phones";
+    return badge;
   }
 
   function toolBtn(action, glyph, label) {
@@ -863,6 +874,13 @@
       var copy = blockEl.cloneNode(true);
       blockEl.parentNode.insertBefore(copy, blockEl.nextSibling);
       focusText(copy);
+    } else if (action === "phone") {
+      var hidden = blockEl.getAttribute("data-phone") === "hide";
+      if (hidden) blockEl.removeAttribute("data-phone"); else blockEl.setAttribute("data-phone", "hide");
+      tool.setAttribute("aria-pressed", hidden ? "false" : "true");
+      tool.title = hidden ? "Hide on phones" : "Show on phones again";
+      tool.setAttribute("aria-label", tool.title);
+      status("dirty", hidden ? "Shown on phones again" : "Hidden on phones. Visitors on a computer still see it.");
     }
     reindex();
     queueSave();
@@ -1269,6 +1287,19 @@
   root.addEventListener("pointerup", function () { endDrag(true); });
   root.addEventListener("pointercancel", function () { endDrag(false); });
   window.addEventListener("blur", function () { endDrag(false); });
+
+  /* ---------- phone / desktop preview ---------- */
+
+  var frameEl = root.querySelector("[data-frame]");
+  Array.prototype.forEach.call(root.querySelectorAll("[data-device]"), function (button) {
+    button.addEventListener("click", function () {
+      var phone = button.getAttribute("data-device") === "phone";
+      if (frameEl) frameEl.classList.toggle("ed-frame--phone", phone);
+      Array.prototype.forEach.call(root.querySelectorAll("[data-device]"), function (other) {
+        other.setAttribute("aria-pressed", other === button ? "true" : "false");
+      });
+    });
+  });
 
   if (publishBtn) {
     publishBtn.addEventListener("click", function () {

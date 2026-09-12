@@ -82,7 +82,14 @@ a { color: var(--site-accent); }
 .site-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .site-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 0 0 16px; max-width: none; }
 .site-columns__col { min-width: 0; }
-@media (max-width: 640px) { .site-columns { grid-template-columns: 1fr; } }
+/* The site is its own container, so phone rules follow the width of the
+   site — the real viewport for visitors, the frame inside the editor. */
+.gosx-site--public { container-type: inline-size; container-name: site; }
+.site-no-phone { display: contents; }
+@container site (max-width: 640px) {
+  .site-columns { grid-template-columns: 1fr; }
+  .site-no-phone { display: none; }
+}
 .site-post-meta { color: var(--site-muted); font-size: 14px; margin: -8px 0 24px; }
 .site-post-meta a { color: inherit; }
 .site-posts { list-style: none; margin: 0; padding: 0; }
@@ -407,7 +414,17 @@ a { color: var(--site-accent); }
 .ed-frame {
   max-width: 940px; margin: 0 auto; background: var(--site-ground);
   border: 1px solid var(--site-rule); box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  transition: max-width .2s ease;
 }
+.ed-frame--phone { max-width: 412px; border: 10px solid #1f2933; border-radius: 26px; box-shadow: 0 8px 30px rgba(0,0,0,.18); overflow: hidden; }
+.ed-device { display: inline-flex; border: 1px solid var(--site-rule); border-radius: 2px; overflow: hidden; }
+.ed-device__btn { font: inherit; font-size: 13px; padding: 7px 11px; background: var(--site-ground); color: var(--site-muted); border: 0; cursor: pointer; }
+.ed-device__btn + .ed-device__btn { border-left: 1px solid var(--site-rule); }
+.ed-device__btn[aria-pressed="true"] { background: var(--site-ink); color: var(--site-ground); }
+.ed-block__badge { display: none; position: absolute; left: 0; top: -9px; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; background: var(--site-ink); color: var(--site-ground); border-radius: 2px; pointer-events: none; }
+.ed-block[data-phone="hide"] .ed-block__badge { display: inline-block; }
+.ed-frame--phone .ed-block[data-phone="hide"] { opacity: .35; outline: 1px dashed var(--site-muted); }
+.ed-tool[aria-pressed="true"] { background: var(--site-ink); color: var(--site-ground); }
 /* The canvas paints its own ground and ink from the site's theme, so a dark
    palette previews as dark instead of borrowing the editor frame's white. */
 .ed-canvas { background: var(--site-ground); color: var(--site-ink); font-family: var(--site-font-body); }

@@ -153,6 +153,10 @@ func (h *Host) renderEditorToolbar(subject editorSubject) gosx.Node {
 				gosx.Attr("data-redo", "true"),
 				gosx.Attr("title", "Redo (Ctrl+Y)"),
 			), gosx.Text("Redo")),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-device"), gosx.Attr("role", "group"), gosx.Attr("aria-label", "Preview as")),
+				gosx.El("button", gosx.Attrs(gosx.Attr("class", "ed-device__btn"), gosx.Attr("type", "button"), gosx.Attr("data-device", "desktop"), gosx.Attr("aria-pressed", "true"), gosx.Attr("title", "See it on a computer")), gosx.Text("Desktop")),
+				gosx.El("button", gosx.Attrs(gosx.Attr("class", "ed-device__btn"), gosx.Attr("type", "button"), gosx.Attr("data-device", "phone"), gosx.Attr("aria-pressed", "false"), gosx.Attr("title", "See it on a phone")), gosx.Text("Phone")),
+			),
 			gosx.El("a", gosx.Attrs(
 				gosx.Attr("class", "ed-btn ed-btn--ghost"),
 				gosx.Attr("href", historyHref(subject.Kind, subject.ID)),
@@ -408,19 +412,33 @@ func (h *Host) renderEditableBlock(index int, instance blockstudio.BlockInstance
 	kind := editorKind(instance.Key)
 	inner := h.renderBlockInner(kind, instance)
 
-	return gosx.El("div", gosx.Attrs(
+	hiddenOnPhone := instance.Values[phoneKey].String == phoneHide
+	attrs := []any{
 		gosx.Attr("class", "ed-block"),
 		gosx.Attr("data-block", kind),
 		gosx.Attr("data-index", itoa(index)),
 		gosx.Attr("tabindex", "0"),
-	),
+	}
+	if hiddenOnPhone {
+		attrs = append(attrs, gosx.Attr("data-phone", phoneHide))
+	}
+	phoneTool := toolButton("phone", "📱", "Hide on phones")
+	if hiddenOnPhone {
+		phoneTool = gosx.El("button", gosx.Attrs(
+			gosx.Attr("class", "ed-tool"), gosx.Attr("type", "button"), gosx.Attr("data-tool", "phone"),
+			gosx.Attr("title", "Show on phones again"), gosx.Attr("aria-label", "Show on phones again"), gosx.Attr("aria-pressed", "true"),
+		), gosx.Text("📱"))
+	}
+	return gosx.El("div", gosx.Attrs(attrs...),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-block__tools"), gosx.Attr("contenteditable", "false")),
 			toolButton("grab", "⠿", "Drag to move"),
 			toolButton("up", "↑", "Move up"),
 			toolButton("down", "↓", "Move down"),
 			toolButton("duplicate", "⧉", "Make a copy"),
+			phoneTool,
 			toolButton("delete", "✕", "Delete"),
 		),
+		gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-block__badge"), gosx.Attr("contenteditable", "false")), gosx.Text("Hidden on phones")),
 		levelPicker(kind, instance),
 		inner,
 		gosx.El("button", gosx.Attrs(
@@ -683,6 +701,7 @@ type editorBlockPayload struct {
 	Alt    string               `json:"alt,omitempty"`
 	Style  string               `json:"style,omitempty"`
 	Form   string               `json:"form,omitempty"`
+	Phone  string               `json:"phone,omitempty"`
 	Images []editorImagePayload `json:"images,omitempty"`
 }
 
@@ -799,6 +818,7 @@ func (h *Host) payloadDocument(blocks []editorBlockPayload) blockstudio.Document
 	for _, incoming := range blocks {
 		kind := strings.TrimSpace(incoming.Kind)
 		value := strings.TrimSpace(incoming.Text)
+		before := len(instances)
 		switch kind {
 		case "heading":
 			if value == "" {
@@ -865,6 +885,9 @@ func (h *Host) payloadDocument(blocks []editorBlockPayload) blockstudio.Document
 				continue
 			}
 			instances = append(instances, block(order, content.BlockParagraph, values("text", value)))
+		}
+		if len(instances) > before && strings.TrimSpace(incoming.Phone) == phoneHide {
+			instances[len(instances)-1].Values[phoneKey] = text(phoneHide)
 		}
 		order++
 	}

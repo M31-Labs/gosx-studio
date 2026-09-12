@@ -32,6 +32,13 @@ const (
 
 const gallerySizes = "(max-width: 720px) 50vw, 360px"
 
+// A block can be kept off small screens: a wide table of prices, a video
+// that would swamp a phone. The value lives on the block itself.
+const (
+	phoneKey  = "phone"
+	phoneHide = "hide"
+)
+
 var (
 	youtubeID = regexp.MustCompile(`^[A-Za-z0-9_-]{6,20}$`)
 	vimeoID   = regexp.MustCompile(`^[0-9]{5,15}$`)
@@ -140,6 +147,9 @@ func (h *Host) renderBody(doc blockstudio.Document, hooks render.Hooks) gosx.Nod
 			continue
 		}
 		if node, ok := h.renderBlock(instance, hooks); ok {
+			if instance.Values[phoneKey].String == phoneHide {
+				node = gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-no-phone")), node)
+			}
 			current.blocks = append(current.blocks, node)
 		}
 	}

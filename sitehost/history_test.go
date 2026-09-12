@@ -119,3 +119,29 @@ func TestReadinessChecksBeforePublish(t *testing.T) {
 	mustContain(t, body, `"checks":[]`, "a clean page has nothing to fix")
 	mustContain(t, postJSON(t, handler, "/admin/api/pages/"+id, `{"title":"Menu","slug":"menu","description":"Our menu.","blocks":[]}`).Body.String(), "The page is empty", "an empty page is flagged")
 }
+
+func TestBlocksCanBeHiddenOnPhones(t *testing.T) {
+	host, handler := newTestHost(t)
+	id := firstPageID(t, host, "menu")
+	postJSON(t, handler, "/admin/api/pages/"+id, `{"title":"Menu","slug":"menu","description":"x","blocks":[
+		{"kind":"paragraph","text":"Everyone sees this"},
+		{"kind":"paragraph","text":"Only on big screens","phone":"hide"}
+	]}`)
+	page, _, _ := host.Store().PageByID(id)
+	if page.Body.Blocks[1].Values[phoneKey].String != phoneHide || page.Body.Blocks[0].Values[phoneKey].String != "" {
+		t.Fatalf("phone flag stored wrong: %+v", page.Body.Blocks)
+	}
+	editor := get(t, handler, "/admin/edit/"+id).Body.String()
+	mustContain(t, editor, `data-phone="hide"`, "the canvas marks the block")
+	mustContain(t, editor, `data-tool="phone" title="Show on phones again" aria-label="Show on phones again" aria-pressed="true"`, "its tool reads as pressed")
+	mustContain(t, editor, `data-device="phone"`, "the toolbar has a phone preview")
+	post(t, handler, "/admin/api/pages/"+id+"/publish", url.Values{})
+	live := get(t, handler, "/menu").Body.String()
+	mustContain(t, live, `<div class="site-no-phone"><p>Only on big screens</p></div>`, "the hidden block is wrapped for visitors")
+	if strings.Contains(live, `<div class="site-no-phone"><p>Everyone`) {
+		t.Fatal("a normal block must not be wrapped")
+	}
+	css := get(t, handler, publicStylesheetPath).Body.String()
+	mustContain(t, css, "@container site (max-width: 640px)", "phone rules follow the site's own width")
+	mustContain(t, css, ".site-no-phone { display: none; }", "and hide the block there")
+}
