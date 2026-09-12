@@ -733,7 +733,7 @@ func (h *Host) renderPeople(w http.ResponseWriter, r *http.Request, status admin
 		if role == roleEditor {
 			attrs = append(attrs, gosx.Attr("checked", "checked"))
 		}
-		roleOptions = append(roleOptions, gosx.El("label", gosx.Attrs(gosx.Attr("class", "admin-check")),
+		roleOptions = append(roleOptions, gosx.El("label", gosx.Attrs(gosx.Attr("class", "admin-radio")),
 			gosx.El("input", gosx.Attrs(attrs...)),
 			gosx.Text(" "+User{Role: role}.roleLabel())))
 	}
@@ -742,7 +742,7 @@ func (h *Host) renderPeople(w http.ResponseWriter, r *http.Request, status admin
 		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", peoplePath)),
 			h.csrfField(), hidden("action", "invite"),
 			adminTextField("email", "Their email", "", "They'll set their own password. Inviting an existing address gives that person a fresh way in if they forgot theirs."),
-			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-field")), gosx.Fragment(roleOptions...)),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-field admin-radios")), gosx.El("span", gosx.Attrs(gosx.Attr("class", "admin-radios__label")), gosx.Text("As")), gosx.Fragment(roleOptions...)),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-actions")),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("type", "submit")), gosx.Text("Create invite link"))),
 		),
