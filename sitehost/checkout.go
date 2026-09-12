@@ -535,7 +535,8 @@ func (h *Host) handleCheckout(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	session, err := createStripeSession(ctx, pay.SecretKey, params)
 	if err != nil {
-		created.Status = "cancelled"
+		// Nobody paid and nobody will: the pending order expires with the
+		// abandoned ones rather than showing up as a cancelled sale.
 		created.Note = "Stripe refused the checkout: " + err.Error()
 		_ = h.orders.update(created)
 		http.Redirect(w, r, cartPath+"?checkout=failed", http.StatusSeeOther)

@@ -202,9 +202,10 @@ func TestFreeShippingOverThresholdAndStripeFailure(t *testing.T) {
 	rec := postWithCookie(t, handler, checkoutPath, url.Values{}, nine)
 	mustContain(t, rec.Header().Get("Location"), "checkout=failed", "a Stripe failure sends the visitor back with a note")
 	mustContain(t, getWithCookie(t, handler, rec.Header().Get("Location"), nine).Body.String(), "couldn", "which the cart page shows")
-	for _, order := range host.orders.list() {
-		if order.Status == "pending" && strings.Contains(order.Note, "") && order.Lines[0].Qty == 9 {
-			t.Fatal("a failed checkout must not leave a pending order")
-		}
+	if strings.Contains(get(t, handler, "/admin/orders").Body.String(), "#100") {
+		t.Fatal("a failed checkout must not show up as an order")
+	}
+	if len(host.orders.list()) == 0 {
+		t.Fatal("the attempt is kept, unlisted, until it expires")
 	}
 }
