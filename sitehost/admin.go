@@ -1,8 +1,8 @@
 package sitehost
 
 import (
+	"errors"
 	"net/http"
-	"sort"
 	"strings"
 
 	"m31labs.dev/gosx"
@@ -35,6 +35,7 @@ func (h *Host) mountAdmin(mux *http.ServeMux) {
 	mux.HandleFunc("GET /admin/pages/{id}", h.handleAdminPageDetail)
 	mux.HandleFunc("POST /admin/pages/{id}", h.handleAdminSavePage)
 	mux.HandleFunc("POST /admin/pages/{id}/publish", h.handleAdminPublishPage)
+	mux.HandleFunc("POST /admin/pages/{id}/action", h.handleAdminPageAction)
 	mux.HandleFunc("GET /admin/settings", h.handleAdminSettings)
 	mux.HandleFunc("GET /admin/settings/{$}", h.handleAdminSettings)
 	mux.HandleFunc("POST /admin/settings", h.handleAdminSaveSettings)
@@ -151,10 +152,7 @@ func (h *Host) sortedPages() []cmsstore.Page {
 	if err != nil {
 		return nil
 	}
-	sort.SliceStable(pages, func(i, j int) bool {
-		return pages[i].Slug == homeSlug && pages[j].Slug != homeSlug
-	})
-	return pages
+	return h.orderPages(pages)
 }
 
 func (h *Host) handleAdminPages(w http.ResponseWriter, r *http.Request) {
@@ -163,37 +161,60 @@ func (h *Host) handleAdminPages(w http.ResponseWriter, r *http.Request) {
 
 func (h *Host) renderAdminPages(w http.ResponseWriter, r *http.Request, status adminStatus) {
 	pages := h.sortedPages()
+	active := make([]cmsstore.Page, 0, len(pages))
+	archived := make([]cmsstore.Page, 0, 2)
+	for _, page := range pages {
+		if PageArchived(page) {
+			archived = append(archived, page)
+		} else {
+			active = append(active, page)
+		}
+	}
 
 	var listing gosx.Node
-	if len(pages) == 0 {
+	if len(active) == 0 {
 		// The empty state Studio's generic index renderer never ships.
 		listing = gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-empty")),
 			gosx.El("h2", nil, gosx.Text("No pages yet")),
 			gosx.El("p", nil, gosx.Text("Pages are what visitors read on your website — a home page, an about page, a contact page. Create your first one below.")),
 		)
 	} else {
-		rows := make([]gosx.Node, 0, len(pages))
-		for _, page := range pages {
-			state, stateLabel := "draft", "Not published"
-			if page.State.Publish == cmsstore.PublishStatePublished {
-				state, stateLabel = "published", "Live"
-			}
-			rows = append(rows, gosx.El("tr", nil,
-				gosx.El("td", nil, gosx.El("a", gosx.Attrs(gosx.Attr("href", "/admin/edit/"+page.ID)), gosx.Text(page.Title))),
-				gosx.El("td", nil, gosx.Text(publicPath(page.Slug))),
-				gosx.El("td", nil, gosx.El("span", gosx.Attrs(gosx.Attr("class", "admin-badge"), gosx.Attr("data-state", state)), gosx.Text(stateLabel))),
-			))
+		rows := make([]gosx.Node, 0, len(active))
+		for index, page := range active {
+			rows = append(rows, h.renderPageRow(page, index == 0, index == len(active)-1))
 		}
 		listing = gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
 			gosx.El("h2", nil, gosx.Text("Your pages")),
-			gosx.El("table", gosx.Attrs(gosx.Attr("class", "admin-table")),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-hint")),
+				gosx.Text("The order here is the order of your site menu. Your home page always comes first.")),
+			gosx.El("table", gosx.Attrs(gosx.Attr("class", "admin-table admin-table--pages")),
 				gosx.El("thead", nil, gosx.El("tr", nil,
 					gosx.El("th", nil, gosx.Text("Page")),
 					gosx.El("th", nil, gosx.Text("Address")),
 					gosx.El("th", nil, gosx.Text("Status")),
+					gosx.El("th", nil, gosx.Text("")),
 				)),
 				gosx.El("tbody", nil, gosx.Fragment(rows...)),
 			),
+		)
+	}
+
+	var archivedPanel gosx.Node = gosx.Fragment()
+	if len(archived) > 0 {
+		rows := make([]gosx.Node, 0, len(archived))
+		for _, page := range archived {
+			rows = append(rows, gosx.El("tr", nil,
+				gosx.El("td", nil, gosx.Text(page.Title)),
+				gosx.El("td", nil, gosx.Text(publicPath(page.Slug))),
+				gosx.El("td", nil, gosx.El("span", gosx.Attrs(gosx.Attr("class", "admin-badge"), gosx.Attr("data-state", "archived")), gosx.Text("Archived"))),
+				gosx.El("td", gosx.Attrs(gosx.Attr("class", "admin-row-actions")), pageActionButton(page.ID, "restore", "Restore")),
+			))
+		}
+		archivedPanel = gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
+			gosx.El("h2", nil, gosx.Text("Archived")),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-hint")), gosx.Text("Not on your site and not in the menu, but nothing is deleted.")),
+			gosx.El("table", gosx.Attrs(gosx.Attr("class", "admin-table admin-table--pages")),
+				gosx.El("tbody", nil, gosx.Fragment(rows...))),
 		)
 	}
 
@@ -210,7 +231,7 @@ func (h *Host) renderAdminPages(w http.ResponseWriter, r *http.Request, status a
 
 	body := h.renderAdminShell("pages", "Pages",
 		"Create, edit, and publish the pages on your website.",
-		status, listing, create)
+		status, listing, create, archivedPanel)
 	h.writeDocument(w, http.StatusOK, h.adminMeta("Pages"), body)
 }
 
@@ -500,4 +521,79 @@ func (h *Host) homeEditHref() string {
 		return "/admin/edit/" + page.ID
 	}
 	return "/admin/pages"
+}
+
+
+// renderPageRow is one page in the admin list with its management actions.
+func (h *Host) renderPageRow(page cmsstore.Page, first, last bool) gosx.Node {
+	state, stateLabel := "draft", "Not published"
+	switch {
+	case PageOffline(page):
+		state, stateLabel = "offline", "Offline"
+	case h.isLive(page):
+		state, stateLabel = "published", "Live"
+	}
+	isHome := page.Slug == homeSlug
+
+	actions := []gosx.Node{}
+	if !isHome {
+		if !first {
+			actions = append(actions, pageActionButton(page.ID, "up", "↑"))
+		}
+		if !last {
+			actions = append(actions, pageActionButton(page.ID, "down", "↓"))
+		}
+		if PageNavHidden(page) {
+			actions = append(actions, pageActionButton(page.ID, "show", "Show in menu"))
+		} else {
+			actions = append(actions, pageActionButton(page.ID, "hide", "Hide from menu"))
+		}
+		if PageOffline(page) {
+			actions = append(actions, pageActionButton(page.ID, "online", "Put back online"))
+		} else if h.isLive(page) {
+			actions = append(actions, pageActionButton(page.ID, "offline", "Take offline"))
+		}
+		actions = append(actions, pageActionButton(page.ID, "archive", "Archive"))
+	}
+
+	name := gosx.El("a", gosx.Attrs(gosx.Attr("href", "/admin/edit/"+page.ID)), gosx.Text(page.Title))
+	if PageNavHidden(page) {
+		name = gosx.Fragment(name, gosx.Text(" "), gosx.El("span", gosx.Attrs(gosx.Attr("class", "admin-badge")), gosx.Text("not in menu")))
+	}
+	return gosx.El("tr", nil,
+		gosx.El("td", nil, name),
+		gosx.El("td", nil, gosx.Text(publicPath(page.Slug))),
+		gosx.El("td", nil, gosx.El("span", gosx.Attrs(gosx.Attr("class", "admin-badge"), gosx.Attr("data-state", state)), gosx.Text(stateLabel))),
+		gosx.El("td", gosx.Attrs(gosx.Attr("class", "admin-row-actions")), gosx.Fragment(actions...)),
+	)
+}
+
+// isLive reports whether visitors can currently see a page.
+func (h *Host) isLive(page cmsstore.Page) bool {
+	_, ok := h.livePage(page)
+	return ok
+}
+
+func pageActionButton(id, action, label string) gosx.Node {
+	return gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/pages/"+id+"/action"), gosx.Attr("class", "admin-inline-form")),
+		gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "action"), gosx.Attr("value", action))),
+		gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-row-btn"), gosx.Attr("type", "submit"), gosx.Attr("data-action", action)), gosx.Text(label)),
+	)
+}
+
+func (h *Host) handleAdminPageAction(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, "/admin/pages?status="+queryEscape("We couldn't read that. Try again."), http.StatusSeeOther)
+		return
+	}
+	message, err := h.pageAction(r.PathValue("id"), strings.TrimSpace(r.PostFormValue("action")))
+	if err != nil {
+		if errors.Is(err, errPageNotFound) {
+			h.writeAdminNotFound(w, "page")
+			return
+		}
+		http.Redirect(w, r, "/admin/pages?status="+queryEscape("That didn't work. Try again."), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/admin/pages?status="+queryEscape(message), http.StatusSeeOther)
 }

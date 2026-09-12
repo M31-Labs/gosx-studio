@@ -570,6 +570,14 @@ func (h *Host) handleEditorPublish(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, editorSaveResult{Message: "We couldn't find that page."})
 		return
 	}
+	// Publishing is the owner saying "show this": it also clears an earlier
+	// "take offline", which would otherwise silently keep the page hidden.
+	if PageOffline(page) {
+		if _, err := h.setPageFlag(page.ID, pageOfflineKey, false); err != nil {
+			writeJSON(w, http.StatusOK, editorSaveResult{Message: "We couldn't publish that. Try again."})
+			return
+		}
+	}
 	if _, _, err := h.store.PublishPage(page.ID); err != nil {
 		writeJSON(w, http.StatusOK, editorSaveResult{Message: "We couldn't publish that. Try again."})
 		return

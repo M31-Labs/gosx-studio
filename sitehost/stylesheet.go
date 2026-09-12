@@ -127,6 +127,16 @@ a { color: var(--site-accent); }
 .admin-status[data-state="error"] { border-left-color: #9c312a; }
 .admin-badge { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--site-muted); }
 .admin-badge[data-state="published"] { color: var(--site-accent); }
+.admin-badge[data-state="offline"], .admin-badge[data-state="archived"] { color: #9c312a; }
+.admin-row-actions { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.admin-inline-form { display: inline; }
+.admin-row-btn {
+  font: inherit; font-size: 12.5px; padding: 4px 9px; cursor: pointer; border-radius: 2px;
+  border: 1px solid var(--site-rule); background: var(--site-ground); color: var(--site-ink);
+}
+.admin-row-btn:hover { border-color: var(--site-accent); color: var(--site-accent); }
+.admin-row-btn[data-action="archive"]:hover { border-color: #9c312a; color: #9c312a; }
+.admin-table--pages td:last-child { white-space: nowrap; }
 .admin-stats { display: flex; flex-wrap: wrap; gap: 1px; background: var(--site-rule); border: 1px solid var(--site-rule); margin: 0 0 28px; max-width: 900px; }
 .admin-stat { background: var(--site-ground); padding: 16px 20px; flex: 1 1 160px; }
 .admin-stat strong { display: block; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }

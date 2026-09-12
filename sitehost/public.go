@@ -3,7 +3,6 @@ package sitehost
 import (
 	"encoding/json"
 	"net/http"
-	"sort"
 	"strings"
 
 	"m31labs.dev/gosx-studio/cms/lifecycle"
@@ -40,6 +39,11 @@ func (h *Host) handlePublicPage(w http.ResponseWriter, r *http.Request) {
 // the internet. So "is this live?" is answered by the revision ledger, which
 // remembers every publish, rather than by the working record.
 func (h *Host) livePage(page cmsstore.Page) (cmsstore.Page, bool) {
+	// The owner's own switches are read from the working record, which is
+	// where they are set; a published snapshot in the ledger predates them.
+	if PageOffline(page) || PageArchived(page) {
+		return cmsstore.Page{}, false
+	}
 	if page.State.Publish == cmsstore.PublishStatePublished {
 		return page, true
 	}
@@ -78,12 +82,7 @@ func (h *Host) livePages() []cmsstore.Page {
 			live = append(live, published)
 		}
 	}
-	// Home first; everything else keeps the order it was created in, which is
-	// the order the starter template meant them to read.
-	sort.SliceStable(live, func(i, j int) bool {
-		return live[i].Slug == homeSlug && live[j].Slug != homeSlug
-	})
-	return live
+	return h.orderPages(live)
 }
 
 // publishedPage resolves a slug against the live versions, so renaming a page
@@ -154,9 +153,26 @@ func (h *Host) servePublicNotFound(w http.ResponseWriter, settings cmsstore.Site
 	h.writeDocument(w, http.StatusNotFound, meta, body)
 }
 
-// navPages lists the pages that appear in the site menu.
+// navPages lists the pages that appear in the site menu: live, and not
+// hidden from it. A hidden page is still served at its address.
 func (h *Host) navPages() []cmsstore.Page {
-	return h.livePages()
+	pages, err := h.store.ListPages(cmsstore.PageFilter{})
+	if err != nil {
+		return nil
+	}
+	hidden := map[string]bool{}
+	for _, page := range pages {
+		if PageNavHidden(page) {
+			hidden[page.ID] = true
+		}
+	}
+	out := make([]cmsstore.Page, 0, len(pages))
+	for _, page := range h.livePages() {
+		if !hidden[page.ID] {
+			out = append(out, page)
+		}
+	}
+	return out
 }
 
 func (h *Host) renderPublicNav(settings cmsstore.SiteSettings, activeSlug string) gosx.Node {

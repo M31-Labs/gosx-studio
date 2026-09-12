@@ -708,3 +708,131 @@ func TestEditorOffersDragHandleAndRedo(t *testing.T) {
 	mustContain(t, body, `data-redo="true"`, "the toolbar offers Redo")
 	mustContain(t, body, `data-undo="true"`, "the toolbar offers Undo")
 }
+
+// ---------- page management ----------
+
+// siteNav returns just the public site's menu markup, so a link in the page
+// body (the home page's "See the menu" button, say) cannot be mistaken for a
+// menu entry.
+func siteNav(t *testing.T, handler http.Handler) string {
+	t.Helper()
+	body := get(t, handler, "/").Body.String()
+	start := strings.Index(body, `<nav class="site-nav"`)
+	if start < 0 {
+		t.Fatal("no site nav on the home page")
+	}
+	nav := body[start:]
+	return nav[:strings.Index(nav, "</nav>")]
+}
+
+func act(t *testing.T, handler http.Handler, id, action string) *httptest.ResponseRecorder {
+	t.Helper()
+	return post(t, handler, "/admin/pages/"+id+"/action", url.Values{"action": {action}})
+}
+
+func TestTakeOfflineAndPutBackOnline(t *testing.T) {
+	host, handler := newTestHost(t)
+	id := firstPageID(t, host, "menu")
+
+	if code := get(t, handler, "/menu").Code; code != http.StatusOK {
+		t.Fatal("menu should start live")
+	}
+	rec := act(t, handler, id, "offline")
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("offline = %d", rec.Code)
+	}
+	if code := get(t, handler, "/menu").Code; code != http.StatusNotFound {
+		t.Fatal("an offline page is still public")
+	}
+	if strings.Contains(siteNav(t, handler), `href="/menu"`) {
+		t.Fatal("an offline page is still in the menu")
+	}
+	list := get(t, handler, "/admin/pages").Body.String()
+	mustContain(t, list, `data-state="offline"`, "the admin list shows the page as offline")
+	mustContain(t, list, "Put back online", "the admin list offers the way back")
+
+	act(t, handler, id, "online")
+	if code := get(t, handler, "/menu").Code; code != http.StatusOK {
+		t.Fatal("put back online did not restore the page")
+	}
+}
+
+func TestPublishingFromTheEditorClearsOffline(t *testing.T) {
+	host, handler := newTestHost(t)
+	id := firstPageID(t, host, "menu")
+	act(t, handler, id, "offline")
+	post(t, handler, "/admin/api/pages/"+id+"/publish", url.Values{})
+	if code := get(t, handler, "/menu").Code; code != http.StatusOK {
+		t.Fatal("publishing should put an offline page back online, or Publish is a lie")
+	}
+}
+
+func TestArchiveAndRestoreKeepsEverything(t *testing.T) {
+	host, handler := newTestHost(t)
+	id := firstPageID(t, host, "visit")
+
+	act(t, handler, id, "archive")
+	if code := get(t, handler, "/visit").Code; code != http.StatusNotFound {
+		t.Fatal("an archived page is still public")
+	}
+	list := get(t, handler, "/admin/pages").Body.String()
+	mustContain(t, list, "Archived", "the admin list has an archived section")
+	mustContain(t, list, "Restore", "archived pages can be restored")
+	if strings.Contains(list, `data-action="archive"`) && strings.Count(list, "Visit") > 1 {
+		t.Fatal("an archived page should not also appear in the active list")
+	}
+	page, _, _ := host.Store().PageByID(id)
+	if len(page.Body.Blocks) == 0 {
+		t.Fatal("archiving must not touch the page's content")
+	}
+
+	act(t, handler, id, "restore")
+	if code := get(t, handler, "/visit").Code; code != http.StatusOK {
+		t.Fatal("restore did not bring the page back")
+	}
+}
+
+func TestHideFromMenuKeepsThePageReachable(t *testing.T) {
+	host, handler := newTestHost(t)
+	id := firstPageID(t, host, "contact")
+	act(t, handler, id, "hide")
+	if strings.Contains(siteNav(t, handler), `href="/contact"`) {
+		t.Fatal("a hidden page is still in the menu")
+	}
+	if code := get(t, handler, "/contact").Code; code != http.StatusOK {
+		t.Fatal("a hidden page must still be reachable by its address")
+	}
+	act(t, handler, id, "show")
+	mustContain(t, siteNav(t, handler), `href="/contact"`, "show puts it back in the menu")
+}
+
+func TestMenuOrderFollowsTheOwner(t *testing.T) {
+	host, handler := newTestHost(t)
+	navLinks := func() string { return siteNav(t, handler) }
+	before := navLinks()
+	if strings.Index(before, "/menu") > strings.Index(before, "/visit") {
+		t.Fatalf("food template should start with menu before visit: %s", before)
+	}
+
+	// Move "visit" up above "menu", then check it stuck for visitors and after restart.
+	act(t, handler, firstPageID(t, host, "visit"), "up")
+	after := navLinks()
+	if strings.Index(after, "/visit") > strings.Index(after, "/menu") {
+		t.Fatalf("moving visit up did not reorder the menu: %s", after)
+	}
+	reopened, err := Open(host.Options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := get(t, reopened.Handler(), "/").Body.String()
+	nav := body[strings.Index(body, `<nav class="site-nav"`):]
+	if strings.Index(nav, "/visit") > strings.Index(nav, "/menu") {
+		t.Fatal("menu order did not survive restart")
+	}
+
+	// Home never moves, and moving past the edge is a no-op rather than an error.
+	if rec := act(t, handler, firstPageID(t, host, "home"), "down"); rec.Code != http.StatusSeeOther {
+		t.Fatalf("moving home = %d", rec.Code)
+	}
+	mustContain(t, get(t, handler, "/").Body.String(), `class="site-brand" href="/"`, "home still leads")
+}
