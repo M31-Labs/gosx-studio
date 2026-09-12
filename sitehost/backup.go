@@ -71,17 +71,19 @@ func (h *Host) siteFiles() [][2]string {
 	return out
 }
 
-const exportReadme = `This is a complete copy of your website's data.
+func (h *Host) exportReadme() string {
+	return `This is a complete copy of your website's data.
 
 To restore it, or to move the site to another server:
 
   1. Unzip this file. You get a folder called "site".
-  2. Start the site from it:  gosx-site -data site/site.json -admin-password YOUR_PASSWORD
+  2. Start the site from it:  gosx-site -data site/` + filepath.Base(h.opts.DataPath) + ` -admin-password YOUR_PASSWORD
   3. Point your domain at the new server (Settings > Your own domain) if it moved.
 
 Pictures are in site/uploads. Messages, forms, and visitor counts are the
-other JSON files. Certificates are not included: HTTPS gets new ones itself.
+JSON files. Certificates are not included: HTTPS gets new ones itself.
 `
+}
 
 // writeArchive streams the site as a zip.
 func (h *Host) writeArchive(w io.Writer) error {
@@ -97,10 +99,27 @@ func (h *Host) writeArchive(w io.Writer) error {
 		_, err = io.Copy(entry, body)
 		return err
 	}
-	if err := add("README.txt", now, strings.NewReader(exportReadme)); err != nil {
+	if err := add("README.txt", now, strings.NewReader(h.exportReadme())); err != nil {
 		return err
 	}
+	// A SQLite site is copied through the store, so the archive holds a
+	// consistent database rather than a file caught mid-write.
+	type backer interface{ Backup(io.Writer) error }
 	for _, file := range h.siteFiles() {
+		if file[1] == h.opts.DataPath {
+			if store, ok := h.store.(backer); ok {
+				header := &zip.FileHeader{Name: exportRoot + file[0], Method: zip.Deflate}
+				header.Modified = now
+				entry, err := archive.CreateHeader(header)
+				if err != nil {
+					return err
+				}
+				if err := store.Backup(entry); err != nil {
+					return err
+				}
+				continue
+			}
+		}
 		src, err := os.Open(file[1])
 		if err != nil {
 			continue

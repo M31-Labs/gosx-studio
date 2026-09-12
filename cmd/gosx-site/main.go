@@ -35,7 +35,7 @@ func main() {
 func run() error {
 	var (
 		addr     = flag.String("addr", env("GOSX_SITE_ADDR", "127.0.0.1:8080"), "address to listen on")
-		dataPath = flag.String("data", env("GOSX_SITE_DATA", filepath.Join("data", "site.json")), "path to the site's data file")
+		dataPath = flag.String("data", env("GOSX_SITE_DATA", filepath.Join("data", "site.db")), "path to the site's data file (a .db is SQLite, the default; a .json is the one-file snapshot)")
 		title    = flag.String("title", env("GOSX_SITE_TITLE", "My site"), "site name, used until you change it in Settings")
 		desc     = flag.String("description", env("GOSX_SITE_DESCRIPTION", ""), "one-line site description for search results")
 		baseURL  = flag.String("base-url", env("GOSX_SITE_BASE_URL", ""), "public address, e.g. https://yourbusiness.com")
@@ -103,6 +103,9 @@ func run() error {
 		go func() { _ = challengeServer.Serve(challengeListener) }()
 	}
 
+	if host.Migrated != "" {
+		fmt.Println("  Moved your site from " + host.Migrated + " into " + *dataPath + " (the old file is kept as " + host.Migrated + ".migrated).")
+	}
 	printWelcome(listener.Addr().String(), *dataPath, *password != "", *https, host.Domain())
 
 	shutdown := make(chan os.Signal, 1)

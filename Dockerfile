@@ -30,7 +30,7 @@ USER site
 VOLUME ["/data"]
 EXPOSE 8080 80 443
 ENV GOSX_SITE_ADDR=0.0.0.0:8080 \
-    GOSX_SITE_DATA=/data/site.json
+    GOSX_SITE_DATA=/data/site.db
 # GOSX_SITE_ADMIN_PASSWORD is required: the binary refuses to listen on a
 # non-loopback address without one, so an unprotected admin area can never
 # be published by accident.

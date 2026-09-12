@@ -22,8 +22,6 @@ import (
 
 	"m31labs.dev/gosx"
 	cmsstore "m31labs.dev/gosx-studio/cms/store"
-	"m31labs.dev/gosx-studio/cms/store/file"
-	"m31labs.dev/gosx-studio/cms/store/memory"
 	"m31labs.dev/gosx-studio/hostruntime"
 )
 
@@ -41,7 +39,10 @@ type LifecycleContentStore interface {
 
 // Options configures the default host.
 type Options struct {
-	// DataPath is the JSON snapshot the site is stored in. Required.
+	// DataPath is the file the site is stored in. Required. A ".json" path
+	// uses the JSON snapshot store; anything else is a SQLite database,
+	// created on first start and migrated from a site.json beside it if one
+	// exists.
 	DataPath string
 	// SiteTitle seeds a new site and names it in the document shell.
 	SiteTitle string
@@ -107,6 +108,10 @@ type Host struct {
 	forms   *formStore
 	due     dueChecker
 	backups backupState
+
+	// Migrated is the JSON file a SQLite site was created from on this
+	// start, or empty.
+	Migrated string
 }
 
 // Open loads or creates the site at Options.DataPath.
@@ -116,15 +121,13 @@ func Open(opts Options) (*Host, error) {
 		return nil, errors.New("sitehost: DataPath is required")
 	}
 
-	store, err := file.Open(opts.DataPath)
+	store, migrated, err := openStore(opts.DataPath)
 	if err != nil {
-		store, err = file.New(opts.DataPath, memory.Seed{})
-		if err != nil {
-			return nil, fmt.Errorf("sitehost: open site data: %w", err)
-		}
+		return nil, fmt.Errorf("sitehost: open site data: %w", err)
 	}
 
 	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath())}
+	host.Migrated = migrated
 	if err := host.configureMail(); err != nil {
 		return nil, err
 	}

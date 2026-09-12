@@ -24,7 +24,7 @@ is required: no adapters, no host application, no configuration file.
 ```
   Visit your site      http://127.0.0.1:8080/
   Edit your site       http://127.0.0.1:8080/admin
-  Saved in             ./data/site.json
+  Saved in             ./data/site.db
 ```
 
 Editing happens on the page itself. The canvas renders the same markup a
@@ -51,12 +51,20 @@ and 443, fetches a certificate from Let's Encrypt the first time someone opens
 the secure address, and renews it on its own:
 
 ```sh
-gosx-site -https -data /srv/site/site.json -admin-password 'a long passphrase'
+gosx-site -https -data /srv/site/site.db -admin-password 'a long passphrase'
 ```
 
 Certificates are cached in a `certs` folder beside the data file. Pass
 `-public-ip` to show the server's address in the DNS instructions when it
 cannot be detected.
+
+### Where the site lives
+
+Everything is in one SQLite file, `data/site.db` by default, with pictures in
+an `uploads` folder beside it. A site that was started on an older version
+with `data/site.json` is moved into the database on the next start, and the
+JSON file is kept as `site.json.migrated`. Pass a `.json` path to `-data` to
+keep using the one-file snapshot instead.
 
 ### Backups and export
 
@@ -66,7 +74,7 @@ kind is written once a day into a `backups` folder beside the data file, and
 the last fourteen are kept. Turn that off with `-no-backups`.
 
 To restore, stop the site, unzip the backup, and start the site from the
-`site.json` inside it. Certificates are never included; HTTPS issues new ones.
+`site.db` inside it. Certificates are never included; HTTPS issues new ones.
 
 ### Run it in a container
 
