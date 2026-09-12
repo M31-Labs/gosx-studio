@@ -49,6 +49,7 @@ func TestVersionHistoryPreviewAndRestore(t *testing.T) {
 		t.Fatalf("restore = %d %q", rec.Code, rec.Header().Get("Location"))
 	}
 	mustContain(t, get(t, handler, "/admin/edit/"+id).Body.String(), "First version", "the editor now holds the restored version")
+	mustContain(t, get(t, handler, "/admin/edit/"+id).Body.String(), `data-live="true"`, "and still says the page is live, because it is")
 	mustContain(t, get(t, handler, "/menu").Body.String(), "First version", "visitors still see the published one")
 	mustContain(t, get(t, handler, "/admin/history/page/"+id).Body.String(), "Restored an earlier version", "the restore is itself a version")
 

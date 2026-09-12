@@ -74,7 +74,7 @@ func (h *Host) pageSubject(page cmsstore.Page) editorSubject {
 		Slug:        page.Slug,
 		Description: pageMetaValue(page, "metaDescription", page.Description),
 		Body:        page.Body,
-		Live:        page.State.Publish == cmsstore.PublishStatePublished,
+		Live:        h.isLive(page),
 		BackHref:    "/admin/pages",
 		BackLabel:   "← Pages",
 		ViewHref:    publicPath(page.Slug),
@@ -892,7 +892,7 @@ func (h *Host) handleEditorSave(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, editorSaveResult{
 		OK:     true,
 		Slug:   slug,
-		Live:   page.State.Publish == cmsstore.PublishStatePublished,
+		Live:   h.isLive(page),
 		Checks: h.readinessChecks("page", strings.TrimSpace(payload.Description), input.Body),
 	})
 }
