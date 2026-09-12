@@ -101,6 +101,7 @@ type Host struct {
 
 	media *mediaIndex
 	stats *statsStore
+	due   dueChecker
 }
 
 // Open loads or creates the site at Options.DataPath.
@@ -197,6 +198,7 @@ func (h *Host) Handler() http.Handler {
 	h.mountBlog(mux)
 	h.mountStats(mux)
 	h.mountDomain(mux)
+	h.mountHistory(mux)
 	h.mountPublic(mux)
 
 	// Outermost first: headers on everything, then sign-in, then CSRF on
@@ -233,7 +235,7 @@ func (h *Host) writeDocument(w http.ResponseWriter, status int, meta PageMeta, b
 	}
 	// The visitor beacon goes on public pages that were actually served,
 	// never on the admin, a 404, or the wizard.
-	meta.Stats = !meta.AdminChrome && status == http.StatusOK && h.SetupComplete() && h.statsEnabled()
+	meta.Stats = !meta.AdminChrome && !meta.NoIndex && status == http.StatusOK && h.SetupComplete() && h.statsEnabled()
 	if meta.Favicon == "" {
 		settings := h.settings()
 		meta.Favicon = brandFromSettings(settings).FaviconHref(meta.Theme, firstNonEmpty(settings.Title, h.opts.SiteTitle))

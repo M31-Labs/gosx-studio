@@ -13,7 +13,6 @@ import (
 	"m31labs.dev/gosx"
 	"m31labs.dev/gosx-admin/blockstudio"
 	"m31labs.dev/gosx-studio/cms/content"
-	"m31labs.dev/gosx-studio/cms/lifecycle"
 	"m31labs.dev/gosx-studio/cms/render"
 	cmsstore "m31labs.dev/gosx-studio/cms/store"
 )
@@ -30,12 +29,11 @@ import (
 // clock passes its date.
 
 const (
-	blogPath         = "/blog"
-	feedPath         = "/feed.xml"
-	blogTitleKey     = "blogTitle"
-	postPublishAtKey = "publishAt"
-	blogPageSize     = 10
-	excerptLength    = 160
+	blogPath      = "/blog"
+	feedPath      = "/feed.xml"
+	blogTitleKey  = "blogTitle"
+	blogPageSize  = 10
+	excerptLength = 160
 )
 
 // timeNow is the clock for scheduling. Tests set it.
@@ -117,26 +115,9 @@ func cloneMetadata(in cmsstore.Metadata) cmsstore.Metadata {
 	return out
 }
 
-// PostPublishAt is the date the owner chose for a post to go live, if any.
-func PostPublishAt(post cmsstore.Post) (time.Time, bool) {
-	raw := strings.TrimSpace(post.Metadata[postPublishAtKey])
-	if raw == "" {
-		return time.Time{}, false
-	}
-	at, err := time.Parse(time.RFC3339, raw)
-	if err != nil {
-		return time.Time{}, false
-	}
-	return at, true
-}
-
-// postScheduled reports a post whose chosen date has not arrived.
+// postScheduled reports a post with a publish waiting for its date.
 func postScheduled(post cmsstore.Post) (time.Time, bool) {
-	at, ok := PostPublishAt(post)
-	if !ok || !at.After(timeNow()) {
-		return time.Time{}, false
-	}
-	return at, true
+	return scheduledFor(post.Metadata)
 }
 
 // postDate is the date shown on a post: the chosen one, else when it was
@@ -157,40 +138,23 @@ func (h *Host) livePost(post cmsstore.Post) (cmsstore.Post, bool) {
 	if PostOffline(post) || PostArchived(post) {
 		return cmsstore.Post{}, false
 	}
-	if _, scheduled := postScheduled(post); scheduled {
-		return cmsstore.Post{}, false
-	}
 	if post.State.Publish == cmsstore.PublishStatePublished {
 		return post, true
 	}
-	revisions := h.store.ListRevisions(lifecycle.Filter{
-		ResourceKind: cmsstore.ResourceKindPost,
-		ResourceID:   post.ID,
-	})
-	for index := len(revisions) - 1; index >= 0; index-- {
-		revision := revisions[index]
-		if revision.Action != cmsstore.ActionPostPublished || len(revision.Snapshot) == 0 {
-			continue
-		}
-		var snapshot cmsstore.Post
-		if err := json.Unmarshal(revision.Snapshot, &snapshot); err != nil {
-			continue
-		}
-		// The owner's date is a switch on the working record, like the
-		// offline flag: the snapshot predates a change to it.
-		snapshot.Metadata = cloneMetadata(snapshot.Metadata)
-		if raw := strings.TrimSpace(post.Metadata[postPublishAtKey]); raw != "" {
-			snapshot.Metadata[postPublishAtKey] = raw
-		} else {
-			delete(snapshot.Metadata, postPublishAtKey)
-		}
-		return snapshot, true
+	revision, ok := h.latestPublished(cmsstore.ResourceKindPost, post.ID, cmsstore.ActionPostPublished)
+	if !ok {
+		return cmsstore.Post{}, false
 	}
-	return cmsstore.Post{}, false
+	var snapshot cmsstore.Post
+	if err := json.Unmarshal(revision.Snapshot, &snapshot); err != nil {
+		return cmsstore.Post{}, false
+	}
+	return snapshot, true
 }
 
 // livePosts is every post a visitor can read, newest first.
 func (h *Host) livePosts() []cmsstore.Post {
+	h.PublishDue()
 	posts, err := h.store.ListPosts(cmsstore.PostFilter{})
 	if err != nil {
 		return nil
@@ -747,25 +711,13 @@ func (h *Host) postStatus(post cmsstore.Post) (state, label string) {
 	case PostArchived(post):
 		return "archived", "Archived"
 	}
-	if at, scheduled := postScheduled(post); scheduled && h.hasPublishedRevision(post) {
+	if at, scheduled := postScheduled(post); scheduled {
 		return "scheduled", "Scheduled for " + formatPostDate(at)
 	}
 	if _, live := h.livePost(post); live {
 		return "published", "Live"
 	}
 	return "draft", "Not published"
-}
-
-func (h *Host) hasPublishedRevision(post cmsstore.Post) bool {
-	if post.State.Publish == cmsstore.PublishStatePublished {
-		return true
-	}
-	for _, revision := range h.store.ListRevisions(lifecycle.Filter{ResourceKind: cmsstore.ResourceKindPost, ResourceID: post.ID}) {
-		if revision.Action == cmsstore.ActionPostPublished {
-			return true
-		}
-	}
-	return false
 }
 
 func (h *Host) renderPostRow(post cmsstore.Post) gosx.Node {
@@ -891,9 +843,10 @@ func (h *Host) postSubject(post cmsstore.Post) editorSubject {
 		PublishURL: "/admin/api/posts/" + post.ID + "/publish",
 		Post:       &post,
 	}
-	if at, scheduled := postScheduled(post); scheduled && h.hasPublishedRevision(post) {
+	if at, scheduled := postScheduled(post); scheduled {
 		subject.Scheduled = at
 	}
+	subject.Checks = h.readinessChecks("post", "", post.Body)
 	return subject
 }
 
@@ -908,10 +861,9 @@ func (h *Host) handlePostEditor(w http.ResponseWriter, r *http.Request) {
 
 type postSavePayload struct {
 	editorSavePayload
-	Excerpt   string `json:"excerpt"`
-	Author    string `json:"author"`
-	Tags      string `json:"tags"`
-	PublishAt string `json:"publishAt"`
+	Excerpt string `json:"excerpt"`
+	Author  string `json:"author"`
+	Tags    string `json:"tags"`
 }
 
 func splitTags(raw string) []string {
@@ -951,14 +903,9 @@ func (h *Host) handlePostSave(w http.ResponseWriter, r *http.Request) {
 	}
 
 	metadata := cloneMetadata(post.Metadata)
-	delete(metadata, postPublishAtKey)
-	if raw := strings.TrimSpace(payload.PublishAt); raw != "" {
-		at, err := time.Parse(time.RFC3339, raw)
-		if err != nil {
-			writeJSON(w, http.StatusOK, editorSaveResult{Message: "That publish date doesn't look right. Pick it again."})
-			return
-		}
-		metadata[postPublishAtKey] = at.UTC().Format(time.RFC3339)
+	if message := applyPublishAt(metadata, payload.PublishAt); message != "" {
+		writeJSON(w, http.StatusOK, editorSaveResult{Message: message})
+		return
 	}
 
 	input := cmsstore.PostInput{
@@ -980,7 +927,7 @@ func (h *Host) handlePostSave(w http.ResponseWriter, r *http.Request) {
 	}
 	updated, _, _ := h.store.PostByID(post.ID)
 	_, live := h.livePost(updated)
-	writeJSON(w, http.StatusOK, editorSaveResult{OK: true, Slug: slug, Live: live})
+	writeJSON(w, http.StatusOK, editorSaveResult{OK: true, Slug: slug, Live: live, Checks: h.readinessChecks("post", "", updated.Body)})
 }
 
 func (h *Host) handlePostPublish(w http.ResponseWriter, r *http.Request) {
@@ -989,28 +936,7 @@ func (h *Host) handlePostPublish(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, editorSaveResult{Message: "We couldn't find that post."})
 		return
 	}
-	if PostOffline(post) {
-		if _, err := h.setPostFlag(post.ID, pageOfflineKey, false); err != nil {
-			writeJSON(w, http.StatusOK, editorSaveResult{Message: "We couldn't publish that. Try again."})
-			return
-		}
-	}
-	published, _, err := h.store.PublishPost(post.ID)
-	if err != nil {
-		writeJSON(w, http.StatusOK, editorSaveResult{Message: "We couldn't publish that. Try again."})
-		return
-	}
-	if at, scheduled := postScheduled(published); scheduled {
-		writeJSON(w, http.StatusOK, editorSaveResult{
-			OK: true, Live: false, Slug: published.Slug,
-			Chip:    "Scheduled",
-			Message: "Scheduled — it goes live on " + formatPostDate(at),
-		})
-		return
-	}
-	writeJSON(w, http.StatusOK, editorSaveResult{
-		OK: true, Live: true, Slug: published.Slug,
-		Chip:    "Live",
-		Message: "Published — your post is live",
-	})
+	result := h.publishPost(post)
+	result.Checks = h.readinessChecks("post", "", post.Body)
+	writeJSON(w, http.StatusOK, result)
 }

@@ -224,6 +224,7 @@
         }
         status("saved", "All changes saved");
         if (result.slug) syncSlugHint(result.slug);
+        renderChecks(result.checks);
         if (pending) {
           pending = false;
           save();
@@ -233,6 +234,25 @@
         saving = false;
         status("error", "Couldn't reach the server. Your text is still here — it'll save when you're back.");
       });
+  }
+
+  function renderChecks(checks) {
+    var list = root.querySelector("[data-checks-list]");
+    if (!list || !Array.isArray(checks)) return;
+    list.textContent = "";
+    if (!checks.length) {
+      var ok = document.createElement("li");
+      ok.className = "ed-check ed-check--ok";
+      ok.textContent = "Looks good. Nothing to fix.";
+      list.appendChild(ok);
+      return;
+    }
+    checks.forEach(function (text) {
+      var li = document.createElement("li");
+      li.className = "ed-check";
+      li.textContent = text;
+      list.appendChild(li);
+    });
   }
 
   function syncSlugHint(slug) {
@@ -1192,6 +1212,7 @@
               return;
             }
             status("saved", result.message || "Published — your page is live");
+            renderChecks(result.checks);
             publishBtn.textContent = "Publish changes";
             if (chip) {
               chip.setAttribute("data-live", result.live ? "true" : "false");

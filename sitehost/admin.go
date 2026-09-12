@@ -422,11 +422,12 @@ func (h *Host) handleAdminPublishPage(w http.ResponseWriter, r *http.Request) {
 		h.writeAdminNotFound(w, "page")
 		return
 	}
-	if _, _, err := h.store.PublishPage(page.ID); err != nil {
-		h.renderAdminPageDetail(w, page, adminStatus{Message: "We couldn't publish that page. Try again.", Error: true})
+	result := h.publishPage(page)
+	if !result.OK {
+		h.renderAdminPageDetail(w, page, adminStatus{Message: result.Message, Error: true})
 		return
 	}
-	http.Redirect(w, r, "/admin/pages/"+page.ID+"?status="+queryEscape("Published. Your page is live at "+publicPath(page.Slug)+"."), http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/pages?status="+queryEscape(result.Message+"."), http.StatusSeeOther)
 }
 
 // ---------- settings ----------
@@ -570,9 +571,12 @@ func (h *Host) homeEditHref() string {
 // renderPageRow is one page in the admin list with its management actions.
 func (h *Host) renderPageRow(page cmsstore.Page, first, last bool) gosx.Node {
 	state, stateLabel := "draft", "Not published"
+	scheduledAt, scheduled := scheduledFor(page.Metadata)
 	switch {
 	case PageOffline(page):
 		state, stateLabel = "offline", "Offline"
+	case scheduled:
+		state, stateLabel = "scheduled", "Scheduled for "+formatPostDate(scheduledAt)
 	case h.isLive(page):
 		state, stateLabel = "published", "Live"
 	}

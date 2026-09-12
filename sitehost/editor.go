@@ -54,10 +54,14 @@ type editorSubject struct {
 	PublishURL  string
 	Page        *cmsstore.Page
 	Post        *cmsstore.Post
+	Checks      []string // what to fix before publishing
 }
 
 func (h *Host) pageSubject(page cmsstore.Page) editorSubject {
+	scheduled, _ := scheduledFor(page.Metadata)
 	return editorSubject{
+		Scheduled:   scheduled,
+		Checks:      h.readinessChecks("page", pageMetaValue(page, "metaDescription", page.Description), page.Body),
 		Kind:        "page",
 		Noun:        "page",
 		ID:          page.ID,
@@ -150,6 +154,11 @@ func (h *Host) renderEditorToolbar(subject editorSubject) gosx.Node {
 			), gosx.Text("Redo")),
 			gosx.El("a", gosx.Attrs(
 				gosx.Attr("class", "ed-btn ed-btn--ghost"),
+				gosx.Attr("href", historyHref(subject.Kind, subject.ID)),
+				gosx.Attr("title", "Every save and publish, with restore"),
+			), gosx.Text("History")),
+			gosx.El("a", gosx.Attrs(
+				gosx.Attr("class", "ed-btn ed-btn--ghost"),
 				gosx.Attr("href", subject.ViewHref),
 				gosx.Attr("target", "_blank"),
 				gosx.Attr("rel", "noopener"),
@@ -200,6 +209,23 @@ func (h *Host) renderEditorSidebar(subject editorSubject) gosx.Node {
 		),
 		h.renderLookSection(),
 		renderSubjectFields(subject),
+		renderChecks(subject.Checks),
+	)
+}
+
+// renderChecks is the "before you publish" block; the script refreshes it
+// after every save.
+func renderChecks(checks []string) gosx.Node {
+	items := make([]gosx.Node, 0, len(checks)+1)
+	if len(checks) == 0 {
+		items = append(items, gosx.El("li", gosx.Attrs(gosx.Attr("class", "ed-check ed-check--ok")), gosx.Text("Looks good. Nothing to fix.")))
+	}
+	for _, check := range checks {
+		items = append(items, gosx.El("li", gosx.Attrs(gosx.Attr("class", "ed-check")), gosx.Text(check)))
+	}
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-side__block"), gosx.Attr("data-checks", "true")),
+		gosx.El("h2", nil, gosx.Text("Before you publish")),
+		gosx.El("ul", gosx.Attrs(gosx.Attr("class", "ed-checks"), gosx.Attr("data-checks-list", "true")), gosx.Fragment(items...)),
 	)
 }
 
@@ -220,12 +246,19 @@ func renderSubjectFields(subject editorSubject) gosx.Node {
 			editorDateField("pagePublishAt", "Publish date", publishAt, "Leave it blank to go live as soon as you publish. Pick a future date to schedule it."),
 		)
 	}
+	publishAt := ""
+	if subject.Page != nil {
+		if at, ok := PagePublishAt(*subject.Page); ok {
+			publishAt = at.UTC().Format(time.RFC3339)
+		}
+	}
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-side__block")),
 		gosx.El("h2", nil, gosx.Text("This page")),
 		editorField("pageTitle", "Page name", subject.Title, "Shown as the heading and in your menu."),
 		editorField("pageSlug", "Web address", subject.Slug, addressHint(subject.Slug)),
 		editorField("pageDescription", "Description for search results", subject.Description,
 			"One or two sentences. Also used when someone shares the link."),
+		editorDateField("pagePublishAt", "Publish date", publishAt, "Leave it blank to go live when you press Publish. Pick a future date, then press Publish, to schedule the change."),
 	)
 }
 
@@ -655,15 +688,34 @@ type editorSavePayload struct {
 	Title       string               `json:"title"`
 	Slug        string               `json:"slug"`
 	Description string               `json:"description"`
+	PublishAt   string               `json:"publishAt"`
 	Blocks      []editorBlockPayload `json:"blocks"`
 }
 
+// applyPublishAt stores the owner's date in UTC, or clears it — and with
+// it any publish that was waiting for it.
+func applyPublishAt(metadata cmsstore.Metadata, raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		delete(metadata, publishAtKey)
+		delete(metadata, publishPendingKey)
+		return ""
+	}
+	at, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return "That publish date doesn't look right. Pick it again."
+	}
+	metadata[publishAtKey] = at.UTC().Format(time.RFC3339)
+	return ""
+}
+
 type editorSaveResult struct {
-	OK      bool   `json:"ok"`
-	Message string `json:"message,omitempty"`
-	Slug    string `json:"slug,omitempty"`
-	Live    bool   `json:"live"`
-	Chip    string `json:"chip,omitempty"`
+	OK      bool     `json:"ok"`
+	Message string   `json:"message,omitempty"`
+	Slug    string   `json:"slug,omitempty"`
+	Live    bool     `json:"live"`
+	Chip    string   `json:"chip,omitempty"`
+	Checks  []string `json:"checks"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
@@ -711,6 +763,10 @@ func (h *Host) handleEditorSave(w http.ResponseWriter, r *http.Request) {
 	} else {
 		delete(metadata, "metaDescription")
 	}
+	if message := applyPublishAt(metadata, payload.PublishAt); message != "" {
+		writeJSON(w, http.StatusOK, editorSaveResult{Message: message})
+		return
+	}
 
 	input := cmsstore.PageInput{
 		Slug:        slug,
@@ -728,9 +784,10 @@ func (h *Host) handleEditorSave(w http.ResponseWriter, r *http.Request) {
 		_ = h.recordRedirect(publicPath(page.Slug), publicPath(slug))
 	}
 	writeJSON(w, http.StatusOK, editorSaveResult{
-		OK:   true,
-		Slug: slug,
-		Live: page.State.Publish == cmsstore.PublishStatePublished,
+		OK:     true,
+		Slug:   slug,
+		Live:   page.State.Publish == cmsstore.PublishStatePublished,
+		Checks: h.readinessChecks("page", strings.TrimSpace(payload.Description), input.Body),
 	})
 }
 
@@ -818,25 +875,9 @@ func (h *Host) handleEditorPublish(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, editorSaveResult{Message: "We couldn't find that page."})
 		return
 	}
-	// Publishing is the owner saying "show this": it also clears an earlier
-	// "take offline", which would otherwise silently keep the page hidden.
-	if PageOffline(page) {
-		if _, err := h.setPageFlag(page.ID, pageOfflineKey, false); err != nil {
-			writeJSON(w, http.StatusOK, editorSaveResult{Message: "We couldn't publish that. Try again."})
-			return
-		}
-	}
-	if _, _, err := h.store.PublishPage(page.ID); err != nil {
-		writeJSON(w, http.StatusOK, editorSaveResult{Message: "We couldn't publish that. Try again."})
-		return
-	}
-	writeJSON(w, http.StatusOK, editorSaveResult{
-		OK:      true,
-		Live:    true,
-		Slug:    page.Slug,
-		Chip:    "Live",
-		Message: "Published — your page is live",
-	})
+	result := h.publishPage(page)
+	result.Checks = h.readinessChecks("page", pageMetaValue(page, "metaDescription", page.Description), page.Body)
+	writeJSON(w, http.StatusOK, result)
 }
 
 // ---------- the Look ----------

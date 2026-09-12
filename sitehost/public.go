@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"m31labs.dev/gosx-studio/cms/lifecycle"
-
 	"m31labs.dev/gosx"
 	"m31labs.dev/gosx-studio/cms/render"
 	cmsstore "m31labs.dev/gosx-studio/cms/store"
@@ -52,26 +50,20 @@ func (h *Host) livePage(page cmsstore.Page) (cmsstore.Page, bool) {
 
 // lastPublishedSnapshot decodes the newest "page.published" revision.
 func (h *Host) lastPublishedSnapshot(pageID string) (cmsstore.Page, bool) {
-	revisions := h.store.ListRevisions(lifecycle.Filter{
-		ResourceKind: cmsstore.ResourceKindPage,
-		ResourceID:   pageID,
-	})
-	for index := len(revisions) - 1; index >= 0; index-- {
-		revision := revisions[index]
-		if revision.Action != cmsstore.ActionPagePublished || len(revision.Snapshot) == 0 {
-			continue
-		}
-		var page cmsstore.Page
-		if err := json.Unmarshal(revision.Snapshot, &page); err != nil {
-			continue
-		}
-		return page, true
+	revision, ok := h.latestPublished(cmsstore.ResourceKindPage, pageID, cmsstore.ActionPagePublished)
+	if !ok {
+		return cmsstore.Page{}, false
 	}
-	return cmsstore.Page{}, false
+	var page cmsstore.Page
+	if err := json.Unmarshal(revision.Snapshot, &page); err != nil {
+		return cmsstore.Page{}, false
+	}
+	return page, true
 }
 
 // livePages is every page as a visitor currently sees it, home first.
 func (h *Host) livePages() []cmsstore.Page {
+	h.PublishDue()
 	pages, err := h.store.ListPages(cmsstore.PageFilter{})
 	if err != nil {
 		return nil
