@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"m31labs.dev/gosx"
 	"m31labs.dev/gosx-admin/blockstudio"
@@ -33,28 +34,74 @@ func (h *Host) mountEditor(mux *http.ServeMux) {
 
 // ---------- the editor shell ----------
 
+// editorSubject is what the canvas edits: a page or a post. The two share
+// every editing affordance and differ only in their sidebar fields and where
+// their saves go.
+type editorSubject struct {
+	Kind        string // "page" or "post"
+	Noun        string // "page" or "post", for copy
+	ID          string
+	Title       string
+	Slug        string
+	Description string
+	Body        blockstudio.Document
+	Live        bool
+	Scheduled   time.Time // a post published ahead of its chosen date
+	BackHref    string
+	BackLabel   string
+	ViewHref    string
+	SaveURL     string
+	PublishURL  string
+	Page        *cmsstore.Page
+	Post        *cmsstore.Post
+}
+
+func (h *Host) pageSubject(page cmsstore.Page) editorSubject {
+	return editorSubject{
+		Kind:        "page",
+		Noun:        "page",
+		ID:          page.ID,
+		Title:       page.Title,
+		Slug:        page.Slug,
+		Description: pageMetaValue(page, "metaDescription", page.Description),
+		Body:        page.Body,
+		Live:        page.State.Publish == cmsstore.PublishStatePublished,
+		BackHref:    "/admin/pages",
+		BackLabel:   "← Pages",
+		ViewHref:    publicPath(page.Slug),
+		SaveURL:     "/admin/api/pages/" + page.ID,
+		PublishURL:  "/admin/api/pages/" + page.ID + "/publish",
+		Page:        &page,
+	}
+}
+
 func (h *Host) handleEditor(w http.ResponseWriter, r *http.Request) {
 	page, ok, err := h.store.PageByID(r.PathValue("id"))
 	if err != nil || !ok {
 		h.writeAdminNotFound(w, "page")
 		return
 	}
+	h.renderEditor(w, h.pageSubject(page))
+}
 
+func (h *Host) renderEditor(w http.ResponseWriter, subject editorSubject) {
 	settings := h.settings()
-	live := page.State.Publish == cmsstore.PublishStatePublished
 
 	body := gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", "ed"),
 		gosx.Attr("data-editor", "true"),
-		gosx.Attr("data-page-id", page.ID),
-		gosx.Attr("data-page-slug", page.Slug),
+		gosx.Attr("data-kind", subject.Kind),
+		gosx.Attr("data-page-id", subject.ID),
+		gosx.Attr("data-page-slug", subject.Slug),
+		gosx.Attr("data-save-url", subject.SaveURL),
+		gosx.Attr("data-publish-url", subject.PublishURL),
 	),
-		h.renderEditorToolbar(page, live),
+		h.renderEditorToolbar(subject),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-body")),
-			h.renderEditorSidebar(page),
+			h.renderEditorSidebar(subject),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-stage")),
 				gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-frame"), gosx.Attr("data-frame", "true")),
-					h.renderEditableCanvas(settings, page),
+					h.renderEditableCanvas(settings, subject),
 				),
 			),
 		),
@@ -62,20 +109,24 @@ func (h *Host) handleEditor(w http.ResponseWriter, r *http.Request) {
 		gosx.El("script", gosx.Attrs(gosx.Attr("src", editorScriptPath), gosx.Attr("defer", "defer"))),
 	)
 
-	meta := h.adminMeta("Editing " + page.Title)
+	meta := h.adminMeta("Editing " + subject.Title)
 	h.writeDocument(w, http.StatusOK, meta, body)
 }
 
-func (h *Host) renderEditorToolbar(page cmsstore.Page, live bool) gosx.Node {
+func (h *Host) renderEditorToolbar(subject editorSubject) gosx.Node {
+	live := subject.Live
 	statusText := "Not published yet"
-	if live {
+	switch {
+	case !subject.Scheduled.IsZero():
+		statusText = "Scheduled for " + formatPostDate(subject.Scheduled)
+	case live:
 		statusText = "Live"
 	}
 	return gosx.El("header", gosx.Attrs(gosx.Attr("class", "ed-bar")),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-bar__left")),
-			gosx.El("a", gosx.Attrs(gosx.Attr("class", "ed-back"), gosx.Attr("href", "/admin/pages"), gosx.Attr("aria-label", "Back to all pages")),
-				gosx.Text("← Pages")),
-			gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-page-name")), gosx.Text(page.Title)),
+			gosx.El("a", gosx.Attrs(gosx.Attr("class", "ed-back"), gosx.Attr("href", subject.BackHref), gosx.Attr("aria-label", "Back to all "+subject.Noun+"s")),
+				gosx.Text(subject.BackLabel)),
+			gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-page-name")), gosx.Text(subject.Title)),
 			gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-chip"), gosx.Attr("data-live", boolAttr(live))), gosx.Text(statusText)),
 		),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-bar__right")),
@@ -99,7 +150,7 @@ func (h *Host) renderEditorToolbar(page cmsstore.Page, live bool) gosx.Node {
 			), gosx.Text("Redo")),
 			gosx.El("a", gosx.Attrs(
 				gosx.Attr("class", "ed-btn ed-btn--ghost"),
-				gosx.Attr("href", publicPath(page.Slug)),
+				gosx.Attr("href", subject.ViewHref),
 				gosx.Attr("target", "_blank"),
 				gosx.Attr("rel", "noopener"),
 			), gosx.Text("View")),
@@ -107,7 +158,7 @@ func (h *Host) renderEditorToolbar(page cmsstore.Page, live bool) gosx.Node {
 				gosx.Attr("class", "ed-btn ed-btn--primary"),
 				gosx.Attr("type", "button"),
 				gosx.Attr("data-publish", "true"),
-			), gosx.Text(publishLabel(live))),
+			), gosx.Text(publishLabel(live || !subject.Scheduled.IsZero()))),
 		),
 	)
 }
@@ -126,12 +177,12 @@ func boolAttr(value bool) string {
 	return "false"
 }
 
-func (h *Host) renderEditorSidebar(page cmsstore.Page) gosx.Node {
+func (h *Host) renderEditorSidebar(subject editorSubject) gosx.Node {
 	return gosx.El("aside", gosx.Attrs(gosx.Attr("class", "ed-side")),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-side__block")),
-			gosx.El("h2", nil, gosx.Text("Add to this page")),
+			gosx.El("h2", nil, gosx.Text("Add to this "+subject.Noun)),
 			gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-hint")),
-				gosx.Text("Click a section on the page to edit it. Use these to add something new at the end.")),
+				gosx.Text("Click a section on the "+subject.Noun+" to edit it. Use these to add something new at the end.")),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-add-grid")),
 				addButton("heading", "Heading", "A section title"),
 				addButton("paragraph", "Text", "A paragraph"),
@@ -148,13 +199,48 @@ func (h *Host) renderEditorSidebar(page cmsstore.Page) gosx.Node {
 			),
 		),
 		h.renderLookSection(),
-		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-side__block")),
-			gosx.El("h2", nil, gosx.Text("This page")),
-			editorField("pageTitle", "Page name", page.Title, "Shown as the heading and in your menu."),
-			editorField("pageSlug", "Web address", page.Slug, addressHint(page.Slug)),
-			editorField("pageDescription", "Description for search results", pageMetaValue(page, "metaDescription", page.Description),
-				"One or two sentences. Also used when someone shares the link."),
-		),
+		renderSubjectFields(subject),
+	)
+}
+
+// renderSubjectFields is the "This page" or "This post" block of the sidebar.
+func renderSubjectFields(subject editorSubject) gosx.Node {
+	if subject.Post != nil {
+		post := subject.Post
+		publishAt := ""
+		if at, ok := PostPublishAt(*post); ok {
+			publishAt = at.UTC().Format(time.RFC3339)
+		}
+		return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-side__block")),
+			gosx.El("h2", nil, gosx.Text("This post")),
+			editorField("pageSlug", "Web address", post.Slug, "yoursite.com"+postPath(post.Slug)),
+			editorField("pageExcerpt", "Summary", post.Excerpt, "One or two sentences, shown in the post list and search results. Leave it blank to use your first paragraph."),
+			editorField("pageTags", "Categories", strings.Join(post.Tags, ", "), "Separate with commas, such as \"News, Recipes\"."),
+			editorField("pageAuthor", "Written by", post.Author, "Optional. Shown under the title."),
+			editorDateField("pagePublishAt", "Publish date", publishAt, "Leave it blank to go live as soon as you publish. Pick a future date to schedule it."),
+		)
+	}
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-side__block")),
+		gosx.El("h2", nil, gosx.Text("This page")),
+		editorField("pageTitle", "Page name", subject.Title, "Shown as the heading and in your menu."),
+		editorField("pageSlug", "Web address", subject.Slug, addressHint(subject.Slug)),
+		editorField("pageDescription", "Description for search results", subject.Description,
+			"One or two sentences. Also used when someone shares the link."),
+	)
+}
+
+// editorDateField is a date-and-time picker. The stored value is UTC; the
+// client shows and reads it in the owner's own time zone.
+func editorDateField(id, label, iso, hint string) gosx.Node {
+	return gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-field"), gosx.Attr("for", id)),
+		gosx.El("span", nil, gosx.Text(label)),
+		gosx.El("input", gosx.Attrs(
+			gosx.Attr("type", "datetime-local"),
+			gosx.Attr("id", id),
+			gosx.Attr("data-meta", strings.TrimPrefix(id, "page")),
+			gosx.Attr("data-iso", iso),
+		)),
+		gosx.El("small", nil, gosx.Text(hint)),
 	)
 }
 
@@ -231,14 +317,26 @@ func menuItem(kind, label string) gosx.Node {
 // renderEditableCanvas renders the real page inside the editor, one wrapper per
 // block carrying the block's kind so the client can serialize the DOM back into
 // a document without a second source of truth.
-func (h *Host) renderEditableCanvas(settings cmsstore.SiteSettings, page cmsstore.Page) gosx.Node {
-	blocks := make([]gosx.Node, 0, len(page.Body.Blocks)+1)
-	for index, instance := range page.Body.Blocks {
+func (h *Host) renderEditableCanvas(settings cmsstore.SiteSettings, subject editorSubject) gosx.Node {
+	blocks := make([]gosx.Node, 0, len(subject.Body.Blocks)+1)
+	for index, instance := range subject.Body.Blocks {
 		blocks = append(blocks, renderEditableBlock(index, instance))
 	}
 
+	activeSlug := subject.Slug
+	var metaLine gosx.Node = gosx.Fragment()
+	if subject.Post != nil {
+		activeSlug = "blog"
+		metaLine = gosx.El("div", gosx.Attrs(
+			gosx.Attr("class", "ed-post-meta"),
+			gosx.Attr("contenteditable", "false"),
+			gosx.Attr("title", "Set the date, author, and categories in the sidebar"),
+			gosx.Attr("data-default-date", formatPostDate(postDate(*subject.Post))),
+		), renderPostMeta(*subject.Post))
+	}
+
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "gosx-site gosx-site--public ed-canvas")),
-		h.renderSiteHeader(settings, brandFromSettings(settings), page.Slug, true),
+		h.renderSiteHeader(settings, brandFromSettings(settings), activeSlug, true),
 		gosx.El("main", gosx.Attrs(gosx.Attr("class", "site-main")),
 			gosx.El("article", gosx.Attrs(gosx.Attr("class", "site-article"), gosx.Attr("data-blocks", "true")),
 				gosx.El("h1", gosx.Attrs(
@@ -246,7 +344,8 @@ func (h *Host) renderEditableCanvas(settings cmsstore.SiteSettings, page cmsstor
 					gosx.Attr("data-page-title", "true"),
 					gosx.Attr("contenteditable", "true"),
 					gosx.Attr("spellcheck", "true"),
-				), gosx.Text(page.Title)),
+				), gosx.Text(subject.Title)),
+				metaLine,
 				gosx.Fragment(blocks...),
 			),
 		),
@@ -564,6 +663,7 @@ type editorSaveResult struct {
 	Message string `json:"message,omitempty"`
 	Slug    string `json:"slug,omitempty"`
 	Live    bool   `json:"live"`
+	Chip    string `json:"chip,omitempty"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
@@ -591,6 +691,10 @@ func (h *Host) handleEditorSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slug := normalizeSlug(firstNonEmpty(payload.Slug, title))
+	if message := reservedSlugMessage(slug); message != "" && page.Slug != slug {
+		writeJSON(w, http.StatusOK, editorSaveResult{Message: message})
+		return
+	}
 	if other, exists, _ := h.store.PageBySlug(slug); exists && other.ID != page.ID {
 		writeJSON(w, http.StatusOK, editorSaveResult{
 			Message: "Another page already uses /" + slug + ".",
@@ -730,7 +834,8 @@ func (h *Host) handleEditorPublish(w http.ResponseWriter, r *http.Request) {
 		OK:      true,
 		Live:    true,
 		Slug:    page.Slug,
-		Message: "Published",
+		Chip:    "Live",
+		Message: "Published — your page is live",
 	})
 }
 

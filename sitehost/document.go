@@ -27,6 +27,7 @@ type PageMeta struct {
 	Kind          string // "website" or "article"
 	AdminChrome   bool
 	NoIndex       bool
+	Feed          bool // advertise the RSS feed
 	// Theme is the site-wide Look. writeDocument fills it in for every page;
 	// a zero value renders the default.
 	Theme Theme
@@ -140,6 +141,14 @@ func RenderHead(meta PageMeta) gosx.Node {
 	}
 	if meta.NoIndex {
 		nodes = append(nodes, metaTag("robots", "noindex, nofollow"))
+	}
+	if meta.Feed && !meta.AdminChrome {
+		nodes = append(nodes, gosx.El("link", gosx.Attrs(
+			gosx.Attr("rel", "alternate"),
+			gosx.Attr("type", "application/rss+xml"),
+			gosx.Attr("title", strings.TrimSpace(meta.SiteTitle)+" posts"),
+			gosx.Attr("href", feedPath),
+		)))
 	}
 
 	nodes = append(nodes,

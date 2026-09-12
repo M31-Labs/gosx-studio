@@ -185,6 +185,7 @@ func (h *Host) Handler() http.Handler {
 	h.mountMessages(mux)
 	h.mountGrowth(mux)
 	h.mountMedia(mux)
+	h.mountBlog(mux)
 	h.mountPublic(mux)
 
 	// Outermost first: headers on everything, then sign-in, then CSRF on

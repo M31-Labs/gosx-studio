@@ -62,6 +62,7 @@ func (h *Host) renderAdminShell(active, heading, lede string, status adminStatus
 	navItems := []struct{ Key, Label, Href string }{
 		{"dashboard", "Dashboard", "/admin"},
 		{"pages", "Pages", "/admin/pages"},
+		{"posts", "Blog", "/admin/posts"},
 		{"messages", messagesLabel, "/admin/messages"},
 		{"media", "Pictures", "/admin/media"},
 		{"settings", "Settings", "/admin/settings"},
@@ -123,6 +124,7 @@ func (h *Host) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 	stats := gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-stats")),
 		adminStat(published, "Live pages"),
 		adminStat(drafts, "Unpublished pages"),
+		adminStat(len(h.livePosts()), "Live posts"),
 		adminStat(h.unreadMessages(), "New messages"),
 	)
 
@@ -137,6 +139,7 @@ func (h *Host) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("href", h.homeEditHref())), gosx.Text("Edit your home page")),
 			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("href", h.homeEditHref()+"#look")), gosx.Text("Change the look")),
 			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("href", "/admin/pages")), gosx.Text("All pages")),
+			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("href", "/admin/posts")), gosx.Text("Write a post")),
 		),
 	)
 
@@ -257,6 +260,10 @@ func (h *Host) handleAdminCreatePage(w http.ResponseWriter, r *http.Request) {
 	}
 	if slug == "" {
 		h.renderAdminPages(w, r, adminStatus{Message: "Give the page a web address, such as \"about-us\".", Error: true})
+		return
+	}
+	if message := reservedSlugMessage(slug); message != "" {
+		h.renderAdminPages(w, r, adminStatus{Message: message, Error: true})
 		return
 	}
 	if _, exists, _ := h.store.PageBySlug(slug); exists {

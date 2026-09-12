@@ -74,6 +74,16 @@ func (h *Host) handleSitemap(w http.ResponseWriter, r *http.Request) {
 			}
 			set.URLs = append(set.URLs, entry)
 		}
+		if posts := h.livePosts(); len(posts) > 0 {
+			set.URLs = append(set.URLs, sitemapURL{Loc: base + blogPath})
+			for _, post := range posts {
+				entry := sitemapURL{Loc: base + postPath(post.Slug)}
+				if !post.Updated.IsZero() {
+					entry.LastMod = post.Updated.UTC().Format("2006-01-02")
+				}
+				set.URLs = append(set.URLs, entry)
+			}
+		}
 	}
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=300")

@@ -83,6 +83,22 @@ a { color: var(--site-accent); }
 .site-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 0 0 16px; max-width: none; }
 .site-columns__col { min-width: 0; }
 @media (max-width: 640px) { .site-columns { grid-template-columns: 1fr; } }
+.site-post-meta { color: var(--site-muted); font-size: 14px; margin: -8px 0 24px; }
+.site-post-meta a { color: inherit; }
+.site-posts { list-style: none; margin: 0; padding: 0; }
+.site-post-card { padding: 22px 0; border-top: 1px solid var(--site-rule); }
+.site-post-card:first-child { border-top: 0; padding-top: 0; }
+.site-post-card__title { margin: 0 0 6px; font-size: clamp(20px, 2.6vw, 25px); line-height: 1.2; }
+.site-post-card__title a { text-decoration: none; }
+.site-post-card__title a:hover { text-decoration: underline; }
+.site-post-card .site-post-meta { margin: 0 0 8px; }
+.site-post-card__excerpt { margin: 0; color: var(--site-muted); }
+.site-categories { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 22px; }
+.site-categories a { font-size: 13.5px; padding: 5px 11px; border: 1px solid var(--site-rule); border-radius: 999px; text-decoration: none; color: var(--site-muted); }
+.site-categories a[aria-current="page"] { background: var(--site-accent); border-color: var(--site-accent); color: var(--site-on-accent, #fff); }
+.site-pager { display: flex; justify-content: space-between; gap: 16px; margin: 28px 0 0; padding-top: 18px; border-top: 1px solid var(--site-rule); }
+.site-pager a:only-child { margin-left: auto; }
+.site-post-nav { margin: 36px 0 0; padding-top: 18px; border-top: 1px solid var(--site-rule); font-size: 14.5px; }
 .site-list { margin: 0 0 16px; padding-left: 22px; }
 .site-list li { margin: 0 0 6px; }
 .site-divider { border: 0; border-top: 1px solid var(--site-rule); margin: 28px 0; }
@@ -430,6 +446,9 @@ body.ed-is-dragging .ed-block__tools, body.ed-is-dragging .ed-insert, body.ed-is
 }
 .ed-inline-input:focus-visible { outline: 2px solid var(--site-accent); outline-offset: 1px; color: var(--site-ink); }
 .ed-figure { display: flex; flex-direction: column; gap: 7px; margin: 20px 0; }
+.ed-post-meta { cursor: default; }
+.ed-post-meta a { pointer-events: none; }
+.ed-field input[type="datetime-local"] { width: 100%; }
 .ed-video { display: flex; flex-direction: column; gap: 7px; margin: 20px 0; }
 .ed-video .site-video { margin: 0; }
 .ed-video .site-video iframe { pointer-events: none; }

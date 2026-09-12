@@ -14,6 +14,8 @@
   var csrfMeta = document.querySelector('meta[name="csrf-token"]');
   var CSRF = csrfMeta ? csrfMeta.getAttribute("content") : "";
   var pageId = root.getAttribute("data-page-id");
+  var saveURL = root.getAttribute("data-save-url") || "/admin/api/pages/" + encodeURIComponent(pageId);
+  var publishURL = root.getAttribute("data-publish-url") || saveURL + "/publish";
   var article = root.querySelector("[data-blocks]");
   var titleNode = root.querySelector("[data-page-title]");
   var saveNode = root.querySelector("[data-save-status]");
@@ -135,6 +137,10 @@
       title: titleNode ? titleNode.textContent.trim() : "",
       slug: fieldValue("pageSlug"),
       description: fieldValue("pageDescription"),
+      excerpt: fieldValue("pageExcerpt"),
+      tags: fieldValue("pageTags"),
+      author: fieldValue("pageAuthor"),
+      publishAt: localToISO(fieldValue("pagePublishAt")),
       blocks: blocks,
     };
   }
@@ -142,6 +148,45 @@
   function fieldValue(id) {
     var el = document.getElementById(id);
     return el ? el.value.trim() : "";
+  }
+
+  /* Date pickers: the server stores UTC, the owner thinks in local time. */
+  function localToISO(local) {
+    if (!local) return "";
+    var d = new Date(local);
+    return isNaN(d.getTime()) ? "" : d.toISOString();
+  }
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+
+  function isoToLocal(iso) {
+    if (!iso) return "";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
+  Array.prototype.forEach.call(root.querySelectorAll("input[type=datetime-local][data-iso]"), function (input) {
+    input.value = isoToLocal(input.getAttribute("data-iso"));
+  });
+
+  /* The line under a post's title mirrors the sidebar as the owner types. */
+  var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  function refreshPostMeta() {
+    var line = article && article.querySelector(".ed-post-meta");
+    if (!line) return;
+    var when = fieldValue("pagePublishAt");
+    var dateText = line.getAttribute("data-default-date") || "";
+    if (when) {
+      var d = new Date(when);
+      if (!isNaN(d.getTime())) dateText = d.getDate() + " " + MONTHS[d.getMonth()] + " " + d.getFullYear();
+    }
+    var text = dateText;
+    var author = fieldValue("pageAuthor");
+    if (author) text += " · by " + author;
+    var tags = fieldValue("pageTags").split(",").map(function (t) { return t.trim(); }).filter(Boolean);
+    if (tags.length) text += " · in " + tags.join(", ");
+    line.textContent = text;
   }
 
   /* ---------- save ---------- */
@@ -160,7 +205,7 @@
     saving = true;
     var payload = serialize();
 
-    fetch("/admin/api/pages/" + encodeURIComponent(pageId), {
+    fetch(saveURL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF },
       credentials: "same-origin",
@@ -800,7 +845,12 @@
       queueSave();
       return;
     }
-    if (event.target.matches("[data-meta]")) queueSave();
+    if (event.target.matches("[data-meta]")) { refreshPostMeta(); queueSave(); }
+  });
+
+  /* A date picker commits on change, not on every keystroke. */
+  root.addEventListener("change", function (event) {
+    if (event.target.matches("input[type=datetime-local][data-meta]")) { refreshPostMeta(); queueSave(); }
   });
 
   /* beforeinput fires before the DOM changes, which is the only moment the
@@ -1127,7 +1177,7 @@
       status("dirty", "Publishing…");
       save();
       setTimeout(function () {
-        fetch("/admin/api/pages/" + encodeURIComponent(pageId) + "/publish", {
+        fetch(publishURL, {
           method: "POST",
           credentials: "same-origin",
           headers: { "X-CSRF-Token": CSRF },
@@ -1141,11 +1191,11 @@
               status("error", result.message || "That didn't publish. Try again.");
               return;
             }
-            status("saved", "Published — your page is live");
+            status("saved", result.message || "Published — your page is live");
             publishBtn.textContent = "Publish changes";
             if (chip) {
-              chip.setAttribute("data-live", "true");
-              chip.textContent = "Live";
+              chip.setAttribute("data-live", result.live ? "true" : "false");
+              chip.textContent = result.chip || "Live";
             }
           })
           .catch(function () {

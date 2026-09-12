@@ -131,6 +131,7 @@ func (h *Host) servePublicSlug(w http.ResponseWriter, r *http.Request, slug stri
 	meta.JSONLD = h.structuredData(settings, brand, page, h.absoluteBase(r))
 	meta.HeadCode = h.headCode()
 	meta.Consent = h.consentRequired()
+	meta.Feed = h.blogInMenu()
 
 	var consent gosx.Node = gosx.Fragment()
 	if meta.HeadCode != "" && meta.Consent {
