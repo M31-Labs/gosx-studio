@@ -30,6 +30,10 @@ type PageMeta struct {
 	// Theme is the site-wide Look. writeDocument fills it in for every page;
 	// a zero value renders the default.
 	Theme Theme
+	// CSRF is the token admin pages expose to their own scripts. Never set on
+	// a public page: anyone can fetch those, and a token readable by anyone
+	// protects no one.
+	CSRF string
 }
 
 func metaFromSettings(settings cmsstore.SiteSettings) PageMeta {
@@ -167,6 +171,9 @@ func RenderHead(meta PageMeta) gosx.Node {
 			gosx.Attr("rel", "stylesheet"),
 			gosx.Attr("href", hostruntime.StylesheetPath),
 		)))
+		if meta.CSRF != "" {
+			nodes = append(nodes, gosx.El("meta", gosx.Attrs(gosx.Attr("name", csrfMetaName), gosx.Attr("content", meta.CSRF))))
+		}
 	}
 
 	return gosx.El("head", nil, gosx.Fragment(nodes...))

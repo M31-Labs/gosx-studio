@@ -2,7 +2,6 @@ package sitehost
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -133,10 +132,7 @@ func TestEditorCarriesTheLookPicker(t *testing.T) {
 
 func TestThemeAPISavesAndReturnsCSS(t *testing.T) {
 	host, handler := newTestHost(t)
-	req := httptest.NewRequest(http.MethodPost, "/admin/api/theme", strings.NewReader(`{"palette":"bold","fonts":"modern","accent":"#00aa00"}`))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
+	rec := postJSON(t, handler, "/admin/api/theme", `{"palette":"bold","fonts":"modern","accent":"#00aa00"}`)
 
 	body := rec.Body.String()
 	if rec.Code != http.StatusOK || !strings.Contains(body, `"ok":true`) {

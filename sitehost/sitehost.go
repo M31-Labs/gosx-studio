@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 
 	"m31labs.dev/gosx"
 	cmsstore "m31labs.dev/gosx-studio/cms/store"
@@ -77,6 +78,10 @@ type Host struct {
 	store    LifecycleContentStore
 	opts     Options
 	messages *messageStore
+
+	securityOnce sync.Once
+	csrf         string
+	authFailures *rateLimiter
 }
 
 // Open loads or creates the site at Options.DataPath.
@@ -94,7 +99,7 @@ func Open(opts Options) (*Host, error) {
 		}
 	}
 
-	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath())}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow)}
 	// Seeding is the wizard's job. Options.Seed exists so tests and embedders
 	// can skip the wizard and get a site in one call.
 	if opts.Seed && !host.SetupComplete() {
@@ -114,7 +119,7 @@ func Open(opts Options) (*Host, error) {
 // this to supply in-memory storage.
 func NewWithStore(store LifecycleContentStore, opts Options) *Host {
 	opts = opts.normalize()
-	return &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath())}
+	return &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow)}
 }
 
 // Store exposes the underlying content store.
@@ -151,7 +156,9 @@ func (h *Host) Handler() http.Handler {
 	h.mountMessages(mux)
 	h.mountPublic(mux)
 
-	return h.guardAdmin(h.requireSetup(mux))
+	// Outermost first: headers on everything, then sign-in, then CSRF on
+	// what is signed in, then the setup gate, then the routes.
+	return securityHeaders(h.guardAdmin(h.requireCSRF(h.requireSetup(mux))))
 }
 
 // settings reads site settings, falling back to the configured defaults so the
@@ -177,6 +184,9 @@ func (h *Host) settings() cmsstore.SiteSettings {
 func (h *Host) writeDocument(w http.ResponseWriter, status int, meta PageMeta, body gosx.Node) {
 	if meta.Theme.Palette.Key == "" {
 		meta.Theme = h.theme()
+	}
+	if meta.AdminChrome {
+		meta.CSRF = h.csrfToken()
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)

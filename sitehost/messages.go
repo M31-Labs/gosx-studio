@@ -375,7 +375,7 @@ func (h *Host) handleAdminMessages(w http.ResponseWriter, r *http.Request) {
 	} else {
 		items := make([]gosx.Node, 0, len(messages))
 		for _, message := range messages {
-			items = append(items, renderMessage(message))
+			items = append(items, h.renderMessage(message))
 		}
 		listing = gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-messages")), gosx.Fragment(items...))
 	}
@@ -386,7 +386,7 @@ func (h *Host) handleAdminMessages(w http.ResponseWriter, r *http.Request) {
 	h.writeDocument(w, http.StatusOK, h.adminMeta("Messages"), body)
 }
 
-func renderMessage(message Message) gosx.Node {
+func (h *Host) renderMessage(message Message) gosx.Node {
 	state := "unread"
 	toggleLabel, toggleValue := "Mark as read", "1"
 	if message.Read {
@@ -404,6 +404,7 @@ func renderMessage(message Message) gosx.Node {
 		gosx.El("footer", gosx.Attrs(gosx.Attr("class", "admin-message__actions")),
 			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("href", "mailto:"+message.Email+"?subject="+replySubject(message))), gosx.Text("Reply by email")),
 			gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/messages/"+message.ID+"/read"), gosx.Attr("class", "admin-inline-form")),
+			h.csrfField(),
 				gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "read"), gosx.Attr("value", toggleValue))),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("type", "submit")), gosx.Text(toggleLabel)),
 			),

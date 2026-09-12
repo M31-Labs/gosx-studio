@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // auth.go guards the back office.
@@ -29,11 +30,24 @@ func (h *Host) guardAdmin(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		host := remoteHost(r)
+		now := time.Now()
+		if h.authFailures != nil && h.authFailures.blocked(host, now) {
+			w.Header().Set("Retry-After", "600")
+			http.Error(w, "Too many sign-in attempts. Wait ten minutes and try again.", http.StatusTooManyRequests)
+			return
+		}
 		user, pass, ok := r.BasicAuth()
 		if !ok || !secureEqual(user, AdminUser) || !secureEqual(pass, password) {
+			if ok && h.authFailures != nil {
+				h.authFailures.record(host, now)
+			}
 			w.Header().Set("WWW-Authenticate", adminRealm)
 			http.Error(w, "Sign in to manage this site.", http.StatusUnauthorized)
 			return
+		}
+		if h.authFailures != nil {
+			h.authFailures.clear(host)
 		}
 		next.ServeHTTP(w, r)
 	})

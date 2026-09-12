@@ -11,6 +11,8 @@
   var root = document.querySelector("[data-editor]");
   if (!root) return;
 
+  var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+  var CSRF = csrfMeta ? csrfMeta.getAttribute("content") : "";
   var pageId = root.getAttribute("data-page-id");
   var article = root.querySelector("[data-blocks]");
   var titleNode = root.querySelector("[data-page-title]");
@@ -97,7 +99,7 @@
 
     fetch("/admin/api/pages/" + encodeURIComponent(pageId), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF },
       credentials: "same-origin",
       body: JSON.stringify(payload),
     })
@@ -558,7 +560,7 @@
     form.append("file", input.files[0]);
     if (label) label.setAttribute("data-busy", "true");
     status("dirty", "Uploading picture…");
-    fetch("/admin/api/upload", { method: "POST", credentials: "same-origin", body: form })
+    fetch("/admin/api/upload", { method: "POST", credentials: "same-origin", headers: { "X-CSRF-Token": CSRF }, body: form })
       .then(function (r) { return r.json(); })
       .then(function (result) {
         if (label) label.removeAttribute("data-busy");
@@ -723,6 +725,7 @@
         fetch("/admin/api/pages/" + encodeURIComponent(pageId) + "/publish", {
           method: "POST",
           credentials: "same-origin",
+          headers: { "X-CSRF-Token": CSRF },
         })
           .then(function (r) {
             return r.json();
@@ -766,6 +769,8 @@
   var look = root && root.querySelector("[data-look]");
   if (!look) return;
 
+  var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+  var CSRF = csrfMeta ? csrfMeta.getAttribute("content") : "";
   var presetsNode = look.querySelector("[data-look-presets]");
   var presets = { palettes: [], fonts: [] };
   try { presets = JSON.parse(presetsNode.textContent); } catch (e) {}
@@ -831,7 +836,7 @@
     status("dirty", "Saving the look…");
     fetch("/admin/api/theme", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF },
       credentials: "same-origin",
       body: JSON.stringify(state),
     })

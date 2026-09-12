@@ -212,7 +212,7 @@ func (h *Host) renderAdminPages(w http.ResponseWriter, r *http.Request, status a
 				gosx.El("td", nil, gosx.Text(page.Title)),
 				gosx.El("td", nil, gosx.Text(publicPath(page.Slug))),
 				gosx.El("td", nil, gosx.El("span", gosx.Attrs(gosx.Attr("class", "admin-badge"), gosx.Attr("data-state", "archived")), gosx.Text("Archived"))),
-				gosx.El("td", gosx.Attrs(gosx.Attr("class", "admin-row-actions")), pageActionButton(page.ID, "restore", "Restore")),
+				gosx.El("td", gosx.Attrs(gosx.Attr("class", "admin-row-actions")), h.pageActionButton(page.ID, "restore", "Restore")),
 			))
 		}
 		archivedPanel = gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
@@ -226,6 +226,7 @@ func (h *Host) renderAdminPages(w http.ResponseWriter, r *http.Request, status a
 	create := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
 		gosx.El("h2", nil, gosx.Text("Add a page")),
 		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/pages")),
+			h.csrfField(),
 			adminTextField("title", "Page name", "", "Shown as the heading and in your site menu."),
 			adminTextField("slug", "Web address", "", "Letters and dashes only. \"about-us\" becomes yoursite.com/about-us."),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-actions")),
@@ -296,6 +297,7 @@ func (h *Host) renderAdminPageDetail(w http.ResponseWriter, page cmsstore.Page, 
 	form := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
 		gosx.El("h2", nil, gosx.Text("Page content")),
 		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/pages/"+page.ID)),
+			h.csrfField(),
 			adminTextField("title", "Page name", page.Title, ""),
 			adminTextField("slug", "Web address", page.Slug, "Changing this changes the page's link. Old links will stop working."),
 			adminTextareaField("body", "Page text", documentToText(page.Body),
@@ -321,6 +323,7 @@ func (h *Host) renderAdminPageDetail(w http.ResponseWriter, page cmsstore.Page, 
 		gosx.El("h2", nil, gosx.Text("Publishing")),
 		gosx.El("p", nil, gosx.Text(stateLine)),
 		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/pages/"+page.ID+"/publish")),
+			h.csrfField(),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-actions")),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("type", "submit")), gosx.Text(publishLabel)),
 				viewLink(live, page.Slug),
@@ -420,6 +423,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 	form := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
 		gosx.El("h2", nil, gosx.Text("Site details")),
 		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/settings")),
+			h.csrfField(),
 			adminTextField("title", "Site name", settings.Title, "Shown in the browser tab, your site menu, and search results."),
 			adminTextField("description", "Site description", settings.Description,
 				"One or two sentences about your business. Search engines show this under your site name."),
@@ -543,22 +547,22 @@ func (h *Host) renderPageRow(page cmsstore.Page, first, last bool) gosx.Node {
 	actions := []gosx.Node{}
 	if !isHome {
 		if !first {
-			actions = append(actions, pageActionButton(page.ID, "up", "↑"))
+			actions = append(actions, h.pageActionButton(page.ID, "up", "↑"))
 		}
 		if !last {
-			actions = append(actions, pageActionButton(page.ID, "down", "↓"))
+			actions = append(actions, h.pageActionButton(page.ID, "down", "↓"))
 		}
 		if PageNavHidden(page) {
-			actions = append(actions, pageActionButton(page.ID, "show", "Show in menu"))
+			actions = append(actions, h.pageActionButton(page.ID, "show", "Show in menu"))
 		} else {
-			actions = append(actions, pageActionButton(page.ID, "hide", "Hide from menu"))
+			actions = append(actions, h.pageActionButton(page.ID, "hide", "Hide from menu"))
 		}
 		if PageOffline(page) {
-			actions = append(actions, pageActionButton(page.ID, "online", "Put back online"))
+			actions = append(actions, h.pageActionButton(page.ID, "online", "Put back online"))
 		} else if h.isLive(page) {
-			actions = append(actions, pageActionButton(page.ID, "offline", "Take offline"))
+			actions = append(actions, h.pageActionButton(page.ID, "offline", "Take offline"))
 		}
-		actions = append(actions, pageActionButton(page.ID, "archive", "Archive"))
+		actions = append(actions, h.pageActionButton(page.ID, "archive", "Archive"))
 	}
 
 	name := gosx.El("a", gosx.Attrs(gosx.Attr("href", "/admin/edit/"+page.ID)), gosx.Text(page.Title))
@@ -579,8 +583,9 @@ func (h *Host) isLive(page cmsstore.Page) bool {
 	return ok
 }
 
-func pageActionButton(id, action, label string) gosx.Node {
+func (h *Host) pageActionButton(id, action, label string) gosx.Node {
 	return gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/pages/"+id+"/action"), gosx.Attr("class", "admin-inline-form")),
+			h.csrfField(),
 		gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "action"), gosx.Attr("value", action))),
 		gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-row-btn"), gosx.Attr("type", "submit"), gosx.Attr("data-action", action)), gosx.Text(label)),
 	)

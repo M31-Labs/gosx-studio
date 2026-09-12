@@ -41,6 +41,7 @@ func postUpload(t *testing.T, handler http.Handler, filename string, data []byte
 	}
 	req := httptest.NewRequest(http.MethodPost, "/admin/api/upload", &body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-CSRF-Token", csrfToken(t, handler))
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	return rec
@@ -151,9 +152,7 @@ func TestEditorImageBlockOffersUpload(t *testing.T) {
 	}
 	// Give the page an image block so the control renders.
 	payload := `{"title":"Menu","slug":"menu","blocks":[{"kind":"image","url":"/uploads/x.png","alt":"Loaves"}]}`
-	req := httptest.NewRequest(http.MethodPost, "/admin/api/pages/"+page.ID, strings.NewReader(payload))
-	req.Header.Set("Content-Type", "application/json")
-	handler.ServeHTTP(httptest.NewRecorder(), req)
+	postJSON(t, handler, "/admin/api/pages/"+page.ID, payload)
 
 	body := get(t, handler, "/admin/edit/"+page.ID).Body.String()
 	mustContain(t, body, `data-upload="true"`, "image blocks carry an upload control")

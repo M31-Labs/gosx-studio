@@ -128,9 +128,7 @@ func TestEditorOffersAndSavesTheContactForm(t *testing.T) {
 	mustContain(t, body, `data-insert="form"`, "the insert menu offers a contact form")
 
 	payload := `{"title":"Menu","slug":"menu","blocks":[{"kind":"paragraph","text":"Ask us anything."},{"kind":"form"}]}`
-	req := httptest.NewRequest(http.MethodPost, "/admin/api/pages/"+id, strings.NewReader(payload))
-	req.Header.Set("Content-Type", "application/json")
-	handler.ServeHTTP(httptest.NewRecorder(), req)
+	postJSON(t, handler, "/admin/api/pages/"+id, payload)
 	post(t, handler, "/admin/api/pages/"+id+"/publish", url.Values{})
 
 	live := get(t, handler, "/menu").Body.String()

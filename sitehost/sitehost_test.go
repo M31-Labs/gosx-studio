@@ -34,10 +34,38 @@ func get(t *testing.T, handler http.Handler, path string) *httptest.ResponseReco
 	return rec
 }
 
+// csrfToken reads the token an admin page exposes, the way the editor's own
+// script does, so tests post the way a real browser would.
+func csrfToken(t *testing.T, handler http.Handler) string {
+	t.Helper()
+	body := get(t, handler, "/admin").Body.String()
+	marker := `<meta name="csrf-token" content="`
+	start := strings.Index(body, marker)
+	if start < 0 {
+		return ""
+	}
+	rest := body[start+len(marker):]
+	return rest[:strings.Index(rest, `"`)]
+}
+
 func post(t *testing.T, handler http.Handler, path string, form url.Values) *httptest.ResponseRecorder {
 	t.Helper()
+	if strings.HasPrefix(path, "/admin") && form.Get("_csrf") == "" {
+		form.Set("_csrf", csrfToken(t, handler))
+	}
 	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	return rec
+}
+
+// postJSON posts to the editor API with the token in the header.
+func postJSON(t *testing.T, handler http.Handler, path, payload string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-CSRF-Token", csrfToken(t, handler))
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	return rec
@@ -549,10 +577,7 @@ func TestEditorSaveRewritesTheDocument(t *testing.T) {
 		{"kind":"quote","text":"The croissants are unreal."},
 		{"kind":"button","text":"Book a table","url":"/contact"}
 	]}`
-	req := httptest.NewRequest(http.MethodPost, "/admin/api/pages/"+id, strings.NewReader(payload))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
+	rec := postJSON(t, handler, "/admin/api/pages/"+id, payload)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("editor save = %d, want 200: %s", rec.Code, rec.Body.String())
@@ -590,9 +615,7 @@ func TestEditorDropsEmptyBlocks(t *testing.T) {
 		{"kind":"heading","text":"","level":"2"},
 		{"kind":"image","url":""}
 	]}`
-	req := httptest.NewRequest(http.MethodPost, "/admin/api/pages/"+id, strings.NewReader(payload))
-	req.Header.Set("Content-Type", "application/json")
-	handler.ServeHTTP(httptest.NewRecorder(), req)
+	postJSON(t, handler, "/admin/api/pages/"+id, payload)
 
 	page, _, _ := host.Store().PageByID(id)
 	if len(page.Body.Blocks) != 1 {
@@ -624,10 +647,7 @@ func TestEditorRejectsADuplicateAddress(t *testing.T) {
 	id := firstPageID(t, host, "menu")
 
 	payload := `{"title":"Menu","slug":"visit","blocks":[{"kind":"paragraph","text":"Hi."}]}`
-	req := httptest.NewRequest(http.MethodPost, "/admin/api/pages/"+id, strings.NewReader(payload))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
+	rec := postJSON(t, handler, "/admin/api/pages/"+id, payload)
 
 	body := rec.Body.String()
 	if strings.Contains(body, `"ok":true`) {
@@ -661,9 +681,7 @@ func TestEditingALivePageDoesNotTakeItOffline(t *testing.T) {
 	}
 
 	payload := `{"title":"Menu","slug":"menu","blocks":[{"kind":"paragraph","text":"A draft nobody should see yet."}]}`
-	req := httptest.NewRequest(http.MethodPost, "/admin/api/pages/"+id, strings.NewReader(payload))
-	req.Header.Set("Content-Type", "application/json")
-	handler.ServeHTTP(httptest.NewRecorder(), req)
+	postJSON(t, handler, "/admin/api/pages/"+id, payload)
 
 	rec := get(t, handler, "/menu")
 	if rec.Code != http.StatusOK {
@@ -691,9 +709,7 @@ func TestNeverPublishedPageStaysPrivateWhileEdited(t *testing.T) {
 		t.Fatal(err)
 	}
 	payload := `{"title":"Draft only","slug":"draft-only","blocks":[{"kind":"paragraph","text":"Secret."}]}`
-	req := httptest.NewRequest(http.MethodPost, "/admin/api/pages/"+page.ID, strings.NewReader(payload))
-	req.Header.Set("Content-Type", "application/json")
-	handler.ServeHTTP(httptest.NewRecorder(), req)
+	postJSON(t, handler, "/admin/api/pages/"+page.ID, payload)
 
 	if code := get(t, handler, "/draft-only").Code; code != http.StatusNotFound {
 		t.Fatal("a page that was never published must stay private")
