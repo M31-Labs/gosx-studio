@@ -382,27 +382,23 @@ func TestAdminPasswordGuardsOnlyTheBackOffice(t *testing.T) {
 	if code := get(t, handler, "/").Code; code != http.StatusOK {
 		t.Fatalf("public site should stay open: GET / = %d, want 200", code)
 	}
-	if code := get(t, handler, "/admin").Code; code != http.StatusUnauthorized {
-		t.Fatalf("admin without credentials = %d, want 401", code)
+	for _, path := range []string{"/admin", "/admin/pages"} {
+		rec := get(t, handler, path)
+		if rec.Code != http.StatusSeeOther || !strings.HasPrefix(rec.Header().Get("Location"), loginPath) {
+			t.Fatalf("%s without an account = %d %q, want a redirect to sign in", path, rec.Code, rec.Header().Get("Location"))
+		}
 	}
-	if code := get(t, handler, "/admin/pages").Code; code != http.StatusUnauthorized {
-		t.Fatalf("admin subpath without credentials = %d, want 401", code)
+	// The server password unlocks exactly one thing: creating the owner.
+	rec := post(t, handler, loginPath, url.Values{"name": {"Ana"}, "email": {"ana@example.com"}, "password": {"correct horse battery"}, "serverPassword": {"correct horse"}})
+	session := cookieNamed(rec, sessionCookie)
+	if session == nil {
+		t.Fatalf("creating the owner with the server password = %d", rec.Code)
 	}
-
-	req := httptest.NewRequest(http.MethodGet, "/admin", nil)
-	req.SetBasicAuth(AdminUser, "correct horse")
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("admin with correct credentials = %d, want 200", rec.Code)
+	if code := getWithCookie(t, handler, "/admin", session).Code; code != http.StatusOK {
+		t.Fatalf("admin with a session = %d, want 200", code)
 	}
-
-	req = httptest.NewRequest(http.MethodGet, "/admin", nil)
-	req.SetBasicAuth(AdminUser, "wrong")
-	rec = httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("admin with wrong password = %d, want 401", rec.Code)
+	if code := get(t, handler, "/").Code; code != http.StatusOK {
+		t.Fatal("the public site stays open")
 	}
 }
 

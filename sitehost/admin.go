@@ -68,6 +68,7 @@ func (h *Host) renderAdminShell(active, heading, lede string, status adminStatus
 		{"shop", "Shop", "/admin/shop"},
 		{"stats", "Visitors", "/admin/stats"},
 		{"media", "Pictures", "/admin/media"},
+		{"users", "People", peoplePath},
 		{"settings", "Settings", "/admin/settings"},
 	}
 	links := make([]gosx.Node, 0, len(navItems)+1)
@@ -79,6 +80,18 @@ func (h *Host) renderAdminShell(active, heading, lede string, status adminStatus
 		links = append(links, gosx.El("a", gosx.Attrs(attrs...), gosx.Text(item.Label)))
 	}
 	links = append(links, gosx.El("a", gosx.Attrs(gosx.Attr("href", "/"), gosx.Attr("target", "_blank"), gosx.Attr("rel", "noopener")), gosx.Text("View site")))
+	if h.users.count() > 0 {
+		accountAttrs := []any{gosx.Attr("href", accountPath), gosx.Attr("class", "admin-nav__account")}
+		if active == "account" {
+			accountAttrs = append(accountAttrs, gosx.Attr("aria-current", "page"))
+		}
+		links = append(links,
+			gosx.El("a", gosx.Attrs(accountAttrs...), gosx.Text("Account")),
+			gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", logoutPath), gosx.Attr("class", "admin-inline-form")),
+				h.csrfField(),
+				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-nav__signout"), gosx.Attr("type", "submit")), gosx.Text("Sign out"))),
+		)
+	}
 
 	body := []gosx.Node{
 		gosx.El("h1", nil, gosx.Text(heading)),
@@ -520,6 +533,7 @@ func (h *Host) handleAdminSaveSettings(w http.ResponseWriter, r *http.Request) {
 		h.renderAdminSettings(w, adminStatus{Message: "We couldn't save those settings. Try again.", Error: true})
 		return
 	}
+	h.auditContent(r, "settings.saved", "Changed site settings")
 	http.Redirect(w, r, "/admin/settings?status="+queryEscape("Settings saved."), http.StatusSeeOther)
 }
 

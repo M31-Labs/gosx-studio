@@ -299,6 +299,9 @@ a { color: var(--site-accent); }
 .admin-stat { background: var(--site-ground); padding: 16px 20px; flex: 1 1 160px; }
 .admin-stat strong { display: block; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .admin-stat span { display: block; font-size: 13px; color: var(--site-muted); margin-top: 4px; }
+.wz-card--narrow { max-width: 460px; }
+.admin-nav__account { margin-left: auto; }
+.admin-nav__signout { font: inherit; font-size: 14px; background: none; border: 0; color: var(--site-muted); cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 3px; }
 .admin-code { background: var(--site-surface); border: 1px solid var(--site-rule); padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .admin-table--records code { font-size: 13px; }
 .admin-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; max-width: 900px; }

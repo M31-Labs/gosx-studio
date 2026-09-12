@@ -140,29 +140,25 @@ func TestRepeatedFailedSignInsLockOut(t *testing.T) {
 		t.Fatal(err)
 	}
 	handler := host.Handler()
-	attempt := func(password string) int {
-		req := httptest.NewRequest(http.MethodGet, "/admin", nil)
-		req.RemoteAddr = "203.0.113.9:4444"
-		req.SetBasicAuth(AdminUser, password)
+	attempt := func(from, serverPassword string) *httptest.ResponseRecorder {
+		form := url.Values{"name": {"Ana"}, "email": {"ana@example.com"}, "password": {"a long enough password"}, "serverPassword": {serverPassword}}
+		req := httptest.NewRequest(http.MethodPost, loginPath, strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = from + ":4444"
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
-		return rec.Code
+		return rec
 	}
 	for i := 0; i < authFailLimit; i++ {
-		if code := attempt("wrong"); code != http.StatusUnauthorized {
-			t.Fatalf("attempt %d = %d, want 401", i, code)
+		if rec := attempt("203.0.113.9", "wrong"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "isn&#39;t the password") {
+			t.Fatalf("attempt %d = %d", i, rec.Code)
 		}
 	}
-	if code := attempt("right"); code != http.StatusTooManyRequests {
-		t.Fatalf("after %d failures the right password should still be locked out, got %d", authFailLimit, code)
+	if rec := attempt("203.0.113.9", "right"); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("after %d failures the right password should still be locked out, got %d", authFailLimit, rec.Code)
 	}
 	// Another address is unaffected.
-	req := httptest.NewRequest(http.MethodGet, "/admin", nil)
-	req.RemoteAddr = "198.51.100.7:1234"
-	req.SetBasicAuth(AdminUser, "right")
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("a different address was locked out too: %d", rec.Code)
+	if rec := attempt("198.51.100.7", "right"); rec.Code != http.StatusSeeOther {
+		t.Fatalf("a different address was locked out too: %d %s", rec.Code, rec.Body.String())
 	}
 }

@@ -55,6 +55,7 @@ type editorSubject struct {
 	Page        *cmsstore.Page
 	Post        *cmsstore.Post
 	Checks      []string // what to fix before publishing
+	CanDesign   bool     // may change the site-wide Look
 }
 
 func (h *Host) pageSubject(page cmsstore.Page) editorSubject {
@@ -85,7 +86,9 @@ func (h *Host) handleEditor(w http.ResponseWriter, r *http.Request) {
 		h.writeAdminNotFound(w, "page")
 		return
 	}
-	h.renderEditor(w, h.pageSubject(page))
+	subject := h.pageSubject(page)
+	subject.CanDesign = h.roleAtLeast(r, roleAdmin)
+	h.renderEditor(w, subject)
 }
 
 func (h *Host) renderEditor(w http.ResponseWriter, subject editorSubject) {
@@ -193,6 +196,10 @@ func boolAttr(value bool) string {
 }
 
 func (h *Host) renderEditorSidebar(subject editorSubject) gosx.Node {
+	var lookSection gosx.Node = gosx.Fragment()
+	if subject.CanDesign {
+		lookSection = h.renderLookSection()
+	}
 	return gosx.El("aside", gosx.Attrs(gosx.Attr("class", "ed-side")),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-side__block")),
 			gosx.El("h2", nil, gosx.Text("Add to this "+subject.Noun)),
@@ -214,7 +221,7 @@ func (h *Host) renderEditorSidebar(subject editorSubject) gosx.Node {
 				addButton("product", "Product", "Something from your shop"),
 			),
 		),
-		h.renderLookSection(),
+		lookSection,
 		renderSubjectFields(subject),
 		renderChecks(subject.Checks),
 	)
@@ -918,6 +925,9 @@ func (h *Host) handleEditorPublish(w http.ResponseWriter, r *http.Request) {
 	}
 	result := h.publishPage(page)
 	result.Checks = h.readinessChecks("page", pageMetaValue(page, "metaDescription", page.Description), page.Body)
+	if result.OK {
+		h.auditContent(r, "page.published", firstNonEmpty(result.Message, "Published")+": “"+page.Title+"”")
+	}
 	writeJSON(w, http.StatusOK, result)
 }
 

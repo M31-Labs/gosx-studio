@@ -40,6 +40,19 @@ admin area by accident.
 Every site gets a working contact form on its contact page. Messages land in
 the admin area's inbox — no mail server to configure.
 
+### Accounts
+
+On a laptop with no `-admin-password`, the admin is open, as before. On a
+server, the password you start with unlocks one thing: the form at
+`/admin/login` that creates the owner account. After that, everyone signs in
+with an email and password, and the password on the command line is only a
+bootstrap.
+
+**People** in the admin invites others by link, as an editor (writes and
+publishes, reads messages) or an admin (everything except handing over the
+site). Anyone can turn on two-step sign-in with an authenticator app under
+**Account**. **Activity** shows who did what, and can be downloaded.
+
 ### Use your own domain
 
 Open **Settings → Your own domain** in the admin. Type the domain, add the two

@@ -185,7 +185,7 @@ func printWelcome(addr, dataPath string, guarded, https bool, domain string) {
 	fmt.Println("  Edit your site       " + base + "/admin")
 	fmt.Println("  Saved in             " + dataPath)
 	if guarded {
-		fmt.Println("  Admin sign-in        username \"" + sitehost.AdminUser + "\" with the password you set")
+		fmt.Println("  Admin sign-in        open " + base + "/admin/login and create the owner account; the password you set unlocks that form")
 	} else {
 		fmt.Println("  Admin sign-in        not required (this server only accepts local connections)")
 	}

@@ -7,6 +7,8 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -38,16 +40,37 @@ const (
 // secret to derive it from.
 func (h *Host) csrfToken() string {
 	h.securityOnce.Do(func() {
-		secret := []byte(strings.TrimSpace(h.opts.AdminPassword))
-		if len(secret) == 0 {
-			secret = make([]byte, 32)
-			_, _ = rand.Read(secret)
-		}
-		mac := hmac.New(sha256.New, secret)
+		mac := hmac.New(sha256.New, h.installSecret())
 		mac.Write([]byte("gosx-site csrf v1"))
 		h.csrf = hex.EncodeToString(mac.Sum(nil))
 	})
 	return h.csrf
+}
+
+// installSecret is a random key kept in a file beside the site data. It
+// signs the CSRF token and the short-lived sign-in cookies, so both stay
+// valid across restarts and never depend on a password.
+func (h *Host) installSecret() []byte {
+	h.secretOnce.Do(func() {
+		path := ""
+		if h.opts.DataPath != "" {
+			path = filepath.Join(filepath.Dir(h.opts.DataPath), "secret.key")
+		}
+		if path != "" {
+			if raw, err := os.ReadFile(path); err == nil && len(raw) >= 32 {
+				h.secret = raw
+				return
+			}
+		}
+		secret := make([]byte, 32)
+		_, _ = rand.Read(secret)
+		if path != "" {
+			_ = os.MkdirAll(filepath.Dir(path), 0o755)
+			_ = os.WriteFile(path, secret, 0o600)
+		}
+		h.secret = secret
+	})
+	return h.secret
 }
 
 // csrfField is the hidden input every admin form carries.
@@ -66,7 +89,7 @@ func tokensEqual(a, b string) bool {
 // csrfExempt paths are unauthenticated by design: the wizard runs before
 // there is an owner to protect, and the contact form is for the public.
 func csrfExempt(path string) bool {
-	return strings.HasPrefix(path, "/setup") || path == contactSendPath || path == statsHitPath || strings.HasPrefix(path, formSendPrefix) || strings.HasPrefix(path, cartPath+"/") || path == checkoutPath || path == stripeWebhookPath
+	return strings.HasPrefix(path, "/setup") || path == contactSendPath || path == statsHitPath || path == loginPath || path == loginCodePath || strings.HasPrefix(path, joinPrefix) || strings.HasPrefix(path, formSendPrefix) || strings.HasPrefix(path, cartPath+"/") || path == checkoutPath || path == stripeWebhookPath
 }
 
 // requireCSRF rejects any state-changing request that did not originate from

@@ -55,8 +55,9 @@ type Options struct {
 	Seed bool
 	// SiteKind picks the starter template when Seed is set. See SiteKinds.
 	SiteKind string
-	// AdminPassword protects every /admin path with HTTP basic auth when set.
-	// Leave it empty only for a server bound to localhost.
+	// AdminPassword is the bootstrap secret on a real server: it gates the
+	// form that creates the owner account, after which sign-in is by email
+	// and password. Leave it empty only for a server bound to localhost.
 	AdminPassword string
 	// UploadDir is where pictures are stored. Defaults to an "uploads" folder
 	// beside DataPath.
@@ -98,6 +99,8 @@ type Host struct {
 
 	securityOnce sync.Once
 	csrf         string
+	secretOnce   sync.Once
+	secret       []byte
 	authFailures *rateLimiter
 
 	mailer     Mailer
@@ -108,6 +111,8 @@ type Host struct {
 	forms    *formStore
 	products *productStore
 	orders   *orderStore
+	users    *userStore
+	auditLog *auditStore
 	due      dueChecker
 	backups  backupState
 
@@ -128,7 +133,7 @@ func Open(opts Options) (*Host, error) {
 		return nil, fmt.Errorf("sitehost: open site data: %w", err)
 	}
 
-	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath()), products: newProductStore(opts.productsPath()), orders: newOrderStore(opts.ordersPath())}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath()), products: newProductStore(opts.productsPath()), orders: newOrderStore(opts.ordersPath()), users: newUserStore(opts.usersPath()), auditLog: newAuditStore(opts.auditPath())}
 	host.Migrated = migrated
 	if err := host.configureMail(); err != nil {
 		return nil, err
@@ -152,7 +157,7 @@ func Open(opts Options) (*Host, error) {
 // this to supply in-memory storage.
 func NewWithStore(store LifecycleContentStore, opts Options) *Host {
 	opts = opts.normalize()
-	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath()), products: newProductStore(opts.productsPath()), orders: newOrderStore(opts.ordersPath())}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath()), products: newProductStore(opts.productsPath()), orders: newOrderStore(opts.ordersPath()), users: newUserStore(opts.usersPath()), auditLog: newAuditStore(opts.auditPath())}
 	_ = host.configureMail()
 	return host
 }
@@ -213,6 +218,8 @@ func (h *Host) Handler() http.Handler {
 	h.mountBackups(mux)
 	h.mountShop(mux)
 	h.mountCheckout(mux)
+	h.mountAuth(mux)
+	h.mountAudit(mux)
 	h.mountPublic(mux)
 
 	// Outermost first: headers on everything, then sign-in, then CSRF on

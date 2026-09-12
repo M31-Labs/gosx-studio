@@ -855,7 +855,9 @@ func (h *Host) handlePostEditor(w http.ResponseWriter, r *http.Request) {
 		h.writeAdminNotFound(w, "post")
 		return
 	}
-	h.renderEditor(w, h.postSubject(post))
+	subject := h.postSubject(post)
+	subject.CanDesign = h.roleAtLeast(r, roleAdmin)
+	h.renderEditor(w, subject)
 }
 
 type postSavePayload struct {
@@ -937,5 +939,8 @@ func (h *Host) handlePostPublish(w http.ResponseWriter, r *http.Request) {
 	}
 	result := h.publishPost(post)
 	result.Checks = h.readinessChecks("post", "", post.Body)
+	if result.OK {
+		h.auditContent(r, "post.published", firstNonEmpty(result.Message, "Published")+": “"+post.Title+"”")
+	}
 	writeJSON(w, http.StatusOK, result)
 }
