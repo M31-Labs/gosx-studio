@@ -39,6 +39,7 @@ func run() error {
 		desc     = flag.String("description", env("GOSX_SITE_DESCRIPTION", ""), "one-line site description for search results")
 		baseURL  = flag.String("base-url", env("GOSX_SITE_BASE_URL", ""), "public address, e.g. https://yourbusiness.com")
 		password = flag.String("admin-password", env("GOSX_SITE_ADMIN_PASSWORD", ""), "password for the admin area (required off localhost)")
+		mailURL  = flag.String("mail", env("GOSX_SITE_MAIL", ""), "email transport: smtp://user:pass@host:587?from=you@example.com, resend://KEY?from=..., or postmark://TOKEN?from=...")
 	)
 	flag.Parse()
 
@@ -60,6 +61,7 @@ func run() error {
 		SiteDescription: *desc,
 		BaseURL:         *baseURL,
 		AdminPassword:   *password,
+		MailURL:         *mailURL,
 	})
 	if err != nil {
 		return err

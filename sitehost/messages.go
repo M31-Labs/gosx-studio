@@ -343,10 +343,12 @@ func (h *Host) handleContactSend(w http.ResponseWriter, r *http.Request) {
 		fail("rate")
 		return
 	}
-	if err := h.messages.add(Message{Name: name, Email: email, Body: body, Page: back, Received: now}); err != nil {
+	message := Message{Name: name, Email: email, Body: body, Page: back, Received: now}
+	if err := h.messages.add(message); err != nil {
 		fail("save")
 		return
 	}
+	h.notify(h.newMessageMail(message, h.absoluteBase(r)))
 	http.Redirect(w, r, back+"?sent=1#"+contactFormAnchor, http.StatusSeeOther)
 }
 

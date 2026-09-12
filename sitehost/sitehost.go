@@ -60,6 +60,11 @@ type Options struct {
 	// UploadDir is where pictures are stored. Defaults to an "uploads" folder
 	// beside DataPath.
 	UploadDir string
+	// MailURL configures how the site sends email: smtp://, smtps://,
+	// resend://, or postmark:// — see ParseMailURL. Empty means no email.
+	MailURL string
+	// Mailer overrides MailURL with a ready transport. Tests use it.
+	Mailer Mailer
 }
 
 func (o Options) normalize() Options {
@@ -82,6 +87,9 @@ type Host struct {
 	securityOnce sync.Once
 	csrf         string
 	authFailures *rateLimiter
+
+	mailer     Mailer
+	mailStatus mailStatus
 }
 
 // Open loads or creates the site at Options.DataPath.
@@ -100,6 +108,9 @@ func Open(opts Options) (*Host, error) {
 	}
 
 	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow)}
+	if err := host.configureMail(); err != nil {
+		return nil, err
+	}
 	// Seeding is the wizard's job. Options.Seed exists so tests and embedders
 	// can skip the wizard and get a site in one call.
 	if opts.Seed && !host.SetupComplete() {
@@ -119,7 +130,23 @@ func Open(opts Options) (*Host, error) {
 // this to supply in-memory storage.
 func NewWithStore(store LifecycleContentStore, opts Options) *Host {
 	opts = opts.normalize()
-	return &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow)}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow)}
+	_ = host.configureMail()
+	return host
+}
+
+// configureMail resolves the transport from Options.
+func (h *Host) configureMail() error {
+	if h.opts.Mailer != nil {
+		h.mailer = h.opts.Mailer
+		return nil
+	}
+	mailer, err := ParseMailURL(h.opts.MailURL)
+	if err != nil {
+		return fmt.Errorf("sitehost: %w", err)
+	}
+	h.mailer = mailer
+	return nil
 }
 
 // Store exposes the underlying content store.

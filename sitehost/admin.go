@@ -41,6 +41,7 @@ func (h *Host) mountAdmin(mux *http.ServeMux) {
 	mux.HandleFunc("GET /admin/settings/{$}", h.handleAdminSettings)
 	mux.HandleFunc("POST /admin/settings", h.handleAdminSaveSettings)
 	mux.HandleFunc("POST /admin/settings/{$}", h.handleAdminSaveSettings)
+	mux.HandleFunc("POST /admin/settings/test-mail", h.handleAdminTestMail)
 }
 
 func (h *Host) adminMeta(title string) PageMeta {
@@ -434,6 +435,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 			adminTextField("baseURL", "Website address", settings.BaseURL,
 				"For example https://yourbusiness.com. Needed so shared links and search results point at the right place."),
 			h.renderBrandFields(settings),
+			h.renderMailFields(settings),
 			h.renderGrowthFields(settings),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-actions")),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("type", "submit")), gosx.Text("Save settings")),
@@ -442,7 +444,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 	)
 	body := h.renderAdminShell("settings", "Settings",
 		"These details appear in search results and when someone shares a link to your site.",
-		status, form)
+		status, form, h.renderMailTestPanel())
 	h.writeDocument(w, http.StatusOK, h.adminMeta("Settings"), body)
 }
 
@@ -472,6 +474,11 @@ func (h *Host) handleAdminSaveSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	applyGrowthFields(r, metadata)
+	if address := strings.TrimSpace(r.PostFormValue("notifyEmail")); address != "" {
+		metadata[notifyEmailKey] = address
+	} else {
+		delete(metadata, notifyEmailKey)
+	}
 	input := cmsstore.SiteSettingsInput{
 		Title:       title,
 		Description: strings.TrimSpace(r.PostFormValue("description")),
@@ -774,4 +781,68 @@ func applyGrowthFields(r *http.Request, metadata cmsstore.Metadata) {
 	} else {
 		metadata[consentKey] = "off"
 	}
+}
+
+
+// ---------- email on the Settings page ----------
+
+func (h *Host) renderMailFields(settings cmsstore.SiteSettings) gosx.Node {
+	return gosx.Fragment(
+		gosx.El("h2", gosx.Attrs(gosx.Attr("class", "admin-subhead")), gosx.Text("Email")),
+		adminTextField("notifyEmail", "Send new messages to", settings.Metadata[notifyEmailKey],
+			"Leave empty to use the contact email from setup ("+firstNonEmpty(settings.Metadata["contactEmail"], "not set")+")."),
+	)
+}
+
+// renderMailTestPanel shows whether email works and lets the owner prove it.
+func (h *Host) renderMailTestPanel() gosx.Node {
+	if h.mailer == nil {
+		return gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
+			gosx.El("h2", nil, gosx.Text("Email delivery")),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-hint")),
+				gosx.Text("No email service is set up, so new messages wait in your inbox here until you look. To be emailed about them, start the site with -mail (or GOSX_SITE_MAIL) set to an smtp://, resend://, or postmark:// address.")),
+		)
+	}
+	last, lastErr, attempts, sent := h.mailStatus.snapshot()
+	state := "Not tried yet."
+	stateClass := ""
+	switch {
+	case attempts == 0:
+	case lastErr != "":
+		state = "Last attempt failed: " + lastErr
+		stateClass = "error"
+	default:
+		state = "Working. Last email sent " + last.Local().Format("Mon 2 Jan, 3:04 PM") + "."
+	}
+	_ = sent
+	return gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
+		gosx.El("h2", nil, gosx.Text("Email delivery")),
+		gosx.El("p", nil, gosx.Text(h.mailer.Describe()+".")),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-status"), gosx.Attr("data-state", stateClass)), gosx.Text(state)),
+		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/settings/test-mail")),
+			h.csrfField(),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-actions")),
+				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("type", "submit")), gosx.Text("Send a test email to "+firstNonEmpty(h.notifyAddress(), "(no address set)"))),
+			),
+		),
+	)
+}
+
+func (h *Host) handleAdminTestMail(w http.ResponseWriter, r *http.Request) {
+	to := h.notifyAddress()
+	if to == "" {
+		http.Redirect(w, r, "/admin/settings?status="+queryEscape("Add an email address first, then send the test."), http.StatusSeeOther)
+		return
+	}
+	siteTitle := firstNonEmpty(h.settings().Title, h.opts.SiteTitle)
+	err := h.sendNow(Mail{
+		To:      to,
+		Subject: "Test email from " + siteTitle,
+		Text:    "If you're reading this, email from your website works. New messages from your contact form will arrive the same way.\n",
+	})
+	if err != nil {
+		http.Redirect(w, r, "/admin/settings?status="+queryEscape("The test email didn't send: "+err.Error()), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/admin/settings?status="+queryEscape("Test email sent to "+to+". Check your inbox (and spam folder)."), http.StatusSeeOther)
 }
