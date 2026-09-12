@@ -111,6 +111,7 @@ func (h *Host) renderEditor(w http.ResponseWriter, subject editorSubject) {
 		),
 		renderInsertMenu(),
 		gosx.El("script", gosx.Attrs(gosx.Attr("type", "application/json"), gosx.Attr("data-forms-presets", "true")), gosx.RawHTML(h.formPresetsJSON())),
+		gosx.El("script", gosx.Attrs(gosx.Attr("type", "application/json"), gosx.Attr("data-products-presets", "true")), gosx.RawHTML(h.productPresetsJSON())),
 		gosx.El("script", gosx.Attrs(gosx.Attr("src", editorScriptPath), gosx.Attr("defer", "defer"))),
 	)
 
@@ -210,6 +211,7 @@ func (h *Host) renderEditorSidebar(subject editorSubject) gosx.Node {
 				addButton("divider", "Divider", "A thin line"),
 				addButton("section", "Section", "A new background band"),
 				addButton("form", "Form", "Contact, sign-up, booking"),
+				addButton("product", "Product", "Something from your shop"),
 			),
 		),
 		h.renderLookSection(),
@@ -338,6 +340,7 @@ func renderInsertMenu() gosx.Node {
 			menuItem("divider", "Divider"),
 			menuItem("section", "Section"),
 			menuItem("form", "Form"),
+			menuItem("product", "Product"),
 		),
 	)
 }
@@ -521,6 +524,8 @@ func (h *Host) renderBlockInner(kind string, instance blockstudio.BlockInstance)
 		)
 	case "form":
 		return h.renderFormPreview(instance.Values["flowKey"].String)
+	case "product":
+		return h.renderProductPreview(instance.Values["productRef"].String)
 	case "image":
 		url := instance.Values["url"].String
 		return gosx.El("figure", gosx.Attrs(gosx.Attr("class", "ed-figure")),
@@ -651,6 +656,8 @@ func editorKind(key string) string {
 		return "columns"
 	case content.BlockGallery:
 		return "gallery"
+	case content.BlockProduct:
+		return "product"
 	default:
 		return "paragraph"
 	}
@@ -680,6 +687,8 @@ func storeKey(kind string) string {
 		return blockColumns
 	case "gallery":
 		return content.BlockGallery
+	case "product":
+		return content.BlockProduct
 	default:
 		return content.BlockParagraph
 	}
@@ -693,16 +702,17 @@ type editorImagePayload struct {
 }
 
 type editorBlockPayload struct {
-	Kind   string               `json:"kind"`
-	Text   string               `json:"text"`
-	Text2  string               `json:"text2,omitempty"`
-	Level  string               `json:"level,omitempty"`
-	URL    string               `json:"url,omitempty"`
-	Alt    string               `json:"alt,omitempty"`
-	Style  string               `json:"style,omitempty"`
-	Form   string               `json:"form,omitempty"`
-	Phone  string               `json:"phone,omitempty"`
-	Images []editorImagePayload `json:"images,omitempty"`
+	Kind    string               `json:"kind"`
+	Text    string               `json:"text"`
+	Text2   string               `json:"text2,omitempty"`
+	Level   string               `json:"level,omitempty"`
+	URL     string               `json:"url,omitempty"`
+	Alt     string               `json:"alt,omitempty"`
+	Style   string               `json:"style,omitempty"`
+	Form    string               `json:"form,omitempty"`
+	Product string               `json:"product,omitempty"`
+	Phone   string               `json:"phone,omitempty"`
+	Images  []editorImagePayload `json:"images,omitempty"`
 }
 
 type editorSavePayload struct {
@@ -846,6 +856,12 @@ func (h *Host) payloadDocument(blocks []editorBlockPayload) blockstudio.Document
 				values("url", url, "alt", strings.TrimSpace(incoming.Alt))))
 		case "form":
 			instances = append(instances, block(order, content.BlockFlow, values("flowKey", h.formRefForPayload(incoming.Form))))
+		case "product":
+			product, ok := h.productByRef(incoming.Product)
+			if !ok {
+				continue
+			}
+			instances = append(instances, block(order, content.BlockProduct, values("productRef", product.ref())))
 		case "list":
 			if value == "" {
 				continue

@@ -93,6 +93,11 @@
       var fsel = el.querySelector("[data-form-select]");
       payload.form = fsel ? fsel.value : "";
     }
+    if (kind === "product") {
+      payload.text = "";
+      var psel = el.querySelector("[data-product-select]");
+      payload.product = psel ? psel.value : "";
+    }
     return payload;
   }
 
@@ -478,6 +483,39 @@
         '</select></label>';
       return bar;
     }
+    if (kind === "product") {
+      var pbox = document.createElement("div");
+      pbox.className = "ed-product";
+      pbox.setAttribute("contenteditable", "false");
+      if (!PRODUCTS.length) {
+        pbox.className = "ed-image-empty";
+        pbox.textContent = "No products yet. Add one under Shop, then pick it here.";
+        return pbox;
+      }
+      var card = document.createElement("ul");
+      card.className = "site-products site-products--single";
+      card.setAttribute("data-product-card", "true");
+      var pbar = document.createElement("div");
+      pbar.className = "ed-form__bar";
+      var plabel = document.createElement("label");
+      plabel.textContent = "Which product: ";
+      var pselect = document.createElement("select");
+      pselect.className = "ed-inline-select";
+      pselect.setAttribute("data-product-select", "true");
+      pselect.setAttribute("aria-label", "Which product");
+      PRODUCTS.forEach(function (preset) {
+        var opt = document.createElement("option");
+        opt.value = preset.ref; opt.textContent = preset.name;
+        pselect.appendChild(opt);
+      });
+      plabel.appendChild(pselect);
+      var pedit = document.createElement("a");
+      pedit.setAttribute("data-product-edit", "true"); pedit.target = "_blank"; pedit.rel = "noopener"; pedit.textContent = "Edit the product";
+      pbar.appendChild(plabel); pbar.appendChild(pedit);
+      pbox.appendChild(card); pbox.appendChild(pbar);
+      refreshProductPreview(pbox);
+      return pbox;
+    }
     if (kind === "form") {
       var box = document.createElement("div");
       box.className = "ed-form";
@@ -677,7 +715,48 @@
       refreshFormPreview(event.target.closest(".ed-form"));
       queueSave();
     }
+    if (event.target.matches("[data-product-select]")) {
+      snapshot();
+      refreshProductPreview(event.target.closest(".ed-product"));
+      queueSave();
+    }
   });
+
+  /* ---------- products on the canvas ---------- */
+
+  var PRODUCTS = [];
+  try {
+    var productsNode = document.querySelector("[data-products-presets]");
+    PRODUCTS = productsNode ? JSON.parse(productsNode.textContent) : [];
+  } catch (e) { PRODUCTS = []; }
+
+  function findProduct(ref) {
+    for (var i = 0; i < PRODUCTS.length; i++) if (PRODUCTS[i].ref === ref) return PRODUCTS[i];
+    return PRODUCTS[0];
+  }
+
+  function refreshProductPreview(box) {
+    var select = box.querySelector("[data-product-select]");
+    var card = box.querySelector("[data-product-card]");
+    if (!select || !card) return;
+    var preset = findProduct(select.value);
+    if (!preset) return;
+    card.textContent = "";
+    var li = document.createElement("li");
+    li.className = "site-product-card site-product-card--inline";
+    var a = document.createElement("a");
+    a.className = "site-product-card__link"; a.href = preset.href; a.tabIndex = -1;
+    var pic = document.createElement("span");
+    pic.className = "site-product-card__picture";
+    if (preset.image) { var img = document.createElement("img"); img.src = preset.image; img.alt = ""; pic.appendChild(img); }
+    else { var blank = document.createElement("span"); blank.className = "site-product-card__blank"; pic.appendChild(blank); }
+    var name = document.createElement("span"); name.className = "site-product-card__name"; name.textContent = preset.name;
+    var price = document.createElement("span"); price.className = "site-product-card__price"; price.textContent = preset.price;
+    a.appendChild(pic); a.appendChild(name); a.appendChild(price);
+    li.appendChild(a); card.appendChild(li);
+    var edit = box.querySelector("[data-product-edit]");
+    if (edit) edit.href = preset.edit || "/admin/shop";
+  }
 
   /* ---------- the picture picker ---------- */
 

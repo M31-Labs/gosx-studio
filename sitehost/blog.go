@@ -13,7 +13,6 @@ import (
 	"m31labs.dev/gosx"
 	"m31labs.dev/gosx-admin/blockstudio"
 	"m31labs.dev/gosx-studio/cms/content"
-	"m31labs.dev/gosx-studio/cms/render"
 	cmsstore "m31labs.dev/gosx-studio/cms/store"
 )
 
@@ -41,7 +40,7 @@ var timeNow = time.Now
 
 // reservedSlugs are addresses the host serves itself; a page cannot take one.
 var reservedSlugs = map[string]bool{
-	"blog": true, "feed.xml": true, "admin": true, "setup": true, "uploads": true,
+	"blog": true, "feed.xml": true, "admin": true, "setup": true, "uploads": true, "shop": true, "cart": true, "checkout": true, "stripe": true, "forms": true,
 	"sitemap.xml": true, "robots.txt": true, "healthz": true, "contact-send": true,
 }
 
@@ -483,7 +482,7 @@ func (h *Host) handleBlogPost(w http.ResponseWriter, r *http.Request) {
 			gosx.El("article", gosx.Attrs(gosx.Attr("class", "site-article site-post")),
 				gosx.El("h1", gosx.Attrs(gosx.Attr("class", "site-title")), gosx.Text(post.Title)),
 				renderPostMeta(post),
-				h.renderBody(post.Body, render.Hooks{Flow: h.flowHook(postPath(post.Slug), formStateFromQuery(r)), Image: h.imageHook()}),
+				h.renderBody(post.Body, h.hooksFor(postPath(post.Slug), formStateFromQuery(r))),
 				gosx.El("nav", gosx.Attrs(gosx.Attr("class", "site-post-nav"), gosx.Attr("aria-label", "Blog")),
 					gosx.El("a", gosx.Attrs(gosx.Attr("href", blogPath)), gosx.Text("← All posts"))),
 			),

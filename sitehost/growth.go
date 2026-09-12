@@ -74,6 +74,12 @@ func (h *Host) handleSitemap(w http.ResponseWriter, r *http.Request) {
 			}
 			set.URLs = append(set.URLs, entry)
 		}
+		if products := h.activeProducts(); len(products) > 0 {
+			set.URLs = append(set.URLs, sitemapURL{Loc: base + shopPath})
+			for _, product := range products {
+				set.URLs = append(set.URLs, sitemapURL{Loc: base + product.path(), LastMod: product.Updated.UTC().Format("2006-01-02")})
+			}
+		}
 		if posts := h.livePosts(); len(posts) > 0 {
 			set.URLs = append(set.URLs, sitemapURL{Loc: base + blogPath})
 			for _, post := range posts {

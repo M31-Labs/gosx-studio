@@ -145,6 +145,16 @@ func (h *Host) renderSiteHeader(settings cmsstore.SiteSettings, brand Brand, act
 		}
 		links = append(links, gosx.El("a", gosx.Attrs(attrs...), gosx.Text(page.Title)))
 	}
+	if h.shopInMenu() {
+		attrs := []any{gosx.Attr("href", shopPath)}
+		if inEditor {
+			attrs = []any{gosx.Attr("href", "#"), gosx.Attr("tabindex", "-1")}
+		}
+		if activeSlug == "shop" {
+			attrs = append(attrs, gosx.Attr("aria-current", "page"))
+		}
+		links = append(links, gosx.El("a", gosx.Attrs(attrs...), gosx.Text(h.shopTitle())))
+	}
 	if h.blogInMenu() {
 		attrs := []any{gosx.Attr("href", blogPath)}
 		if inEditor {

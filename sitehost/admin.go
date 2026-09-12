@@ -65,6 +65,7 @@ func (h *Host) renderAdminShell(active, heading, lede string, status adminStatus
 		{"posts", "Blog", "/admin/posts"},
 		{"messages", messagesLabel, "/admin/messages"},
 		{"forms", "Forms", "/admin/forms"},
+		{"shop", "Shop", "/admin/shop"},
 		{"stats", "Visitors", "/admin/stats"},
 		{"media", "Pictures", "/admin/media"},
 		{"settings", "Settings", "/admin/settings"},
@@ -453,6 +454,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 			h.renderMailFields(settings),
 			h.renderGrowthFields(settings),
 			renderStatsField(settings),
+			renderShopFields(settings),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-actions")),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("type", "submit")), gosx.Text("Save settings")),
 			),
@@ -491,6 +493,7 @@ func (h *Host) handleAdminSaveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	applyGrowthFields(r, metadata)
 	applyStatsField(r, metadata)
+	applyShopFields(r, metadata)
 	if address := strings.TrimSpace(r.PostFormValue("notifyEmail")); address != "" {
 		metadata[notifyEmailKey] = address
 	} else {

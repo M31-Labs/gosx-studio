@@ -10,7 +10,6 @@ import (
 	"m31labs.dev/gosx"
 	"m31labs.dev/gosx-admin/blockstudio"
 	"m31labs.dev/gosx-studio/cms/lifecycle"
-	"m31labs.dev/gosx-studio/cms/render"
 	cmsstore "m31labs.dev/gosx-studio/cms/store"
 )
 
@@ -229,7 +228,7 @@ func (h *Host) handleHistoryPreview(w http.ResponseWriter, r *http.Request) {
 			gosx.El("article", gosx.Attrs(gosx.Attr("class", "site-article")),
 				gosx.El("h1", gosx.Attrs(gosx.Attr("class", "site-title")), gosx.Text(title)),
 				metaLine,
-				h.renderBody(body, render.Hooks{Flow: h.flowHook("#", formState{}), Image: h.imageHook()}),
+				h.renderBody(body, h.hooksFor("#", formState{})),
 			),
 		),
 		h.renderPublicFooter(settings),
