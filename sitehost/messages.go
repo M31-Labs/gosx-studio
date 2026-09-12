@@ -167,6 +167,45 @@ func (s *messageStore) markRead(id string, read bool) error {
 // allow reports whether one more send from this host fits the rate limit.
 // It is deliberately small: enough to stop a script from filling the inbox,
 // not a substitute for a real abuse system behind a proxy.
+// remove deletes one message for good.
+func (s *messageStore) remove(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.loadLocked(); err != nil {
+		return err
+	}
+	for index, message := range s.messages {
+		if message.ID == id {
+			s.messages = append(s.messages[:index], s.messages[index+1:]...)
+			return s.saveLocked()
+		}
+	}
+	return errors.New("message not found")
+}
+
+// pruneOlderThan deletes messages received before the cutoff.
+func (s *messageStore) pruneOlderThan(cutoff time.Time) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.loadLocked(); err != nil {
+		return 0
+	}
+	kept := s.messages[:0]
+	removed := 0
+	for _, message := range s.messages {
+		if message.Received.Before(cutoff) {
+			removed++
+			continue
+		}
+		kept = append(kept, message)
+	}
+	s.messages = kept
+	if removed > 0 {
+		_ = s.saveLocked()
+	}
+	return removed
+}
+
 func (s *messageStore) allow(host string, now time.Time) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -406,9 +445,22 @@ func (h *Host) handleAdminMessages(w http.ResponseWriter, r *http.Request) {
 		listing = gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-messages")), gosx.Fragment(items...))
 	}
 
+	tools := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
+		gosx.El("h2", nil, gosx.Text("Keep, export, delete")),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-hint")), gosx.Text("These are people's words and addresses. Export them before you delete them if you might need them; set how long to keep them under Settings → Privacy.")),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-actions")),
+			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("href", "/admin/messages/export.csv")), gosx.Text("Export all as a spreadsheet (CSV)")),
+			gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/messages/prune"), gosx.Attr("class", "admin-inline-form admin-prune")),
+				h.csrfField(),
+				gosx.El("label", nil, gosx.Text("Delete messages older than "),
+					gosx.El("input", gosx.Attrs(gosx.Attr("type", "number"), gosx.Attr("name", "days"), gosx.Attr("value", "365"), gosx.Attr("min", "1"), gosx.Attr("aria-label", "Days"))),
+					gosx.Text(" days")),
+				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("type", "submit")), gosx.Text("Delete them"))),
+		),
+	)
 	body := h.renderAdminShell("messages", "Messages",
 		"Everything visitors have sent through your forms, newest first.",
-		status, listing)
+		status, listing, tools)
 	h.writeDocument(w, http.StatusOK, h.adminMeta("Messages"), body)
 }
 
@@ -451,6 +503,10 @@ func (h *Host) renderMessage(message Message) gosx.Node {
 				h.csrfField(),
 				gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "read"), gosx.Attr("value", toggleValue))),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("type", "submit")), gosx.Text(toggleLabel)),
+			),
+			gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/messages/"+message.ID+"/delete"), gosx.Attr("class", "admin-inline-form")),
+				h.csrfField(),
+				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("type", "submit"), gosx.Attr("data-action", "delete")), gosx.Text("Delete")),
 			),
 		),
 	)

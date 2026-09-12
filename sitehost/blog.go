@@ -913,13 +913,18 @@ func (h *Host) handlePostSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	body := h.payloadDocument(payload.Blocks)
+	if !h.roleAtLeast(r, roleAdmin) && !lockedBlocksUnchanged(post.Body, body) {
+		writeJSON(w, http.StatusOK, editorSaveResult{Message: "This post has locked sections that only an admin can change. Undo the change to the locked part and save again."})
+		return
+	}
 	input := cmsstore.PostInput{
 		Slug:     slug,
 		Title:    title,
 		Excerpt:  strings.TrimSpace(payload.Excerpt),
 		Author:   strings.TrimSpace(payload.Author),
 		Tags:     splitTags(payload.Tags),
-		Body:     h.payloadDocument(payload.Blocks),
+		Body:     body,
 		Metadata: metadata,
 		State:    post.State,
 	}

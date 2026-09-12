@@ -47,6 +47,7 @@
     var textNode = el.querySelector("[data-text]");
     var payload = { kind: kind, text: textNode ? serializeText(textNode) : "" };
     if (el.getAttribute("data-phone") === "hide") payload.phone = "hide";
+    if (el.getAttribute("data-locked") === "true") payload.locked = "true";
     if (kind === "section") {
       var style = el.querySelector("[data-section-style]");
       payload.style = style ? style.value : "plain";
@@ -345,9 +346,22 @@
     tools.appendChild(toolBtn("down", "↓", "Move down"));
     tools.appendChild(toolBtn("duplicate", "⧉", "Make a copy"));
     tools.appendChild(toolBtn("phone", "📱", "Hide on phones"));
+    tools.appendChild(toolBtn("lock", "🔒", "Lock: only admins can change this"));
     tools.appendChild(toolBtn("delete", "✕", "Delete"));
     return tools;
   }
+
+  /* Editors see locked blocks but cannot touch them. */
+  var canLock = root.getAttribute("data-can-lock") === "true";
+  function freezeLocked() {
+    if (canLock) return;
+    Array.prototype.forEach.call(root.querySelectorAll('.ed-block[data-locked="true"]'), function (blockEl) {
+      Array.prototype.forEach.call(blockEl.querySelectorAll("[contenteditable=true]"), function (el) { el.setAttribute("contenteditable", "false"); });
+      Array.prototype.forEach.call(blockEl.querySelectorAll("input, select, textarea, button.ed-tool, .ed-insert, .ed-level"), function (el) { el.disabled = true; });
+      blockEl.classList.add("ed-block--frozen");
+    });
+  }
+  freezeLocked();
 
   function makeBadge() {
     var badge = document.createElement("span");
@@ -953,6 +967,14 @@
       var copy = blockEl.cloneNode(true);
       blockEl.parentNode.insertBefore(copy, blockEl.nextSibling);
       focusText(copy);
+    } else if (action === "lock") {
+      if (root.getAttribute("data-can-lock") !== "true") return;
+      var wasLocked = blockEl.getAttribute("data-locked") === "true";
+      if (wasLocked) blockEl.removeAttribute("data-locked"); else blockEl.setAttribute("data-locked", "true");
+      tool.setAttribute("aria-pressed", wasLocked ? "false" : "true");
+      tool.title = wasLocked ? "Lock: only admins can change this" : "Unlock for editors";
+      tool.setAttribute("aria-label", tool.title);
+      status("dirty", wasLocked ? "Unlocked: editors can change this again" : "Locked: editors can see this but not change it");
     } else if (action === "phone") {
       var hidden = blockEl.getAttribute("data-phone") === "hide";
       if (hidden) blockEl.removeAttribute("data-phone"); else blockEl.setAttribute("data-phone", "hide");
@@ -1344,6 +1366,7 @@
 
   root.addEventListener("pointerdown", function (event) {
     var grab = event.target.closest('[data-tool="grab"]');
+    if (grab && grab.closest(".ed-block--frozen")) return;
     if (!grab) return;
     var blockEl = grab.closest(".ed-block");
     if (!blockEl) return;

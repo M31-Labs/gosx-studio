@@ -255,6 +255,7 @@ var backupAsync = true
 // housekeeping runs the daily backup check off the request path.
 func (h *Host) housekeeping(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.pruneIfDue()
 		if !h.opts.NoBackups && h.opts.backupDir() != "" {
 			h.backups.mu.Lock()
 			due := h.backups.lastCheck.IsZero() || timeNow().Sub(h.backups.lastCheck) >= backupCheck

@@ -113,6 +113,7 @@ func (h *Host) renderEditor(w http.ResponseWriter, subject editorSubject) {
 		gosx.Attr("data-review-url", subject.ReviewURL),
 		gosx.Attr("data-preview-url", subject.PreviewURL),
 		gosx.Attr("data-must-request", boolAttr(subject.MustRequest)),
+		gosx.Attr("data-can-lock", boolAttr(subject.CanDesign)),
 	),
 		h.renderEditorToolbar(subject),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-body")),
@@ -471,6 +472,7 @@ func (h *Host) renderEditableBlock(index int, instance blockstudio.BlockInstance
 	inner := h.renderBlockInner(kind, instance)
 
 	hiddenOnPhone := instance.Values[phoneKey].String == phoneHide
+	locked := instance.Values[lockedKey].String == "true"
 	attrs := []any{
 		gosx.Attr("class", "ed-block"),
 		gosx.Attr("data-block", kind),
@@ -479,6 +481,16 @@ func (h *Host) renderEditableBlock(index int, instance blockstudio.BlockInstance
 	}
 	if hiddenOnPhone {
 		attrs = append(attrs, gosx.Attr("data-phone", phoneHide))
+	}
+	if locked {
+		attrs = append(attrs, gosx.Attr("data-locked", "true"))
+	}
+	lockTool := toolButton("lock", "🔒", "Lock: only admins can change this")
+	if locked {
+		lockTool = gosx.El("button", gosx.Attrs(
+			gosx.Attr("class", "ed-tool"), gosx.Attr("type", "button"), gosx.Attr("data-tool", "lock"),
+			gosx.Attr("title", "Unlock for editors"), gosx.Attr("aria-label", "Unlock for editors"), gosx.Attr("aria-pressed", "true"),
+		), gosx.Text("🔒"))
 	}
 	phoneTool := toolButton("phone", "📱", "Hide on phones")
 	if hiddenOnPhone {
@@ -494,9 +506,11 @@ func (h *Host) renderEditableBlock(index int, instance blockstudio.BlockInstance
 			toolButton("down", "↓", "Move down"),
 			toolButton("duplicate", "⧉", "Make a copy"),
 			phoneTool,
+			lockTool,
 			toolButton("delete", "✕", "Delete"),
 		),
 		gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-block__badge"), gosx.Attr("contenteditable", "false")), gosx.Text("Hidden on phones")),
+		gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-block__lock"), gosx.Attr("contenteditable", "false")), gosx.Text("Locked")),
 		levelPicker(kind, instance),
 		inner,
 		gosx.El("button", gosx.Attrs(
@@ -767,6 +781,7 @@ type editorBlockPayload struct {
 	Form    string               `json:"form,omitempty"`
 	Product string               `json:"product,omitempty"`
 	Phone   string               `json:"phone,omitempty"`
+	Locked  string               `json:"locked,omitempty"`
 	Images  []editorImagePayload `json:"images,omitempty"`
 }
 
@@ -854,11 +869,16 @@ func (h *Host) handleEditorSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	body := h.payloadDocument(payload.Blocks)
+	if !h.roleAtLeast(r, roleAdmin) && !lockedBlocksUnchanged(page.Body, body) {
+		writeJSON(w, http.StatusOK, editorSaveResult{Message: "This page has locked sections that only an admin can change. Your other edits are still here; undo the change to the locked part and save again."})
+		return
+	}
 	input := cmsstore.PageInput{
 		Slug:        slug,
 		Title:       title,
 		Description: strings.TrimSpace(payload.Description),
-		Body:        h.payloadDocument(payload.Blocks),
+		Body:        body,
 		Metadata:    metadata,
 		State:       page.State,
 	}
@@ -959,6 +979,9 @@ func (h *Host) payloadDocument(blocks []editorBlockPayload) blockstudio.Document
 		}
 		if len(instances) > before && strings.TrimSpace(incoming.Phone) == phoneHide {
 			instances[len(instances)-1].Values[phoneKey] = text(phoneHide)
+		}
+		if len(instances) > before && strings.TrimSpace(incoming.Locked) == "true" {
+			instances[len(instances)-1].Values[lockedKey] = text("true")
 		}
 		order++
 	}
@@ -1251,4 +1274,37 @@ func (h *Host) clearReviewOnPage(page cmsstore.Page) cmsstore.Page {
 		return page
 	}
 	return updated
+}
+
+// A locked block belongs to the admins: editors see it, cannot change it,
+// and cannot remove it.
+const lockedKey = "locked"
+
+// lockedBlocksUnchanged is true when the incoming document keeps every
+// locked block exactly as stored, in the same order, and adds none.
+func lockedBlocksUnchanged(stored, incoming blockstudio.Document) bool {
+	pick := func(doc blockstudio.Document) []string {
+		out := []string{}
+		for _, instance := range doc.Blocks {
+			if instance.Values[lockedKey].String != "true" {
+				continue
+			}
+			raw, _ := json.Marshal(struct {
+				Key    string
+				Values blockstudio.Values
+			}{instance.Key, instance.Values})
+			out = append(out, string(raw))
+		}
+		return out
+	}
+	before, after := pick(stored), pick(incoming)
+	if len(before) != len(after) {
+		return false
+	}
+	for index := range before {
+		if before[index] != after[index] {
+			return false
+		}
+	}
+	return true
 }

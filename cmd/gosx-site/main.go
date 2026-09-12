@@ -45,6 +45,7 @@ func run() error {
 		certDir  = flag.String("cert-dir", env("GOSX_SITE_CERT_DIR", ""), "where certificates are cached (default: a certs folder beside the data file)")
 		publicIP = flag.String("public-ip", env("GOSX_SITE_PUBLIC_IP", ""), "this server's public IP address, shown in the domain instructions")
 		noBackup = flag.Bool("no-backups", env("GOSX_SITE_NO_BACKUPS", "") == "true", "turn off the daily backup zip written beside the data file")
+		logReqs  = flag.Bool("log-requests", env("GOSX_SITE_LOG_REQUESTS", "true") != "false", "write one JSON line per request to stderr")
 	)
 	flag.Parse()
 
@@ -85,6 +86,7 @@ func run() error {
 		CertDir:         *certDir,
 		PublicIP:        *publicIP,
 		NoBackups:       *noBackup,
+		LogRequests:     *logReqs,
 	})
 	if err != nil {
 		return err

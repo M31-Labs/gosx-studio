@@ -481,6 +481,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 			h.renderPaymentFields(settings, h.absoluteBaseFromSettings()),
 			renderReviewField(settings),
 			h.renderSSOFields(settings, h.absoluteBaseFromSettings()),
+			h.renderPrivacyFields(settings),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-actions")),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("type", "submit")), gosx.Text("Save settings")),
 			),
@@ -488,7 +489,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 	)
 	body := h.renderAdminShell("settings", "Settings",
 		"These details appear in search results and when someone shares a link to your site.",
-		status, domainPanel, form, h.renderMailTestPanel(), h.renderBackupPanel())
+		status, domainPanel, form, h.renderPrivacyPanel(), h.renderMailTestPanel(), h.renderBackupPanel())
 	h.writeDocument(w, http.StatusOK, h.adminMeta("Settings"), body)
 }
 
@@ -521,6 +522,10 @@ func (h *Host) handleAdminSaveSettings(w http.ResponseWriter, r *http.Request) {
 	applyStatsField(r, metadata)
 	applyShopFields(r, metadata)
 	applyReviewField(r, metadata)
+	if message := applyPrivacyFields(r, metadata); message != "" {
+		h.renderAdminSettings(w, adminStatus{Message: message, Error: true})
+		return
+	}
 	if message := applySSOFields(r, metadata); message != "" {
 		h.renderAdminSettings(w, adminStatus{Message: message, Error: true})
 		return

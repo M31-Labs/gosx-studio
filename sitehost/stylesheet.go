@@ -474,6 +474,13 @@ a { color: var(--site-accent); }
 .ed-block[data-phone="hide"] .ed-block__badge { display: inline-block; }
 .ed-frame--phone .ed-block[data-phone="hide"] { opacity: .35; outline: 1px dashed var(--site-muted); }
 .ed-tool[aria-pressed="true"] { background: var(--site-ink); color: var(--site-ground); }
+.ed-block__lock { display: none; position: absolute; right: 0; top: -9px; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; background: #8a5a00; color: #fff; border-radius: 2px; pointer-events: none; }
+.ed-block[data-locked="true"] .ed-block__lock { display: inline-block; }
+.ed-block--frozen { opacity: .8; }
+.ed-block--frozen .ed-block__tools { display: none; }
+.ed[data-can-lock="false"] [data-tool="lock"] { display: none; }
+.admin-prune { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.admin-prune input { width: 70px; font: inherit; padding: 5px 8px; border: 1px solid var(--site-rule); }
 /* The canvas paints its own ground and ink from the site's theme, so a dark
    palette previews as dark instead of borrowing the editor frame's white. */
 .ed-canvas { background: var(--site-ground); color: var(--site-ink); font-family: var(--site-font-body); }

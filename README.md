@@ -72,6 +72,19 @@ or sends it back with a note the editor sees in the editor. Anyone signed in
 can make a **preview link** for a draft from the editor's sidebar: it shows
 the current draft to whoever has it for three days, without an account.
 
+### Running it for a team
+
+- **Locked sections.** An admin can lock any block from its toolbar. Editors
+  see it and cannot change or remove it; a save that touches a locked block
+  is refused with an explanation.
+- **Request logs and metrics.** Every response carries an `X-Request-ID`,
+  and each request is one JSON line on stderr (`-log-requests=false` to
+  stop). `/admin/metrics` serves Prometheus counters and content gauges to a
+  signed-in admin.
+- **Privacy.** Messages export as CSV, delete one by one or by age, and can
+  expire automatically (**Settings → Privacy**). One click writes a
+  plain-language privacy page for the owner to check and publish.
+
 ### Use your own domain
 
 Open **Settings → Your own domain** in the admin. Type the domain, add the two
