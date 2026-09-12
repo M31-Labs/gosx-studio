@@ -170,7 +170,7 @@ a { color: var(--site-accent); }
 .ed-form__bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 12.5px; color: var(--site-muted); }
 .ed-form__bar a { color: var(--site-accent); }
 .ed-inline-select { font: inherit; font-size: 12.5px; padding: 3px 6px; border: 1px solid var(--site-rule); background: var(--site-ground); color: var(--site-ink); }
-.admin-fields input[type="text"], .admin-fields select { width: 100%; min-width: 90px; font: inherit; font-size: 13.5px; padding: 6px 8px; border: 1px solid var(--site-rule); background: var(--site-ground); color: inherit; }
+.admin-fields input[type="text"], .admin-fields input[type="number"], .admin-fields select { width: 100%; min-width: 90px; font: inherit; font-size: 13.5px; padding: 6px 8px; border: 1px solid var(--site-rule); background: var(--site-ground); color: inherit; }
 .admin-field-row__required { text-align: center; }
 .admin-message__fields { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: 14px; }
 .admin-message__field { display: contents; }

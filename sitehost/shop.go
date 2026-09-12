@@ -912,6 +912,10 @@ func (h *Host) handleCart(w http.ResponseWriter, r *http.Request) {
 	meta.NoIndex = true
 	meta.CanonicalPath = cartPath
 
+	var failed gosx.Node = gosx.Fragment()
+	if r.URL.Query().Get("checkout") == "failed" {
+		failed = gosx.El("p", gosx.Attrs(gosx.Attr("class", "site-form__error"), gosx.Attr("role", "alert")), gosx.Text("We couldn't start the payment. Please try again in a moment."))
+	}
 	var body gosx.Node
 	if len(resolved) == 0 {
 		body = gosx.Fragment(
@@ -962,6 +966,7 @@ func (h *Host) handleCart(w http.ResponseWriter, r *http.Request) {
 	}
 	meta, shell := h.publicShell(r, "cart", meta, gosx.El("section", gosx.Attrs(gosx.Attr("class", "site-article site-cart-page")),
 		gosx.El("h1", gosx.Attrs(gosx.Attr("class", "site-title")), gosx.Text("Your cart")),
+		failed,
 		body,
 	))
 	h.writeDocument(w, http.StatusOK, meta, shell)

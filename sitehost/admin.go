@@ -130,6 +130,7 @@ func (h *Host) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		adminStat(len(h.livePosts()), "Live posts"),
 		adminStat(h.unreadMessages(), "New messages"),
 		adminStat(h.stats.summary(timeNow(), 7).WeekVisitors, "Visitors this week"),
+		adminStat(h.openOrders(), "Orders to send"),
 	)
 
 	next := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
@@ -455,6 +456,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 			h.renderGrowthFields(settings),
 			renderStatsField(settings),
 			renderShopFields(settings),
+			h.renderPaymentFields(settings, h.absoluteBaseFromSettings()),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-actions")),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("type", "submit")), gosx.Text("Save settings")),
 			),
@@ -494,6 +496,10 @@ func (h *Host) handleAdminSaveSettings(w http.ResponseWriter, r *http.Request) {
 	applyGrowthFields(r, metadata)
 	applyStatsField(r, metadata)
 	applyShopFields(r, metadata)
+	if message := applyPaymentFields(r, metadata, normalizeCurrency(metadata[currencyKey])); message != "" {
+		h.renderAdminSettings(w, adminStatus{Message: message, Error: true})
+		return
+	}
 	if address := strings.TrimSpace(r.PostFormValue("notifyEmail")); address != "" {
 		metadata[notifyEmailKey] = address
 	} else {

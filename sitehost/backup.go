@@ -50,7 +50,7 @@ func (h *Host) siteFiles() [][2]string {
 		return nil
 	}
 	out := [][2]string{}
-	for _, path := range []string{h.opts.DataPath, h.opts.messagesPath(), h.opts.formsPath(), h.opts.statsPath(), h.opts.productsPath()} {
+	for _, path := range []string{h.opts.DataPath, h.opts.messagesPath(), h.opts.formsPath(), h.opts.statsPath(), h.opts.productsPath(), h.opts.ordersPath()} {
 		if path == "" {
 			continue
 		}

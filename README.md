@@ -66,6 +66,23 @@ with `data/site.json` is moved into the database on the next start, and the
 JSON file is kept as `site.json.migrated`. Pass a `.json` path to `-data` to
 keep using the one-file snapshot instead.
 
+### Selling
+
+**Shop** in the admin holds products with pictures, options, and stock. A
+product on sale appears at `/shop` and in the menu, and can be placed on any
+page with the Product block. Visitors fill a cart; to let them pay, connect
+Stripe under **Settings → Payments**:
+
+1. Paste your Stripe secret key.
+2. In Stripe, add a webhook endpoint for `https://yoursite.com/stripe/webhook`
+   sending `checkout.session.completed`, and paste its signing secret.
+3. Set a flat shipping charge, a free-shipping threshold, the countries you
+   ship to, and whether Stripe Tax works out tax.
+
+Payment happens on Stripe's hosted page; card details never reach the site.
+Paid orders appear under **Shop → Orders** with the buyer's address, a link
+to the payment in Stripe for refunds, and a "Mark as sent" button.
+
 ### Backups and export
 
 **Settings → Backups and export** downloads the whole site as one zip: pages,

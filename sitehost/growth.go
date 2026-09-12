@@ -38,6 +38,16 @@ func (h *Host) mountGrowth(mux *http.ServeMux) {
 
 // absoluteBase is the origin absolute links are built on: the configured
 // website address, or the request's own host before one is set.
+// absoluteBaseFromSettings is the site's address when there is no request
+// to read it from: the configured one, or a placeholder the owner will
+// recognise.
+func (h *Host) absoluteBaseFromSettings() string {
+	if base := strings.TrimRight(strings.TrimSpace(h.settings().BaseURL), "/"); base != "" {
+		return base
+	}
+	return "https://yoursite.com"
+}
+
 func (h *Host) absoluteBase(r *http.Request) string {
 	if base := strings.TrimRight(strings.TrimSpace(h.settings().BaseURL), "/"); base != "" {
 		return base
