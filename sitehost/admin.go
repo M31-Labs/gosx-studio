@@ -59,6 +59,10 @@ func (h *Host) renderAdminShell(active, heading, lede string, status adminStatus
 	if unread := h.unreadMessages(); unread > 0 {
 		messagesLabel = "Messages (" + itoa(unread) + ")"
 	}
+	reviewLabel := "Review"
+	if waiting := len(h.reviewQueue()); waiting > 0 {
+		reviewLabel = "Review (" + itoa(waiting) + ")"
+	}
 	navItems := []struct{ Key, Label, Href string }{
 		{"dashboard", "Dashboard", "/admin"},
 		{"pages", "Pages", "/admin/pages"},
@@ -69,8 +73,13 @@ func (h *Host) renderAdminShell(active, heading, lede string, status adminStatus
 		{"stats", "Visitors", "/admin/stats"},
 		{"media", "Pictures", "/admin/media"},
 		{"users", "People", peoplePath},
-		{"settings", "Settings", "/admin/settings"},
 	}
+	if h.reviewRequired() || len(h.reviewQueue()) > 0 {
+		navItems = append(navItems, struct{ Key, Label, Href string }{"review", reviewLabel, reviewPath})
+	}
+	navItems = append(navItems, []struct{ Key, Label, Href string }{
+		{"settings", "Settings", "/admin/settings"},
+	}...)
 	links := make([]gosx.Node, 0, len(navItems)+1)
 	for _, item := range navItems {
 		attrs := []any{gosx.Attr("href", item.Href)}
@@ -470,6 +479,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 			renderStatsField(settings),
 			renderShopFields(settings),
 			h.renderPaymentFields(settings, h.absoluteBaseFromSettings()),
+			renderReviewField(settings),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-actions")),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("type", "submit")), gosx.Text("Save settings")),
 			),
@@ -509,6 +519,7 @@ func (h *Host) handleAdminSaveSettings(w http.ResponseWriter, r *http.Request) {
 	applyGrowthFields(r, metadata)
 	applyStatsField(r, metadata)
 	applyShopFields(r, metadata)
+	applyReviewField(r, metadata)
 	if message := applyPaymentFields(r, metadata, normalizeCurrency(metadata[currencyKey])); message != "" {
 		h.renderAdminSettings(w, adminStatus{Message: message, Error: true})
 		return

@@ -840,6 +840,9 @@ func (h *Host) postSubject(post cmsstore.Post) editorSubject {
 		ViewHref:   postPath(post.Slug),
 		SaveURL:    "/admin/api/posts/" + post.ID,
 		PublishURL: "/admin/api/posts/" + post.ID + "/publish",
+		ReviewURL:  "/admin/api/posts/" + post.ID + "/review",
+		PreviewURL: "/admin/api/posts/" + post.ID + "/preview-link",
+		Review:     reviewStateOf(post.Metadata),
 		Post:       &post,
 	}
 	if at, scheduled := postScheduled(post); scheduled {
@@ -857,6 +860,7 @@ func (h *Host) handlePostEditor(w http.ResponseWriter, r *http.Request) {
 	}
 	subject := h.postSubject(post)
 	subject.CanDesign = h.roleAtLeast(r, roleAdmin)
+	subject.MustRequest = h.mustRequestReview(r)
 	h.renderEditor(w, subject)
 }
 
@@ -936,6 +940,17 @@ func (h *Host) handlePostPublish(w http.ResponseWriter, r *http.Request) {
 	if err != nil || !ok {
 		writeJSON(w, http.StatusNotFound, editorSaveResult{Message: "We couldn't find that post."})
 		return
+	}
+	if h.mustRequestReview(r) {
+		writeJSON(w, http.StatusOK, editorSaveResult{Message: "This site needs an admin to approve changes. Use Request review."})
+		return
+	}
+	if state := reviewStateOf(post.Metadata); state.Requested || state.Feedback != "" {
+		metadata := cloneMetadata(post.Metadata)
+		setReview(metadata, false, "", "", "")
+		if updated, err := h.store.UpdatePost(post.ID, postInput(post, metadata)); err == nil {
+			post = updated
+		}
 	}
 	result := h.publishPost(post)
 	result.Checks = h.readinessChecks("post", "", post.Body)

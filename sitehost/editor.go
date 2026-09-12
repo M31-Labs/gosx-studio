@@ -56,6 +56,10 @@ type editorSubject struct {
 	Post        *cmsstore.Post
 	Checks      []string // what to fix before publishing
 	CanDesign   bool     // may change the site-wide Look
+	MustRequest bool     // approval is on and this person is an editor
+	Review      reviewState
+	ReviewURL   string
+	PreviewURL  string // where the client asks for a share link
 }
 
 func (h *Host) pageSubject(page cmsstore.Page) editorSubject {
@@ -76,6 +80,9 @@ func (h *Host) pageSubject(page cmsstore.Page) editorSubject {
 		ViewHref:    publicPath(page.Slug),
 		SaveURL:     "/admin/api/pages/" + page.ID,
 		PublishURL:  "/admin/api/pages/" + page.ID + "/publish",
+		ReviewURL:   "/admin/api/pages/" + page.ID + "/review",
+		PreviewURL:  "/admin/api/pages/" + page.ID + "/preview-link",
+		Review:      reviewStateOf(page.Metadata),
 		Page:        &page,
 	}
 }
@@ -88,6 +95,7 @@ func (h *Host) handleEditor(w http.ResponseWriter, r *http.Request) {
 	}
 	subject := h.pageSubject(page)
 	subject.CanDesign = h.roleAtLeast(r, roleAdmin)
+	subject.MustRequest = h.mustRequestReview(r)
 	h.renderEditor(w, subject)
 }
 
@@ -102,6 +110,9 @@ func (h *Host) renderEditor(w http.ResponseWriter, subject editorSubject) {
 		gosx.Attr("data-page-slug", subject.Slug),
 		gosx.Attr("data-save-url", subject.SaveURL),
 		gosx.Attr("data-publish-url", subject.PublishURL),
+		gosx.Attr("data-review-url", subject.ReviewURL),
+		gosx.Attr("data-preview-url", subject.PreviewURL),
+		gosx.Attr("data-must-request", boolAttr(subject.MustRequest)),
 	),
 		h.renderEditorToolbar(subject),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-body")),
@@ -126,10 +137,16 @@ func (h *Host) renderEditorToolbar(subject editorSubject) gosx.Node {
 	live := subject.Live
 	statusText := "Not published yet"
 	switch {
+	case subject.Review.Requested:
+		statusText = "Waiting for review"
 	case !subject.Scheduled.IsZero():
 		statusText = "Scheduled for " + formatPostDate(subject.Scheduled)
 	case live:
 		statusText = "Live"
+	}
+	publishText := publishLabel(live || !subject.Scheduled.IsZero())
+	if subject.MustRequest {
+		publishText = "Request review"
 	}
 	return gosx.El("header", gosx.Attrs(gosx.Attr("class", "ed-bar")),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-bar__left")),
@@ -176,7 +193,7 @@ func (h *Host) renderEditorToolbar(subject editorSubject) gosx.Node {
 				gosx.Attr("class", "ed-btn ed-btn--primary"),
 				gosx.Attr("type", "button"),
 				gosx.Attr("data-publish", "true"),
-			), gosx.Text(publishLabel(live || !subject.Scheduled.IsZero()))),
+			), gosx.Text(publishText)),
 		),
 	)
 }
@@ -223,7 +240,38 @@ func (h *Host) renderEditorSidebar(subject editorSubject) gosx.Node {
 		),
 		lookSection,
 		renderSubjectFields(subject),
+		renderReviewNotes(subject),
 		renderChecks(subject.Checks),
+		renderShareBlock(subject),
+	)
+}
+
+// renderReviewNotes tells an editor where their draft stands.
+func renderReviewNotes(subject editorSubject) gosx.Node {
+	switch {
+	case subject.Review.Requested:
+		return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-side__block")),
+			gosx.El("h2", nil, gosx.Text("Review")),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-check ed-check--ok")), gosx.Text("Sent for review by "+subject.Review.By+". An admin will approve it or send it back. You can keep editing meanwhile.")))
+	case subject.Review.Feedback != "":
+		return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-side__block")),
+			gosx.El("h2", nil, gosx.Text("Sent back")),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-check")), gosx.Text(subject.Review.Feedback)))
+	}
+	return gosx.Fragment()
+}
+
+// renderShareBlock makes preview links for people without an account.
+func renderShareBlock(subject editorSubject) gosx.Node {
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-side__block"), gosx.Attr("data-share", "true")),
+		gosx.El("h2", nil, gosx.Text("Share a preview")),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-hint")), gosx.Text("A link that shows this draft, as it is right now, to anyone who has it. It works for three days.")),
+		gosx.El("button", gosx.Attrs(gosx.Attr("class", "ed-library-btn"), gosx.Attr("type", "button"), gosx.Attr("data-share-make", "true")), gosx.Text("Make a preview link")),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-share__result"), gosx.Attr("data-share-result", "true"), gosx.Attr("hidden", "hidden")),
+			gosx.El("input", gosx.Attrs(gosx.Attr("class", "ed-inline-input"), gosx.Attr("type", "text"), gosx.Attr("readonly", "readonly"), gosx.Attr("data-share-link", "true"), gosx.Attr("aria-label", "Preview link"))),
+			gosx.El("button", gosx.Attrs(gosx.Attr("class", "ed-library-btn"), gosx.Attr("type", "button"), gosx.Attr("data-share-copy", "true")), gosx.Text("Copy")),
+			gosx.El("small", gosx.Attrs(gosx.Attr("data-share-expires", "true"))),
+		),
 	)
 }
 
@@ -923,6 +971,11 @@ func (h *Host) handleEditorPublish(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, editorSaveResult{Message: "We couldn't find that page."})
 		return
 	}
+	if h.mustRequestReview(r) {
+		writeJSON(w, http.StatusOK, editorSaveResult{Message: "This site needs an admin to approve changes. Use Request review."})
+		return
+	}
+	page = h.clearReviewOnPage(page)
 	result := h.publishPage(page)
 	result.Checks = h.readinessChecks("page", pageMetaValue(page, "metaDescription", page.Description), page.Body)
 	if result.OK {
@@ -1184,4 +1237,18 @@ func galleryEditorItem(url, alt string) gosx.Node {
 		gosx.El("input", gosx.Attrs(gosx.Attr("class", "ed-inline-input"), gosx.Attr("type", "text"), gosx.Attr("data-galt", "true"), gosx.Attr("value", alt), gosx.Attr("placeholder", "Describe this picture"), gosx.Attr("aria-label", "Picture description"))),
 		gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("class", "ed-tool ed-gallery__remove"), gosx.Attr("data-gremove", "true"), gosx.Attr("aria-label", "Remove this picture")), gosx.Text("✕")),
 	)
+}
+
+// clearReviewOnPage drops a pending request when an admin publishes directly.
+func (h *Host) clearReviewOnPage(page cmsstore.Page) cmsstore.Page {
+	if !reviewStateOf(page.Metadata).Requested && reviewStateOf(page.Metadata).Feedback == "" {
+		return page
+	}
+	metadata := cloneMetadata(page.Metadata)
+	setReview(metadata, false, "", "", "")
+	updated, err := h.store.UpdatePage(page.ID, cmsstore.PageInput{Slug: page.Slug, Title: page.Title, Description: page.Description, Body: page.Body, State: page.State, Metadata: metadata})
+	if err != nil {
+		return page
+	}
+	return updated
 }

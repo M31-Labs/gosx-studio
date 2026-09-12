@@ -1380,7 +1380,34 @@
     });
   });
 
-  if (publishBtn) {
+  var mustRequest = root.getAttribute("data-must-request") === "true";
+  var reviewURL = root.getAttribute("data-review-url") || "";
+
+  if (publishBtn && mustRequest && reviewURL) {
+    publishBtn.addEventListener("click", function () {
+      var note = window.prompt("Anything the reviewer should know? (optional)", "") || "";
+      publishBtn.disabled = true;
+      status("dirty", "Sending for review…");
+      save();
+      setTimeout(function () {
+        fetch(reviewURL, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF },
+          body: JSON.stringify({ note: note }),
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (result) {
+            publishBtn.disabled = false;
+            if (!result.ok) { status("error", result.message || "That didn't send. Try again."); return; }
+            status("saved", result.message || "Sent for review");
+            renderChecks(result.checks);
+            if (chip) { chip.setAttribute("data-live", "false"); chip.textContent = result.chip || "Waiting for review"; }
+          })
+          .catch(function () { publishBtn.disabled = false; status("error", "Couldn't reach the server. Try again."); });
+      }, 400);
+    });
+  } else if (publishBtn) {
     publishBtn.addEventListener("click", function () {
       publishBtn.disabled = true;
       status("dirty", "Publishing…");
@@ -1413,6 +1440,39 @@
             status("error", "Couldn't reach the server. Try publishing again.");
           });
       }, 400);
+    });
+  }
+
+  /* ---------- preview links ---------- */
+
+  var shareMake = root.querySelector("[data-share-make]");
+  if (shareMake) {
+    shareMake.addEventListener("click", function () {
+      var previewURL = root.getAttribute("data-preview-url");
+      if (!previewURL) return;
+      shareMake.disabled = true;
+      save();
+      fetch(previewURL, { method: "POST", credentials: "same-origin", headers: { "X-CSRF-Token": CSRF } })
+        .then(function (r) { return r.json(); })
+        .then(function (result) {
+          shareMake.disabled = false;
+          if (!result.ok) { status("error", result.message || "Couldn't make a link."); return; }
+          var box = root.querySelector("[data-share-result]");
+          var input = root.querySelector("[data-share-link]");
+          var expires = root.querySelector("[data-share-expires]");
+          if (input) input.value = result.url;
+          if (expires) expires.textContent = "Works until " + result.expires + ".";
+          if (box) box.hidden = false;
+          if (input) { input.focus(); input.select(); }
+        })
+        .catch(function () { shareMake.disabled = false; status("error", "Couldn't reach the server. Try again."); });
+    });
+    var copy = root.querySelector("[data-share-copy]");
+    if (copy) copy.addEventListener("click", function () {
+      var input = root.querySelector("[data-share-link]");
+      if (!input || !input.value) return;
+      input.select();
+      try { navigator.clipboard.writeText(input.value); copy.textContent = "Copied"; setTimeout(function () { copy.textContent = "Copy"; }, 1500); } catch (e) { document.execCommand("copy"); }
     });
   }
 

@@ -557,6 +557,11 @@ body.ed-is-dragging .ed-block__tools, body.ed-is-dragging .ed-insert, body.ed-is
 .site-preview-banner a { color: #fff; }
 .site-preview-banner__actions { display: flex; gap: 14px; align-items: center; }
 .site-preview-banner .admin-row-btn { background: #fff; color: #1f2933; border-color: #fff; }
+.site-preview-banner__sendback { display: inline-flex; gap: 6px; }
+.site-preview-banner__sendback input { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid #fff; border-radius: 2px; min-width: 180px; }
+.ed-share__result { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.ed-share__result .ed-inline-input { flex: 1 1 160px; min-width: 0; }
+.ed-share__result small { flex-basis: 100%; color: var(--site-muted); font-size: 11.5px; }
 .ed-post-meta a { pointer-events: none; }
 .ed-field input[type="datetime-local"] { width: 100%; }
 .ed-video { display: flex; flex-direction: column; gap: 7px; margin: 20px 0; }

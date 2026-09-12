@@ -53,6 +53,15 @@ publishes, reads messages) or an admin (everything except handing over the
 site). Anyone can turn on two-step sign-in with an authenticator app under
 **Account**. **Activity** shows who did what, and can be downloaded.
 
+### Review before publishing
+
+Turn on **Settings → Team → Publishing needs approval** and editors' Publish
+button becomes Request review. Requests wait under **Review**, where an admin
+looks at the draft as visitors would see it, then approves and publishes it
+or sends it back with a note the editor sees in the editor. Anyone signed in
+can make a **preview link** for a draft from the editor's sidebar: it shows
+the current draft to whoever has it for three days, without an account.
+
 ### Use your own domain
 
 Open **Settings → Your own domain** in the admin. Type the domain, add the two

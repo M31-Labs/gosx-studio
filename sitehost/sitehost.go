@@ -220,6 +220,7 @@ func (h *Host) Handler() http.Handler {
 	h.mountCheckout(mux)
 	h.mountAuth(mux)
 	h.mountAudit(mux)
+	h.mountReview(mux)
 	h.mountPublic(mux)
 
 	// Outermost first: headers on everything, then sign-in, then CSRF on
