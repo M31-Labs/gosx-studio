@@ -422,13 +422,14 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 	settings := h.settings()
 	form := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
 		gosx.El("h2", nil, gosx.Text("Site details")),
-		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/settings")),
+		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/settings"), gosx.Attr("enctype", "multipart/form-data")),
 			h.csrfField(),
 			adminTextField("title", "Site name", settings.Title, "Shown in the browser tab, your site menu, and search results."),
 			adminTextField("description", "Site description", settings.Description,
 				"One or two sentences about your business. Search engines show this under your site name."),
 			adminTextField("baseURL", "Website address", settings.BaseURL,
 				"For example https://yourbusiness.com. Needed so shared links and search results point at the right place."),
+			h.renderBrandFields(settings),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-actions")),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("type", "submit")), gosx.Text("Save settings")),
 			),
@@ -441,9 +442,11 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 }
 
 func (h *Host) handleAdminSaveSettings(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		h.renderAdminSettings(w, adminStatus{Message: "We couldn't read that form. Try again.", Error: true})
-		return
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		if err := r.ParseForm(); err != nil {
+			h.renderAdminSettings(w, adminStatus{Message: "We couldn't read that form. Try again.", Error: true})
+			return
+		}
 	}
 	title := strings.TrimSpace(r.PostFormValue("title"))
 	if title == "" {
@@ -458,6 +461,10 @@ func (h *Host) handleAdminSaveSettings(w http.ResponseWriter, r *http.Request) {
 		for key, value := range current.Metadata {
 			metadata[key] = value
 		}
+	}
+	if problem := h.applyBrandFields(r, metadata); problem != "" {
+		h.renderAdminSettings(w, adminStatus{Message: problem, Error: true})
+		return
 	}
 	input := cmsstore.SiteSettingsInput{
 		Title:       title,
@@ -606,4 +613,115 @@ func (h *Host) handleAdminPageAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/admin/pages?status="+queryEscape(message), http.StatusSeeOther)
+}
+
+
+// ---------- brand fields on the Settings page ----------
+
+func (h *Host) renderBrandFields(settings cmsstore.SiteSettings) gosx.Node {
+	brand := brandFromSettings(settings)
+
+	layout := func(key, label, hint string) gosx.Node {
+		attrs := []any{gosx.Attr("type", "radio"), gosx.Attr("name", "headerLayout"), gosx.Attr("value", key), gosx.Attr("id", "layout-"+key)}
+		if brand.HeaderLayout == key {
+			attrs = append(attrs, gosx.Attr("checked", "checked"))
+		}
+		return gosx.El("label", gosx.Attrs(gosx.Attr("class", "admin-choice"), gosx.Attr("for", "layout-"+key)),
+			gosx.El("input", gosx.Attrs(attrs...)),
+			gosx.El("span", nil, gosx.Text(label)),
+			gosx.El("small", nil, gosx.Text(hint)),
+		)
+	}
+
+	social := make([]gosx.Node, 0, 6)
+	for _, network := range SocialNetworks() {
+		social = append(social, adminTextField(socialKey(network.Key), network.Label, brand.Social[network.Key], network.Placeholder))
+	}
+
+	return gosx.Fragment(
+		gosx.El("h2", gosx.Attrs(gosx.Attr("class", "admin-subhead")), gosx.Text("Brand")),
+		imageField("logo", "Logo", brand.LogoURL, "Shown in the header instead of your site name. PNG or JPEG, ideally on a transparent background."),
+		imageField("favicon", "Browser tab icon", brand.FaviconURL, "The small square icon in the browser tab. Leave empty to use a letter mark in your accent colour."),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-field")),
+			gosx.El("span", nil, gosx.Text("Header layout")),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-choices")),
+				layout("left", "Left", "Name or logo on the left, menu on the right."),
+				layout("centered", "Centered", "Name or logo centred, menu beneath it."),
+			),
+		),
+		gosx.El("h2", gosx.Attrs(gosx.Attr("class", "admin-subhead")), gosx.Text("Footer")),
+		adminTextField("footerText", "Footer text", brand.FooterText, "A line at the bottom of every page — an address, opening hours, or a tagline."),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-hint")), gosx.Text("Your email and phone from setup appear in the footer automatically.")),
+		gosx.El("h2", gosx.Attrs(gosx.Attr("class", "admin-subhead")), gosx.Text("Find us elsewhere")),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-hint")), gosx.Text("Paste the address of each profile you want linked from the footer. Leave the rest empty.")),
+		gosx.Fragment(social...),
+	)
+}
+
+// imageField is a file input with a preview of the current image and a way
+// to remove it. Uploads go through the same content-addressed store the
+// editor uses.
+func imageField(name, label, current, hint string) gosx.Node {
+	nodes := []gosx.Node{gosx.El("span", nil, gosx.Text(label))}
+	if current != "" {
+		nodes = append(nodes,
+			gosx.El("img", gosx.Attrs(gosx.Attr("class", "admin-image-preview"), gosx.Attr("src", current), gosx.Attr("alt", ""))),
+			gosx.El("label", gosx.Attrs(gosx.Attr("class", "admin-check")),
+				gosx.El("input", gosx.Attrs(gosx.Attr("type", "checkbox"), gosx.Attr("name", "remove_"+name), gosx.Attr("value", "1"))),
+				gosx.Text(" Remove this image"),
+			),
+		)
+	}
+	nodes = append(nodes,
+		gosx.El("input", gosx.Attrs(
+			gosx.Attr("type", "file"), gosx.Attr("id", "field-"+name), gosx.Attr("name", name),
+			gosx.Attr("accept", "image/png,image/jpeg,image/gif,image/webp"),
+		)),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-hint")), gosx.Text(hint)),
+	)
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-field admin-field--image")), gosx.Fragment(nodes...))
+}
+
+// applyBrandFields reads the Brand and Footer sections of a Settings post
+// into metadata. It returns a message when an upload was refused.
+func (h *Host) applyBrandFields(r *http.Request, metadata cmsstore.Metadata) string {
+	for _, image := range []struct{ field, key, label string }{
+		{"logo", brandLogoKey, "logo"},
+		{"favicon", brandFaviconKey, "tab icon"},
+	} {
+		if r.PostFormValue("remove_"+image.field) == "1" {
+			delete(metadata, image.key)
+		}
+		file, _, err := r.FormFile(image.field)
+		if err != nil {
+			continue // no file chosen
+		}
+		url, err := h.storeUpload(file)
+		file.Close()
+		switch {
+		case errors.Is(err, errUploadNotImage):
+			return "The " + image.label + " doesn't look like a picture. PNG, JPEG, GIF, and WebP work."
+		case errors.Is(err, errUploadTooLarge):
+			return "The " + image.label + " is too big. Pictures up to 10 MB work best."
+		case err != nil:
+			return "We couldn't save the " + image.label + ". Try again."
+		}
+		metadata[image.key] = url
+	}
+
+	metadata[brandHeaderLayoutKey] = normalizeHeaderLayout(r.PostFormValue("headerLayout"))
+	if text := strings.TrimSpace(r.PostFormValue("footerText")); text != "" {
+		metadata[brandFooterTextKey] = text
+	} else {
+		delete(metadata, brandFooterTextKey)
+	}
+	for _, network := range SocialNetworks() {
+		key := socialKey(network.Key)
+		if link := normalizeSocialLink(r.PostFormValue(key)); link != "" {
+			metadata[key] = link
+		} else {
+			delete(metadata, key)
+		}
+	}
+	return ""
 }

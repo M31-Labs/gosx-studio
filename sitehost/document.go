@@ -30,6 +30,8 @@ type PageMeta struct {
 	// Theme is the site-wide Look. writeDocument fills it in for every page;
 	// a zero value renders the default.
 	Theme Theme
+	// Favicon is the tab icon's href; writeDocument fills it in.
+	Favicon string
 	// CSRF is the token admin pages expose to their own scripts. Never set on
 	// a public page: anyone can fetch those, and a token readable by anyone
 	// protects no one.
@@ -166,6 +168,13 @@ func RenderHead(meta PageMeta) gosx.Node {
 		theme = DefaultTheme()
 	}
 	nodes = append(nodes, RenderThemeHead(theme))
+	if strings.TrimSpace(meta.Favicon) != "" {
+		iconAttrs := []any{gosx.Attr("rel", "icon"), gosx.Attr("href", meta.Favicon)}
+		if strings.HasPrefix(meta.Favicon, "data:image/svg+xml") {
+			iconAttrs = append(iconAttrs, gosx.Attr("type", "image/svg+xml"))
+		}
+		nodes = append(nodes, gosx.El("link", gosx.Attrs(iconAttrs...)))
+	}
 	if meta.AdminChrome {
 		nodes = append(nodes, gosx.El("link", gosx.Attrs(
 			gosx.Attr("rel", "stylesheet"),

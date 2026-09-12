@@ -112,8 +112,11 @@ func (h *Host) servePublicSlug(w http.ResponseWriter, r *http.Request, slug stri
 	if page.Slug == homeSlug {
 		meta.Kind = "website"
 	}
-	meta.ImageURL = page.Metadata["metaImageUrl"]
-	meta.ImageAlt = page.Metadata["metaImageAlt"]
+	// A page with no share image of its own falls back to the logo, so a
+	// shared link never renders as a naked URL once a logo exists.
+	brand := brandFromSettings(settings)
+	meta.ImageURL = firstNonEmpty(page.Metadata["metaImageUrl"], brand.LogoURL)
+	meta.ImageAlt = firstNonEmpty(page.Metadata["metaImageAlt"], settings.Title)
 	if title := strings.TrimSpace(page.Metadata["metaTitle"]); title != "" {
 		meta.Title = title
 	}
@@ -176,30 +179,11 @@ func (h *Host) navPages() []cmsstore.Page {
 }
 
 func (h *Host) renderPublicNav(settings cmsstore.SiteSettings, activeSlug string) gosx.Node {
-	links := make([]gosx.Node, 0, 8)
-	for _, page := range h.navPages() {
-		if page.Slug == homeSlug {
-			continue
-		}
-		attrs := []any{gosx.Attr("href", publicPath(page.Slug))}
-		if page.Slug == activeSlug {
-			attrs = append(attrs, gosx.Attr("aria-current", "page"))
-		}
-		links = append(links, gosx.El("a", gosx.Attrs(attrs...), gosx.Text(page.Title)))
-	}
-
-	return gosx.El("header", gosx.Attrs(gosx.Attr("class", "site-header")),
-		gosx.El("a", gosx.Attrs(gosx.Attr("class", "site-brand"), gosx.Attr("href", "/")),
-			gosx.Text(firstNonEmpty(settings.Title, h.opts.SiteTitle))),
-		gosx.El("nav", gosx.Attrs(gosx.Attr("class", "site-nav"), gosx.Attr("aria-label", "Site")),
-			gosx.Fragment(links...)),
-	)
+	return h.renderSiteHeader(settings, brandFromSettings(settings), activeSlug, false)
 }
 
 func (h *Host) renderPublicFooter(settings cmsstore.SiteSettings) gosx.Node {
-	return gosx.El("footer", gosx.Attrs(gosx.Attr("class", "site-footer")),
-		gosx.El("p", nil, gosx.Text(firstNonEmpty(settings.Title, h.opts.SiteTitle))),
-	)
+	return h.renderSiteFooter(settings, brandFromSettings(settings))
 }
 
 func publicPath(slug string) string {

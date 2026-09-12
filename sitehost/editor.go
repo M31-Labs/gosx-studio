@@ -226,11 +226,7 @@ func (h *Host) renderEditableCanvas(settings cmsstore.SiteSettings, page cmsstor
 	}
 
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "gosx-site gosx-site--public ed-canvas")),
-		gosx.El("header", gosx.Attrs(gosx.Attr("class", "site-header")),
-			gosx.El("span", gosx.Attrs(gosx.Attr("class", "site-brand")), gosx.Text(firstNonEmpty(settings.Title, h.opts.SiteTitle))),
-			gosx.El("nav", gosx.Attrs(gosx.Attr("class", "site-nav"), gosx.Attr("aria-label", "Site")),
-				gosx.Fragment(h.editorNavLinks(page.Slug)...)),
-		),
+		h.renderSiteHeader(settings, brandFromSettings(settings), page.Slug, true),
 		gosx.El("main", gosx.Attrs(gosx.Attr("class", "site-main")),
 			gosx.El("article", gosx.Attrs(gosx.Attr("class", "site-article"), gosx.Attr("data-blocks", "true")),
 				gosx.El("h1", gosx.Attrs(
@@ -242,6 +238,7 @@ func (h *Host) renderEditableCanvas(settings cmsstore.SiteSettings, page cmsstor
 				gosx.Fragment(blocks...),
 			),
 		),
+		h.renderSiteFooter(settings, brandFromSettings(settings)),
 	)
 }
 

@@ -188,6 +188,10 @@ func (h *Host) writeDocument(w http.ResponseWriter, status int, meta PageMeta, b
 	if meta.AdminChrome {
 		meta.CSRF = h.csrfToken()
 	}
+	if meta.Favicon == "" {
+		settings := h.settings()
+		meta.Favicon = brandFromSettings(settings).FaviconHref(meta.Theme, firstNonEmpty(settings.Title, h.opts.SiteTitle))
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	_, _ = w.Write([]byte(RenderDocument(meta, body)))

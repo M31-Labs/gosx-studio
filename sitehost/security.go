@@ -84,8 +84,16 @@ func (h *Host) requireCSRF(next http.Handler) http.Handler {
 			return
 		}
 		token := strings.TrimSpace(r.Header.Get(csrfHeader))
-		if token == "" && strings.HasPrefix(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
+		contentType := r.Header.Get("Content-Type")
+		if token == "" && strings.HasPrefix(contentType, "application/x-www-form-urlencoded") {
 			if err := r.ParseForm(); err == nil {
+				token = strings.TrimSpace(r.PostFormValue(csrfFormField))
+			}
+		}
+		if token == "" && strings.HasPrefix(contentType, "multipart/form-data") {
+			// A plain HTML upload form (the Settings page's logo field)
+			// cannot send a header; its token is a field like any other.
+			if err := r.ParseMultipartForm(32 << 20); err == nil {
 				token = strings.TrimSpace(r.PostFormValue(csrfFormField))
 			}
 		}
