@@ -520,6 +520,9 @@ func (h *Host) handleEditorSave(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, editorSaveResult{Message: "We couldn't save that. Try again."})
 		return
 	}
+	if slug != page.Slug && page.Slug != homeSlug {
+		_ = h.recordRedirect(publicPath(page.Slug), publicPath(slug))
+	}
 	writeJSON(w, http.StatusOK, editorSaveResult{
 		OK:   true,
 		Slug: slug,

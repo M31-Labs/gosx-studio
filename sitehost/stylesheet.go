@@ -101,6 +101,16 @@ a { color: var(--site-accent); }
 .admin-message__head time { color: var(--site-muted); margin-left: auto; }
 .admin-message__body { margin: 10px 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 68ch; }
 .admin-message__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.site-consent {
+  position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 50; max-width: 640px; margin: 0 auto;
+  display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between;
+  padding: 16px 18px; border: 1px solid var(--site-rule); background: var(--site-ground); color: var(--site-ink);
+  box-shadow: 0 8px 28px rgba(0,0,0,.14); border-radius: 4px; font-size: 14.5px;
+}
+.site-consent[hidden] { display: none; }
+.site-consent p { margin: 0; flex: 1 1 320px; }
+.site-consent__actions { display: flex; gap: 8px; }
+.site-consent__decline { font: inherit; font-size: 14px; background: none; border: 1px solid var(--site-rule); color: var(--site-ink); padding: 9px 14px; border-radius: 2px; cursor: pointer; }
 .site-footer {
   display: flex; flex-direction: column; gap: 10px;
   padding: 28px max(16px, 5vw) 32px;

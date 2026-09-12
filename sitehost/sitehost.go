@@ -154,11 +154,12 @@ func (h *Host) Handler() http.Handler {
 	h.mountEditor(mux)
 	h.mountUploads(mux)
 	h.mountMessages(mux)
+	h.mountGrowth(mux)
 	h.mountPublic(mux)
 
 	// Outermost first: headers on everything, then sign-in, then CSRF on
 	// what is signed in, then the setup gate, then the routes.
-	return securityHeaders(h.guardAdmin(h.requireCSRF(h.requireSetup(mux))))
+	return h.securityHeaders(h.guardAdmin(h.requireCSRF(h.requireSetup(mux))))
 }
 
 // settings reads site settings, falling back to the configured defaults so the

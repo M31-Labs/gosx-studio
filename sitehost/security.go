@@ -137,10 +137,14 @@ const contentSecurityPolicy = "default-src 'self'; " +
 	"base-uri 'self'; " +
 	"object-src 'none'"
 
-func securityHeaders(next http.Handler) http.Handler {
+func (h *Host) securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header := w.Header()
-		header.Set("Content-Security-Policy", contentSecurityPolicy)
+		policy := contentSecurityPolicy
+		if !isAdminPath(r.URL.Path) && !strings.HasPrefix(r.URL.Path, "/setup") {
+			policy = h.publicCSP()
+		}
+		header.Set("Content-Security-Policy", policy)
 		header.Set("X-Content-Type-Options", "nosniff")
 		header.Set("X-Frame-Options", "DENY")
 		header.Set("Referrer-Policy", "strict-origin-when-cross-origin")

@@ -328,6 +328,7 @@ func (h *Host) requireSetup(next http.Handler) http.Handler {
 		exempt := strings.HasPrefix(path, "/setup") ||
 			strings.HasPrefix(path, "/_gosx/") ||
 			strings.HasPrefix(path, uploadsURLPrefix) ||
+			path == sitemapPath || path == robotsPath ||
 			path == "/healthz"
 		if exempt || h.SetupComplete() {
 			next.ServeHTTP(w, r)

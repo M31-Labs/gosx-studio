@@ -1,6 +1,7 @@
 package sitehost
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -396,6 +397,9 @@ func (h *Host) handleAdminSavePage(w http.ResponseWriter, r *http.Request) {
 		h.renderAdminPageDetail(w, page, adminStatus{Message: "We couldn't save that page. Try again.", Error: true})
 		return
 	}
+	if slug != page.Slug && page.Slug != homeSlug {
+		_ = h.recordRedirect(publicPath(page.Slug), publicPath(slug))
+	}
 	http.Redirect(w, r, "/admin/pages/"+page.ID+"?status="+queryEscape("Saved. Publish when you're ready for visitors to see it."), http.StatusSeeOther)
 }
 
@@ -430,6 +434,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 			adminTextField("baseURL", "Website address", settings.BaseURL,
 				"For example https://yourbusiness.com. Needed so shared links and search results point at the right place."),
 			h.renderBrandFields(settings),
+			h.renderGrowthFields(settings),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-actions")),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("type", "submit")), gosx.Text("Save settings")),
 			),
@@ -466,6 +471,7 @@ func (h *Host) handleAdminSaveSettings(w http.ResponseWriter, r *http.Request) {
 		h.renderAdminSettings(w, adminStatus{Message: problem, Error: true})
 		return
 	}
+	applyGrowthFields(r, metadata)
 	input := cmsstore.SiteSettingsInput{
 		Title:       title,
 		Description: strings.TrimSpace(r.PostFormValue("description")),
@@ -724,4 +730,48 @@ func (h *Host) applyBrandFields(r *http.Request, metadata cmsstore.Metadata) str
 		}
 	}
 	return ""
+}
+
+
+// ---------- search engines and other services on the Settings page ----------
+
+func (h *Host) renderGrowthFields(settings cmsstore.SiteSettings) gosx.Node {
+	consentOff := settings.Metadata[consentKey] == "off"
+	consentAttrs := []any{gosx.Attr("type", "checkbox"), gosx.Attr("name", "cookieConsent"), gosx.Attr("value", "required")}
+	if !consentOff {
+		consentAttrs = append(consentAttrs, gosx.Attr("checked", "checked"))
+	}
+	return gosx.Fragment(
+		gosx.El("h2", gosx.Attrs(gosx.Attr("class", "admin-subhead")), gosx.Text("Search engines")),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-hint")),
+			gosx.Text("Your site publishes a sitemap at "+sitemapPath+" and rules at "+robotsPath+" automatically. Submit the sitemap to Google Search Console to be found faster.")),
+		adminTextareaField("redirects", "Redirects", formatRedirectLines(h.redirects()),
+			"One per line: /old-address -> /new-address. When you rename a page, its old address is added here for you so links people already have keep working."),
+		gosx.El("h2", gosx.Attrs(gosx.Attr("class", "admin-subhead")), gosx.Text("Code from other services")),
+		adminTextareaField("headCode", "Paste code here", h.headCode(),
+			"Analytics, chat widgets, or pixels from other services usually give you a snippet to paste. It goes into every page of your public site. Pasting code here relaxes the site's script policy to let it run."),
+		gosx.El("label", gosx.Attrs(gosx.Attr("class", "admin-check")),
+			gosx.El("input", gosx.Attrs(consentAttrs...)),
+			gosx.Text(" Ask visitors before running it (shows a cookie notice; recommended in the EU and UK)"),
+		),
+	)
+}
+
+func applyGrowthFields(r *http.Request, metadata cmsstore.Metadata) {
+	table := parseRedirectLines(r.PostFormValue("redirects"))
+	if len(table) == 0 {
+		delete(metadata, redirectsKey)
+	} else if data, err := json.Marshal(table); err == nil {
+		metadata[redirectsKey] = string(data)
+	}
+	if code := strings.TrimSpace(r.PostFormValue("headCode")); code != "" {
+		metadata[headCodeKey] = code
+	} else {
+		delete(metadata, headCodeKey)
+	}
+	if r.PostFormValue("cookieConsent") == "required" {
+		delete(metadata, consentKey)
+	} else {
+		metadata[consentKey] = "off"
+	}
 }

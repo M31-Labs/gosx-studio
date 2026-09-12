@@ -100,6 +100,11 @@ func (h *Host) servePublicSlug(w http.ResponseWriter, r *http.Request, slug stri
 	settings := h.settings()
 	page, ok := h.publishedPage(slug)
 	if !ok {
+		// A page that moved keeps its old address working.
+		if target, moved := h.resolveRedirect("/" + slug); moved {
+			http.Redirect(w, r, target, http.StatusMovedPermanently)
+			return
+		}
 		h.servePublicNotFound(w, settings, slug)
 		return
 	}
@@ -123,6 +128,14 @@ func (h *Host) servePublicSlug(w http.ResponseWriter, r *http.Request, slug stri
 	if description := strings.TrimSpace(page.Metadata["metaDescription"]); description != "" {
 		meta.Description = description
 	}
+	meta.JSONLD = h.structuredData(settings, brand, page, h.absoluteBase(r))
+	meta.HeadCode = h.headCode()
+	meta.Consent = h.consentRequired()
+
+	var consent gosx.Node = gosx.Fragment()
+	if meta.HeadCode != "" && meta.Consent {
+		consent = renderConsentBanner()
+	}
 
 	body := gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-shell")),
 		h.renderPublicNav(settings, page.Slug),
@@ -133,6 +146,7 @@ func (h *Host) servePublicSlug(w http.ResponseWriter, r *http.Request, slug stri
 			),
 		),
 		h.renderPublicFooter(settings),
+		consent,
 	)
 	h.writeDocument(w, http.StatusOK, meta, body)
 }

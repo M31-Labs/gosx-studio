@@ -32,6 +32,12 @@ type PageMeta struct {
 	Theme Theme
 	// Favicon is the tab icon's href; writeDocument fills it in.
 	Favicon string
+	// JSONLD is the page's structured data; public pages only.
+	JSONLD []map[string]any
+	// HeadCode is the owner's pasted third-party code; public pages only.
+	HeadCode string
+	// Consent gates HeadCode behind the visitor's choice.
+	Consent bool
 	// CSRF is the token admin pages expose to their own scripts. Never set on
 	// a public page: anyone can fetch those, and a token readable by anyone
 	// protects no one.
@@ -174,6 +180,10 @@ func RenderHead(meta PageMeta) gosx.Node {
 			iconAttrs = append(iconAttrs, gosx.Attr("type", "image/svg+xml"))
 		}
 		nodes = append(nodes, gosx.El("link", gosx.Attrs(iconAttrs...)))
+	}
+	nodes = append(nodes, renderJSONLD(meta.JSONLD))
+	if !meta.AdminChrome {
+		nodes = append(nodes, renderHeadCode(meta.HeadCode, meta.Consent))
 	}
 	if meta.AdminChrome {
 		nodes = append(nodes, gosx.El("link", gosx.Attrs(
