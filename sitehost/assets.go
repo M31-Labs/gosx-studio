@@ -13,6 +13,9 @@ var editorScript []byte
 //go:embed assets/consent.js
 var consentScript []byte
 
+//go:embed assets/stats.js
+var statsScript []byte
+
 const editorScriptPath = "/_gosx/site/editor.js"
 
 var editorScriptModTime = time.Now()
@@ -30,5 +33,13 @@ func consentScriptHandler() http.Handler {
 		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 		http.ServeContent(w, r, "consent.js", editorScriptModTime, bytes.NewReader(consentScript))
+	})
+}
+
+func statsScriptHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		http.ServeContent(w, r, "stats.js", editorScriptModTime, bytes.NewReader(statsScript))
 	})
 }

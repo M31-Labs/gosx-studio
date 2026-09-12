@@ -237,6 +237,18 @@ a { color: var(--site-accent); }
 .admin-stat { background: var(--site-ground); padding: 16px 20px; flex: 1 1 160px; }
 .admin-stat strong { display: block; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .admin-stat span { display: block; font-size: 13px; color: var(--site-muted); margin-top: 4px; }
+.admin-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; max-width: 900px; }
+.admin-columns .admin-panel { margin: 0; }
+.stats-chart { display: block; width: 100%; max-width: 900px; height: auto; margin-top: 8px; }
+.stats-bar { fill: var(--site-accent); }
+.stats-bar:hover { fill: var(--site-ink); }
+.stats-axis { stroke: var(--site-rule); stroke-width: 1; }
+.stats-label { fill: var(--site-muted); font-size: 11px; font-family: var(--site-font-body, inherit); }
+.stats-table td { vertical-align: middle; }
+.stats-row__label { display: block; overflow-wrap: anywhere; }
+.stats-row__bar { display: block; width: 100%; height: 4px; margin-top: 5px; }
+.stats-row__bar rect { fill: var(--site-accent); }
+.stats-count { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* ---------- setup wizard ---------- */
 .wz { min-height: 100vh; display: grid; place-items: center; padding: clamp(20px, 5vw, 56px) max(16px, 4vw); background: var(--site-surface); }

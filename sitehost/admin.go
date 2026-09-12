@@ -64,6 +64,7 @@ func (h *Host) renderAdminShell(active, heading, lede string, status adminStatus
 		{"pages", "Pages", "/admin/pages"},
 		{"posts", "Blog", "/admin/posts"},
 		{"messages", messagesLabel, "/admin/messages"},
+		{"stats", "Visitors", "/admin/stats"},
 		{"media", "Pictures", "/admin/media"},
 		{"settings", "Settings", "/admin/settings"},
 	}
@@ -126,6 +127,7 @@ func (h *Host) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		adminStat(drafts, "Unpublished pages"),
 		adminStat(len(h.livePosts()), "Live posts"),
 		adminStat(h.unreadMessages(), "New messages"),
+		adminStat(h.stats.summary(timeNow(), 7).WeekVisitors, "Visitors this week"),
 	)
 
 	next := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
@@ -445,6 +447,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 			h.renderBrandFields(settings),
 			h.renderMailFields(settings),
 			h.renderGrowthFields(settings),
+			renderStatsField(settings),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-actions")),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("type", "submit")), gosx.Text("Save settings")),
 			),
@@ -482,6 +485,7 @@ func (h *Host) handleAdminSaveSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	applyGrowthFields(r, metadata)
+	applyStatsField(r, metadata)
 	if address := strings.TrimSpace(r.PostFormValue("notifyEmail")); address != "" {
 		metadata[notifyEmailKey] = address
 	} else {

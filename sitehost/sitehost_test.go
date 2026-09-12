@@ -794,7 +794,7 @@ func TestArchiveAndRestoreKeepsEverything(t *testing.T) {
 	list := get(t, handler, "/admin/pages").Body.String()
 	mustContain(t, list, "Archived", "the admin list has an archived section")
 	mustContain(t, list, "Restore", "archived pages can be restored")
-	if strings.Contains(list, `data-action="archive"`) && strings.Count(list, "Visit") > 1 {
+	if strings.Contains(list, `data-action="archive"`) && strings.Count(list, ">Visit<") > 1 {
 		t.Fatal("an archived page should not also appear in the active list")
 	}
 	page, _, _ := host.Store().PageByID(id)

@@ -92,6 +92,7 @@ type Host struct {
 	mailStatus mailStatus
 
 	media *mediaIndex
+	stats *statsStore
 }
 
 // Open loads or creates the site at Options.DataPath.
@@ -109,7 +110,7 @@ func Open(opts Options) (*Host, error) {
 		}
 	}
 
-	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir())}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath())}
 	if err := host.configureMail(); err != nil {
 		return nil, err
 	}
@@ -132,7 +133,7 @@ func Open(opts Options) (*Host, error) {
 // this to supply in-memory storage.
 func NewWithStore(store LifecycleContentStore, opts Options) *Host {
 	opts = opts.normalize()
-	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir())}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath())}
 	_ = host.configureMail()
 	return host
 }
@@ -186,6 +187,7 @@ func (h *Host) Handler() http.Handler {
 	h.mountGrowth(mux)
 	h.mountMedia(mux)
 	h.mountBlog(mux)
+	h.mountStats(mux)
 	h.mountPublic(mux)
 
 	// Outermost first: headers on everything, then sign-in, then CSRF on
@@ -220,6 +222,9 @@ func (h *Host) writeDocument(w http.ResponseWriter, status int, meta PageMeta, b
 	if meta.AdminChrome {
 		meta.CSRF = h.csrfToken()
 	}
+	// The visitor beacon goes on public pages that were actually served,
+	// never on the admin, a 404, or the wizard.
+	meta.Stats = !meta.AdminChrome && status == http.StatusOK && h.SetupComplete() && h.statsEnabled()
 	if meta.Favicon == "" {
 		settings := h.settings()
 		meta.Favicon = brandFromSettings(settings).FaviconHref(meta.Theme, firstNonEmpty(settings.Title, h.opts.SiteTitle))

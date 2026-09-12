@@ -28,6 +28,7 @@ type PageMeta struct {
 	AdminChrome   bool
 	NoIndex       bool
 	Feed          bool // advertise the RSS feed
+	Stats         bool // include the visitor beacon
 	// Theme is the site-wide Look. writeDocument fills it in for every page;
 	// a zero value renders the default.
 	Theme Theme
@@ -141,6 +142,9 @@ func RenderHead(meta PageMeta) gosx.Node {
 	}
 	if meta.NoIndex {
 		nodes = append(nodes, metaTag("robots", "noindex, nofollow"))
+	}
+	if meta.Stats {
+		nodes = append(nodes, gosx.El("script", gosx.Attrs(gosx.Attr("src", statsScriptPath), gosx.Attr("defer", "defer"))))
 	}
 	if meta.Feed && !meta.AdminChrome {
 		nodes = append(nodes, gosx.El("link", gosx.Attrs(
