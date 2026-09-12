@@ -87,7 +87,11 @@
       payload.alt = alt ? alt.value.trim() : "";
       payload.text = "";
     }
-    if (kind === "form") payload.text = "";
+    if (kind === "form") {
+      payload.text = "";
+      var fsel = el.querySelector("[data-form-select]");
+      payload.form = fsel ? fsel.value : "";
+    }
     return payload;
   }
 
@@ -465,14 +469,32 @@
     }
     if (kind === "form") {
       var box = document.createElement("div");
-      box.className = "site-form ed-form-preview";
+      box.className = "ed-form";
       box.setAttribute("contenteditable", "false");
-      box.innerHTML =
-        '<label class="site-form__field"><span>Your name</span><input type="text" disabled></label>' +
-        '<label class="site-form__field"><span>Your email</span><input type="email" disabled></label>' +
-        '<label class="site-form__field"><span>Message</span><textarea rows="3" disabled></textarea></label>' +
-        '<span class="site-button" aria-hidden="true">Send message</span>' +
-        '<p class="ed-form-preview__note">Messages people send here arrive in Messages, in your admin area.</p>';
+      var fields = document.createElement("div");
+      fields.className = "site-form ed-form-preview";
+      fields.setAttribute("data-form-fields", "true");
+      var bar = document.createElement("div");
+      bar.className = "ed-form__bar";
+      var label = document.createElement("label");
+      label.textContent = "Which form: ";
+      var select = document.createElement("select");
+      select.className = "ed-inline-select";
+      select.setAttribute("data-form-select", "true");
+      select.setAttribute("aria-label", "Which form");
+      FORMS.forEach(function (preset) {
+        var opt = document.createElement("option");
+        opt.value = preset.ref; opt.textContent = preset.name;
+        select.appendChild(opt);
+      });
+      label.appendChild(select);
+      var edit = document.createElement("a");
+      edit.setAttribute("data-form-edit", "true"); edit.target = "_blank"; edit.rel = "noopener"; edit.textContent = "Change the questions";
+      var build = document.createElement("a");
+      build.href = "/admin/forms"; build.target = "_blank"; build.rel = "noopener"; build.textContent = "Build a new form";
+      bar.appendChild(label); bar.appendChild(edit); bar.appendChild(build);
+      box.appendChild(fields); box.appendChild(bar);
+      refreshFormPreview(box);
       return box;
     }
     var p = document.createElement("p");
@@ -588,6 +610,63 @@
     }
     if (preview) preview.parentNode.replaceChild(next, preview);
   }
+
+  /* ---------- forms on the canvas ---------- */
+
+  var FORMS = [];
+  try {
+    var formsNode = document.querySelector("[data-forms-presets]");
+    FORMS = formsNode ? JSON.parse(formsNode.textContent) : [];
+  } catch (e) { FORMS = []; }
+
+  function findForm(ref) {
+    for (var i = 0; i < FORMS.length; i++) if (FORMS[i].ref === ref) return FORMS[i];
+    return FORMS[0] || { ref: "contact", name: "Contact form", button: "Send", fields: [], edit: "/admin/messages" };
+  }
+
+  /* Redraws a form block's disabled preview from the chosen form. */
+  function refreshFormPreview(box) {
+    var select = box.querySelector("[data-form-select]");
+    var holder = box.querySelector("[data-form-fields]");
+    if (!select || !holder) return;
+    var preset = findForm(select.value);
+    holder.textContent = "";
+    (preset.fields || []).forEach(function (field) {
+      var label = document.createElement("label");
+      var text = field.label + (field.required ? " *" : "");
+      if (field.kind === "checkbox") {
+        label.className = "site-form__check";
+        var cb = document.createElement("input"); cb.type = "checkbox"; cb.disabled = true;
+        var span = document.createElement("span"); span.textContent = text;
+        label.appendChild(cb); label.appendChild(span);
+      } else {
+        label.className = "site-form__field";
+        var span2 = document.createElement("span"); span2.textContent = text;
+        var control;
+        if (field.kind === "textarea") { control = document.createElement("textarea"); control.rows = 3; }
+        else if (field.kind === "select") {
+          control = document.createElement("select");
+          var opt = document.createElement("option"); opt.textContent = "Choose…"; control.appendChild(opt);
+        } else { control = document.createElement("input"); control.type = field.kind === "email" ? "email" : field.kind === "date" ? "date" : field.kind === "phone" ? "tel" : "text"; }
+        control.disabled = true;
+        label.appendChild(span2); label.appendChild(control);
+      }
+      holder.appendChild(label);
+    });
+    var button = document.createElement("span");
+    button.className = "site-button"; button.setAttribute("aria-hidden", "true"); button.textContent = preset.button || "Send";
+    holder.appendChild(button);
+    var edit = box.querySelector("[data-form-edit]");
+    if (edit) edit.href = preset.edit || "/admin/forms";
+  }
+
+  root.addEventListener("change", function (event) {
+    if (event.target.matches("[data-form-select]")) {
+      snapshot();
+      refreshFormPreview(event.target.closest(".ed-form"));
+      queueSave();
+    }
+  });
 
   /* ---------- the picture picker ---------- */
 

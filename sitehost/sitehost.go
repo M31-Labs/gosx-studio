@@ -101,6 +101,7 @@ type Host struct {
 
 	media *mediaIndex
 	stats *statsStore
+	forms *formStore
 	due   dueChecker
 }
 
@@ -119,7 +120,7 @@ func Open(opts Options) (*Host, error) {
 		}
 	}
 
-	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath())}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath())}
 	if err := host.configureMail(); err != nil {
 		return nil, err
 	}
@@ -142,7 +143,7 @@ func Open(opts Options) (*Host, error) {
 // this to supply in-memory storage.
 func NewWithStore(store LifecycleContentStore, opts Options) *Host {
 	opts = opts.normalize()
-	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath())}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath())}
 	_ = host.configureMail()
 	return host
 }
@@ -199,6 +200,7 @@ func (h *Host) Handler() http.Handler {
 	h.mountStats(mux)
 	h.mountDomain(mux)
 	h.mountHistory(mux)
+	h.mountForms(mux)
 	h.mountPublic(mux)
 
 	// Outermost first: headers on everything, then sign-in, then CSRF on

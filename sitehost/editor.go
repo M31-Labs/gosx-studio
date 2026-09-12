@@ -110,6 +110,7 @@ func (h *Host) renderEditor(w http.ResponseWriter, subject editorSubject) {
 			),
 		),
 		renderInsertMenu(),
+		gosx.El("script", gosx.Attrs(gosx.Attr("type", "application/json"), gosx.Attr("data-forms-presets", "true")), gosx.RawHTML(h.formPresetsJSON())),
 		gosx.El("script", gosx.Attrs(gosx.Attr("src", editorScriptPath), gosx.Attr("defer", "defer"))),
 	)
 
@@ -204,7 +205,7 @@ func (h *Host) renderEditorSidebar(subject editorSubject) gosx.Node {
 				addButton("list", "List", "Bullet points"),
 				addButton("divider", "Divider", "A thin line"),
 				addButton("section", "Section", "A new background band"),
-				addButton("form", "Contact form", "Visitors write to you"),
+				addButton("form", "Form", "Contact, sign-up, booking"),
 			),
 		),
 		h.renderLookSection(),
@@ -332,7 +333,7 @@ func renderInsertMenu() gosx.Node {
 			menuItem("list", "List"),
 			menuItem("divider", "Divider"),
 			menuItem("section", "Section"),
-			menuItem("form", "Contact form"),
+			menuItem("form", "Form"),
 		),
 	)
 }
@@ -353,7 +354,7 @@ func menuItem(kind, label string) gosx.Node {
 func (h *Host) renderEditableCanvas(settings cmsstore.SiteSettings, subject editorSubject) gosx.Node {
 	blocks := make([]gosx.Node, 0, len(subject.Body.Blocks)+1)
 	for index, instance := range subject.Body.Blocks {
-		blocks = append(blocks, renderEditableBlock(index, instance))
+		blocks = append(blocks, h.renderEditableBlock(index, instance))
 	}
 
 	activeSlug := subject.Slug
@@ -403,9 +404,9 @@ func (h *Host) editorNavLinks(activeSlug string) []gosx.Node {
 
 // renderEditableBlock wraps one block in the editing chrome: a hover toolbar,
 // an insert point, and a contenteditable region for text kinds.
-func renderEditableBlock(index int, instance blockstudio.BlockInstance) gosx.Node {
+func (h *Host) renderEditableBlock(index int, instance blockstudio.BlockInstance) gosx.Node {
 	kind := editorKind(instance.Key)
-	inner := renderBlockInner(kind, instance)
+	inner := h.renderBlockInner(kind, instance)
 
 	return gosx.El("div", gosx.Attrs(
 		gosx.Attr("class", "ed-block"),
@@ -465,7 +466,7 @@ func levelPicker(kind string, instance blockstudio.BlockInstance) gosx.Node {
 		gosx.Fragment(options...))
 }
 
-func renderBlockInner(kind string, instance blockstudio.BlockInstance) gosx.Node {
+func (h *Host) renderBlockInner(kind string, instance blockstudio.BlockInstance) gosx.Node {
 	value := instance.Values["text"].String
 	switch kind {
 	case "heading":
@@ -501,7 +502,7 @@ func renderBlockInner(kind string, instance blockstudio.BlockInstance) gosx.Node
 			)),
 		)
 	case "form":
-		return renderFormPreview()
+		return h.renderFormPreview(instance.Values["flowKey"].String)
 	case "image":
 		url := instance.Values["url"].String
 		return gosx.El("figure", gosx.Attrs(gosx.Attr("class", "ed-figure")),
@@ -681,6 +682,7 @@ type editorBlockPayload struct {
 	URL    string               `json:"url,omitempty"`
 	Alt    string               `json:"alt,omitempty"`
 	Style  string               `json:"style,omitempty"`
+	Form   string               `json:"form,omitempty"`
 	Images []editorImagePayload `json:"images,omitempty"`
 }
 
@@ -772,7 +774,7 @@ func (h *Host) handleEditorSave(w http.ResponseWriter, r *http.Request) {
 		Slug:        slug,
 		Title:       title,
 		Description: strings.TrimSpace(payload.Description),
-		Body:        payloadDocument(payload.Blocks),
+		Body:        h.payloadDocument(payload.Blocks),
 		Metadata:    metadata,
 		State:       page.State,
 	}
@@ -791,7 +793,7 @@ func (h *Host) handleEditorSave(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func payloadDocument(blocks []editorBlockPayload) blockstudio.Document {
+func (h *Host) payloadDocument(blocks []editorBlockPayload) blockstudio.Document {
 	instances := make([]blockstudio.BlockInstance, 0, len(blocks))
 	order := 0
 	for _, incoming := range blocks {
@@ -823,7 +825,7 @@ func payloadDocument(blocks []editorBlockPayload) blockstudio.Document {
 			instances = append(instances, block(order, content.BlockImage,
 				values("url", url, "alt", strings.TrimSpace(incoming.Alt))))
 		case "form":
-			instances = append(instances, block(order, content.BlockFlow, values("flowKey", contactFlowKey)))
+			instances = append(instances, block(order, content.BlockFlow, values("flowKey", h.formRefForPayload(incoming.Form))))
 		case "list":
 			if value == "" {
 				continue
@@ -1084,24 +1086,6 @@ func (h *Host) handleThemeSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, themeSaveResult{OK: true, CSS: theme.CSS(), FontsURL: theme.GoogleFontsURL()})
-}
-
-// renderFormPreview is what a contact form looks like on the canvas: the real
-// fields, disabled, with a note about where messages go. The visitor-facing
-// form is rendered by messages.go; this exists so the owner can see and move
-// the form without being able to submit it to themselves.
-func renderFormPreview() gosx.Node {
-	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-form ed-form-preview"), gosx.Attr("contenteditable", "false")),
-		gosx.El("label", gosx.Attrs(gosx.Attr("class", "site-form__field")), gosx.El("span", nil, gosx.Text("Your name")),
-			gosx.El("input", gosx.Attrs(gosx.Attr("type", "text"), gosx.Attr("disabled", "disabled")))),
-		gosx.El("label", gosx.Attrs(gosx.Attr("class", "site-form__field")), gosx.El("span", nil, gosx.Text("Your email")),
-			gosx.El("input", gosx.Attrs(gosx.Attr("type", "email"), gosx.Attr("disabled", "disabled")))),
-		gosx.El("label", gosx.Attrs(gosx.Attr("class", "site-form__field")), gosx.El("span", nil, gosx.Text("Message")),
-			gosx.El("textarea", gosx.Attrs(gosx.Attr("rows", "3"), gosx.Attr("disabled", "disabled")))),
-		gosx.El("span", gosx.Attrs(gosx.Attr("class", "site-button"), gosx.Attr("aria-hidden", "true")), gosx.Text("Send message")),
-		gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-form-preview__note")),
-			gosx.Text("Messages people send here arrive in Messages, in your admin area.")),
-	)
 }
 
 // renderVideoEditor shows the video on the canvas with its address beneath,

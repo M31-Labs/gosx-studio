@@ -49,6 +49,10 @@ type Message struct {
 	Page     string    `json:"page,omitempty"`
 	Received time.Time `json:"received"`
 	Read     bool      `json:"read"`
+	// Owner-built forms: which one, and every answer in order.
+	Form     string       `json:"form,omitempty"`
+	FormName string       `json:"formName,omitempty"`
+	Fields   []FieldValue `json:"fields,omitempty"`
 }
 
 // messageStore keeps messages in one JSON file beside the site data. Volumes
@@ -202,14 +206,28 @@ func (h *Host) mountMessages(mux *http.ServeMux) {
 type formState struct {
 	Sent  bool
 	Error string
+	Form  string // which form the state is about; "" is the contact form
 }
 
 func formStateFromQuery(r *http.Request) formState {
+	state := formStateBase(r)
+	state.Form = strings.TrimSpace(r.URL.Query().Get("form"))
+	return state
+}
+
+func formStateBase(r *http.Request) formState {
+	which := strings.TrimSpace(r.URL.Query().Get("which"))
 	switch r.URL.Query().Get("sent") {
 	case "1":
 		return formState{Sent: true}
 	case "error":
 		switch r.URL.Query().Get("why") {
+		case "field":
+			return formState{Error: "Please fill in “" + which + "”."}
+		case "tick":
+			return formState{Error: "Please tick “" + which + "” to continue."}
+		case "choice":
+			return formState{Error: "Pick one of the choices for “" + which + "”."}
 		case "email":
 			return formState{Error: "That email address doesn't look right. Check it and try again."}
 		case "message":
@@ -230,8 +248,14 @@ func formStateFromQuery(r *http.Request) formState {
 // would see.
 func (h *Host) flowHook(pagePath string, state formState) render.Hook {
 	return func(ctx render.Context) (gosx.Node, bool) {
+		if form, ok := h.formByRef(ctx.Ref); ok {
+			return h.renderCustomForm(form, pagePath, state), true
+		}
 		if strings.TrimSpace(ctx.Ref) != contactFlowKey {
 			return gosx.Fragment(), true
+		}
+		if state.Form != "" {
+			state = formState{}
 		}
 		return renderContactForm(pagePath, state), true
 	}
@@ -383,7 +407,7 @@ func (h *Host) handleAdminMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body := h.renderAdminShell("messages", "Messages",
-		"Everything visitors have sent through your contact form, newest first.",
+		"Everything visitors have sent through your forms, newest first.",
 		status, listing)
 	h.writeDocument(w, http.StatusOK, h.adminMeta("Messages"), body)
 }
@@ -396,13 +420,31 @@ func (h *Host) renderMessage(message Message) gosx.Node {
 		toggleLabel, toggleValue = "Mark as unread", "0"
 	}
 	when := message.Received.Local().Format("Mon 2 Jan, 3:04 PM")
+	var body gosx.Node = gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-message__body")), gosx.Text(message.Body))
+	if len(message.Fields) > 0 {
+		rows := make([]gosx.Node, 0, len(message.Fields))
+		for _, field := range message.Fields {
+			rows = append(rows, gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-message__field")),
+				gosx.El("dt", nil, gosx.Text(field.Label)), gosx.El("dd", nil, gosx.Text(firstNonEmpty(field.Value, "—")))))
+		}
+		body = gosx.El("dl", gosx.Attrs(gosx.Attr("class", "admin-message__fields")), gosx.Fragment(rows...))
+	}
+	var formBadge gosx.Node = gosx.Fragment()
+	if message.FormName != "" {
+		formBadge = gosx.El("span", gosx.Attrs(gosx.Attr("class", "admin-badge")), gosx.Text(message.FormName))
+	}
+	var emailLink gosx.Node = gosx.Fragment()
+	if message.Email != "" {
+		emailLink = gosx.El("a", gosx.Attrs(gosx.Attr("href", "mailto:"+message.Email)), gosx.Text(message.Email))
+	}
 	return gosx.El("article", gosx.Attrs(gosx.Attr("class", "admin-message"), gosx.Attr("data-state", state)),
 		gosx.El("header", gosx.Attrs(gosx.Attr("class", "admin-message__head")),
 			gosx.El("strong", nil, gosx.Text(message.Name)),
-			gosx.El("a", gosx.Attrs(gosx.Attr("href", "mailto:"+message.Email)), gosx.Text(message.Email)),
+			formBadge,
+			emailLink,
 			gosx.El("time", gosx.Attrs(gosx.Attr("datetime", message.Received.Format(time.RFC3339))), gosx.Text(when)),
 		),
-		gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-message__body")), gosx.Text(message.Body)),
+		body,
 		gosx.El("footer", gosx.Attrs(gosx.Attr("class", "admin-message__actions")),
 			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("href", "mailto:"+message.Email+"?subject="+replySubject(message))), gosx.Text("Reply by email")),
 			gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/messages/"+message.ID+"/read"), gosx.Attr("class", "admin-inline-form")),

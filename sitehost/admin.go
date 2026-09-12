@@ -64,6 +64,7 @@ func (h *Host) renderAdminShell(active, heading, lede string, status adminStatus
 		{"pages", "Pages", "/admin/pages"},
 		{"posts", "Blog", "/admin/posts"},
 		{"messages", messagesLabel, "/admin/messages"},
+		{"forms", "Forms", "/admin/forms"},
 		{"stats", "Visitors", "/admin/stats"},
 		{"media", "Pictures", "/admin/media"},
 		{"settings", "Settings", "/admin/settings"},

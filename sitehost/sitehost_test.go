@@ -29,6 +29,10 @@ func newTestHost(t *testing.T) (*Host, http.Handler) {
 
 func get(t *testing.T, handler http.Handler, path string) *httptest.ResponseRecorder {
 	t.Helper()
+	// A browser never sends the #fragment; neither does this helper.
+	if at := strings.Index(path, "#"); at >= 0 {
+		path = path[:at]
+	}
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 	return rec

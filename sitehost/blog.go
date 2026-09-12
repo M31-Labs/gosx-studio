@@ -914,7 +914,7 @@ func (h *Host) handlePostSave(w http.ResponseWriter, r *http.Request) {
 		Excerpt:  strings.TrimSpace(payload.Excerpt),
 		Author:   strings.TrimSpace(payload.Author),
 		Tags:     splitTags(payload.Tags),
-		Body:     payloadDocument(payload.Blocks),
+		Body:     h.payloadDocument(payload.Blocks),
 		Metadata: metadata,
 		State:    post.State,
 	}

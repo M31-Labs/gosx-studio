@@ -136,5 +136,5 @@ func TestEditorOffersAndSavesTheContactForm(t *testing.T) {
 	mustContain(t, live, `value="/menu"`, "the form returns to the page it lives on")
 	canvas := get(t, handler, "/admin/edit/"+id).Body.String()
 	mustContain(t, canvas, `data-block="form"`, "the form shows on the canvas as a block")
-	mustContain(t, canvas, "arrive in Messages", "the canvas preview says where messages go")
+	mustContain(t, canvas, `data-form-select="true"`, "the canvas preview lets the owner pick a form")
 }
