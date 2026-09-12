@@ -40,6 +40,24 @@ admin area by accident.
 Every site gets a working contact form on its contact page. Messages land in
 the admin area's inbox — no mail server to configure.
 
+### Use your own domain
+
+Open **Settings → Your own domain** in the admin. Type the domain, add the two
+DNS records the screen shows, and press **Check DNS now** until it reports that
+the domain reaches the server.
+
+For HTTPS, start the site with the `-https` flag. It then listens on ports 80
+and 443, fetches a certificate from Let's Encrypt the first time someone opens
+the secure address, and renews it on its own:
+
+```sh
+gosx-site -https -data /srv/site/site.json -admin-password 'a long passphrase'
+```
+
+Certificates are cached in a `certs` folder beside the data file. Pass
+`-public-ip` to show the server's address in the DNS instructions when it
+cannot be detected.
+
 ### Run it in a container
 
 ```sh

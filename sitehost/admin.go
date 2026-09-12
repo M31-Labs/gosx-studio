@@ -136,12 +136,14 @@ func (h *Host) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 			gosx.El("li", nil, gosx.Text("Edit your home page text, then publish it.")),
 			gosx.El("li", nil, gosx.Text("Add your site name and description in Settings so search results and shared links read well.")),
 			gosx.El("li", nil, gosx.Text("Add the pages your visitors need, such as services, pricing, or opening hours.")),
+			gosx.El("li", nil, gosx.Text("Connect your own domain so people find you at yourbusiness.com.")),
 		),
 		gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-actions")),
 			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("href", h.homeEditHref())), gosx.Text("Edit your home page")),
 			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("href", h.homeEditHref()+"#look")), gosx.Text("Change the look")),
 			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("href", "/admin/pages")), gosx.Text("All pages")),
 			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("href", "/admin/posts")), gosx.Text("Write a post")),
+			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("href", "/admin/domain")), gosx.Text("Connect a domain")),
 		),
 	)
 
@@ -435,6 +437,7 @@ func (h *Host) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 
 func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 	settings := h.settings()
+	domainPanel := h.renderDomainPanel()
 	form := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
 		gosx.El("h2", nil, gosx.Text("Site details")),
 		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/settings"), gosx.Attr("enctype", "multipart/form-data")),
@@ -455,7 +458,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 	)
 	body := h.renderAdminShell("settings", "Settings",
 		"These details appear in search results and when someone shares a link to your site.",
-		status, form, h.renderMailTestPanel())
+		status, domainPanel, form, h.renderMailTestPanel())
 	h.writeDocument(w, http.StatusOK, h.adminMeta("Settings"), body)
 }
 

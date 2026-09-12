@@ -65,6 +65,14 @@ type Options struct {
 	MailURL string
 	// Mailer overrides MailURL with a ready transport. Tests use it.
 	Mailer Mailer
+	// TLS reports that the process serves HTTPS with automatic certificates.
+	// The admin's domain screen reads it; cmd/gosx-site sets it for -https.
+	TLS bool
+	// CertDir caches issued certificates. Defaults to a "certs" folder beside
+	// DataPath.
+	CertDir string
+	// PublicIP is the address DNS records should point at, when known.
+	PublicIP string
 }
 
 func (o Options) normalize() Options {
@@ -188,11 +196,12 @@ func (h *Host) Handler() http.Handler {
 	h.mountMedia(mux)
 	h.mountBlog(mux)
 	h.mountStats(mux)
+	h.mountDomain(mux)
 	h.mountPublic(mux)
 
 	// Outermost first: headers on everything, then sign-in, then CSRF on
 	// what is signed in, then the setup gate, then the routes.
-	return h.securityHeaders(h.guardAdmin(h.requireCSRF(h.requireSetup(mux))))
+	return h.securityHeaders(h.hostRedirect(h.guardAdmin(h.requireCSRF(h.requireSetup(mux)))))
 }
 
 // settings reads site settings, falling back to the configured defaults so the

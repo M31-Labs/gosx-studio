@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"flag"
 	"fmt"
@@ -40,9 +41,15 @@ func run() error {
 		baseURL  = flag.String("base-url", env("GOSX_SITE_BASE_URL", ""), "public address, e.g. https://yourbusiness.com")
 		password = flag.String("admin-password", env("GOSX_SITE_ADMIN_PASSWORD", ""), "password for the admin area (required off localhost)")
 		mailURL  = flag.String("mail", env("GOSX_SITE_MAIL", ""), "email transport: smtp://user:pass@host:587?from=you@example.com, resend://KEY?from=..., or postmark://TOKEN?from=...")
+		https    = flag.Bool("https", env("GOSX_SITE_HTTPS", "") == "true", "serve HTTPS on :443 with automatic Let's Encrypt certificates (and redirect :80); connect a domain in the admin first")
+		certDir  = flag.String("cert-dir", env("GOSX_SITE_CERT_DIR", ""), "where certificates are cached (default: a certs folder beside the data file)")
+		publicIP = flag.String("public-ip", env("GOSX_SITE_PUBLIC_IP", ""), "this server's public IP address, shown in the domain instructions")
 	)
 	flag.Parse()
 
+	if *https && *addr == "127.0.0.1:8080" {
+		*addr = ":443"
+	}
 	if err := checkAdminExposure(*addr, *password); err != nil {
 		return err
 	}
@@ -55,6 +62,17 @@ func run() error {
 	}
 	defer listener.Close()
 
+	// HTTPS also needs port 80: Let's Encrypt checks the domain there, and
+	// anyone typing the address without https:// is sent to the secure one.
+	var challengeListener net.Listener
+	if *https {
+		challengeListener, err = net.Listen("tcp", ":80")
+		if err != nil {
+			return fmt.Errorf("listen on :80 for certificate checks and http to https redirects: %w", err)
+		}
+		defer challengeListener.Close()
+	}
+
 	host, err := sitehost.Open(sitehost.Options{
 		DataPath:        *dataPath,
 		SiteTitle:       *title,
@@ -62,6 +80,9 @@ func run() error {
 		BaseURL:         *baseURL,
 		AdminPassword:   *password,
 		MailURL:         *mailURL,
+		TLS:             *https,
+		CertDir:         *certDir,
+		PublicIP:        *publicIP,
 	})
 	if err != nil {
 		return err
@@ -72,8 +93,15 @@ func run() error {
 		Handler:           host.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
+	var challengeServer *http.Server
+	if *https {
+		manager := host.TLSManager()
+		listener = tls.NewListener(listener, manager.TLSConfig())
+		challengeServer = &http.Server{Addr: ":80", Handler: manager.HTTPHandler(nil), ReadHeaderTimeout: 10 * time.Second}
+		go func() { _ = challengeServer.Serve(challengeListener) }()
+	}
 
-	printWelcome(listener.Addr().String(), *dataPath, *password != "")
+	printWelcome(listener.Addr().String(), *dataPath, *password != "", *https, host.Domain())
 
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
@@ -93,6 +121,9 @@ func run() error {
 		fmt.Println("\nStopping. Your site is saved.")
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+		if challengeServer != nil {
+			_ = challengeServer.Shutdown(ctx)
+		}
 		return server.Shutdown(ctx)
 	}
 }
@@ -123,7 +154,7 @@ func isLoopbackAddr(addr string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-func printWelcome(addr, dataPath string, guarded bool) {
+func printWelcome(addr, dataPath string, guarded, https bool, domain string) {
 	// Bound to every interface, the listener reports "[::]" or "0.0.0.0",
 	// which is not an address a person can type. Show one that is.
 	if host, port, err := net.SplitHostPort(addr); err == nil {
@@ -132,6 +163,12 @@ func printWelcome(addr, dataPath string, guarded bool) {
 		}
 	}
 	base := "http://" + addr
+	if https {
+		base = "https://" + strings.TrimSuffix(addr, ":443")
+		if domain != "" {
+			base = "https://" + domain
+		}
+	}
 	if abs, err := filepath.Abs(dataPath); err == nil {
 		dataPath = abs
 	}
@@ -146,6 +183,11 @@ func printWelcome(addr, dataPath string, guarded bool) {
 		fmt.Println("  Admin sign-in        username \"" + sitehost.AdminUser + "\" with the password you set")
 	} else {
 		fmt.Println("  Admin sign-in        not required (this server only accepts local connections)")
+	}
+	if https && domain == "" {
+		fmt.Println("  HTTPS                on, waiting for a domain: connect one under Settings, Your own domain")
+	} else if https {
+		fmt.Println("  HTTPS                on, certificates from Let's Encrypt are automatic")
 	}
 	fmt.Println()
 	fmt.Println("  Press Ctrl+C to stop.")

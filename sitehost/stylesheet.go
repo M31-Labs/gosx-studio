@@ -237,6 +237,8 @@ a { color: var(--site-accent); }
 .admin-stat { background: var(--site-ground); padding: 16px 20px; flex: 1 1 160px; }
 .admin-stat strong { display: block; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .admin-stat span { display: block; font-size: 13px; color: var(--site-muted); margin-top: 4px; }
+.admin-code { background: var(--site-surface); border: 1px solid var(--site-rule); padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.admin-table--records code { font-size: 13px; }
 .admin-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; max-width: 900px; }
 .admin-columns .admin-panel { margin: 0; }
 .stats-chart { display: block; width: 100%; max-width: 900px; height: auto; margin-top: 8px; }

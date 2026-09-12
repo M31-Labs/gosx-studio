@@ -28,7 +28,7 @@ RUN apk add --no-cache ca-certificates tzdata \
 COPY --from=build /out/gosx-site /usr/local/bin/gosx-site
 USER site
 VOLUME ["/data"]
-EXPOSE 8080
+EXPOSE 8080 80 443
 ENV GOSX_SITE_ADDR=0.0.0.0:8080 \
     GOSX_SITE_DATA=/data/site.json
 # GOSX_SITE_ADMIN_PASSWORD is required: the binary refuses to listen on a
