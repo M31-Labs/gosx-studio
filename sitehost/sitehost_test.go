@@ -466,11 +466,19 @@ func TestWizardWalksThreeStepsAndBuildsTheSite(t *testing.T) {
 		"step": {"2"}, "siteTitle": {"Wildflower Bakery"}, "tagline": {"Sourdough, every morning."},
 		"kind": {"food"},
 	})
-	mustContain(t, step2.Body.String(), "How should people reach you?", "step two advances to step three")
+	mustContain(t, step2.Body.String(), "Pick a look", "step two advances to the look step")
+	mustContain(t, step2.Body.String(), `id="template-bakery"`, "with looks that suit a food business")
+
+	step3 := post(t, handler, "/setup", url.Values{
+		"step": {"3"}, "siteTitle": {"Wildflower Bakery"}, "tagline": {"Sourdough, every morning."},
+		"kind": {"food"}, "template": {"bistro"},
+	})
+	mustContain(t, step3.Body.String(), "How should people reach you?", "the look step advances to contact details")
+	mustContain(t, step3.Body.String(), `name="template" value="bistro"`, "and carries the chosen look forward")
 
 	done := post(t, handler, "/setup", url.Values{
-		"step": {"3"}, "siteTitle": {"Wildflower Bakery"}, "tagline": {"Sourdough, every morning."},
-		"kind": {"food"}, "email": {"hello@wildflower.example"}, "location": {"42 Mill Lane"},
+		"step": {"4"}, "siteTitle": {"Wildflower Bakery"}, "tagline": {"Sourdough, every morning."},
+		"kind": {"food"}, "template": {"bistro"}, "email": {"hello@wildflower.example"}, "location": {"42 Mill Lane"},
 	})
 	if done.Code != http.StatusSeeOther {
 		t.Fatalf("finishing the wizard = %d, want 303: %s", done.Code, done.Body.String())
@@ -497,6 +505,12 @@ func TestWizardWalksThreeStepsAndBuildsTheSite(t *testing.T) {
 		"the email from step three reaches the contact page")
 	mustContain(t, get(t, handler, "/contact").Body.String(), "42 Mill Lane",
 		"the location from step three reaches the contact page")
+	if theme := host.theme(); theme.Palette.Key != "night" || theme.Fonts.Key != "editorial" || theme.Buttons != "square" || theme.Spacing != "airy" {
+		t.Fatalf("the Bistro look was not applied: %+v", theme.view())
+	}
+	if host.settings().Metadata["siteTemplate"] != "bistro" {
+		t.Fatal("the chosen template is remembered")
+	}
 }
 
 func TestWizardRefusesToBuildWithoutAName(t *testing.T) {

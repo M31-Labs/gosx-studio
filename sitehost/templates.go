@@ -82,6 +82,7 @@ type SetupAnswers struct {
 	SiteTitle string
 	Tagline   string
 	Kind      string
+	Template  string // Template key; empty means the kind's default
 	Email     string
 	Phone     string
 	Location  string
@@ -92,6 +93,7 @@ func (a SetupAnswers) trimmed() SetupAnswers {
 	a.SiteTitle = strings.TrimSpace(a.SiteTitle)
 	a.Tagline = strings.TrimSpace(a.Tagline)
 	a.Kind = strings.TrimSpace(a.Kind)
+	a.Template = strings.ToLower(strings.TrimSpace(a.Template))
 	a.Email = strings.TrimSpace(a.Email)
 	a.Phone = strings.TrimSpace(a.Phone)
 	a.Location = strings.TrimSpace(a.Location)
@@ -224,6 +226,7 @@ func StarterSiteFor(answers SetupAnswers) []StarterPage {
 		pages = []StarterPage{home}
 	}
 
+	pages[0].Body = bandHome(pages[0].Body, templateFor(answers).Band)
 	return append(pages, contactPage(name, answers))
 }
 

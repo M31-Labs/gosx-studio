@@ -41,6 +41,7 @@ func answersFromForm(r *http.Request) SetupAnswers {
 		SiteTitle: r.FormValue("siteTitle"),
 		Tagline:   r.FormValue("tagline"),
 		Kind:      r.FormValue("kind"),
+		Template:  r.FormValue("template"),
 		Email:     r.FormValue("email"),
 		Phone:     r.FormValue("phone"),
 		Location:  r.FormValue("location"),
@@ -83,8 +84,13 @@ func (h *Host) handleSetupStep(w http.ResponseWriter, r *http.Request) {
 		}
 		h.renderSetup(w, "3", answers, "")
 	case "3":
+		// A look is always chosen: the first card is preselected, and an
+		// unknown key falls back to the kind's default.
+		answers.Template = templateFor(answers).Key
+		h.renderSetup(w, "4", answers, "")
+	case "4":
 		if err := h.CompleteSetup(answers); err != nil {
-			h.renderSetup(w, "3", answers, "Something went wrong building your site. Try again.")
+			h.renderSetup(w, "4", answers, "Something went wrong building your site. Try again.")
 			return
 		}
 		http.Redirect(w, r, "/admin?welcome=1", http.StatusSeeOther)
@@ -95,6 +101,8 @@ func (h *Host) handleSetupStep(w http.ResponseWriter, r *http.Request) {
 
 func previousStep(step string) string {
 	switch step {
+	case "4":
+		return "3"
 	case "3":
 		return "2"
 	case "2":
@@ -124,6 +132,14 @@ func (h *Host) CompleteSetup(answers SetupAnswers) error {
 	if answers.Kind != "" {
 		metadata["siteKind"] = SiteKindByKey(answers.Kind).Key
 	}
+	// The chosen starting point sets the Look; the owner changes any of it
+	// later from the editor.
+	template := templateFor(answers)
+	metadata["siteTemplate"] = template.Key
+	metadata[themePaletteKey] = template.Palette
+	metadata[themeFontsKey] = template.Fonts
+	metadata[themeButtonsKey] = template.Buttons
+	metadata[themeSpacingKey] = template.Spacing
 
 	if _, err := h.store.SaveSiteSettings(cmsstore.SiteSettingsInput{
 		Title:       answers.SiteTitle,
@@ -176,16 +192,23 @@ func (h *Host) renderSetup(w http.ResponseWriter, step string, answers SetupAnsw
 	}
 
 	var panel gosx.Node
+	var extras gosx.Node = gosx.Fragment()
 	switch step {
 	case "2":
 		panel = setupStepTwo(answers)
 	case "3":
+		panel = setupStepLook(answers)
+		if fonts := fontsPreviewURL(); fonts != "" {
+			extras = gosx.El("link", gosx.Attrs(gosx.Attr("rel", "stylesheet"), gosx.Attr("href", fonts)))
+		}
+	case "4":
 		panel = setupStepThree(answers)
 	default:
 		panel = setupStepOne(answers)
 	}
 
 	body := gosx.El("div", gosx.Attrs(gosx.Attr("class", "wz")),
+		extras,
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "wz-card")),
 			setupProgress(step),
 			problemNote(problem),
@@ -208,7 +231,8 @@ func setupProgress(step string) gosx.Node {
 	steps := []struct{ Key, Label string }{
 		{"1", "Your business"},
 		{"2", "What you do"},
-		{"3", "Getting in touch"},
+		{"3", "Your look"},
+		{"4", "Getting in touch"},
 	}
 	dots := make([]gosx.Node, 0, len(steps))
 	for _, item := range steps {
@@ -275,6 +299,7 @@ func setupStepTwo(answers SetupAnswers) gosx.Node {
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "wz-choices")), gosx.Fragment(cards...)),
 		hidden("siteTitle", answers.SiteTitle),
 		hidden("tagline", answers.Tagline),
+		hidden("template", answers.Template),
 		hidden("step", "2"),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "wz-actions")),
 			gosx.El("button", gosx.Attrs(gosx.Attr("class", "wz-btn wz-btn--ghost"), gosx.Attr("type", "submit"), gosx.Attr("name", "back"), gosx.Attr("value", "1")), gosx.Text("Back")),
@@ -294,9 +319,10 @@ func setupStepThree(answers SetupAnswers) gosx.Node {
 		hidden("siteTitle", answers.SiteTitle),
 		hidden("tagline", answers.Tagline),
 		hidden("kind", answers.Kind),
-		hidden("step", "3"),
+		hidden("template", answers.Template),
+		hidden("step", "4"),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "wz-actions")),
-			gosx.El("button", gosx.Attrs(gosx.Attr("class", "wz-btn wz-btn--ghost"), gosx.Attr("type", "submit"), gosx.Attr("name", "back"), gosx.Attr("value", "2")), gosx.Text("Back")),
+			gosx.El("button", gosx.Attrs(gosx.Attr("class", "wz-btn wz-btn--ghost"), gosx.Attr("type", "submit"), gosx.Attr("name", "back"), gosx.Attr("value", "3")), gosx.Text("Back")),
 			gosx.El("button", gosx.Attrs(gosx.Attr("class", "wz-btn"), gosx.Attr("type", "submit")), gosx.Text("Build my site")),
 		),
 	)
@@ -355,4 +381,51 @@ func (h *Host) renderUnbuiltSite(w http.ResponseWriter) {
 		),
 	)
 	h.writeDocument(w, http.StatusOK, meta, body)
+}
+
+// setupStepLook is the template gallery: the three starting points that
+// suit what the owner does, each drawn from its own palette and type.
+func setupStepLook(answers SetupAnswers) gosx.Node {
+	templates := TemplatesForKind(answers.Kind)
+	chosen := templateFor(answers).Key
+	cards := make([]gosx.Node, 0, len(templates))
+	for _, template := range templates {
+		palette := PaletteByKey(template.Palette)
+		fonts := FontPairByKey(template.Fonts)
+		inputAttrs := []any{
+			gosx.Attr("type", "radio"), gosx.Attr("name", "template"),
+			gosx.Attr("id", "template-"+template.Key), gosx.Attr("value", template.Key),
+		}
+		if template.Key == chosen {
+			inputAttrs = append(inputAttrs, gosx.Attr("checked", "checked"))
+		}
+		radius := ButtonShapeByKey(template.Buttons).Radius
+		cards = append(cards, gosx.El("label", gosx.Attrs(gosx.Attr("class", "wz-choice wz-choice--look"), gosx.Attr("for", "template-"+template.Key)),
+			gosx.El("input", gosx.Attrs(inputAttrs...)),
+			// A miniature of the look: its ground, a heading in its display
+			// face, a line of body text, and a button in its accent and shape.
+			gosx.El("span", gosx.Attrs(gosx.Attr("class", "wz-look"), gosx.Attr("aria-hidden", "true"),
+				gosx.Attr("style", "display:block;padding:14px;border-radius:3px;background:"+palette.Ground+";color:"+palette.Ink+";border:1px solid "+palette.Rule)),
+				gosx.El("span", gosx.Attrs(gosx.Attr("style", "display:block;font-family:"+fonts.Display+";font-weight:700;font-size:18px;line-height:1.1;margin-bottom:6px")), gosx.Text(firstNonEmpty(answers.SiteTitle, "Your name here"))),
+				gosx.El("span", gosx.Attrs(gosx.Attr("style", "display:block;font-family:"+fonts.Body+";font-size:11.5px;color:"+palette.Muted+";margin-bottom:10px")), gosx.Text("A short line about what you do.")),
+				gosx.El("span", gosx.Attrs(gosx.Attr("style", "display:inline-block;padding:5px 11px;font-size:11px;font-family:"+fonts.Body+";background:"+palette.Accent+";color:"+palette.Ground+";border-radius:"+radius)), gosx.Text("Get in touch")),
+			),
+			gosx.El("span", gosx.Attrs(gosx.Attr("class", "wz-choice__label")), gosx.Text(template.Label)),
+			gosx.El("span", gosx.Attrs(gosx.Attr("class", "wz-choice__blurb")), gosx.Text(template.Blurb)),
+		))
+	}
+	return gosx.Fragment(
+		gosx.El("h1", nil, gosx.Text("Pick a look")),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "wz-lede")),
+			gosx.Text("Three starting points that suit what you do. Colours, fonts, and shapes can all be changed later, from the editor, while you watch.")),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "wz-choices")), gosx.Fragment(cards...)),
+		hidden("siteTitle", answers.SiteTitle),
+		hidden("tagline", answers.Tagline),
+		hidden("kind", answers.Kind),
+		hidden("step", "3"),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "wz-actions")),
+			gosx.El("button", gosx.Attrs(gosx.Attr("class", "wz-btn wz-btn--ghost"), gosx.Attr("type", "submit"), gosx.Attr("name", "back"), gosx.Attr("value", "2")), gosx.Text("Back")),
+			gosx.El("button", gosx.Attrs(gosx.Attr("class", "wz-btn"), gosx.Attr("type", "submit")), gosx.Text("Next")),
+		),
+	)
 }
