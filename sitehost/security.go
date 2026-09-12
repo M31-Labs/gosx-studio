@@ -132,6 +132,7 @@ const contentSecurityPolicy = "default-src 'self'; " +
 	"img-src 'self' data: https: http:; " +
 	"media-src 'self' https:; " +
 	"connect-src 'self'; " +
+	"frame-src https://www.youtube-nocookie.com https://player.vimeo.com; " +
 	"frame-ancestors 'none'; " +
 	"form-action 'self'; " +
 	"base-uri 'self'; " +

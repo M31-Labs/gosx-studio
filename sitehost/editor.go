@@ -138,6 +138,9 @@ func (h *Host) renderEditorSidebar(page cmsstore.Page) gosx.Node {
 				addButton("quote", "Quote", "A customer's words"),
 				addButton("button", "Button", "Sends people somewhere"),
 				addButton("image", "Image", "A picture"),
+				addButton("gallery", "Gallery", "A grid of pictures"),
+				addButton("video", "Video", "YouTube or Vimeo"),
+				addButton("columns", "Two columns", "Text side by side"),
 				addButton("list", "List", "Bullet points"),
 				addButton("divider", "Divider", "A thin line"),
 				addButton("section", "Section", "A new background band"),
@@ -204,6 +207,9 @@ func renderInsertMenu() gosx.Node {
 			menuItem("quote", "Quote"),
 			menuItem("button", "Button"),
 			menuItem("image", "Image"),
+			menuItem("gallery", "Gallery"),
+			menuItem("video", "Video"),
+			menuItem("columns", "Two columns"),
 			menuItem("list", "List"),
 			menuItem("divider", "Divider"),
 			menuItem("section", "Section"),
@@ -421,6 +427,17 @@ func renderBlockInner(kind string, instance blockstudio.BlockInstance) gosx.Node
 		return gosx.El("hr", gosx.Attrs(gosx.Attr("class", "site-divider"), gosx.Attr("contenteditable", "false")))
 	case "section":
 		return renderSectionBar(normalizeSectionStyle(instance.Values["style"].String))
+	case "video":
+		return renderVideoEditor(instance.Values["url"].String)
+	case "columns":
+		return gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-columns ed-columns")),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-columns__col"), gosx.Attr("data-text", "true"), gosx.Attr("data-col", "1"), gosx.Attr("contenteditable", "true"), gosx.Attr("spellcheck", "true")),
+				renderInline(firstNonEmpty(strings.TrimSpace(instance.Values["text"].String), "Left column"))),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-columns__col"), gosx.Attr("data-text", "true"), gosx.Attr("data-col", "2"), gosx.Attr("contenteditable", "true"), gosx.Attr("spellcheck", "true")),
+				renderInline(firstNonEmpty(strings.TrimSpace(instance.Values["text2"].String), "Right column"))),
+		)
+	case "gallery":
+		return renderGalleryEditor(galleryImages(instance))
 	default:
 		return gosx.El("p", gosx.Attrs(
 			gosx.Attr("data-text", "true"),
@@ -477,6 +494,12 @@ func editorKind(key string) string {
 		return "divider"
 	case blockSection:
 		return "section"
+	case blockVideo:
+		return "video"
+	case blockColumns:
+		return "columns"
+	case content.BlockGallery:
+		return "gallery"
 	default:
 		return "paragraph"
 	}
@@ -500,6 +523,12 @@ func storeKey(kind string) string {
 		return blockDivider
 	case "section":
 		return blockSection
+	case "video":
+		return blockVideo
+	case "columns":
+		return blockColumns
+	case "gallery":
+		return content.BlockGallery
 	default:
 		return content.BlockParagraph
 	}
@@ -507,13 +536,20 @@ func storeKey(kind string) string {
 
 // ---------- the save API ----------
 
+type editorImagePayload struct {
+	URL string `json:"url"`
+	Alt string `json:"alt"`
+}
+
 type editorBlockPayload struct {
-	Kind  string `json:"kind"`
-	Text  string `json:"text"`
-	Level string `json:"level,omitempty"`
-	URL   string `json:"url,omitempty"`
-	Alt   string `json:"alt,omitempty"`
-	Style string `json:"style,omitempty"`
+	Kind   string               `json:"kind"`
+	Text   string               `json:"text"`
+	Text2  string               `json:"text2,omitempty"`
+	Level  string               `json:"level,omitempty"`
+	URL    string               `json:"url,omitempty"`
+	Alt    string               `json:"alt,omitempty"`
+	Style  string               `json:"style,omitempty"`
+	Images []editorImagePayload `json:"images,omitempty"`
 }
 
 type editorSavePayload struct {
@@ -636,6 +672,31 @@ func payloadDocument(blocks []editorBlockPayload) blockstudio.Document {
 			instances = append(instances, block(order, blockDivider, values()))
 		case "section":
 			instances = append(instances, block(order, blockSection, values("style", normalizeSectionStyle(incoming.Style))))
+		case "video":
+			url := strings.TrimSpace(incoming.URL)
+			if url == "" {
+				continue
+			}
+			instances = append(instances, block(order, blockVideo, values("url", url, "text", value)))
+		case "columns":
+			right := strings.TrimSpace(incoming.Text2)
+			if value == "" && right == "" {
+				continue
+			}
+			instances = append(instances, block(order, blockColumns, values("text", value, "text2", right)))
+		case "gallery":
+			images := make([][2]string, 0, len(incoming.Images))
+			for _, image := range incoming.Images {
+				images = append(images, [2]string{image.URL, image.Alt})
+			}
+			galleryList := galleryValue(images)
+			if len(galleryList.List) == 0 {
+				continue
+			}
+			instances = append(instances, blockstudio.BlockInstance{
+				ID: content.BlockGallery + "-" + itoa(order), Key: content.BlockGallery, Enabled: true, Order: order,
+				Values: blockstudio.Values{"images": galleryList},
+			})
 		default:
 			if value == "" {
 				continue
@@ -672,7 +733,6 @@ func (h *Host) handleEditorPublish(w http.ResponseWriter, r *http.Request) {
 		Message: "Published",
 	})
 }
-
 
 // ---------- the Look ----------
 
@@ -822,7 +882,6 @@ func (h *Host) handleThemeSave(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, themeSaveResult{OK: true, CSS: theme.CSS(), FontsURL: theme.GoogleFontsURL()})
 }
 
-
 // renderFormPreview is what a contact form looks like on the canvas: the real
 // fields, disabled, with a note about where messages go. The visitor-facing
 // form is rendered by messages.go; this exists so the owner can see and move
@@ -838,5 +897,54 @@ func renderFormPreview() gosx.Node {
 		gosx.El("span", gosx.Attrs(gosx.Attr("class", "site-button"), gosx.Attr("aria-hidden", "true")), gosx.Text("Send message")),
 		gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-form-preview__note")),
 			gosx.Text("Messages people send here arrive in Messages, in your admin area.")),
+	)
+}
+
+// renderVideoEditor shows the video on the canvas with its address beneath,
+// or a friendly empty state until an address is pasted.
+func renderVideoEditor(rawURL string) gosx.Node {
+	rawURL = strings.TrimSpace(rawURL)
+	var preview gosx.Node
+	if embed, ok := videoEmbedURL(rawURL); ok {
+		preview = gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-video"), gosx.Attr("data-video-preview", "true")),
+			gosx.El("iframe", gosx.Attrs(gosx.Attr("src", embed), gosx.Attr("title", "Video"), gosx.Attr("loading", "lazy"), gosx.Attr("allowfullscreen", "allowfullscreen"))))
+	} else {
+		preview = gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-image-empty"), gosx.Attr("data-video-preview", "true")),
+			gosx.Text("Paste a YouTube or Vimeo link below"))
+	}
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-video")),
+		preview,
+		gosx.El("input", gosx.Attrs(
+			gosx.Attr("class", "ed-inline-input"), gosx.Attr("type", "text"), gosx.Attr("data-video-url", "true"),
+			gosx.Attr("value", rawURL), gosx.Attr("placeholder", "https://youtube.com/watch?v=…"),
+			gosx.Attr("aria-label", "Video link"), gosx.Attr("contenteditable", "false"),
+		)),
+	)
+}
+
+// renderGalleryEditor is the gallery on the canvas: its pictures with a
+// remove control each, plus upload and library controls.
+func renderGalleryEditor(images [][2]string) gosx.Node {
+	items := make([]gosx.Node, 0, len(images))
+	for _, image := range images {
+		items = append(items, galleryEditorItem(image[0], image[1]))
+	}
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-gallery"), gosx.Attr("data-picker-target", "gallery"), gosx.Attr("contenteditable", "false")),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-gallery ed-gallery__grid"), gosx.Attr("data-gallery-items", "true")), gosx.Fragment(items...)),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-gallery__controls")),
+			gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-upload")),
+				gosx.El("input", gosx.Attrs(gosx.Attr("type", "file"), gosx.Attr("multiple", "multiple"), gosx.Attr("accept", "image/png,image/jpeg,image/gif,image/webp"), gosx.Attr("data-upload", "true"), gosx.Attr("aria-label", "Add pictures"))),
+				gosx.El("span", nil, gosx.Text("Add pictures")),
+			),
+			gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("class", "ed-library-btn"), gosx.Attr("data-library", "true")), gosx.Text("Choose from your pictures")),
+		),
+	)
+}
+
+func galleryEditorItem(url, alt string) gosx.Node {
+	return gosx.El("figure", gosx.Attrs(gosx.Attr("class", "site-gallery__item ed-gallery__item")),
+		gosx.El("img", gosx.Attrs(gosx.Attr("src", url), gosx.Attr("alt", ""), gosx.Attr("data-gimg", "true"), gosx.Attr("loading", "lazy"))),
+		gosx.El("input", gosx.Attrs(gosx.Attr("class", "ed-inline-input"), gosx.Attr("type", "text"), gosx.Attr("data-galt", "true"), gosx.Attr("value", alt), gosx.Attr("placeholder", "Describe this picture"), gosx.Attr("aria-label", "Picture description"))),
+		gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("class", "ed-tool ed-gallery__remove"), gosx.Attr("data-gremove", "true"), gosx.Attr("aria-label", "Remove this picture")), gosx.Text("✕")),
 	)
 }

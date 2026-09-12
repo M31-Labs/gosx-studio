@@ -48,6 +48,27 @@
       var style = el.querySelector("[data-section-style]");
       payload.style = style ? style.value : "plain";
     }
+    if (kind === "video") {
+      var vurl = el.querySelector("[data-video-url]");
+      payload.url = vurl ? vurl.value.trim() : "";
+      payload.text = "";
+    }
+    if (kind === "columns") {
+      var c1 = el.querySelector('[data-col="1"]');
+      var c2 = el.querySelector('[data-col="2"]');
+      payload.text = c1 ? serializeText(c1) : "";
+      payload.text2 = c2 ? serializeText(c2) : "";
+    }
+    if (kind === "gallery") {
+      payload.text = "";
+      payload.images = [];
+      var gitems = el.querySelectorAll(".ed-gallery__item");
+      for (var g = 0; g < gitems.length; g++) {
+        var gimg = gitems[g].querySelector("[data-gimg]");
+        var galt = gitems[g].querySelector("[data-galt]");
+        if (gimg && gimg.getAttribute("src")) payload.images.push({ url: gimg.getAttribute("src"), alt: galt ? galt.value.trim() : "" });
+      }
+    }
 
     if (kind === "heading") {
       var h = el.querySelector("[data-text]");
@@ -319,6 +340,35 @@
       fig.appendChild(inlineInput("alt", "", "Describe the picture for people who can't see it", "Image description"));
       return fig;
     }
+    if (kind === "video") {
+      var vid = document.createElement("div");
+      vid.className = "ed-video";
+      vid.innerHTML =
+        '<div class="ed-image-empty" data-video-preview="true">Paste a YouTube or Vimeo link below</div>' +
+        '<input class="ed-inline-input" type="text" data-video-url="true" value="" placeholder="https://youtube.com/watch?v=…" aria-label="Video link" contenteditable="false">';
+      return vid;
+    }
+    if (kind === "columns") {
+      var cols = document.createElement("div");
+      cols.className = "site-columns ed-columns";
+      var left = document.createElement("div"); left.className = "site-columns__col"; markText(left); left.setAttribute("data-col", "1"); left.textContent = "Left column";
+      var right = document.createElement("div"); right.className = "site-columns__col"; markText(right); right.setAttribute("data-col", "2"); right.textContent = "Right column";
+      cols.appendChild(left); cols.appendChild(right);
+      return cols;
+    }
+    if (kind === "gallery") {
+      var gal = document.createElement("div");
+      gal.className = "ed-gallery";
+      gal.setAttribute("data-picker-target", "gallery");
+      gal.setAttribute("contenteditable", "false");
+      gal.innerHTML =
+        '<div class="site-gallery ed-gallery__grid" data-gallery-items="true"></div>' +
+        '<div class="ed-gallery__controls">' +
+        '<label class="ed-upload"><input type="file" multiple accept="image/png,image/jpeg,image/gif,image/webp" data-upload="true" aria-label="Add pictures"><span>Add pictures</span></label>' +
+        '<button type="button" class="ed-library-btn" data-library="true">Choose from your pictures</button>' +
+        '</div>';
+      return gal;
+    }
     if (kind === "list") {
       var ul = document.createElement("ul");
       ul.className = "site-list";
@@ -410,6 +460,70 @@
     return btn;
   }
 
+  function galleryItem(url, alt) {
+    var fig = document.createElement("figure");
+    fig.className = "site-gallery__item ed-gallery__item";
+    fig.innerHTML =
+      '<img src="" alt="" data-gimg="true" loading="lazy">' +
+      '<input class="ed-inline-input" type="text" data-galt="true" value="" placeholder="Describe this picture" aria-label="Picture description">' +
+      '<button type="button" class="ed-tool ed-gallery__remove" data-gremove="true" aria-label="Remove this picture">✕</button>';
+    fig.querySelector("[data-gimg]").setAttribute("src", url);
+    fig.querySelector("[data-galt]").value = alt || "";
+    return fig;
+  }
+
+  function addToGallery(gallery, url) {
+    var grid = gallery.querySelector("[data-gallery-items]");
+    if (grid) grid.appendChild(galleryItem(url, ""));
+  }
+
+  /* Mirrors videoEmbedURL on the server, so the canvas can preview a link
+     the moment it is pasted. */
+  function videoEmbed(raw) {
+    raw = (raw || "").trim();
+    if (!raw) return "";
+    if (raw.indexOf("://") < 0) raw = "https://" + raw;
+    var a;
+    try { a = new URL(raw); } catch (e) { return ""; }
+    var host = a.hostname.toLowerCase().replace(/^www\./, "");
+    var path = a.pathname.replace(/^\/+|\/+$/g, "");
+    var yt = /^[A-Za-z0-9_-]{6,20}$/;
+    if (host === "youtube.com" || host === "m.youtube.com" || host === "youtube-nocookie.com") {
+      var id = a.searchParams.get("v") || "";
+      var parts = path.split("/");
+      if (!id && parts.length === 2 && ["shorts", "embed", "live"].indexOf(parts[0]) >= 0) id = parts[1];
+      if (yt.test(id)) return "https://www.youtube-nocookie.com/embed/" + id;
+    }
+    if (host === "youtu.be" && yt.test(path)) return "https://www.youtube-nocookie.com/embed/" + path;
+    if (host === "vimeo.com" || host === "player.vimeo.com") {
+      var vid = path.split("/").pop();
+      if (/^[0-9]{5,15}$/.test(vid)) return "https://player.vimeo.com/video/" + vid;
+    }
+    return "";
+  }
+
+  function refreshVideo(input) {
+    var box = input.closest(".ed-video");
+    if (!box) return;
+    var preview = box.querySelector("[data-video-preview]");
+    var embed = videoEmbed(input.value);
+    var next;
+    if (embed) {
+      next = document.createElement("div");
+      next.className = "site-video";
+      next.setAttribute("data-video-preview", "true");
+      var frame = document.createElement("iframe");
+      frame.src = embed; frame.title = "Video"; frame.loading = "lazy"; frame.setAttribute("allowfullscreen", "allowfullscreen");
+      next.appendChild(frame);
+    } else {
+      next = document.createElement("div");
+      next.className = "ed-image-empty";
+      next.setAttribute("data-video-preview", "true");
+      next.textContent = input.value.trim() ? "That doesn't look like a YouTube or Vimeo link" : "Paste a YouTube or Vimeo link below";
+    }
+    if (preview) preview.parentNode.replaceChild(next, preview);
+  }
+
   /* ---------- the picture picker ---------- */
 
   var picker = null;
@@ -423,7 +537,7 @@
 
   function openPicker(button) {
     closePicker();
-    pickerTarget = button.closest(".ed-figure");
+    pickerTarget = button.closest(".ed-figure") || button.closest("[data-picker-target]");
     picker = document.createElement("div");
     picker.className = "ed-menu ed-picker";
     picker.setAttribute("data-picker", "true");
@@ -550,14 +664,25 @@
     var pick = event.target.closest("[data-pick]");
     if (pick && pickerTarget) {
       event.preventDefault();
-      var src = pickerTarget.querySelector("[data-src]");
-      if (src) {
-        snapshot();
-        src.value = pick.getAttribute("data-pick");
-        refreshImage(src);
-        queueSave();
+      snapshot();
+      if (pickerTarget.classList.contains("ed-gallery")) {
+        addToGallery(pickerTarget, pick.getAttribute("data-pick"));
+      } else {
+        var src = pickerTarget.querySelector("[data-src]");
+        if (src) { src.value = pick.getAttribute("data-pick"); refreshImage(src); }
       }
+      queueSave();
       closePicker();
+      return;
+    }
+
+    var gremove = event.target.closest("[data-gremove]");
+    if (gremove) {
+      event.preventDefault();
+      snapshot();
+      var item = gremove.closest(".ed-gallery__item");
+      if (item) item.remove();
+      queueSave();
       return;
     }
     if (picker && !event.target.closest("[data-picker]")) closePicker();
@@ -663,6 +788,8 @@
   });
 
   root.addEventListener("input", function (event) {
+    if (event.target.matches("[data-video-url]")) { refreshVideo(event.target); queueSave(); return; }
+    if (event.target.matches("[data-galt]")) { queueSave(); return; }
     var field = event.target.closest("[data-text]") || (event.target.matches("[data-href],[data-src],[data-alt]") ? event.target : null);
     if (field) {
       if (typingSession !== field) {
@@ -717,28 +844,42 @@
 
   /* Uploads: the file goes up, the returned URL goes into the link field,
      and the preview updates — the same path a pasted link takes. */
+  function uploadOne(file) {
+    var form = new FormData();
+    form.append("file", file);
+    return fetch("/admin/api/upload", { method: "POST", credentials: "same-origin", headers: { "X-CSRF-Token": CSRF }, body: form })
+      .then(function (r) { return r.json(); });
+  }
+
   root.addEventListener("change", function (event) {
     var input = event.target.closest("[data-upload]");
     if (!input || !input.files || !input.files[0]) return;
     var label = input.closest(".ed-upload");
+    var gallery = input.closest(".ed-gallery");
     var fig = input.closest(".ed-figure");
     var src = fig && fig.querySelector("[data-src]");
-    var form = new FormData();
-    form.append("file", input.files[0]);
+    var files = Array.prototype.slice.call(input.files);
     if (label) label.setAttribute("data-busy", "true");
-    status("dirty", "Uploading picture…");
-    fetch("/admin/api/upload", { method: "POST", credentials: "same-origin", headers: { "X-CSRF-Token": CSRF }, body: form })
-      .then(function (r) { return r.json(); })
-      .then(function (result) {
+    status("dirty", files.length > 1 ? "Uploading " + files.length + " pictures…" : "Uploading picture…");
+
+    var chain = Promise.resolve();
+    var failed = "";
+    files.forEach(function (file) {
+      chain = chain.then(function () {
+        return uploadOne(file).then(function (result) {
+          if (!result.ok) { failed = result.message || "A picture didn't upload."; return; }
+          snapshot();
+          if (gallery) addToGallery(gallery, result.url);
+          else if (src) { src.value = result.url; refreshImage(src); }
+        });
+      });
+    });
+    chain
+      .then(function () {
         if (label) label.removeAttribute("data-busy");
         input.value = "";
-        if (!result.ok) { status("error", result.message || "That picture didn't upload. Try again."); return; }
-        if (src) {
-          snapshot();
-          src.value = result.url;
-          refreshImage(src);
-          queueSave();
-        }
+        if (failed) { status("error", failed); }
+        queueSave();
       })
       .catch(function () {
         if (label) label.removeAttribute("data-busy");

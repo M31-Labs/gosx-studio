@@ -239,33 +239,43 @@ var _ = gif.Decode // gif stays registered for DecodeConfig
 // known about them.
 func (h *Host) imageHook() render.Hook {
 	return func(ctx render.Context) (gosx.Node, bool) {
-		rawURL := strings.TrimSpace(ctx.Ref)
 		alt, _ := ctx.Block["alt"].(string)
-		safeURL, ok := mediaurl.ForImage(rawURL)
+		attrs, ok := h.imageAttrs(ctx.Ref, alt, mediaSizes)
 		if !ok {
 			return gosx.Fragment(), false
 		}
-		attrs := []any{
-			gosx.Attr("src", safeURL),
-			gosx.Attr("alt", alt),
-			gosx.Attr("loading", "lazy"),
-			gosx.Attr("decoding", "async"),
-		}
-		if strings.HasPrefix(safeURL, uploadsURLPrefix) {
-			if entry, found := h.media.get(strings.TrimPrefix(safeURL, uploadsURLPrefix)); found && entry.Width > 0 {
-				attrs = append(attrs, gosx.Attr("width", strconv.Itoa(entry.Width)), gosx.Attr("height", strconv.Itoa(entry.Height)))
-				if len(entry.Variants) > 0 {
-					parts := make([]string, 0, len(entry.Variants)+1)
-					for _, variant := range entry.Variants {
-						parts = append(parts, uploadsURLPrefix+variant.Name+" "+strconv.Itoa(variant.Width)+"w")
-					}
-					parts = append(parts, entry.url()+" "+strconv.Itoa(entry.Width)+"w")
-					attrs = append(attrs, gosx.Attr("srcset", strings.Join(parts, ", ")), gosx.Attr("sizes", mediaSizes))
-				}
-			}
-		}
 		return gosx.El("figure", nil, gosx.El("img", gosx.Attrs(attrs...))), true
 	}
+}
+
+// imageAttrs is the <img> attribute set for a picture: src and alt always,
+// lazy loading always, and — for an upload the index knows — its intrinsic
+// size and a srcset of its renditions. sizes says how wide the slot is.
+func (h *Host) imageAttrs(rawURL, alt, sizes string) ([]any, bool) {
+	safeURL, ok := mediaurl.ForImage(strings.TrimSpace(rawURL))
+	if !ok {
+		return nil, false
+	}
+	attrs := []any{
+		gosx.Attr("src", safeURL),
+		gosx.Attr("alt", alt),
+		gosx.Attr("loading", "lazy"),
+		gosx.Attr("decoding", "async"),
+	}
+	if strings.HasPrefix(safeURL, uploadsURLPrefix) {
+		if entry, found := h.media.get(strings.TrimPrefix(safeURL, uploadsURLPrefix)); found && entry.Width > 0 {
+			attrs = append(attrs, gosx.Attr("width", strconv.Itoa(entry.Width)), gosx.Attr("height", strconv.Itoa(entry.Height)))
+			if len(entry.Variants) > 0 {
+				parts := make([]string, 0, len(entry.Variants)+1)
+				for _, variant := range entry.Variants {
+					parts = append(parts, uploadsURLPrefix+variant.Name+" "+strconv.Itoa(variant.Width)+"w")
+				}
+				parts = append(parts, entry.url()+" "+strconv.Itoa(entry.Width)+"w")
+				attrs = append(attrs, gosx.Attr("srcset", strings.Join(parts, ", ")), gosx.Attr("sizes", sizes))
+			}
+		}
+	}
+	return attrs, true
 }
 
 // ---------- the library ----------

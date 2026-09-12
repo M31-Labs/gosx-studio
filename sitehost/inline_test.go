@@ -14,21 +14,21 @@ func inlineHTML(text string) string { return gosx.RenderHTML(gosx.El("p", nil, r
 
 func TestInlineMarkersRenderAsTags(t *testing.T) {
 	cases := map[string]string{
-		"plain":                             "<p>plain</p>",
-		"**bold** and _italic_":             "<p><strong>bold</strong> and <em>italic</em></p>",
-		"see [our menu](/menu) today":       `<p>see <a href="/menu">our menu</a> today</p>`,
-		"[out](https://x.example/p)":        `<p><a href="https://x.example/p" rel="noopener">out</a></p>`,
-		"[mail](mailto:a@b.example)":        `<p><a href="mailto:a@b.example">mail</a></p>`,
-		"line one\nline two":                "<p>line one<br />line two</p>",
-		"**[bold link](/x)**":               `<p><strong><a href="/x">bold link</a></strong></p>`,
-		"snake_case_name stays":             "<p>snake_case_name stays</p>",
-		"lonely ** stars":                   "<p>lonely ** stars</p>",
-		"[not a link":                       "<p>[not a link</p>",
-		"[x](javascript:alert(1))":          "<p>[x](javascript:alert(1))</p>",
-		"[x](data:text/html,hi)":            "<p>[x](data:text/html,hi)</p>",
-		"<script>alert(1)</script>":         "<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>",
-		"**<b>x</b>**":                      "<p><strong>&lt;b&gt;x&lt;/b&gt;</strong></p>",
-		"[a](/p\" onclick=\"x)":             "<p>[a](/p&#34; onclick=&#34;x)</p>",
+		"plain":                       "<p>plain</p>",
+		"**bold** and _italic_":       "<p><strong>bold</strong> and <em>italic</em></p>",
+		"see [our menu](/menu) today": `<p>see <a href="/menu">our menu</a> today</p>`,
+		"[out](https://x.example/p)":  `<p><a href="https://x.example/p" rel="noopener">out</a></p>`,
+		"[mail](mailto:a@b.example)":  `<p><a href="mailto:a@b.example">mail</a></p>`,
+		"line one\nline two":          "<p>line one<br />line two</p>",
+		"**[bold link](/x)**":         `<p><strong><a href="/x">bold link</a></strong></p>`,
+		"snake_case_name stays":       "<p>snake_case_name stays</p>",
+		"lonely ** stars":             "<p>lonely ** stars</p>",
+		"[not a link":                 "<p>[not a link</p>",
+		"[x](javascript:alert(1))":    "<p>[x](javascript:alert(1))</p>",
+		"[x](data:text/html,hi)":      "<p>[x](data:text/html,hi)</p>",
+		"<script>alert(1)</script>":   "<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>",
+		"**<b>x</b>**":                "<p><strong>&lt;b&gt;x&lt;/b&gt;</strong></p>",
+		"[a](/p\" onclick=\"x)":       "<p>[a](/p&#34; onclick=&#34;x)</p>",
 	}
 	for in, want := range cases {
 		if got := inlineHTML(in); got != want {
@@ -114,4 +114,64 @@ func TestEditorOffersTheNewBlocks(t *testing.T) {
 		mustContain(t, body, `data-add="`+kind+`"`, kind+" is in the sidebar")
 		mustContain(t, body, `data-insert="`+kind+`"`, kind+" is in the insert menu")
 	}
+}
+
+func TestVideoEmbedURL(t *testing.T) {
+	cases := map[string]string{
+		"https://www.youtube.com/watch?v=dQw4w9WgXcQ":      "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+		"youtu.be/dQw4w9WgXcQ":                             "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+		"https://youtube.com/shorts/dQw4w9WgXcQ?feature=x": "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+		"https://vimeo.com/76979871":                       "https://player.vimeo.com/video/76979871",
+		"https://player.vimeo.com/video/76979871?h=abc":    "https://player.vimeo.com/video/76979871",
+		"https://example.com/video.mp4":                    "",
+		"https://youtube.com/watch?v=<script>":             "",
+		"javascript:alert(1)":                              "",
+		"":                                                 "",
+	}
+	for in, want := range cases {
+		got, ok := videoEmbedURL(in)
+		if got != want || ok != (want != "") {
+			t.Errorf("videoEmbedURL(%q) = %q,%v want %q", in, got, ok, want)
+		}
+	}
+}
+
+func TestGalleryVideoAndColumnsRoundTrip(t *testing.T) {
+	host, handler := newTestHost(t)
+	id := firstPageID(t, host, "menu")
+	imgURL := uploadedURL(t, postUpload(t, handler, "g.png", bigPNG(t, 1200, 900)).Body.String())
+	payload := `{"title":"Menu","slug":"menu","blocks":[
+		{"kind":"gallery","images":[{"url":"` + imgURL + `","alt":"Loaves"},{"url":"https://example.com/r.jpg","alt":"Remote"},{"url":"","alt":"dropped"}]},
+		{"kind":"video","url":"https://youtu.be/dQw4w9WgXcQ"},
+		{"kind":"video","url":"https://example.com/not-a-video"},
+		{"kind":"columns","text":"**Left** side","text2":"Right side"}
+	]}`
+	if rec := postJSON(t, handler, "/admin/api/pages/"+id, payload); !strings.Contains(rec.Body.String(), `"ok":true`) {
+		t.Fatalf("save: %s", rec.Body.String())
+	}
+	page, _, _ := host.Store().PageByID(id)
+	if page.Body.Blocks[0].Key != content.BlockGallery || len(page.Body.Blocks[0].Values["images"].List) != 2 {
+		t.Fatalf("gallery stored wrong: %+v", page.Body.Blocks[0])
+	}
+
+	canvas := get(t, handler, "/admin/edit/"+id).Body.String()
+	mustContain(t, canvas, `data-picker-target="gallery"`, "the gallery has picker and upload controls")
+	mustContain(t, canvas, `data-gimg="true" loading="lazy"`, "gallery items show on the canvas")
+	mustContain(t, canvas, `src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"`, "the video previews on the canvas")
+	mustContain(t, canvas, `data-col="2"`, "columns are two editable areas")
+
+	post(t, handler, "/admin/api/pages/"+id+"/publish", map[string][]string{})
+	live := get(t, handler, "/menu").Body.String()
+	mustContain(t, live, `<div class="site-gallery">`, "the gallery reaches visitors")
+	mustContain(t, live, `-w480.png 480w`, "gallery pictures get responsive renditions")
+	mustContain(t, live, `sizes="(max-width: 720px) 50vw, 360px"`, "gallery sizes match its grid")
+	mustContain(t, live, `alt="Loaves"`, "gallery alt text survives")
+	mustContain(t, live, `<iframe src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"`, "the video embeds privacy-enhanced")
+	mustContain(t, live, `allowfullscreen`, "the video can go fullscreen")
+	if strings.Contains(live, "not-a-video") {
+		t.Fatal("a non-video link must not render an embed")
+	}
+	mustContain(t, live, `<div class="site-columns"><div class="site-columns__col"><strong>Left</strong> side</div><div class="site-columns__col">Right side</div></div>`, "columns render side by side with formatting")
+	csp := get(t, handler, "/menu").Header().Get("Content-Security-Policy")
+	mustContain(t, csp, "frame-src https://www.youtube-nocookie.com https://player.vimeo.com", "the policy lets the players load")
 }
