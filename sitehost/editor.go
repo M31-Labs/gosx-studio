@@ -930,6 +930,39 @@ func (h *Host) renderLookSection() gosx.Node {
 		))
 	}
 
+	shapes := make([]gosx.Node, 0, 3)
+	for _, shape := range ButtonShapes() {
+		inputAttrs := []any{
+			gosx.Attr("type", "radio"), gosx.Attr("name", "lookButtons"),
+			gosx.Attr("id", "look-buttons-"+shape.Key), gosx.Attr("value", shape.Key),
+			gosx.Attr("data-look-buttons", shape.Key),
+		}
+		if shape.Key == view.ButtonsKey {
+			inputAttrs = append(inputAttrs, gosx.Attr("checked", "checked"))
+		}
+		shapes = append(shapes, gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-shape"), gosx.Attr("for", "look-buttons-"+shape.Key)),
+			gosx.El("input", gosx.Attrs(inputAttrs...)),
+			gosx.El("i", gosx.Attrs(gosx.Attr("class", "ed-shape__sample"), gosx.Attr("style", "border-radius:"+shape.Radius))),
+			gosx.El("span", nil, gosx.Text(shape.Label)),
+		))
+	}
+	spacing := make([]gosx.Node, 0, 3)
+	for _, scale := range SpacingScales() {
+		inputAttrs := []any{
+			gosx.Attr("type", "radio"), gosx.Attr("name", "lookSpacing"),
+			gosx.Attr("id", "look-spacing-"+scale.Key), gosx.Attr("value", scale.Key),
+			gosx.Attr("data-look-spacing", scale.Key),
+		}
+		if scale.Key == view.SpacingKey {
+			inputAttrs = append(inputAttrs, gosx.Attr("checked", "checked"))
+		}
+		spacing = append(spacing, gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-shape"), gosx.Attr("for", "look-spacing-"+scale.Key)),
+			gosx.El("input", gosx.Attrs(inputAttrs...)),
+			gosx.El("i", gosx.Attrs(gosx.Attr("class", "ed-shape__sample ed-shape__sample--space"), gosx.Attr("data-scale", scale.Key))),
+			gosx.El("span", nil, gosx.Text(scale.Label)),
+		))
+	}
+
 	presets := lookPresetsJSON()
 
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-side__block"), gosx.Attr("data-look", "true"), gosx.Attr("id", "look")),
@@ -958,6 +991,16 @@ func (h *Host) renderLookSection() gosx.Node {
 				gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("data-look-accent-reset", "true")), gosx.Text("Use the palette's")),
 			),
 		),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-look-group")),
+			gosx.El("span", nil, gosx.Text("Corners")),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-shapes"), gosx.Attr("role", "radiogroup"), gosx.Attr("aria-label", "Button shape")),
+				gosx.Fragment(shapes...)),
+		),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-look-group")),
+			gosx.El("span", nil, gosx.Text("Spacing")),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-shapes"), gosx.Attr("role", "radiogroup"), gosx.Attr("aria-label", "Spacing")),
+				gosx.Fragment(spacing...)),
+		),
 		gosx.El("link", gosx.Attrs(gosx.Attr("rel", "stylesheet"), gosx.Attr("href", fontsPreviewURL()))),
 		gosx.El("script", gosx.Attrs(gosx.Attr("type", "application/json"), gosx.Attr("data-look-presets", "true")),
 			gosx.RawHTML(presets)),
@@ -973,6 +1016,11 @@ type lookPresetPalette struct {
 	Muted   string `json:"muted"`
 	Rule    string `json:"rule"`
 	Accent  string `json:"accent"`
+}
+
+type lookPresetShape struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 type lookPresetFonts struct {
@@ -993,7 +1041,15 @@ func lookPresetsJSON() string {
 	for _, f := range FontPairs() {
 		fonts = append(fonts, lookPresetFonts{f.Key, f.Display, f.Body, (Theme{Fonts: f}).GoogleFontsURL()})
 	}
-	data, err := json.Marshal(map[string]any{"palettes": palettes, "fonts": fonts})
+	shapes := make([]lookPresetShape, 0, 3)
+	for _, shape := range ButtonShapes() {
+		shapes = append(shapes, lookPresetShape{shape.Key, shape.Radius})
+	}
+	spacing := make([]lookPresetShape, 0, 3)
+	for _, scale := range SpacingScales() {
+		spacing = append(spacing, lookPresetShape{scale.Key, scale.Scale})
+	}
+	data, err := json.Marshal(map[string]any{"palettes": palettes, "fonts": fonts, "buttons": shapes, "spacing": spacing})
 	if err != nil {
 		return "{}"
 	}
@@ -1005,6 +1061,8 @@ type themeSavePayload struct {
 	Palette string `json:"palette"`
 	Fonts   string `json:"fonts"`
 	Accent  string `json:"accent"`
+	Buttons string `json:"buttons"`
+	Spacing string `json:"spacing"`
 }
 
 type themeSaveResult struct {
@@ -1020,7 +1078,7 @@ func (h *Host) handleThemeSave(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, themeSaveResult{Message: "We couldn't read that change. Try again."})
 		return
 	}
-	theme, err := h.SaveTheme(payload.Palette, payload.Fonts, payload.Accent)
+	theme, err := h.SaveTheme(payload.Palette, payload.Fonts, payload.Accent, payload.Buttons, payload.Spacing)
 	if err != nil {
 		writeJSON(w, http.StatusOK, themeSaveResult{Message: "We couldn't save the look. Try again."})
 		return

@@ -69,7 +69,7 @@ func TestThemeCSSIsScopedAndComplete(t *testing.T) {
 func TestSaveThemeRoundTripsAndPreservesSettings(t *testing.T) {
 	host, handler := newTestHost(t)
 
-	saved, err := host.SaveTheme("night", "editorial", "#ff8800")
+	saved, err := host.SaveTheme("night", "editorial", "#ff8800", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestSaveThemeRoundTripsAndPreservesSettings(t *testing.T) {
 	mustContain(t, body, "fonts.googleapis.com/css2?family=Newsreader", "the pairing's fonts are linked")
 
 	// Choosing the palette's own accent drops the override.
-	saved, err = host.SaveTheme("night", "clean", "#4cbba0")
+	saved, err = host.SaveTheme("night", "clean", "#4cbba0", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestSaveThemeRoundTripsAndPreservesSettings(t *testing.T) {
 
 func TestUnknownThemeKeysFallBackToDefaults(t *testing.T) {
 	host, _ := newTestHost(t)
-	saved, err := host.SaveTheme("nope", "nope", "javascript:alert(1)")
+	saved, err := host.SaveTheme("nope", "nope", "javascript:alert(1)", "nope", "nope")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,4 +142,28 @@ func TestThemeAPISavesAndReturnsCSS(t *testing.T) {
 	if theme := host.theme(); theme.Palette.Key != "bold" || theme.Fonts.Key != "modern" {
 		t.Fatalf("theme not persisted: %+v", theme)
 	}
+}
+
+func TestButtonShapeAndSpacingReachTheCSS(t *testing.T) {
+	host, handler := newTestHost(t)
+	saved, err := host.SaveTheme("fresh", "clean", "", "pill", "airy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustContain(t, saved.CSS(), "--site-radius:999px;", "pill corners reach the CSS")
+	mustContain(t, saved.CSS(), "--site-space:1.35;", "airy spacing reaches the CSS")
+	mustContain(t, get(t, handler, "/").Body.String(), "--site-radius:999px;", "visitors get the corners")
+
+	saved, _ = host.SaveTheme("fresh", "clean", "", "what", "ever")
+	mustContain(t, saved.CSS(), "--site-radius:2px;", "unknown shapes fall back to square")
+	mustContain(t, saved.CSS(), "--site-space:1;", "unknown spacing falls back to regular")
+
+	body := postJSON(t, handler, "/admin/api/theme", `{"palette":"warm","fonts":"classic","accent":"","buttons":"rounded","spacing":"compact"}`).Body.String()
+	mustContain(t, body, "--site-radius:8px;", "the API saves the shape")
+	mustContain(t, body, "--site-space:0.8;", "and the spacing")
+
+	editor := get(t, handler, host.homeEditHref()).Body.String()
+	mustContain(t, editor, `data-look-buttons="rounded" checked="checked"`, "the picker shows the current shape")
+	mustContain(t, editor, `data-look-spacing="compact" checked="checked"`, "and the current spacing")
+	mustContain(t, editor, `"buttons":[{"key":"square","value":"2px"}`, "the presets carry the shapes for live preview")
 }

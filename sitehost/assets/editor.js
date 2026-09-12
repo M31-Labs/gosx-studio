@@ -1260,10 +1260,14 @@
   function current() {
     var palette = look.querySelector("[data-look-palette]:checked");
     var fonts = look.querySelector("[data-look-fonts]:checked");
+    var buttons = look.querySelector("[data-look-buttons]:checked");
+    var spacing = look.querySelector("[data-look-spacing]:checked");
     return {
       palette: palette ? palette.value : (presets.palettes[0] || {}).key,
       fonts: fonts ? fonts.value : (presets.fonts[0] || {}).key,
       accent: accentInput ? accentInput.value : "",
+      buttons: buttons ? buttons.value : "",
+      spacing: spacing ? spacing.value : "",
     };
   }
 
@@ -1289,6 +1293,10 @@
       canvas.style.setProperty("--site-accent", accent || "");
       canvas.style.setProperty("--site-font-display", f.display || "");
       canvas.style.setProperty("--site-font-body", f.body || "");
+      var shape = find(presets.buttons || [], state.buttons);
+      var space = find(presets.spacing || [], state.spacing);
+      if (shape) canvas.style.setProperty("--site-radius", shape.value);
+      if (space) canvas.style.setProperty("--site-space", space.value);
     }
     if (f.fontsUrl) ensureFontLink(f.fontsUrl);
   }

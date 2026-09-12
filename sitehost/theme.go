@@ -46,13 +46,69 @@ type Theme struct {
 	Palette Palette
 	Fonts   FontPair
 	Accent  string // hex, overrides Palette.Accent when set
+	Buttons string // ButtonShape key
+	Spacing string // SpacingScale key
 }
 
 const (
 	themePaletteKey = "themePalette"
 	themeFontsKey   = "themeFonts"
 	themeAccentKey  = "themeAccent"
+	themeButtonsKey = "themeButtons"
+	themeSpacingKey = "themeSpacing"
 )
+
+// ButtonShape is how corners on buttons, pictures, and fields look.
+type ButtonShape struct {
+	Key    string
+	Label  string
+	Radius string // CSS length
+}
+
+// ButtonShapes are the corner styles. The first is the default.
+func ButtonShapes() []ButtonShape {
+	return []ButtonShape{
+		{Key: "square", Label: "Square", Radius: "2px"},
+		{Key: "rounded", Label: "Rounded", Radius: "8px"},
+		{Key: "pill", Label: "Pill", Radius: "999px"},
+	}
+}
+
+func ButtonShapeByKey(key string) ButtonShape {
+	key = strings.ToLower(strings.TrimSpace(key))
+	for _, shape := range ButtonShapes() {
+		if shape.Key == key {
+			return shape
+		}
+	}
+	return ButtonShapes()[0]
+}
+
+// SpacingScale is how much air the site has between things.
+type SpacingScale struct {
+	Key   string
+	Label string
+	Scale string // multiplier as CSS number
+}
+
+// SpacingScales are the spacing choices. The second is the default.
+func SpacingScales() []SpacingScale {
+	return []SpacingScale{
+		{Key: "compact", Label: "Compact", Scale: "0.8"},
+		{Key: "regular", Label: "Regular", Scale: "1"},
+		{Key: "airy", Label: "Airy", Scale: "1.35"},
+	}
+}
+
+func SpacingScaleByKey(key string) SpacingScale {
+	key = strings.ToLower(strings.TrimSpace(key))
+	for _, scale := range SpacingScales() {
+		if scale.Key == key {
+			return scale
+		}
+	}
+	return SpacingScales()[1]
+}
 
 // Palettes are the looks the owner can pick from. The first is the default.
 func Palettes() []Palette {
@@ -145,6 +201,8 @@ func ThemeFromSettings(settings cmsstore.SiteSettings) Theme {
 		Palette: PaletteByKey(settings.Metadata[themePaletteKey]),
 		Fonts:   FontPairByKey(settings.Metadata[themeFontsKey]),
 		Accent:  NormalizeAccent(settings.Metadata[themeAccentKey]),
+		Buttons: ButtonShapeByKey(settings.Metadata[themeButtonsKey]).Key,
+		Spacing: SpacingScaleByKey(settings.Metadata[themeSpacingKey]).Key,
 	}
 }
 
@@ -191,6 +249,8 @@ func (t Theme) CSS() string {
 	b.WriteString("--site-accent:" + t.EffectiveAccent() + ";")
 	b.WriteString("--site-font-display:" + t.Fonts.Display + ";")
 	b.WriteString("--site-font-body:" + t.Fonts.Body + ";")
+	b.WriteString("--site-radius:" + ButtonShapeByKey(t.Buttons).Radius + ";")
+	b.WriteString("--site-space:" + SpacingScaleByKey(t.Spacing).Scale + ";")
 	b.WriteString("}")
 	return b.String()
 }
@@ -214,15 +274,20 @@ type themeView struct {
 	PaletteKey string
 	FontsKey   string
 	Accent     string
+	ButtonsKey string
+	SpacingKey string
 }
 
 func (t Theme) view() themeView {
-	return themeView{PaletteKey: t.Palette.Key, FontsKey: t.Fonts.Key, Accent: t.EffectiveAccent()}
+	return themeView{
+		PaletteKey: t.Palette.Key, FontsKey: t.Fonts.Key, Accent: t.EffectiveAccent(),
+		ButtonsKey: ButtonShapeByKey(t.Buttons).Key, SpacingKey: SpacingScaleByKey(t.Spacing).Key,
+	}
 }
 
 // SaveTheme writes the Look to the site's settings, preserving every other
 // setting and metadata key, and publishes it so visitors see it at once.
-func (h *Host) SaveTheme(paletteKey, fontsKey, accent string) (Theme, error) {
+func (h *Host) SaveTheme(paletteKey, fontsKey, accent, buttonsKey, spacingKey string) (Theme, error) {
 	current := h.settings()
 	metadata := cmsstore.Metadata{}
 	for key, value := range current.Metadata {
@@ -232,6 +297,8 @@ func (h *Host) SaveTheme(paletteKey, fontsKey, accent string) (Theme, error) {
 	fonts := FontPairByKey(fontsKey)
 	metadata[themePaletteKey] = palette.Key
 	metadata[themeFontsKey] = fonts.Key
+	metadata[themeButtonsKey] = ButtonShapeByKey(buttonsKey).Key
+	metadata[themeSpacingKey] = SpacingScaleByKey(spacingKey).Key
 	if normalized := NormalizeAccent(accent); normalized != "" && normalized != palette.Accent {
 		metadata[themeAccentKey] = normalized
 	} else {
