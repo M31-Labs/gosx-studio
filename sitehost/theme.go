@@ -268,4 +268,3 @@ func fontsPreviewURL() string {
 	}
 	return "https://fonts.googleapis.com/css2?" + strings.Join(parts, "&") + "&display=swap"
 }
-

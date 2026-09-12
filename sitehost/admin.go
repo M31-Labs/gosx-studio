@@ -553,7 +553,6 @@ func (h *Host) homeEditHref() string {
 	return "/admin/pages"
 }
 
-
 // renderPageRow is one page in the admin list with its management actions.
 func (h *Host) renderPageRow(page cmsstore.Page, first, last bool) gosx.Node {
 	state, stateLabel := "draft", "Not published"
@@ -606,7 +605,7 @@ func (h *Host) isLive(page cmsstore.Page) bool {
 
 func (h *Host) pageActionButton(id, action, label string) gosx.Node {
 	return gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/pages/"+id+"/action"), gosx.Attr("class", "admin-inline-form")),
-			h.csrfField(),
+		h.csrfField(),
 		gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "action"), gosx.Attr("value", action))),
 		gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-row-btn"), gosx.Attr("type", "submit"), gosx.Attr("data-action", action)), gosx.Text(label)),
 	)
@@ -628,7 +627,6 @@ func (h *Host) handleAdminPageAction(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Redirect(w, r, "/admin/pages?status="+queryEscape(message), http.StatusSeeOther)
 }
-
 
 // ---------- brand fields on the Settings page ----------
 
@@ -740,7 +738,6 @@ func (h *Host) applyBrandFields(r *http.Request, metadata cmsstore.Metadata) str
 	return ""
 }
 
-
 // ---------- search engines and other services on the Settings page ----------
 
 func (h *Host) renderGrowthFields(settings cmsstore.SiteSettings) gosx.Node {
@@ -783,7 +780,6 @@ func applyGrowthFields(r *http.Request, metadata cmsstore.Metadata) {
 		metadata[consentKey] = "off"
 	}
 }
-
 
 // ---------- email on the Settings page ----------
 

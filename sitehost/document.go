@@ -17,16 +17,16 @@ import (
 // gets titles, descriptions, canonical URLs, and share cards without anyone
 // writing Go.
 type PageMeta struct {
-	Title       string
-	Description string
+	Title         string
+	Description   string
 	CanonicalPath string
-	ImageURL    string
-	ImageAlt    string
-	SiteTitle   string
-	BaseURL     string
-	Kind        string // "website" or "article"
-	AdminChrome bool
-	NoIndex     bool
+	ImageURL      string
+	ImageAlt      string
+	SiteTitle     string
+	BaseURL       string
+	Kind          string // "website" or "article"
+	AdminChrome   bool
+	NoIndex       bool
 	// Theme is the site-wide Look. writeDocument fills it in for every page;
 	// a zero value renders the default.
 	Theme Theme

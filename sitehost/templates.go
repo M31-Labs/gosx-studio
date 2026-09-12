@@ -79,13 +79,13 @@ func SiteKindByKey(key string) SiteKind {
 
 // SetupAnswers is everything the wizard collects.
 type SetupAnswers struct {
-	SiteTitle   string
-	Tagline     string
-	Kind        string
-	Email       string
-	Phone       string
-	Location    string
-	BaseURL     string
+	SiteTitle string
+	Tagline   string
+	Kind      string
+	Email     string
+	Phone     string
+	Location  string
+	BaseURL   string
 }
 
 func (a SetupAnswers) trimmed() SetupAnswers {
@@ -131,7 +131,7 @@ func StarterSiteFor(answers SetupAnswers) []StarterPage {
 				para(2, "When a piece sells, say so here rather than deleting it — people like seeing what you've made."),
 			)},
 			{Slug: "about", Title: "About", Description: "The story behind " + name + ".", Publish: true, Body: document(
-				heading(0, 2, "About " + name),
+				heading(0, 2, "About "+name),
 				para(1, "Who you are and how you got here. People buy from people, so write this the way you'd tell a customer standing in front of you."),
 				quote(2, "Swap this for something a real customer said about your work."),
 			)},

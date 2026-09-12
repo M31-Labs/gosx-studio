@@ -4,8 +4,8 @@ import (
 	"strconv"
 
 	"m31labs.dev/gosx-admin/blockstudio"
-	cmsstore "m31labs.dev/gosx-studio/cms/store"
 	"m31labs.dev/gosx-studio/cms/content"
+	cmsstore "m31labs.dev/gosx-studio/cms/store"
 )
 
 // seed.go gives a fresh install real content instead of an empty database.

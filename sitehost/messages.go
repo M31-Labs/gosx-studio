@@ -406,7 +406,7 @@ func (h *Host) renderMessage(message Message) gosx.Node {
 		gosx.El("footer", gosx.Attrs(gosx.Attr("class", "admin-message__actions")),
 			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("href", "mailto:"+message.Email+"?subject="+replySubject(message))), gosx.Text("Reply by email")),
 			gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/messages/"+message.ID+"/read"), gosx.Attr("class", "admin-inline-form")),
-			h.csrfField(),
+				h.csrfField(),
 				gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "read"), gosx.Attr("value", toggleValue))),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("type", "submit")), gosx.Text(toggleLabel)),
 			),
