@@ -126,6 +126,7 @@ func (h *Host) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		),
 		gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-actions")),
 			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("href", h.homeEditHref())), gosx.Text("Edit your home page")),
+			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("href", h.homeEditHref()+"#look")), gosx.Text("Change the look")),
 			gosx.El("a", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("href", "/admin/pages")), gosx.Text("All pages")),
 		),
 	)

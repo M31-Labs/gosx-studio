@@ -27,6 +27,7 @@ func (h *Host) mountEditor(mux *http.ServeMux) {
 	mux.HandleFunc("GET /admin/edit/{id}", h.handleEditor)
 	mux.HandleFunc("POST /admin/api/pages/{id}", h.handleEditorSave)
 	mux.HandleFunc("POST /admin/api/pages/{id}/publish", h.handleEditorPublish)
+	mux.HandleFunc("POST /admin/api/theme", h.handleThemeSave)
 	mux.Handle("GET "+editorScriptPath, editorScriptHandler())
 }
 
@@ -133,6 +134,7 @@ func (h *Host) renderEditorSidebar(page cmsstore.Page) gosx.Node {
 				addButton("image", "Image", "A picture"),
 			),
 		),
+		h.renderLookSection(),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-side__block")),
 			gosx.El("h2", nil, gosx.Text("This page")),
 			editorField("pageTitle", "Page name", page.Title, "Shown as the heading and in your menu."),
@@ -562,4 +564,153 @@ func (h *Host) handleEditorPublish(w http.ResponseWriter, r *http.Request) {
 		Slug:    page.Slug,
 		Message: "Published",
 	})
+}
+
+
+// ---------- the Look ----------
+
+// renderLookSection is the site-wide theme picker. It lives in the editor
+// rather than on a settings page because the point of choosing a colour is
+// seeing the page change under your cursor.
+func (h *Host) renderLookSection() gosx.Node {
+	theme := h.theme()
+	view := theme.view()
+
+	swatches := make([]gosx.Node, 0, 6)
+	for _, palette := range Palettes() {
+		inputAttrs := []any{
+			gosx.Attr("type", "radio"), gosx.Attr("name", "lookPalette"),
+			gosx.Attr("id", "look-palette-"+palette.Key), gosx.Attr("value", palette.Key),
+			gosx.Attr("data-look-palette", palette.Key),
+		}
+		if palette.Key == view.PaletteKey {
+			inputAttrs = append(inputAttrs, gosx.Attr("checked", "checked"))
+		}
+		swatches = append(swatches, gosx.El("label", gosx.Attrs(
+			gosx.Attr("class", "ed-swatch"), gosx.Attr("for", "look-palette-"+palette.Key), gosx.Attr("title", palette.Blurb),
+		),
+			gosx.El("input", gosx.Attrs(inputAttrs...)),
+			gosx.El("span", gosx.Attrs(
+				gosx.Attr("class", "ed-swatch__chip"),
+				gosx.Attr("style", "background:"+palette.Ground+";border:1px solid "+palette.Rule),
+			), gosx.El("i", gosx.Attrs(gosx.Attr("style", "background:"+palette.Accent)))),
+			gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-swatch__name")), gosx.Text(palette.Label)),
+		))
+	}
+
+	fonts := make([]gosx.Node, 0, 5)
+	for _, pair := range FontPairs() {
+		inputAttrs := []any{
+			gosx.Attr("type", "radio"), gosx.Attr("name", "lookFonts"),
+			gosx.Attr("id", "look-fonts-"+pair.Key), gosx.Attr("value", pair.Key),
+			gosx.Attr("data-look-fonts", pair.Key),
+		}
+		if pair.Key == view.FontsKey {
+			inputAttrs = append(inputAttrs, gosx.Attr("checked", "checked"))
+		}
+		fonts = append(fonts, gosx.El("label", gosx.Attrs(
+			gosx.Attr("class", "ed-font"), gosx.Attr("for", "look-fonts-"+pair.Key), gosx.Attr("title", pair.Blurb),
+		),
+			gosx.El("input", gosx.Attrs(inputAttrs...)),
+			gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-font__sample"), gosx.Attr("style", "font-family:"+pair.Display)), gosx.Text("Aa")),
+			gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-font__name")), gosx.Text(pair.Label)),
+		))
+	}
+
+	presets := lookPresetsJSON()
+
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-side__block"), gosx.Attr("data-look", "true"), gosx.Attr("id", "look")),
+		gosx.El("h2", nil, gosx.Text("Look")),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-hint")),
+			gosx.Text("Changes here apply to your whole site, and you can see them on the page as you pick.")),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-look-group")),
+			gosx.El("span", nil, gosx.Text("Colours")),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-swatches"), gosx.Attr("role", "radiogroup"), gosx.Attr("aria-label", "Colour palette")),
+				gosx.Fragment(swatches...)),
+		),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-look-group")),
+			gosx.El("span", nil, gosx.Text("Fonts")),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-fonts"), gosx.Attr("role", "radiogroup"), gosx.Attr("aria-label", "Font pairing")),
+				gosx.Fragment(fonts...)),
+		),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-look-group")),
+			gosx.El("span", nil, gosx.Text("Accent colour")),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-accent")),
+				gosx.El("input", gosx.Attrs(
+					gosx.Attr("type", "color"), gosx.Attr("id", "lookAccent"),
+					gosx.Attr("data-look-accent", "true"), gosx.Attr("value", view.Accent),
+					gosx.Attr("aria-label", "Accent colour"),
+				)),
+				gosx.El("small", nil, gosx.Text("Buttons and links.")),
+				gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("data-look-accent-reset", "true")), gosx.Text("Use the palette's")),
+			),
+		),
+		gosx.El("link", gosx.Attrs(gosx.Attr("rel", "stylesheet"), gosx.Attr("href", fontsPreviewURL()))),
+		gosx.El("script", gosx.Attrs(gosx.Attr("type", "application/json"), gosx.Attr("data-look-presets", "true")),
+			gosx.RawHTML(presets)),
+	)
+}
+
+type lookPresetPalette struct {
+	Key     string `json:"key"`
+	Scheme  string `json:"scheme"`
+	Ground  string `json:"ground"`
+	Surface string `json:"surface"`
+	Ink     string `json:"ink"`
+	Muted   string `json:"muted"`
+	Rule    string `json:"rule"`
+	Accent  string `json:"accent"`
+}
+
+type lookPresetFonts struct {
+	Key     string `json:"key"`
+	Display string `json:"display"`
+	Body    string `json:"body"`
+	Fonts   string `json:"fontsUrl"`
+}
+
+// lookPresetsJSON hands the picker every preset's values so a click can
+// restyle the canvas before the save round-trip returns.
+func lookPresetsJSON() string {
+	palettes := make([]lookPresetPalette, 0, 6)
+	for _, p := range Palettes() {
+		palettes = append(palettes, lookPresetPalette{p.Key, p.Scheme, p.Ground, p.Surface, p.Ink, p.Muted, p.Rule, p.Accent})
+	}
+	fonts := make([]lookPresetFonts, 0, 5)
+	for _, f := range FontPairs() {
+		fonts = append(fonts, lookPresetFonts{f.Key, f.Display, f.Body, (Theme{Fonts: f}).GoogleFontsURL()})
+	}
+	data, err := json.Marshal(map[string]any{"palettes": palettes, "fonts": fonts})
+	if err != nil {
+		return "{}"
+	}
+	// A closing script tag inside the JSON would end the element early.
+	return strings.ReplaceAll(string(data), "</", "<\\/")
+}
+
+type themeSavePayload struct {
+	Palette string `json:"palette"`
+	Fonts   string `json:"fonts"`
+	Accent  string `json:"accent"`
+}
+
+type themeSaveResult struct {
+	OK       bool   `json:"ok"`
+	Message  string `json:"message,omitempty"`
+	CSS      string `json:"css,omitempty"`
+	FontsURL string `json:"fontsUrl,omitempty"`
+}
+
+func (h *Host) handleThemeSave(w http.ResponseWriter, r *http.Request) {
+	var payload themeSavePayload
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&payload); err != nil {
+		writeJSON(w, http.StatusBadRequest, themeSaveResult{Message: "We couldn't read that change. Try again."})
+		return
+	}
+	theme, err := h.SaveTheme(payload.Palette, payload.Fonts, payload.Accent)
+	if err != nil {
+		writeJSON(w, http.StatusOK, themeSaveResult{Message: "We couldn't save the look. Try again."})
+		return
+	}
+	writeJSON(w, http.StatusOK, themeSaveResult{OK: true, CSS: theme.CSS(), FontsURL: theme.GoogleFontsURL()})
 }

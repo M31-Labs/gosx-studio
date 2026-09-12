@@ -27,6 +27,9 @@ type PageMeta struct {
 	Kind        string // "website" or "article"
 	AdminChrome bool
 	NoIndex     bool
+	// Theme is the site-wide Look. writeDocument fills it in for every page;
+	// a zero value renders the default.
+	Theme Theme
 }
 
 func metaFromSettings(settings cmsstore.SiteSettings) PageMeta {
@@ -153,6 +156,12 @@ func RenderHead(meta PageMeta) gosx.Node {
 		gosx.Attr("rel", "stylesheet"),
 		gosx.Attr("href", publicStylesheetPath),
 	)))
+	// The theme comes after the base stylesheet so its values win.
+	theme := meta.Theme
+	if theme.Palette.Key == "" {
+		theme = DefaultTheme()
+	}
+	nodes = append(nodes, RenderThemeHead(theme))
 	if meta.AdminChrome {
 		nodes = append(nodes, gosx.El("link", gosx.Attrs(
 			gosx.Attr("rel", "stylesheet"),

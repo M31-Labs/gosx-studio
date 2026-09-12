@@ -168,6 +168,9 @@ func (h *Host) settings() cmsstore.SiteSettings {
 }
 
 func (h *Host) writeDocument(w http.ResponseWriter, status int, meta PageMeta, body gosx.Node) {
+	if meta.Theme.Palette.Key == "" {
+		meta.Theme = h.theme()
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	_, _ = w.Write([]byte(RenderDocument(meta, body)))

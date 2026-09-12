@@ -19,6 +19,8 @@ const siteCSS = `
   --site-accent: #0e6b59;
   --site-surface: #f6f8f7;
   --site-measure: 68ch;
+  --site-font-display: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --site-font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -35,9 +37,10 @@ body {
   margin: 0;
   background: var(--site-ground);
   color: var(--site-ink);
-  font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 16px/1.6 var(--site-font-body);
   -webkit-font-smoothing: antialiased;
 }
+.site-brand, .site-title, .site-article h2, .site-article h3, .site-article h4 { font-family: var(--site-font-display); }
 img { max-width: 100%; height: auto; }
 a { color: var(--site-accent); }
 .site-shell { display: flex; flex-direction: column; min-height: 100vh; }
@@ -175,6 +178,38 @@ a { color: var(--site-accent); }
 }
 .wz-btn--ghost { background: transparent; color: var(--site-ink); border-color: var(--site-rule); }
 
+/* ---------- Look (site-wide theme) ---------- */
+.ed-look-group { margin: 0 0 14px; }
+.ed-look-group > span { display: block; font-size: 12.5px; color: var(--site-muted); margin: 0 0 6px; }
+.ed-swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ed-swatch {
+  position: relative; display: flex; flex-direction: column; gap: 4px; cursor: pointer;
+  border: 1px solid var(--site-rule); border-radius: 2px; padding: 6px; background: var(--site-ground);
+}
+.ed-swatch input { position: absolute; opacity: 0; pointer-events: none; }
+.ed-swatch:has(input:checked) { border-color: var(--site-accent); box-shadow: inset 0 0 0 1px var(--site-accent); }
+.ed-swatch:has(input:focus-visible) { outline: 2px solid var(--site-accent); outline-offset: 2px; }
+.ed-swatch__chip { height: 26px; border-radius: 2px; display: flex; align-items: flex-end; padding: 3px; }
+.ed-swatch__chip i { display: block; width: 14px; height: 6px; border-radius: 1px; }
+.ed-swatch__name { font-size: 11.5px; color: var(--site-ink); }
+.ed-fonts { display: grid; gap: 6px; }
+.ed-font {
+  position: relative; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; cursor: pointer;
+  border: 1px solid var(--site-rule); border-radius: 2px; padding: 7px 10px; background: var(--site-ground);
+}
+.ed-font input { position: absolute; opacity: 0; pointer-events: none; }
+.ed-font:has(input:checked) { border-color: var(--site-accent); box-shadow: inset 0 0 0 1px var(--site-accent); }
+.ed-font:has(input:focus-visible) { outline: 2px solid var(--site-accent); outline-offset: 2px; }
+.ed-font__sample { font-size: 17px; line-height: 1.1; color: var(--site-ink); }
+.ed-font__name { font-size: 11.5px; color: var(--site-muted); white-space: nowrap; }
+.ed-accent { display: flex; align-items: center; gap: 10px; }
+.ed-accent input[type="color"] {
+  width: 42px; height: 30px; padding: 2px; border: 1px solid var(--site-rule); border-radius: 2px;
+  background: var(--site-ground); cursor: pointer;
+}
+.ed-accent small { font-size: 12px; color: var(--site-muted); }
+.ed-accent button { font: inherit; font-size: 12px; background: none; border: 0; color: var(--site-accent); cursor: pointer; padding: 0; text-decoration: underline; }
+
 /* ---------- editor ---------- */
 .gosx-site--admin:has(.ed) { overflow: hidden; }
 .ed { display: flex; flex-direction: column; height: 100vh; }
@@ -230,6 +265,9 @@ a { color: var(--site-accent); }
   max-width: 940px; margin: 0 auto; background: var(--site-ground);
   border: 1px solid var(--site-rule); box-shadow: 0 1px 3px rgba(0,0,0,.05);
 }
+/* The canvas paints its own ground and ink from the site's theme, so a dark
+   palette previews as dark instead of borrowing the editor frame's white. */
+.ed-canvas { background: var(--site-ground); color: var(--site-ink); font-family: var(--site-font-body); }
 .ed-canvas .site-header { pointer-events: none; opacity: .75; }
 .ed-canvas .site-main { padding-bottom: 40px; }
 .ed-block { position: relative; padding: 2px 0; margin: 0 0 2px; border-radius: 2px; }

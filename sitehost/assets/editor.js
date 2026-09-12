@@ -532,3 +532,114 @@
   reindex();
   status("saved", "All changes saved");
 })();
+
+/* ---------- Look: site-wide theme, live on the canvas ---------- */
+(function () {
+  "use strict";
+  var root = document.querySelector("[data-editor]");
+  var look = root && root.querySelector("[data-look]");
+  if (!look) return;
+
+  var presetsNode = look.querySelector("[data-look-presets]");
+  var presets = { palettes: [], fonts: [] };
+  try { presets = JSON.parse(presetsNode.textContent); } catch (e) {}
+
+  var canvas = root.querySelector(".ed-canvas");
+  var themeStyle = document.querySelector("style[data-site-theme]");
+  var saveNode = root.querySelector("[data-save-status]");
+  var accentInput = look.querySelector("[data-look-accent]");
+  var timer = null;
+
+  function current() {
+    var palette = look.querySelector("[data-look-palette]:checked");
+    var fonts = look.querySelector("[data-look-fonts]:checked");
+    return {
+      palette: palette ? palette.value : (presets.palettes[0] || {}).key,
+      fonts: fonts ? fonts.value : (presets.fonts[0] || {}).key,
+      accent: accentInput ? accentInput.value : "",
+    };
+  }
+
+  function find(list, key) {
+    for (var i = 0; i < list.length; i++) if (list[i].key === key) return list[i];
+    return list[0];
+  }
+
+  /* Restyle the canvas immediately: the same custom properties the server
+     emits, written straight onto the canvas root, so the page changes under
+     the cursor before the save returns. */
+  function apply(state) {
+    var p = find(presets.palettes, state.palette) || {};
+    var f = find(presets.fonts, state.fonts) || {};
+    var accent = state.accent || p.accent;
+    if (canvas) {
+      canvas.style.setProperty("color-scheme", p.scheme || "light");
+      canvas.style.setProperty("--site-ground", p.ground || "");
+      canvas.style.setProperty("--site-surface", p.surface || "");
+      canvas.style.setProperty("--site-ink", p.ink || "");
+      canvas.style.setProperty("--site-muted", p.muted || "");
+      canvas.style.setProperty("--site-rule", p.rule || "");
+      canvas.style.setProperty("--site-accent", accent || "");
+      canvas.style.setProperty("--site-font-display", f.display || "");
+      canvas.style.setProperty("--site-font-body", f.body || "");
+    }
+    if (f.fontsUrl) ensureFontLink(f.fontsUrl);
+  }
+
+  function ensureFontLink(href) {
+    if (document.querySelector('link[href="' + href + '"]')) return;
+    var link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    document.head.appendChild(link);
+  }
+
+  function status(state, text) {
+    if (!saveNode) return;
+    saveNode.setAttribute("data-save-status", state);
+    saveNode.textContent = text;
+  }
+
+  function save() {
+    var state = current();
+    status("dirty", "Saving the look…");
+    fetch("/admin/api/theme", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify(state),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (result) {
+        if (!result.ok) { status("error", result.message || "The look didn't save. Try again."); return; }
+        if (themeStyle && result.css) themeStyle.textContent = result.css;
+        status("saved", "Look saved — it's live on every page");
+      })
+      .catch(function () { status("error", "Couldn't reach the server. Try again."); });
+  }
+
+  function changed() {
+    apply(current());
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(save, 500);
+  }
+
+  look.addEventListener("change", function (event) {
+    if (event.target.matches("[data-look-palette]")) {
+      // A new palette brings its own accent unless the owner has chosen one.
+      var p = find(presets.palettes, event.target.value);
+      if (accentInput && p && !accentInput.dataset.custom) accentInput.value = p.accent;
+    }
+    if (event.target.matches("[data-look-accent]")) accentInput.dataset.custom = "1";
+    changed();
+  });
+  look.addEventListener("input", function (event) {
+    if (event.target.matches("[data-look-accent]")) { accentInput.dataset.custom = "1"; apply(current()); }
+  });
+  var reset = look.querySelector("[data-look-accent-reset]");
+  if (reset) reset.addEventListener("click", function () {
+    var p = find(presets.palettes, current().palette);
+    if (accentInput && p) { accentInput.value = p.accent; delete accentInput.dataset.custom; }
+    changed();
+  });
+})();
