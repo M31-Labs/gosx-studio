@@ -44,6 +44,7 @@ func run() error {
 		https    = flag.Bool("https", env("GOSX_SITE_HTTPS", "") == "true", "serve HTTPS on :443 with automatic Let's Encrypt certificates (and redirect :80); connect a domain in the admin first")
 		certDir  = flag.String("cert-dir", env("GOSX_SITE_CERT_DIR", ""), "where certificates are cached (default: a certs folder beside the data file)")
 		publicIP = flag.String("public-ip", env("GOSX_SITE_PUBLIC_IP", ""), "this server's public IP address, shown in the domain instructions")
+		noBackup = flag.Bool("no-backups", env("GOSX_SITE_NO_BACKUPS", "") == "true", "turn off the daily backup zip written beside the data file")
 	)
 	flag.Parse()
 
@@ -83,6 +84,7 @@ func run() error {
 		TLS:             *https,
 		CertDir:         *certDir,
 		PublicIP:        *publicIP,
+		NoBackups:       *noBackup,
 	})
 	if err != nil {
 		return err

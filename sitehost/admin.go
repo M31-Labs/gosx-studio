@@ -460,7 +460,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 	)
 	body := h.renderAdminShell("settings", "Settings",
 		"These details appear in search results and when someone shares a link to your site.",
-		status, domainPanel, form, h.renderMailTestPanel())
+		status, domainPanel, form, h.renderMailTestPanel(), h.renderBackupPanel())
 	h.writeDocument(w, http.StatusOK, h.adminMeta("Settings"), body)
 }
 

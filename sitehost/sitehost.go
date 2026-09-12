@@ -73,6 +73,9 @@ type Options struct {
 	CertDir string
 	// PublicIP is the address DNS records should point at, when known.
 	PublicIP string
+	// NoBackups turns off the daily backup into a "backups" folder beside
+	// DataPath. Export on demand still works.
+	NoBackups bool
 }
 
 func (o Options) normalize() Options {
@@ -99,10 +102,11 @@ type Host struct {
 	mailer     Mailer
 	mailStatus mailStatus
 
-	media *mediaIndex
-	stats *statsStore
-	forms *formStore
-	due   dueChecker
+	media   *mediaIndex
+	stats   *statsStore
+	forms   *formStore
+	due     dueChecker
+	backups backupState
 }
 
 // Open loads or creates the site at Options.DataPath.
@@ -201,11 +205,12 @@ func (h *Host) Handler() http.Handler {
 	h.mountDomain(mux)
 	h.mountHistory(mux)
 	h.mountForms(mux)
+	h.mountBackups(mux)
 	h.mountPublic(mux)
 
 	// Outermost first: headers on everything, then sign-in, then CSRF on
 	// what is signed in, then the setup gate, then the routes.
-	return h.securityHeaders(h.hostRedirect(h.guardAdmin(h.requireCSRF(h.requireSetup(mux)))))
+	return h.housekeeping(h.securityHeaders(h.hostRedirect(h.guardAdmin(h.requireCSRF(h.requireSetup(mux))))))
 }
 
 // settings reads site settings, falling back to the configured defaults so the

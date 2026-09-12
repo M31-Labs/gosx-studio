@@ -58,6 +58,16 @@ Certificates are cached in a `certs` folder beside the data file. Pass
 `-public-ip` to show the server's address in the DNS instructions when it
 cannot be detected.
 
+### Backups and export
+
+**Settings → Backups and export** downloads the whole site as one zip: pages,
+posts, pictures, messages, forms, and visitor counts. A backup of the same
+kind is written once a day into a `backups` folder beside the data file, and
+the last fourteen are kept. Turn that off with `-no-backups`.
+
+To restore, stop the site, unzip the backup, and start the site from the
+`site.json` inside it. Certificates are never included; HTTPS issues new ones.
+
 ### Run it in a container
 
 ```sh

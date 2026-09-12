@@ -20,6 +20,7 @@ func newTestHost(t *testing.T) (*Host, http.Handler) {
 		BaseURL:         "https://wildflower.example",
 		SiteKind:        "food",
 		Seed:            true,
+		NoBackups:       true, // the backup tests open their own host
 	})
 	if err != nil {
 		t.Fatal(err)
