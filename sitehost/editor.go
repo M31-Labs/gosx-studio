@@ -138,6 +138,7 @@ func (h *Host) renderEditorSidebar(page cmsstore.Page) gosx.Node {
 				addButton("quote", "Quote", "A customer's words"),
 				addButton("button", "Button", "Sends people somewhere"),
 				addButton("image", "Image", "A picture"),
+				addButton("form", "Contact form", "Visitors write to you"),
 			),
 		),
 		h.renderLookSection(),
@@ -200,6 +201,7 @@ func renderInsertMenu() gosx.Node {
 			menuItem("quote", "Quote"),
 			menuItem("button", "Button"),
 			menuItem("image", "Image"),
+			menuItem("form", "Contact form"),
 		),
 	)
 }
@@ -357,6 +359,8 @@ func renderBlockInner(kind string, instance blockstudio.BlockInstance) gosx.Node
 				gosx.Attr("contenteditable", "false"),
 			)),
 		)
+	case "form":
+		return renderFormPreview()
 	case "image":
 		url := instance.Values["url"].String
 		return gosx.El("figure", gosx.Attrs(gosx.Attr("class", "ed-figure")),
@@ -417,6 +421,8 @@ func editorKind(key string) string {
 		return "button"
 	case content.BlockImage:
 		return "image"
+	case content.BlockFlow:
+		return "form"
 	default:
 		return "paragraph"
 	}
@@ -432,6 +438,8 @@ func storeKey(kind string) string {
 		return content.BlockButton
 	case "image":
 		return content.BlockImage
+	case "form":
+		return content.BlockFlow
 	default:
 		return content.BlockParagraph
 	}
@@ -553,6 +561,8 @@ func payloadDocument(blocks []editorBlockPayload) blockstudio.Document {
 			}
 			instances = append(instances, block(order, content.BlockImage,
 				values("url", url, "alt", strings.TrimSpace(incoming.Alt))))
+		case "form":
+			instances = append(instances, block(order, content.BlockFlow, values("flowKey", contactFlowKey)))
 		default:
 			if value == "" {
 				continue
@@ -737,4 +747,23 @@ func (h *Host) handleThemeSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, themeSaveResult{OK: true, CSS: theme.CSS(), FontsURL: theme.GoogleFontsURL()})
+}
+
+
+// renderFormPreview is what a contact form looks like on the canvas: the real
+// fields, disabled, with a note about where messages go. The visitor-facing
+// form is rendered by messages.go; this exists so the owner can see and move
+// the form without being able to submit it to themselves.
+func renderFormPreview() gosx.Node {
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-form ed-form-preview"), gosx.Attr("contenteditable", "false")),
+		gosx.El("label", gosx.Attrs(gosx.Attr("class", "site-form__field")), gosx.El("span", nil, gosx.Text("Your name")),
+			gosx.El("input", gosx.Attrs(gosx.Attr("type", "text"), gosx.Attr("disabled", "disabled")))),
+		gosx.El("label", gosx.Attrs(gosx.Attr("class", "site-form__field")), gosx.El("span", nil, gosx.Text("Your email")),
+			gosx.El("input", gosx.Attrs(gosx.Attr("type", "email"), gosx.Attr("disabled", "disabled")))),
+		gosx.El("label", gosx.Attrs(gosx.Attr("class", "site-form__field")), gosx.El("span", nil, gosx.Text("Message")),
+			gosx.El("textarea", gosx.Attrs(gosx.Attr("rows", "3"), gosx.Attr("disabled", "disabled")))),
+		gosx.El("span", gosx.Attrs(gosx.Attr("class", "site-button"), gosx.Attr("aria-hidden", "true")), gosx.Text("Send message")),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-form-preview__note")),
+			gosx.Text("Messages people send here arrive in Messages, in your admin area.")),
+	)
 }

@@ -58,6 +58,7 @@
       payload.alt = alt ? alt.value.trim() : "";
       payload.text = "";
     }
+    if (kind === "form") payload.text = "";
     return payload;
   }
 
@@ -272,6 +273,18 @@
       fig.appendChild(inlineInput("src", "", "or paste a link to one", "Image link"));
       fig.appendChild(inlineInput("alt", "", "Describe the picture for people who can't see it", "Image description"));
       return fig;
+    }
+    if (kind === "form") {
+      var box = document.createElement("div");
+      box.className = "site-form ed-form-preview";
+      box.setAttribute("contenteditable", "false");
+      box.innerHTML =
+        '<label class="site-form__field"><span>Your name</span><input type="text" disabled></label>' +
+        '<label class="site-form__field"><span>Your email</span><input type="email" disabled></label>' +
+        '<label class="site-form__field"><span>Message</span><textarea rows="3" disabled></textarea></label>' +
+        '<span class="site-button" aria-hidden="true">Send message</span>' +
+        '<p class="ed-form-preview__note">Messages people send here arrive in Messages, in your admin area.</p>';
+      return box;
     }
     var p = document.createElement("p");
     markText(p);

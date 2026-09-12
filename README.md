@@ -37,6 +37,21 @@ The server binds to localhost by default and refuses to listen on a public
 address unless you set `-admin-password`, so it never exposes an unprotected
 admin area by accident.
 
+Every site gets a working contact form on its contact page. Messages land in
+the admin area's inbox — no mail server to configure.
+
+### Run it in a container
+
+```sh
+docker build -t gosx-site .
+docker run -p 8080:8080 -v gosx-site-data:/data \
+  -e GOSX_SITE_ADMIN_PASSWORD=change-me gosx-site
+```
+
+Pages, pictures, and messages all live in the `/data` volume. The admin
+password is required in a container because the server is reachable from the
+network; the image will not start without one.
+
 `cmd/gosx-site` is the default host: it assembles the `sitehost`, `cms`, and
 `hostruntime` packages into a program that runs. Applications that need more
 control still configure the packages directly, as the reference deployments

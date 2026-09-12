@@ -73,6 +73,31 @@ a { color: var(--site-accent); }
   text-decoration: none; font-weight: 500; border: 0; cursor: pointer;
   font-size: 15px;
 }
+.site-form { display: flex; flex-direction: column; gap: 14px; max-width: 520px; margin: 18px 0 28px; }
+.site-form__field { display: flex; flex-direction: column; gap: 5px; }
+.site-form__field span { font-size: 14px; color: var(--site-muted); }
+.site-form__field input, .site-form__field textarea {
+  width: 100%; padding: 10px 12px; font: inherit; font-size: 16px; border-radius: 2px;
+  border: 1px solid var(--site-rule); background: var(--site-ground); color: var(--site-ink);
+}
+.site-form__field input:focus-visible, .site-form__field textarea:focus-visible { outline: 2px solid var(--site-accent); outline-offset: 1px; }
+.site-form button.site-button { align-self: flex-start; }
+.site-form__error { margin: 0; padding: 10px 14px; border-left: 3px solid #9c312a; background: rgba(156,49,42,.08); font-size: 15px; }
+.site-form__hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.site-form--sent { border: 1px solid var(--site-rule); background: var(--site-surface); padding: 20px 22px; }
+.site-form--sent h3 { margin: 0 0 6px; }
+.site-form--sent p { margin: 0; color: var(--site-muted); }
+.ed-form-preview { pointer-events: none; opacity: .92; }
+.ed-form-preview .site-button { align-self: flex-start; }
+.ed-form-preview__note { margin: 0; font-size: 12.5px; color: var(--site-muted); }
+.admin-messages { display: flex; flex-direction: column; gap: 12px; max-width: 900px; }
+.admin-message { border: 1px solid var(--site-rule); background: var(--site-ground); padding: 16px 18px; border-left-width: 3px; }
+.admin-message[data-state="unread"] { border-left-color: var(--site-accent); }
+.admin-message[data-state="read"] { opacity: .8; }
+.admin-message__head { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; font-size: 14px; }
+.admin-message__head time { color: var(--site-muted); margin-left: auto; }
+.admin-message__body { margin: 10px 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 68ch; }
+.admin-message__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .site-footer {
   padding: 24px max(16px, 5vw);
   border-top: 1px solid var(--site-rule);

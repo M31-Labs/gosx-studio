@@ -235,6 +235,12 @@ func contactPage(name string, answers SetupAnswers) StarterPage {
 	if answers.Location != "" {
 		body.Blocks = append(body.Blocks, heading(2, 3, "Where to find us"), para(3, answers.Location))
 	}
+	// A working form, on the contact page, from the first minute. Messages
+	// land in the admin inbox; no mail server is needed.
+	body.Blocks = append(body.Blocks,
+		heading(len(body.Blocks), 3, "Send us a message"),
+		block(len(body.Blocks)+1, content.BlockFlow, values("flowKey", contactFlowKey)),
+	)
 	return StarterPage{
 		Slug:        "contact",
 		Title:       "Contact",

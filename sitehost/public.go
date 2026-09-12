@@ -126,7 +126,7 @@ func (h *Host) servePublicSlug(w http.ResponseWriter, r *http.Request, slug stri
 		gosx.El("main", gosx.Attrs(gosx.Attr("class", "site-main"), gosx.Attr("id", "main")),
 			gosx.El("article", gosx.Attrs(gosx.Attr("class", "site-article")),
 				gosx.El("h1", gosx.Attrs(gosx.Attr("class", "site-title")), gosx.Text(page.Title)),
-				render.Document(page.Body, render.Hooks{}),
+				render.Document(page.Body, render.Hooks{Flow: h.flowHook(publicPath(page.Slug), formStateFromQuery(r))}),
 			),
 		),
 		h.renderPublicFooter(settings),

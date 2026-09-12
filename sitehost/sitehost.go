@@ -74,8 +74,9 @@ func (o Options) normalize() Options {
 
 // Host is a running default site: one store, one HTTP handler.
 type Host struct {
-	store LifecycleContentStore
-	opts  Options
+	store    LifecycleContentStore
+	opts     Options
+	messages *messageStore
 }
 
 // Open loads or creates the site at Options.DataPath.
@@ -93,7 +94,7 @@ func Open(opts Options) (*Host, error) {
 		}
 	}
 
-	host := &Host{store: store, opts: opts}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath())}
 	// Seeding is the wizard's job. Options.Seed exists so tests and embedders
 	// can skip the wizard and get a site in one call.
 	if opts.Seed && !host.SetupComplete() {
@@ -112,7 +113,8 @@ func Open(opts Options) (*Host, error) {
 // NewWithStore builds a host around an existing store. Tests and embedders use
 // this to supply in-memory storage.
 func NewWithStore(store LifecycleContentStore, opts Options) *Host {
-	return &Host{store: store, opts: opts.normalize()}
+	opts = opts.normalize()
+	return &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath())}
 }
 
 // Store exposes the underlying content store.
@@ -146,6 +148,7 @@ func (h *Host) Handler() http.Handler {
 	h.mountAdmin(mux)
 	h.mountEditor(mux)
 	h.mountUploads(mux)
+	h.mountMessages(mux)
 	h.mountPublic(mux)
 
 	return h.guardAdmin(h.requireSetup(mux))

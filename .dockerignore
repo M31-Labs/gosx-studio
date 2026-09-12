@@ -1,0 +1,10 @@
+.git
+.tiller
+.analyses
+dist
+data
+parity_e2e/node_modules
+parity_e2e/test-results
+parity_e2e/playwright-report
+**/*.png
+**/*.test

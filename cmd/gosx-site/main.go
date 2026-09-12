@@ -122,6 +122,13 @@ func isLoopbackAddr(addr string) bool {
 }
 
 func printWelcome(addr, dataPath string, guarded bool) {
+	// Bound to every interface, the listener reports "[::]" or "0.0.0.0",
+	// which is not an address a person can type. Show one that is.
+	if host, port, err := net.SplitHostPort(addr); err == nil {
+		if ip := net.ParseIP(host); host == "" || (ip != nil && ip.IsUnspecified()) {
+			addr = net.JoinHostPort("localhost", port)
+		}
+	}
 	base := "http://" + addr
 	if abs, err := filepath.Abs(dataPath); err == nil {
 		dataPath = abs

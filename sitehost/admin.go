@@ -53,9 +53,14 @@ func (h *Host) adminMeta(title string) PageMeta {
 }
 
 func (h *Host) renderAdminShell(active, heading, lede string, status adminStatus, sections ...gosx.Node) gosx.Node {
+	messagesLabel := "Messages"
+	if unread := h.unreadMessages(); unread > 0 {
+		messagesLabel = "Messages (" + itoa(unread) + ")"
+	}
 	navItems := []struct{ Key, Label, Href string }{
 		{"dashboard", "Dashboard", "/admin"},
 		{"pages", "Pages", "/admin/pages"},
+		{"messages", messagesLabel, "/admin/messages"},
 		{"settings", "Settings", "/admin/settings"},
 	}
 	links := make([]gosx.Node, 0, len(navItems)+1)
@@ -115,7 +120,7 @@ func (h *Host) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 	stats := gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-stats")),
 		adminStat(published, "Live pages"),
 		adminStat(drafts, "Unpublished pages"),
-		adminStat(len(h.store.ListRevisions(revisionFilterAll())), "Saved versions"),
+		adminStat(h.unreadMessages(), "New messages"),
 	)
 
 	next := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
