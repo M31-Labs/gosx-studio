@@ -24,6 +24,8 @@
   var saving = false;
   var pending = false;
   var history = [];
+  var future = [];
+  var redoBtn = root.querySelector("[data-redo]");
   var insertIndex = null;
 
   /* ---------- status ---------- */
@@ -131,17 +133,41 @@
 
   /* ---------- history ---------- */
 
+  function updateHistoryButtons() {
+    if (undoBtn) undoBtn.disabled = history.length === 0;
+    if (redoBtn) redoBtn.disabled = future.length === 0;
+  }
+
+  /* A new edit invalidates anything that was undone: that is what every
+     editor a person has used does, and the alternative — a redo that
+     resurrects a state from a different branch — feels like the page moved
+     on its own. */
   function snapshot() {
     history.push(article.innerHTML);
     if (history.length > 50) history.shift();
-    if (undoBtn) undoBtn.disabled = false;
+    future = [];
+    updateHistoryButtons();
   }
+
+  function endTypingSession() { typingSession = null; }
 
   function undo() {
     if (!history.length) return;
+    endTypingSession();
+    future.push(article.innerHTML);
     article.innerHTML = history.pop();
     reindex();
-    if (undoBtn) undoBtn.disabled = history.length === 0;
+    updateHistoryButtons();
+    queueSave();
+  }
+
+  function redo() {
+    if (!future.length) return;
+    endTypingSession();
+    history.push(article.innerHTML);
+    article.innerHTML = future.pop();
+    reindex();
+    updateHistoryButtons();
     queueSave();
   }
 
@@ -172,6 +198,7 @@
     var tools = document.createElement("div");
     tools.className = "ed-block__tools";
     tools.setAttribute("contenteditable", "false");
+    tools.appendChild(toolBtn("grab", "⠿", "Drag to move"));
     tools.appendChild(toolBtn("up", "↑", "Move up"));
     tools.appendChild(toolBtn("down", "↓", "Move down"));
     tools.appendChild(toolBtn("duplicate", "⧉", "Make a copy"));
@@ -318,7 +345,7 @@
 
   root.addEventListener("click", function (event) {
     var tool = event.target.closest("[data-tool]");
-    if (tool) {
+    if (tool && tool.getAttribute("data-tool") !== "grab") {
       event.preventDefault();
       handleTool(tool);
       return;
@@ -425,13 +452,49 @@
     insertIndex = null;
   }
 
-  /* text edits */
-  root.addEventListener("input", function (event) {
-    if (event.target.closest("[data-text]") || event.target.matches("[data-href],[data-src],[data-alt],[data-meta]")) {
-      if (event.target.matches("[data-src]")) refreshImage(event.target);
-      queueSave();
+  /* text edits. A snapshot is taken at the START of a typing session — the
+     first keystroke after focus lands in a field — not on every keystroke,
+     so Undo steps back over what was just typed in one go rather than one
+     character at a time, and history never fills with 50 near-identical
+     states from a single sentence. */
+  var typingSession = null;
+  root.addEventListener("focusin", function (event) {
+    if (event.target.closest("[data-text]") || event.target.matches("[data-href],[data-src],[data-alt]")) {
+      typingSession = null;
     }
   });
+  root.addEventListener("input", function (event) {
+    var field = event.target.closest("[data-text]") || (event.target.matches("[data-href],[data-src],[data-alt]") ? event.target : null);
+    if (field) {
+      if (typingSession !== field) {
+        typingSession = field;
+        preTypingSnapshot(field);
+      }
+      if (event.target.matches("[data-src]")) refreshImage(event.target);
+      queueSave();
+      return;
+    }
+    if (event.target.matches("[data-meta]")) queueSave();
+  });
+
+  /* beforeinput fires before the DOM changes, which is the only moment the
+     pre-edit markup can still be captured. */
+  var pendingTypingField = null;
+  root.addEventListener("beforeinput", function (event) {
+    var field = event.target.closest("[data-text]");
+    if (!field) return;
+    if (typingSession !== field) {
+      snapshot();
+      pendingTypingField = field;
+    }
+  });
+  function preTypingSnapshot(field) {
+    // Inputs (href/src/alt) do not fire beforeinput on the article; take
+    // the snapshot here for them. Contenteditable fields were snapshotted
+    // in beforeinput, before the DOM changed.
+    if (pendingTypingField === field) { pendingTypingField = null; return; }
+    if (field.tagName === "INPUT") snapshot();
+  }
 
   function refreshImage(input) {
     var fig = input.closest(".ed-figure");
@@ -468,7 +531,11 @@
     if (event.key === "Escape") closeInsertMenu();
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
       event.preventDefault();
-      undo();
+      if (event.shiftKey) redo(); else undo();
+    }
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "y") {
+      event.preventDefault();
+      redo();
     }
   });
 
@@ -487,6 +554,104 @@
       undo();
     });
   }
+  if (redoBtn) {
+    redoBtn.disabled = true;
+    redoBtn.addEventListener("click", function () {
+      redo();
+    });
+  }
+
+  /* ---------- drag to reorder ---------- */
+
+  /* Pointer events rather than HTML5 drag-and-drop: the native API does not
+     fire on most touch browsers, and a phone is where a section is most
+     likely to be moved with a thumb. The grip captures the pointer, the
+     block under the pointer is found with elementsFromPoint (skipping the
+     one being dragged), and an accent line shows where it will land. */
+  var dragging = null;
+  var dropTarget = null;
+  var dropBefore = false;
+  var dropLine = null;
+
+  function ensureDropLine() {
+    if (dropLine) return dropLine;
+    dropLine = document.createElement("div");
+    dropLine.className = "ed-drop-line";
+    dropLine.hidden = true;
+    article.appendChild(dropLine);
+    return dropLine;
+  }
+
+  function blockAtPoint(x, y) {
+    var stack = document.elementsFromPoint(x, y);
+    for (var i = 0; i < stack.length; i++) {
+      var blockEl = stack[i].closest && stack[i].closest(".ed-block");
+      if (blockEl && blockEl !== dragging && article.contains(blockEl)) return blockEl;
+    }
+    return null;
+  }
+
+  function showDropLine(target, before) {
+    var line = ensureDropLine();
+    dropTarget = target;
+    dropBefore = before;
+    line.style.top = (before ? target.offsetTop : target.offsetTop + target.offsetHeight) - 1 + "px";
+    line.hidden = false;
+  }
+
+  function hideDropLine() {
+    dropTarget = null;
+    if (dropLine) dropLine.hidden = true;
+  }
+
+  function endDrag(commit) {
+    if (!dragging) return;
+    var moved = false;
+    if (commit && dropTarget && dropTarget !== dragging) {
+      if (dropBefore) article.insertBefore(dragging, dropTarget);
+      else article.insertBefore(dragging, dropTarget.nextSibling);
+      moved = true;
+    }
+    dragging.classList.remove("is-dragging");
+    var el = dragging;
+    dragging = null;
+    hideDropLine();
+    document.body.classList.remove("ed-is-dragging");
+    if (moved) {
+      reindex();
+      el.focus();
+      queueSave();
+    } else {
+      // Nothing changed, so the snapshot taken at pickup is noise.
+      history.pop();
+      updateHistoryButtons();
+    }
+  }
+
+  root.addEventListener("pointerdown", function (event) {
+    var grab = event.target.closest('[data-tool="grab"]');
+    if (!grab) return;
+    var blockEl = grab.closest(".ed-block");
+    if (!blockEl) return;
+    event.preventDefault();
+    snapshot();
+    dragging = blockEl;
+    blockEl.classList.add("is-dragging");
+    document.body.classList.add("ed-is-dragging");
+    try { grab.setPointerCapture(event.pointerId); } catch (e) {}
+  });
+
+  root.addEventListener("pointermove", function (event) {
+    if (!dragging) return;
+    var target = blockAtPoint(event.clientX, event.clientY);
+    if (!target) { hideDropLine(); return; }
+    var rect = target.getBoundingClientRect();
+    showDropLine(target, event.clientY < rect.top + rect.height / 2);
+  });
+
+  root.addEventListener("pointerup", function () { endDrag(true); });
+  root.addEventListener("pointercancel", function () { endDrag(false); });
+  window.addEventListener("blur", function () { endDrag(false); });
 
   if (publishBtn) {
     publishBtn.addEventListener("click", function () {

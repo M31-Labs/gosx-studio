@@ -699,3 +699,12 @@ func TestNeverPublishedPageStaysPrivateWhileEdited(t *testing.T) {
 		t.Fatal("a page that was never published must stay private")
 	}
 }
+
+func TestEditorOffersDragHandleAndRedo(t *testing.T) {
+	host, handler := newTestHost(t)
+	id := firstPageID(t, host, "menu")
+	body := get(t, handler, "/admin/edit/"+id).Body.String()
+	mustContain(t, body, `data-tool="grab"`, "every block carries a drag handle")
+	mustContain(t, body, `data-redo="true"`, "the toolbar offers Redo")
+	mustContain(t, body, `data-undo="true"`, "the toolbar offers Undo")
+}

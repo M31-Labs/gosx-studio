@@ -91,6 +91,12 @@ func (h *Host) renderEditorToolbar(page cmsstore.Page, live bool) gosx.Node {
 				gosx.Attr("data-undo", "true"),
 				gosx.Attr("title", "Undo (Ctrl+Z)"),
 			), gosx.Text("Undo")),
+			gosx.El("button", gosx.Attrs(
+				gosx.Attr("class", "ed-btn ed-btn--ghost"),
+				gosx.Attr("type", "button"),
+				gosx.Attr("data-redo", "true"),
+				gosx.Attr("title", "Redo (Ctrl+Y)"),
+			), gosx.Text("Redo")),
 			gosx.El("a", gosx.Attrs(
 				gosx.Attr("class", "ed-btn ed-btn--ghost"),
 				gosx.Attr("href", publicPath(page.Slug)),
@@ -265,6 +271,7 @@ func renderEditableBlock(index int, instance blockstudio.BlockInstance) gosx.Nod
 		gosx.Attr("tabindex", "0"),
 	),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-block__tools"), gosx.Attr("contenteditable", "false")),
+			toolButton("grab", "⠿", "Drag to move"),
 			toolButton("up", "↑", "Move up"),
 			toolButton("down", "↓", "Move down"),
 			toolButton("duplicate", "⧉", "Make a copy"),

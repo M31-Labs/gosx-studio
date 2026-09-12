@@ -285,6 +285,15 @@ a { color: var(--site-accent); }
   border: 0; background: transparent; color: var(--site-muted); font-size: 13px; border-radius: 2px;
 }
 .ed-tool:hover { background: var(--site-surface); color: var(--site-ink); }
+.ed-tool[data-tool="grab"] { cursor: grab; touch-action: none; }
+.ed-canvas .site-article { position: relative; }
+.ed-block.is-dragging { opacity: .4; }
+.ed-drop-line {
+  position: absolute; left: 0; right: 0; height: 3px; border-radius: 2px;
+  background: var(--site-accent); pointer-events: none; z-index: 5;
+}
+body.ed-is-dragging { user-select: none; cursor: grabbing; }
+body.ed-is-dragging .ed-block__tools, body.ed-is-dragging .ed-insert, body.ed-is-dragging .ed-levels { display: none; }
 .ed-levels {
   position: absolute; top: -13px; left: 4px; display: none; gap: 2px; z-index: 3;
   background: var(--site-ground); border: 1px solid var(--site-rule); border-radius: 2px; padding: 2px;
