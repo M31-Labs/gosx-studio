@@ -729,8 +729,12 @@ func (h *Host) renderPeople(w http.ResponseWriter, r *http.Request, status admin
 	}
 	roleOptions := make([]gosx.Node, 0, 3)
 	for _, role := range []string{roleEditor, roleAdmin} {
+		attrs := []any{gosx.Attr("type", "radio"), gosx.Attr("name", "role"), gosx.Attr("value", role)}
+		if role == roleEditor {
+			attrs = append(attrs, gosx.Attr("checked", "checked"))
+		}
 		roleOptions = append(roleOptions, gosx.El("label", gosx.Attrs(gosx.Attr("class", "admin-check")),
-			gosx.El("input", gosx.Attrs(gosx.Attr("type", "radio"), gosx.Attr("name", "role"), gosx.Attr("value", role), gosx.Attr("checked", map[bool]string{true: "checked", false: ""}[role == roleEditor]))),
+			gosx.El("input", gosx.Attrs(attrs...)),
 			gosx.Text(" "+User{Role: role}.roleLabel())))
 	}
 	invite := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),

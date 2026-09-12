@@ -186,6 +186,9 @@ func TestInvitesRolesAndTwoStep(t *testing.T) {
 	people := getWithCookie(t, handler, peoplePath, owner).Body.String()
 	mustContain(t, people, "sam@example.com", "people are listed")
 	mustContain(t, people, ">Admin<", "with their role")
+	if strings.Count(people, `name="role"`) != 2 || strings.Count(people, `checked="checked"`) != 1 {
+		t.Fatalf("exactly one role must be preselected in the invite form: %d radios, %d checked", strings.Count(people, `name="role"`), strings.Count(people, `checked="checked"`))
+	}
 
 	// Two-step sign-in on the owner's account.
 	rec = postAs(t, handler, owner, accountPath, url.Values{"action": {"2fa-start"}})
