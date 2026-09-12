@@ -266,9 +266,10 @@
       var empty = document.createElement("div");
       empty.className = "ed-image-empty";
       empty.setAttribute("data-img", "true");
-      empty.textContent = "No picture yet — paste a link below";
+      empty.textContent = "No picture yet — upload one, or paste a link";
       fig.appendChild(empty);
-      fig.appendChild(inlineInput("src", "", "Paste an image link", "Image link"));
+      fig.appendChild(uploadControl());
+      fig.appendChild(inlineInput("src", "", "or paste a link to one", "Image link"));
       fig.appendChild(inlineInput("alt", "", "Describe the picture for people who can't see it", "Image description"));
       return fig;
     }
@@ -294,6 +295,22 @@
     input.placeholder = placeholder;
     input.setAttribute("aria-label", label);
     return input;
+  }
+
+  function uploadControl() {
+    var label = document.createElement("label");
+    label.className = "ed-upload";
+    label.setAttribute("contenteditable", "false");
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/png,image/jpeg,image/gif,image/webp";
+    input.setAttribute("data-upload", "true");
+    input.setAttribute("aria-label", "Upload a picture");
+    var text = document.createElement("span");
+    text.textContent = "Upload a picture";
+    label.appendChild(input);
+    label.appendChild(text);
+    return label;
   }
 
   function makeInsertPoint() {
@@ -511,10 +528,41 @@
       replacement = document.createElement("div");
       replacement.className = "ed-image-empty";
       replacement.setAttribute("data-img", "true");
-      replacement.textContent = "No picture yet — paste a link below";
+      replacement.textContent = "No picture yet — upload one, or paste a link";
     }
     if (current) current.parentNode.replaceChild(replacement, current);
   }
+
+  /* Uploads: the file goes up, the returned URL goes into the link field,
+     and the preview updates — the same path a pasted link takes. */
+  root.addEventListener("change", function (event) {
+    var input = event.target.closest("[data-upload]");
+    if (!input || !input.files || !input.files[0]) return;
+    var label = input.closest(".ed-upload");
+    var fig = input.closest(".ed-figure");
+    var src = fig && fig.querySelector("[data-src]");
+    var form = new FormData();
+    form.append("file", input.files[0]);
+    if (label) label.setAttribute("data-busy", "true");
+    status("dirty", "Uploading picture…");
+    fetch("/admin/api/upload", { method: "POST", credentials: "same-origin", body: form })
+      .then(function (r) { return r.json(); })
+      .then(function (result) {
+        if (label) label.removeAttribute("data-busy");
+        input.value = "";
+        if (!result.ok) { status("error", result.message || "That picture didn't upload. Try again."); return; }
+        if (src) {
+          snapshot();
+          src.value = result.url;
+          refreshImage(src);
+          queueSave();
+        }
+      })
+      .catch(function () {
+        if (label) label.removeAttribute("data-busy");
+        status("error", "Couldn't reach the server. Try the upload again.");
+      });
+  });
 
   /* Enter inside a text block makes a new paragraph rather than a <div> soup. */
   root.addEventListener("keydown", function (event) {

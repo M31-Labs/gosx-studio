@@ -319,6 +319,14 @@ body.ed-is-dragging .ed-block__tools, body.ed-is-dragging .ed-insert, body.ed-is
 }
 .ed-inline-input:focus-visible { outline: 2px solid var(--site-accent); outline-offset: 1px; color: var(--site-ink); }
 .ed-figure { display: flex; flex-direction: column; gap: 7px; margin: 20px 0; }
+.ed-upload {
+  display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; cursor: pointer;
+  padding: 6px 12px; border: 1px solid var(--site-accent); color: var(--site-accent);
+  border-radius: 2px; font-size: 13px; background: transparent;
+}
+.ed-upload input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.ed-upload:has(input:focus-visible) { outline: 2px solid var(--site-accent); outline-offset: 2px; }
+.ed-upload[data-busy="true"] { opacity: .6; cursor: progress; }
 .ed-image-empty {
   display: grid; place-items: center; min-height: 130px; border: 1px dashed var(--site-rule);
   color: var(--site-muted); font-size: 13.5px; text-align: center; padding: 16px;

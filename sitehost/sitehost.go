@@ -56,6 +56,9 @@ type Options struct {
 	// AdminPassword protects every /admin path with HTTP basic auth when set.
 	// Leave it empty only for a server bound to localhost.
 	AdminPassword string
+	// UploadDir is where pictures are stored. Defaults to an "uploads" folder
+	// beside DataPath.
+	UploadDir string
 }
 
 func (o Options) normalize() Options {
@@ -142,6 +145,7 @@ func (h *Host) Handler() http.Handler {
 	h.mountSetup(mux)
 	h.mountAdmin(mux)
 	h.mountEditor(mux)
+	h.mountUploads(mux)
 	h.mountPublic(mux)
 
 	return h.guardAdmin(h.requireSetup(mux))

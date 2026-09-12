@@ -361,12 +361,21 @@ func renderBlockInner(kind string, instance blockstudio.BlockInstance) gosx.Node
 		url := instance.Values["url"].String
 		return gosx.El("figure", gosx.Attrs(gosx.Attr("class", "ed-figure")),
 			imagePreview(url),
+			gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-upload"), gosx.Attr("contenteditable", "false")),
+				gosx.El("input", gosx.Attrs(
+					gosx.Attr("type", "file"),
+					gosx.Attr("accept", "image/png,image/jpeg,image/gif,image/webp"),
+					gosx.Attr("data-upload", "true"),
+					gosx.Attr("aria-label", "Upload a picture"),
+				)),
+				gosx.El("span", nil, gosx.Text("Upload a picture")),
+			),
 			gosx.El("input", gosx.Attrs(
 				gosx.Attr("class", "ed-inline-input"),
 				gosx.Attr("type", "text"),
 				gosx.Attr("data-src", "true"),
 				gosx.Attr("value", url),
-				gosx.Attr("placeholder", "Paste an image link"),
+				gosx.Attr("placeholder", "or paste a link to one"),
 				gosx.Attr("aria-label", "Image link"),
 				gosx.Attr("contenteditable", "false"),
 			)),
@@ -392,7 +401,7 @@ func renderBlockInner(kind string, instance blockstudio.BlockInstance) gosx.Node
 func imagePreview(url string) gosx.Node {
 	if strings.TrimSpace(url) == "" {
 		return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-image-empty"), gosx.Attr("data-img", "true")),
-			gosx.Text("No picture yet — paste a link below"))
+			gosx.Text("No picture yet — upload one, or paste a link"))
 	}
 	return gosx.El("img", gosx.Attrs(gosx.Attr("data-img", "true"), gosx.Attr("src", url), gosx.Attr("alt", "")))
 }
