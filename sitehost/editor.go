@@ -138,6 +138,9 @@ func (h *Host) renderEditorSidebar(page cmsstore.Page) gosx.Node {
 				addButton("quote", "Quote", "A customer's words"),
 				addButton("button", "Button", "Sends people somewhere"),
 				addButton("image", "Image", "A picture"),
+				addButton("list", "List", "Bullet points"),
+				addButton("divider", "Divider", "A thin line"),
+				addButton("section", "Section", "A new background band"),
 				addButton("form", "Contact form", "Visitors write to you"),
 			),
 		),
@@ -201,6 +204,9 @@ func renderInsertMenu() gosx.Node {
 			menuItem("quote", "Quote"),
 			menuItem("button", "Button"),
 			menuItem("image", "Image"),
+			menuItem("list", "List"),
+			menuItem("divider", "Divider"),
+			menuItem("section", "Section"),
 			menuItem("form", "Contact form"),
 		),
 	)
@@ -331,13 +337,13 @@ func renderBlockInner(kind string, instance blockstudio.BlockInstance) gosx.Node
 			gosx.Attr("data-level", level),
 			gosx.Attr("contenteditable", "true"),
 			gosx.Attr("spellcheck", "true"),
-		), gosx.Text(value))
+		), renderInline(value))
 	case "quote":
 		return gosx.El("blockquote", gosx.Attrs(
 			gosx.Attr("data-text", "true"),
 			gosx.Attr("contenteditable", "true"),
 			gosx.Attr("spellcheck", "true"),
-		), gosx.Text(value))
+		), renderInline(value))
 	case "button":
 		return gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-button-row")),
 			gosx.El("a", gosx.Attrs(
@@ -394,13 +400,54 @@ func renderBlockInner(kind string, instance blockstudio.BlockInstance) gosx.Node
 				gosx.Attr("contenteditable", "false"),
 			)),
 		)
+	case "list":
+		items := make([]gosx.Node, 0, 6)
+		for _, line := range strings.Split(value, "\n") {
+			if line = strings.TrimSpace(line); line != "" {
+				items = append(items, gosx.El("li", nil, renderInline(line)))
+			}
+		}
+		if len(items) == 0 {
+			items = append(items, gosx.El("li", nil, gosx.Text("First point")))
+		}
+		return gosx.El("ul", gosx.Attrs(
+			gosx.Attr("class", "site-list"),
+			gosx.Attr("data-text", "true"),
+			gosx.Attr("data-list", "true"),
+			gosx.Attr("contenteditable", "true"),
+			gosx.Attr("spellcheck", "true"),
+		), gosx.Fragment(items...))
+	case "divider":
+		return gosx.El("hr", gosx.Attrs(gosx.Attr("class", "site-divider"), gosx.Attr("contenteditable", "false")))
+	case "section":
+		return renderSectionBar(normalizeSectionStyle(instance.Values["style"].String))
 	default:
 		return gosx.El("p", gosx.Attrs(
 			gosx.Attr("data-text", "true"),
 			gosx.Attr("contenteditable", "true"),
 			gosx.Attr("spellcheck", "true"),
-		), gosx.Text(value))
+		), renderInline(value))
 	}
+}
+
+// renderSectionBar is a section break on the canvas: a labelled rule with
+// the background choice for everything beneath it.
+func renderSectionBar(style string) gosx.Node {
+	options := make([]gosx.Node, 0, 3)
+	for _, candidate := range []struct{ key, label string }{{"plain", "Plain"}, {"tinted", "Tinted"}, {"accent", "Accent colour"}} {
+		attrs := []any{gosx.Attr("value", candidate.key)}
+		if candidate.key == style {
+			attrs = append(attrs, gosx.Attr("selected", "selected"))
+		}
+		options = append(options, gosx.El("option", gosx.Attrs(attrs...), gosx.Text(candidate.label)))
+	}
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-section-bar"), gosx.Attr("data-section", style), gosx.Attr("contenteditable", "false")),
+		gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-section-bar__label")), gosx.Text("New section")),
+		gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-section-bar__style")),
+			gosx.El("span", nil, gosx.Text("Background")),
+			gosx.El("select", gosx.Attrs(gosx.Attr("data-section-style", "true"), gosx.Attr("aria-label", "Section background")), gosx.Fragment(options...)),
+		),
+	)
 }
 
 func imagePreview(url string) gosx.Node {
@@ -424,6 +471,12 @@ func editorKind(key string) string {
 		return "image"
 	case content.BlockFlow:
 		return "form"
+	case blockList:
+		return "list"
+	case blockDivider:
+		return "divider"
+	case blockSection:
+		return "section"
 	default:
 		return "paragraph"
 	}
@@ -441,6 +494,12 @@ func storeKey(kind string) string {
 		return content.BlockImage
 	case "form":
 		return content.BlockFlow
+	case "list":
+		return blockList
+	case "divider":
+		return blockDivider
+	case "section":
+		return blockSection
 	default:
 		return content.BlockParagraph
 	}
@@ -454,6 +513,7 @@ type editorBlockPayload struct {
 	Level string `json:"level,omitempty"`
 	URL   string `json:"url,omitempty"`
 	Alt   string `json:"alt,omitempty"`
+	Style string `json:"style,omitempty"`
 }
 
 type editorSavePayload struct {
@@ -567,6 +627,15 @@ func payloadDocument(blocks []editorBlockPayload) blockstudio.Document {
 				values("url", url, "alt", strings.TrimSpace(incoming.Alt))))
 		case "form":
 			instances = append(instances, block(order, content.BlockFlow, values("flowKey", contactFlowKey)))
+		case "list":
+			if value == "" {
+				continue
+			}
+			instances = append(instances, block(order, blockList, values("text", value)))
+		case "divider":
+			instances = append(instances, block(order, blockDivider, values()))
+		case "section":
+			instances = append(instances, block(order, blockSection, values("style", normalizeSectionStyle(incoming.Style))))
 		default:
 			if value == "" {
 				continue

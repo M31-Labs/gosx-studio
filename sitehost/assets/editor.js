@@ -43,7 +43,11 @@
   function blockPayload(el) {
     var kind = el.getAttribute("data-block") || "paragraph";
     var textNode = el.querySelector("[data-text]");
-    var payload = { kind: kind, text: textNode ? textNode.textContent.trim() : "" };
+    var payload = { kind: kind, text: textNode ? serializeText(textNode) : "" };
+    if (kind === "section") {
+      var style = el.querySelector("[data-section-style]");
+      payload.style = style ? style.value : "plain";
+    }
 
     if (kind === "heading") {
       var h = el.querySelector("[data-text]");
@@ -62,6 +66,44 @@
     }
     if (kind === "form") payload.text = "";
     return payload;
+  }
+
+  /* ---------- inline formatting <-> markers ---------- */
+
+  /* The document stores **bold**, _italic_, and [label](address); the
+     browser edits <strong>, <em>, and <a>. This walks the editable DOM back
+     into markers. Lists serialize one item per line. */
+  function serializeInline(node) {
+    var out = "";
+    var children = node.childNodes;
+    for (var i = 0; i < children.length; i++) {
+      var child = children[i];
+      if (child.nodeType === 3) { out += child.nodeValue; continue; }
+      if (child.nodeType !== 1) continue;
+      var tag = child.tagName;
+      if (tag === "BR") { out += "\n"; continue; }
+      if (child.getAttribute && child.getAttribute("contenteditable") === "false") continue;
+      var inner = serializeInline(child);
+      if (tag === "STRONG" || tag === "B") out += inner ? "**" + inner + "**" : "";
+      else if (tag === "EM" || tag === "I") out += inner ? "_" + inner + "_" : "";
+      else if (tag === "A") out += inner ? "[" + inner + "](" + (child.getAttribute("href") || "") + ")" : "";
+      else if (tag === "DIV" || tag === "P") out += (out && !/\n$/.test(out) ? "\n" : "") + inner;
+      else out += inner;
+    }
+    return out;
+  }
+
+  function serializeText(textNode) {
+    if (textNode.hasAttribute("data-list")) {
+      var lines = [];
+      var items = textNode.querySelectorAll("li");
+      for (var i = 0; i < items.length; i++) {
+        var line = serializeInline(items[i]).replace(/\u00a0/g, " ").trim();
+        if (line) lines.push(line);
+      }
+      return lines.join("\n");
+    }
+    return serializeInline(textNode).replace(/\u00a0/g, " ").trim();
   }
 
   function serialize() {
@@ -276,6 +318,35 @@
       fig.appendChild(inlineInput("src", "", "or paste a link to one", "Image link"));
       fig.appendChild(inlineInput("alt", "", "Describe the picture for people who can't see it", "Image description"));
       return fig;
+    }
+    if (kind === "list") {
+      var ul = document.createElement("ul");
+      ul.className = "site-list";
+      markText(ul);
+      ul.setAttribute("data-list", "true");
+      var li = document.createElement("li");
+      li.textContent = "First point";
+      ul.appendChild(li);
+      return ul;
+    }
+    if (kind === "divider") {
+      var hr = document.createElement("hr");
+      hr.className = "site-divider";
+      hr.setAttribute("contenteditable", "false");
+      return hr;
+    }
+    if (kind === "section") {
+      var bar = document.createElement("div");
+      bar.className = "ed-section-bar";
+      bar.setAttribute("data-section", "plain");
+      bar.setAttribute("contenteditable", "false");
+      bar.innerHTML =
+        '<span class="ed-section-bar__label">New section</span>' +
+        '<label class="ed-section-bar__style"><span>Background</span>' +
+        '<select data-section-style="true" aria-label="Section background">' +
+        '<option value="plain" selected>Plain</option><option value="tinted">Tinted</option><option value="accent">Accent colour</option>' +
+        '</select></label>';
+      return bar;
     }
     if (kind === "form") {
       var box = document.createElement("div");
@@ -582,6 +653,15 @@
       typingSession = null;
     }
   });
+  root.addEventListener("change", function (event) {
+    var style = event.target.closest("[data-section-style]");
+    if (!style) return;
+    snapshot();
+    var bar = style.closest(".ed-section-bar");
+    if (bar) bar.setAttribute("data-section", style.value);
+    queueSave();
+  });
+
   root.addEventListener("input", function (event) {
     var field = event.target.closest("[data-text]") || (event.target.matches("[data-href],[data-src],[data-alt]") ? event.target : null);
     if (field) {
@@ -670,7 +750,7 @@
   root.addEventListener("keydown", function (event) {
     if (event.key === "Enter" && !event.shiftKey) {
       var text = event.target.closest("[data-text]");
-      if (text && text.tagName !== "A") {
+      if (text && text.tagName !== "A" && !text.hasAttribute("data-list")) {
         event.preventDefault();
         var blockEl = text.closest(".ed-block");
         var nodes = Array.prototype.slice.call(article.querySelectorAll(".ed-block"));
@@ -687,6 +767,103 @@
       event.preventDefault();
       redo();
     }
+  });
+
+  /* ---------- the formatting bubble ---------- */
+
+  /* Select some text and a small bar appears above it: bold, italic, link.
+     execCommand is old but it is what every browser's contenteditable
+     understands, and the result is serialized to markers, not stored as
+     HTML, so what it produces can never reach the page directly. */
+  var bubble = document.createElement("div");
+  bubble.className = "ed-bubble";
+  bubble.hidden = true;
+  bubble.setAttribute("contenteditable", "false");
+  bubble.innerHTML =
+    '<button type="button" data-fmt="bold" title="Bold (Ctrl+B)"><b>B</b></button>' +
+    '<button type="button" data-fmt="italic" title="Italic (Ctrl+I)"><i>I</i></button>' +
+    '<button type="button" data-fmt="link" title="Link">Link</button>' +
+    '<button type="button" data-fmt="clear" title="Remove formatting">Clear</button>' +
+    '<span class="ed-bubble__link" hidden><input type="url" placeholder="https:// or /page" aria-label="Link address"><button type="button" data-fmt="apply-link">Add</button></span>';
+  root.appendChild(bubble);
+  var bubbleLink = bubble.querySelector(".ed-bubble__link");
+  var bubbleInput = bubble.querySelector("input");
+  var savedRange = null;
+
+  function selectionInText() {
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+    var node = sel.anchorNode;
+    if (!node) return null;
+    var el = node.nodeType === 1 ? node : node.parentElement;
+    var text = el && el.closest("[data-text]");
+    if (!text || text.tagName === "A" || !article.contains(text)) return null;
+    return sel.getRangeAt(0);
+  }
+
+  function placeBubble(range) {
+    var rect = range.getBoundingClientRect();
+    bubble.hidden = false;
+    bubble.style.top = window.scrollY + rect.top - bubble.offsetHeight - 8 + "px";
+    bubble.style.left = Math.max(8, window.scrollX + rect.left + rect.width / 2 - bubble.offsetWidth / 2) + "px";
+  }
+
+  document.addEventListener("selectionchange", function () {
+    if (!bubbleLink.hidden) return; // typing a link address
+    var range = selectionInText();
+    if (!range) { bubble.hidden = true; return; }
+    savedRange = range.cloneRange();
+    placeBubble(range);
+  });
+
+  function restoreSelection() {
+    if (!savedRange) return;
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(savedRange);
+  }
+
+  bubble.addEventListener("mousedown", function (event) { event.preventDefault(); });
+  bubble.addEventListener("click", function (event) {
+    var btn = event.target.closest("[data-fmt]");
+    if (!btn) return;
+    var fmt = btn.getAttribute("data-fmt");
+    if (fmt === "link") {
+      bubbleLink.hidden = false;
+      bubbleInput.value = "";
+      bubbleInput.focus();
+      return;
+    }
+    restoreSelection();
+    snapshot();
+    if (fmt === "bold") document.execCommand("bold");
+    else if (fmt === "italic") document.execCommand("italic");
+    else if (fmt === "clear") { document.execCommand("unlink"); document.execCommand("removeFormat"); }
+    else if (fmt === "apply-link") {
+      var href = bubbleInput.value.trim();
+      if (href) {
+        if (!/^(https?:\/\/|\/|mailto:|tel:|#)/.test(href)) href = "https://" + href;
+        document.execCommand("createLink", false, href);
+      }
+      bubbleLink.hidden = true;
+    }
+    queueSave();
+  });
+  bubbleInput.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") { event.preventDefault(); bubble.querySelector('[data-fmt="apply-link"]').click(); }
+    if (event.key === "Escape") { bubbleLink.hidden = true; bubble.hidden = true; }
+  });
+
+  /* Ctrl+B / Ctrl+I in a text block. */
+  root.addEventListener("keydown", function (event) {
+    if (!(event.metaKey || event.ctrlKey)) return;
+    var key = event.key.toLowerCase();
+    if (key !== "b" && key !== "i") return;
+    if (!event.target.closest("[data-text]")) return;
+    event.preventDefault();
+    snapshot();
+    document.execCommand(key === "b" ? "bold" : "italic");
+    queueSave();
   });
 
   /* Paste as plain text, so pasted formatting never contaminates the page. */
