@@ -53,6 +53,16 @@ publishes, reads messages) or an admin (everything except handing over the
 site). Anyone can turn on two-step sign-in with an authenticator app under
 **Account**. **Activity** shows who did what, and can be downloaded.
 
+### Single sign-on
+
+**Settings → Single sign-on** connects an OpenID Connect provider such as
+Google Workspace, Microsoft 365, Okta, or Keycloak. Register the site there
+with the redirect address `https://yoursite.com/admin/sso/callback`, paste
+the issuer address, client ID, and secret, and a "Sign in with…" button
+appears on the sign-in page. Someone whose email already has an account
+signs in as that account; someone from the allowed email domain gets an
+editor account; everyone else is turned away.
+
 ### Review before publishing
 
 Turn on **Settings → Team → Publishing needs approval** and editors' Publish

@@ -73,7 +73,7 @@ func (h *Host) roleAtLeast(r *http.Request, role string) bool {
 }
 
 func isPublicAdminPath(path string) bool {
-	return path == loginPath || path == loginCodePath || strings.HasPrefix(path, joinPrefix)
+	return path == loginPath || path == loginCodePath || strings.HasPrefix(path, joinPrefix) || strings.HasPrefix(path, "/admin/sso/")
 }
 
 // guardAdmin decides who gets into /admin.
@@ -228,6 +228,7 @@ func (h *Host) renderLogin(w http.ResponseWriter, status int, problem, email, ne
 		hidden("next", next),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "wz-actions")),
 			gosx.El("button", gosx.Attrs(gosx.Attr("class", "wz-btn"), gosx.Attr("type", "submit")), gosx.Text("Sign in"))),
+		h.ssoButton(next),
 		gosx.El("p", gosx.Attrs(gosx.Attr("class", "wz-hint")), gosx.Text("Forgotten your password? Another admin can send you a fresh invite from People.")),
 	)
 	h.renderAuthPage(w, status, "Sign in", problem, panel)

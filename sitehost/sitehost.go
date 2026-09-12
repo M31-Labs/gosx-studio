@@ -113,6 +113,7 @@ type Host struct {
 	orders   *orderStore
 	users    *userStore
 	auditLog *auditStore
+	ssoState ssoCache
 	due      dueChecker
 	backups  backupState
 
@@ -221,6 +222,7 @@ func (h *Host) Handler() http.Handler {
 	h.mountAuth(mux)
 	h.mountAudit(mux)
 	h.mountReview(mux)
+	h.mountSSO(mux)
 	h.mountPublic(mux)
 
 	// Outermost first: headers on everything, then sign-in, then CSRF on

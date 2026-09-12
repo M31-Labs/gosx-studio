@@ -300,6 +300,8 @@ a { color: var(--site-accent); }
 .admin-stat strong { display: block; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .admin-stat span { display: block; font-size: 13px; color: var(--site-muted); margin-top: 4px; }
 .wz-card--narrow { max-width: 460px; }
+.wz-actions--alt { margin-top: -6px; }
+.wz-actions--alt .wz-btn { width: 100%; text-align: center; }
 .admin-radios { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; }
 .admin-radios__label { color: var(--site-muted); font-size: 13px; }
 .admin-radio { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }

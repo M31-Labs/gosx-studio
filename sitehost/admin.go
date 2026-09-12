@@ -480,6 +480,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 			renderShopFields(settings),
 			h.renderPaymentFields(settings, h.absoluteBaseFromSettings()),
 			renderReviewField(settings),
+			h.renderSSOFields(settings, h.absoluteBaseFromSettings()),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-actions")),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("type", "submit")), gosx.Text("Save settings")),
 			),
@@ -520,6 +521,10 @@ func (h *Host) handleAdminSaveSettings(w http.ResponseWriter, r *http.Request) {
 	applyStatsField(r, metadata)
 	applyShopFields(r, metadata)
 	applyReviewField(r, metadata)
+	if message := applySSOFields(r, metadata); message != "" {
+		h.renderAdminSettings(w, adminStatus{Message: message, Error: true})
+		return
+	}
 	if message := applyPaymentFields(r, metadata, normalizeCurrency(metadata[currencyKey])); message != "" {
 		h.renderAdminSettings(w, adminStatus{Message: message, Error: true})
 		return
