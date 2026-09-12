@@ -272,6 +272,7 @@
       empty.textContent = "No picture yet — upload one, or paste a link";
       fig.appendChild(empty);
       fig.appendChild(uploadControl());
+      fig.appendChild(libraryButton());
       fig.appendChild(inlineInput("src", "", "or paste a link to one", "Image link"));
       fig.appendChild(inlineInput("alt", "", "Describe the picture for people who can't see it", "Image description"));
       return fig;
@@ -326,6 +327,70 @@
     label.appendChild(input);
     label.appendChild(text);
     return label;
+  }
+
+  function libraryButton() {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ed-library-btn";
+    btn.setAttribute("data-library", "true");
+    btn.setAttribute("contenteditable", "false");
+    btn.textContent = "Choose from your pictures";
+    return btn;
+  }
+
+  /* ---------- the picture picker ---------- */
+
+  var picker = null;
+  var pickerTarget = null;
+
+  function closePicker() {
+    if (picker) picker.remove();
+    picker = null;
+    pickerTarget = null;
+  }
+
+  function openPicker(button) {
+    closePicker();
+    pickerTarget = button.closest(".ed-figure");
+    picker = document.createElement("div");
+    picker.className = "ed-menu ed-picker";
+    picker.setAttribute("data-picker", "true");
+    picker.innerHTML = '<p class="ed-picker__hint">Loading your pictures…</p>';
+    var rect = button.getBoundingClientRect();
+    picker.style.top = window.scrollY + rect.bottom + 6 + "px";
+    picker.style.left = window.scrollX + rect.left + "px";
+    // Inside the editor root: the click listener that applies a pick is
+    // bound there, and a picker parked on <body> would never reach it.
+    root.appendChild(picker);
+
+    fetch("/admin/api/media", { credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (result) {
+        if (!picker) return;
+        picker.innerHTML = "";
+        var pictures = (result && result.pictures) || [];
+        if (!pictures.length) {
+          picker.innerHTML = '<p class="ed-picker__hint">No pictures yet. Upload one and it will be here next time.</p>';
+          return;
+        }
+        pictures.forEach(function (pic) {
+          var item = document.createElement("button");
+          item.type = "button";
+          item.className = "ed-picker__item";
+          item.setAttribute("data-pick", pic.url);
+          item.title = pic.width + " × " + pic.height;
+          var img = document.createElement("img");
+          img.src = pic.thumb;
+          img.alt = "";
+          img.loading = "lazy";
+          item.appendChild(img);
+          picker.appendChild(item);
+        });
+      })
+      .catch(function () {
+        if (picker) picker.innerHTML = '<p class="ed-picker__hint">Couldn\'t load your pictures. Try again.</p>';
+      });
   }
 
   function makeInsertPoint() {
@@ -403,6 +468,28 @@
       addBlock(add.getAttribute("data-add"), null);
       return;
     }
+
+    var library = event.target.closest("[data-library]");
+    if (library) {
+      event.preventDefault();
+      openPicker(library);
+      return;
+    }
+
+    var pick = event.target.closest("[data-pick]");
+    if (pick && pickerTarget) {
+      event.preventDefault();
+      var src = pickerTarget.querySelector("[data-src]");
+      if (src) {
+        snapshot();
+        src.value = pick.getAttribute("data-pick");
+        refreshImage(src);
+        queueSave();
+      }
+      closePicker();
+      return;
+    }
+    if (picker && !event.target.closest("[data-picker]")) closePicker();
 
     var choose = event.target.closest("[data-insert]");
     if (choose) {
@@ -591,7 +678,7 @@
         return;
       }
     }
-    if (event.key === "Escape") closeInsertMenu();
+    if (event.key === "Escape") { closeInsertMenu(); closePicker(); }
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
       event.preventDefault();
       if (event.shiftKey) redo(); else undo();

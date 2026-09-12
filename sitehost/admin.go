@@ -63,6 +63,7 @@ func (h *Host) renderAdminShell(active, heading, lede string, status adminStatus
 		{"dashboard", "Dashboard", "/admin"},
 		{"pages", "Pages", "/admin/pages"},
 		{"messages", messagesLabel, "/admin/messages"},
+		{"media", "Pictures", "/admin/media"},
 		{"settings", "Settings", "/admin/settings"},
 	}
 	links := make([]gosx.Node, 0, len(navItems)+1)

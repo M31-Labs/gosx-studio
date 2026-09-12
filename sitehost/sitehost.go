@@ -90,6 +90,8 @@ type Host struct {
 
 	mailer     Mailer
 	mailStatus mailStatus
+
+	media *mediaIndex
 }
 
 // Open loads or creates the site at Options.DataPath.
@@ -107,7 +109,7 @@ func Open(opts Options) (*Host, error) {
 		}
 	}
 
-	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow)}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir())}
 	if err := host.configureMail(); err != nil {
 		return nil, err
 	}
@@ -130,7 +132,7 @@ func Open(opts Options) (*Host, error) {
 // this to supply in-memory storage.
 func NewWithStore(store LifecycleContentStore, opts Options) *Host {
 	opts = opts.normalize()
-	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow)}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir())}
 	_ = host.configureMail()
 	return host
 }
@@ -182,6 +184,7 @@ func (h *Host) Handler() http.Handler {
 	h.mountUploads(mux)
 	h.mountMessages(mux)
 	h.mountGrowth(mux)
+	h.mountMedia(mux)
 	h.mountPublic(mux)
 
 	// Outermost first: headers on everything, then sign-in, then CSRF on

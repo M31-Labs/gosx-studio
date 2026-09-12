@@ -27,6 +27,11 @@ type Hooks struct {
 	Product Hook
 	Flow    Hook
 	Unknown Hook
+	// Image lets a host render image blocks itself — typically to add
+	// responsive variants, intrinsic dimensions, and lazy loading, which
+	// need knowledge of the host's media store that this package does not
+	// have. Context.Ref carries the image URL; Block carries "alt".
+	Image Hook
 }
 
 func Body(body string, hooks Hooks) gosx.Node {
@@ -55,6 +60,11 @@ func RenderBlock(block Block, hooks Hooks) (gosx.Node, bool) {
 	case boolField(block, "isQuote"):
 		return gosx.El("blockquote", nil, gosx.Text(stringField(block, "text"))), true
 	case boolField(block, "isImage"):
+		if hooks.Image != nil {
+			if node, ok := hooks.Image(Context{Block: block, Key: "image", Ref: stringField(block, "url")}); ok {
+				return node, true
+			}
+		}
 		return gosx.El("figure", nil, renderImage(stringField(block, "url"), stringField(block, "alt"))), true
 	case boolField(block, "isGallery"):
 		images := mapSliceField(block, "images")

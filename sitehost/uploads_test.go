@@ -85,8 +85,14 @@ func TestUploadStoresServesAndDedupes(t *testing.T) {
 	again := postUpload(t, handler, "different-name.png", data).Body.String()
 	mustContain(t, again, `"url":"`+url+`"`, "identical uploads share one URL")
 	entries, _ := os.ReadDir(host.Options().uploadDir())
-	if len(entries) != 1 {
-		t.Fatalf("expected one stored file after a duplicate upload, found %d", len(entries))
+	images := 0
+	for _, entry := range entries {
+		if entry.Name() != mediaIndexFile {
+			images++
+		}
+	}
+	if images != 1 {
+		t.Fatalf("expected one stored picture after a duplicate upload, found %d", images)
 	}
 }
 

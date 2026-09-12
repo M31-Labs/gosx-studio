@@ -159,3 +159,30 @@ func TestHeadingWithoutLevelStaysH2(t *testing.T) {
 		t.Fatalf("heading without a level must render as h2: %s", html)
 	}
 }
+
+
+// TestImageHookRendersHostOwnedImages covers the seam a host uses to add
+// responsive variants and dimensions: the hook gets the URL and alt, and its
+// node replaces the default <figure><img>.
+func TestImageHookRendersHostOwnedImages(t *testing.T) {
+	var seen Context
+	html := gosx.RenderHTML(Body("[image: /uploads/abc.png | A loaf]", Hooks{
+		Image: func(ctx Context) (gosx.Node, bool) {
+			seen = ctx
+			return gosx.El("picture", gosx.Attrs(gosx.Attr("data-host", "true")), gosx.Text(ctx.Ref)), true
+		},
+	}))
+	if seen.Key != "image" || seen.Ref != "/uploads/abc.png" || seen.Block["alt"] != "A loaf" {
+		t.Fatalf("image hook context = %+v", seen)
+	}
+	if !strings.Contains(html, `<picture data-host="true">/uploads/abc.png</picture>`) {
+		t.Fatalf("hook output not used: %s", html)
+	}
+	// Declining falls back to the default rendering.
+	html = gosx.RenderHTML(Body("[image: /uploads/abc.png | A loaf]", Hooks{
+		Image: func(Context) (gosx.Node, bool) { return gosx.Fragment(), false },
+	}))
+	if !strings.Contains(html, `<img src="/uploads/abc.png" alt="A loaf" />`) {
+		t.Fatalf("fallback not used: %s", html)
+	}
+}

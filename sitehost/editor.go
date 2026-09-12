@@ -371,6 +371,10 @@ func renderBlockInner(kind string, instance blockstudio.BlockInstance) gosx.Node
 				)),
 				gosx.El("span", nil, gosx.Text("Upload a picture")),
 			),
+			gosx.El("button", gosx.Attrs(
+				gosx.Attr("type", "button"), gosx.Attr("class", "ed-library-btn"),
+				gosx.Attr("data-library", "true"), gosx.Attr("contenteditable", "false"),
+			), gosx.Text("Choose from your pictures")),
 			gosx.El("input", gosx.Attrs(
 				gosx.Attr("class", "ed-inline-input"),
 				gosx.Attr("type", "text"),

@@ -396,6 +396,22 @@ body.ed-is-dragging .ed-block__tools, body.ed-is-dragging .ed-insert, body.ed-is
 .ed-upload input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .ed-upload:has(input:focus-visible) { outline: 2px solid var(--site-accent); outline-offset: 2px; }
 .ed-upload[data-busy="true"] { opacity: .6; cursor: progress; }
+.ed-library-btn {
+  align-self: flex-start; cursor: pointer; padding: 6px 12px; border-radius: 2px; font: inherit; font-size: 13px;
+  border: 1px solid var(--site-rule); background: transparent; color: var(--site-ink);
+}
+.ed-library-btn:hover { border-color: var(--site-accent); color: var(--site-accent); }
+.ed-picker { display: grid; grid-template-columns: repeat(4, 84px); gap: 6px; padding: 8px; max-height: 320px; overflow-y: auto; }
+.ed-picker__hint { grid-column: 1 / -1; margin: 6px; font-size: 13px; color: var(--site-muted); }
+.ed-picker__item { padding: 0; border: 1px solid var(--site-rule); background: var(--site-ground); cursor: pointer; border-radius: 2px; overflow: hidden; aspect-ratio: 1; }
+.ed-picker__item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ed-picker__item:hover { border-color: var(--site-accent); }
+.admin-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; max-width: 1000px; }
+.admin-media { border: 1px solid var(--site-rule); background: var(--site-ground); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.admin-media__thumb { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; background: var(--site-surface); }
+.admin-media__meta { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: var(--site-muted); }
+.admin-media__usage { color: var(--site-ink); }
+.admin-media__link { font: inherit; font-size: 12px; padding: 5px 7px; border: 1px solid var(--site-rule); background: var(--site-surface); color: var(--site-ink); border-radius: 2px; }
 .ed-image-empty {
   display: grid; place-items: center; min-height: 130px; border: 1px dashed var(--site-rule);
   color: var(--site-muted); font-size: 13.5px; text-align: center; padding: 16px;

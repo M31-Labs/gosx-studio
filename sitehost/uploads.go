@@ -37,7 +37,7 @@ var uploadTypes = map[string]string{
 	"image/webp": ".webp",
 }
 
-var uploadName = regexp.MustCompile(`^[a-f0-9]{24}\.(png|jpg|gif|webp)$`)
+var uploadName = regexp.MustCompile(`^[a-f0-9]{24}(?:-w[0-9]{3,4})?\.(png|jpg|gif|webp)$`)
 
 // UploadDir is where pictures are stored. It defaults to an "uploads" folder
 // beside the site's data file.
@@ -87,6 +87,7 @@ func (h *Host) storeUpload(r io.Reader) (string, error) {
 	}
 	target := filepath.Join(dir, name)
 	if _, err := os.Stat(target); err == nil {
+		_, _ = h.media.ensure(name, data, sniffed)
 		return uploadsURLPrefix + name, nil
 	}
 	// Write to a temporary name and rename, so a half-written file is never
@@ -108,6 +109,10 @@ func (h *Host) storeUpload(r io.Reader) (string, error) {
 		os.Remove(temp.Name())
 		return "", err
 	}
+	// Measure it and make the smaller renditions the render hook serves.
+	// A failure here is not a failed upload: the original is safe on disk
+	// and renders without srcset.
+	_, _ = h.media.ensure(name, data, sniffed)
 	return uploadsURLPrefix + name, nil
 }
 
