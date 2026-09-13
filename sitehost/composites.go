@@ -392,7 +392,12 @@ func (h *Host) renderComposite(spec compositeSpec, instance blockstudio.BlockIns
 	get := func(key string) string { return strings.TrimSpace(instance.Values[key].String) }
 	f := func(key string) partSpec { field, _ := spec.field(key); return field }
 	variant := spec.variant(get("variant"))
-	class := "site-" + spec.Key + " site-" + spec.Key + "--" + variant
+	shown := variant
+	// A split or cover hero without a picture reads as a plain one.
+	if spec.Key == "hero" && get("image") == "" && !editable && (variant == "split" || variant == "cover") {
+		shown = "left"
+	}
+	class := "site-" + spec.Key + " site-" + spec.Key + "--" + shown
 	rootAttrs := []any{gosx.Attr("class", class)}
 	if editable {
 		rootAttrs = append(rootAttrs, gosx.Attr("data-composite", spec.Key), gosx.Attr("data-variant-value", variant))

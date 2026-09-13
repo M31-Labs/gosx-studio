@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"m31labs.dev/gosx"
-	"m31labs.dev/gosx-studio/cms/content"
 	cmsstore "m31labs.dev/gosx-studio/cms/store"
 )
 
@@ -272,6 +271,7 @@ func (h *Host) renderAdminPages(w http.ResponseWriter, r *http.Request, status a
 			h.csrfField(),
 			adminTextField("title", "Page name", "", "Shown as the heading and in your site menu."),
 			adminTextField("slug", "Web address", "", "Letters and dashes only. \"about-us\" becomes yoursite.com/about-us."),
+			renderPageTemplatePicker(),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-actions")),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("type", "submit")), gosx.Text("Create page")),
 			),
@@ -282,6 +282,24 @@ func (h *Host) renderAdminPages(w http.ResponseWriter, r *http.Request, status a
 		"Create, edit, and publish the pages on your website.",
 		status, listing, create, archivedPanel)
 	h.writeDocument(w, http.StatusOK, h.adminMeta("Pages"), body)
+}
+
+// renderPageTemplatePicker is the "start from" choice on Add a page.
+func renderPageTemplatePicker() gosx.Node {
+	choices := make([]gosx.Node, 0, 9)
+	for index, template := range PageTemplates() {
+		attrs := []any{gosx.Attr("type", "radio"), gosx.Attr("name", "template"), gosx.Attr("value", template.Key), gosx.Attr("id", "template-"+template.Key)}
+		if index == 0 {
+			attrs = append(attrs, gosx.Attr("checked", "checked"))
+		}
+		choices = append(choices, gosx.El("label", gosx.Attrs(gosx.Attr("class", "admin-choice"), gosx.Attr("for", "template-"+template.Key)),
+			gosx.El("input", gosx.Attrs(attrs...)),
+			gosx.El("span", gosx.Attrs(gosx.Attr("class", "admin-choice__name")), gosx.Text(template.Label)),
+			gosx.El("span", gosx.Attrs(gosx.Attr("class", "admin-choice__blurb")), gosx.Text(template.Blurb))))
+	}
+	return gosx.El("fieldset", gosx.Attrs(gosx.Attr("class", "admin-choices")),
+		gosx.El("legend", nil, gosx.Text("Start from")),
+		gosx.Fragment(choices...))
 }
 
 func (h *Host) handleAdminCreatePage(w http.ResponseWriter, r *http.Request) {
@@ -314,7 +332,7 @@ func (h *Host) handleAdminCreatePage(w http.ResponseWriter, r *http.Request) {
 	page, err := h.store.CreatePage(cmsstore.PageInput{
 		Slug:  slug,
 		Title: title,
-		Body:  document(block(0, content.BlockParagraph, values("text", "Write your page here."))),
+		Body:  PageTemplateByKey(r.PostFormValue("template")).build(title),
 	})
 	if err != nil {
 		h.renderAdminPages(w, r, adminStatus{Message: "We couldn't create that page. Try again.", Error: true})
