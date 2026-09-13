@@ -70,6 +70,11 @@ type Product struct {
 	TrackStock  bool           `json:"trackStock"`
 	Ships       bool           `json:"ships"`
 	Active      bool           `json:"active"`
+	Kind        string         `json:"kind,omitempty"`     // physical, digital, subscription, booking
+	Interval    string         `json:"interval,omitempty"` // subscriptions: month, year, week
+	File        string         `json:"file,omitempty"`     // digital: stored file name
+	FileName    string         `json:"fileName,omitempty"` // digital: the name buyers see
+	Booking     BookingRules   `json:"booking,omitempty"`  // booking: when it can be booked
 	Created     time.Time      `json:"created"`
 	Updated     time.Time      `json:"updated"`
 }
@@ -400,6 +405,24 @@ func (s *productStore) remove(id string) error {
 
 func normalizeProduct(product Product) Product {
 	product.Name = firstNonEmpty(strings.TrimSpace(product.Name), "Product")
+	product.Kind = normalizeKind(product.Kind)
+	if product.Kind != kindPhysical {
+		product.Ships = false
+		product.TrackStock = product.Kind == kindBooking && false
+	}
+	if product.Kind == kindSubscription {
+		product.Interval = normalizeInterval(product.Interval)
+	} else {
+		product.Interval = ""
+	}
+	if product.Kind != kindDigital {
+		product.File, product.FileName = "", ""
+	}
+	if product.Kind == kindBooking {
+		product.Booking = normalizeBookingRules(product.Booking)
+	} else {
+		product.Booking = BookingRules{}
+	}
 	product.Description = strings.TrimSpace(product.Description)
 	if product.Price < 0 {
 		product.Price = 0
@@ -472,6 +495,8 @@ func (h *Host) productByRef(ref string) (Product, bool) {
 // ---------- routes ----------
 
 func (h *Host) mountShop(mux *http.ServeMux) {
+	h.mountGoods(mux)
+	h.mountBookings(mux)
 	mux.HandleFunc("GET "+shopPath, h.handleShop)
 	mux.HandleFunc("GET "+shopPath+"/{$}", h.handleShop)
 	mux.HandleFunc("GET "+shopPath+"/{slug}", h.handleProductPage)
@@ -551,7 +576,7 @@ func (h *Host) renderProductCard(product Product, inline bool) gosx.Node {
 			picture = gosx.El("img", gosx.Attrs(attrs...))
 		}
 	}
-	price := []gosx.Node{gosx.El("span", gosx.Attrs(gosx.Attr("class", "site-price")), gosx.Text(formatMoney(product.Price, currency)))}
+	price := []gosx.Node{gosx.El("span", gosx.Attrs(gosx.Attr("class", "site-price")), gosx.Text(priceLabel(product, currency)))}
 	if product.Compare > 0 {
 		price = append(price, gosx.Text(" "), gosx.El("s", gosx.Attrs(gosx.Attr("class", "site-price--was")), gosx.Text(formatMoney(product.Compare, currency))))
 	}
@@ -619,7 +644,7 @@ func (h *Host) handleProductPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	price := []gosx.Node{gosx.El("span", gosx.Attrs(gosx.Attr("class", "site-price site-price--big")), gosx.Text(formatMoney(product.Price, currency)))}
+	price := []gosx.Node{gosx.El("span", gosx.Attrs(gosx.Attr("class", "site-price site-price--big")), gosx.Text(priceLabel(product, currency)))}
 	if product.Compare > 0 {
 		price = append(price, gosx.Text(" "), gosx.El("s", gosx.Attrs(gosx.Attr("class", "site-price--was")), gosx.Text(formatMoney(product.Compare, currency))))
 	}
@@ -631,11 +656,23 @@ func (h *Host) handleProductPage(w http.ResponseWriter, r *http.Request) {
 			gosx.Text("Added to your cart. "), gosx.El("a", gosx.Attrs(gosx.Attr("href", cartPath)), gosx.Text("View cart")))
 	}
 
+	var bookingDay *time.Time
+	if product.Kind == kindBooking {
+		if day, err := time.ParseInLocation("2006-01-02", r.URL.Query().Get("date"), time.Local); err == nil {
+			bookingDay = &day
+		}
+		switch r.URL.Query().Get("problem") {
+		case "slot":
+			notice = gosx.El("p", gosx.Attrs(gosx.Attr("class", "site-form__error"), gosx.Attr("role", "alert")), gosx.Text("That time isn't free any more, or a name was missing. Pick again."))
+		case "email":
+			notice = gosx.El("p", gosx.Attrs(gosx.Attr("class", "site-form__error"), gosx.Attr("role", "alert")), gosx.Text("That email address doesn't look right."))
+		}
+	}
 	details := gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-product__details")),
 		gosx.El("h1", gosx.Attrs(gosx.Attr("class", "site-title")), gosx.Text(product.Name)),
 		gosx.El("p", gosx.Attrs(gosx.Attr("class", "site-product__price")), gosx.Fragment(price...)),
 		notice,
-		h.renderBuyForm(product),
+		h.renderBuyForm(product, bookingDay),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-product__description")), renderInline(product.Description)),
 		gosx.El("p", gosx.Attrs(gosx.Attr("class", "site-post-nav")), gosx.El("a", gosx.Attrs(gosx.Attr("href", shopPath)), gosx.Text("← Back to the shop"))),
 	)
@@ -648,7 +685,7 @@ func (h *Host) handleProductPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // renderBuyForm is the option picker, quantity, and Add to cart button.
-func (h *Host) renderBuyForm(product Product) gosx.Node {
+func (h *Host) renderBuyForm(product Product, bookingDay *time.Time) gosx.Node {
 	currency := h.currency()
 	if product.soldOut() {
 		return gosx.El("p", gosx.Attrs(gosx.Attr("class", "site-product__stock")), gosx.El("span", gosx.Attrs(gosx.Attr("class", "site-badge")), gosx.Text("Sold out")))
@@ -676,12 +713,24 @@ func (h *Host) renderBuyForm(product Product) gosx.Node {
 	if product.TrackStock && len(product.Variants) == 0 && product.Stock <= 5 {
 		stockNote = gosx.El("span", gosx.Attrs(gosx.Attr("class", "site-product__stock")), gosx.Text("Only "+strconv.Itoa(product.Stock)+" left"))
 	}
+	buttonText := "Add to cart"
+	var qtyField gosx.Node = gosx.El("label", gosx.Attrs(gosx.Attr("class", "site-form__field site-buy__qty")),
+		gosx.El("span", nil, gosx.Text("Quantity")),
+		gosx.El("input", gosx.Attrs(gosx.Attr("type", "number"), gosx.Attr("name", "qty"), gosx.Attr("value", "1"), gosx.Attr("min", "1"), gosx.Attr("max", strconv.Itoa(cartMaxQty)), gosx.Attr("inputmode", "numeric"))))
+	switch product.Kind {
+	case kindDigital:
+		buttonText = "Buy"
+		qtyField = gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "qty"), gosx.Attr("value", "1")))
+	case kindSubscription:
+		buttonText = "Subscribe"
+		qtyField = gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("name", "qty"), gosx.Attr("value", "1")))
+	case kindBooking:
+		return h.renderBookingForm(product, bookingDay)
+	}
 	nodes = append(nodes,
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-buy__row")),
-			gosx.El("label", gosx.Attrs(gosx.Attr("class", "site-form__field site-buy__qty")),
-				gosx.El("span", nil, gosx.Text("Quantity")),
-				gosx.El("input", gosx.Attrs(gosx.Attr("type", "number"), gosx.Attr("name", "qty"), gosx.Attr("value", "1"), gosx.Attr("min", "1"), gosx.Attr("max", strconv.Itoa(cartMaxQty)), gosx.Attr("inputmode", "numeric")))),
-			gosx.El("button", gosx.Attrs(gosx.Attr("class", "site-button"), gosx.Attr("type", "submit")), gosx.Text("Add to cart")),
+			qtyField,
+			gosx.El("button", gosx.Attrs(gosx.Attr("class", "site-button"), gosx.Attr("type", "submit")), gosx.Text(buttonText)),
 		),
 		stockNote,
 	)
@@ -731,6 +780,7 @@ type cartLine struct {
 	Product string `json:"p"`
 	Variant string `json:"v,omitempty"`
 	Qty     int    `json:"q"`
+	Slot    string `json:"s,omitempty"` // bookings: the chosen start time, RFC 3339
 }
 
 // resolvedLine is a cart line with its product looked up and its quantity
@@ -797,6 +847,15 @@ func (h *Host) resolveCart(lines []cartLine) ([]resolvedLine, int64) {
 		if qty > cartMaxQty {
 			qty = cartMaxQty
 		}
+		if product.Kind == kindSubscription || product.Kind == kindDigital || product.Kind == kindBooking {
+			qty = 1
+		}
+		if product.Kind == kindBooking {
+			start, err := time.Parse(time.RFC3339, line.Slot)
+			if err != nil || !h.slotOK(product, start) {
+				continue
+			}
+		}
 		capped := false
 		if available := product.available(line.Variant); available >= 0 && qty > available {
 			qty, capped = available, true
@@ -808,6 +867,12 @@ func (h *Host) resolveCart(lines []cartLine) ([]resolvedLine, int64) {
 		name := product.Name
 		if hasVariant {
 			name += " — " + variant.Name
+		}
+		if product.Kind == kindSubscription {
+			name += " (per " + normalizeInterval(product.Interval) + ")"
+		}
+		if line.Slot != "" {
+			name += " — " + slotLabel(line.Slot)
 		}
 		line.Qty = qty
 		out = append(out, resolvedLine{Line: line, Product: product, Variant: variant, Unit: unit, Total: unit * int64(qty), Name: name, Capped: capped})
@@ -853,17 +918,27 @@ func (h *Host) handleCartAdd(w http.ResponseWriter, r *http.Request) {
 	} else {
 		variant = ""
 	}
+	slot := ""
+	if product.Kind == kindBooking {
+		start, err := time.Parse(time.RFC3339, r.PostFormValue("slot"))
+		if err != nil || !h.slotOK(product, start) {
+			http.Redirect(w, r, product.path()+"?problem=slot", http.StatusSeeOther)
+			return
+		}
+		slot = start.UTC().Format(time.RFC3339)
+		qty = 1
+	}
 	lines := readCart(r)
 	merged := false
 	for index := range lines {
-		if lines[index].Product == product.ID && lines[index].Variant == variant {
+		if lines[index].Product == product.ID && lines[index].Variant == variant && slot == "" && lines[index].Slot == "" {
 			lines[index].Qty += qty
 			merged = true
 			break
 		}
 	}
 	if !merged {
-		lines = append(lines, cartLine{Product: product.ID, Variant: variant, Qty: qty})
+		lines = append(lines, cartLine{Product: product.ID, Variant: variant, Qty: qty, Slot: slot})
 	}
 	// The quantity is kept as asked; the cart page trims it to stock and
 	// says so, once, where the visitor can see it.

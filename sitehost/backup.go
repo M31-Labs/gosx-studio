@@ -58,6 +58,15 @@ func (h *Host) siteFiles() [][2]string {
 			out = append(out, [2]string{filepath.Base(path), path})
 		}
 	}
+	if files := h.opts.filesDir(); files != "" {
+		entries, _ := os.ReadDir(files)
+		for _, entry := range entries {
+			if entry.IsDir() || !storedFileName.MatchString(entry.Name()) {
+				continue
+			}
+			out = append(out, [2]string{"files/" + entry.Name(), filepath.Join(files, entry.Name())})
+		}
+	}
 	if uploads := h.opts.uploadDir(); uploads != "" {
 		entries, _ := os.ReadDir(uploads)
 		for _, entry := range entries {

@@ -3,6 +3,7 @@ package sitehost
 import (
 	"encoding/json"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -220,7 +221,13 @@ func (h *Host) renderProductEditor(w http.ResponseWriter, product Product, statu
 			variantsTable,
 			gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-actions")),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-secondary"), gosx.Attr("type", "submit"), gosx.Attr("name", "addVariant"), gosx.Attr("value", "1")), gosx.Text("Add an option"))),
+			gosx.El("h2", gosx.Attrs(gosx.Attr("class", "admin-subhead")), gosx.Text("What kind of product")),
+			kindSelect(product),
+			intervalSelect(product),
+			h.digitalFileFields(product),
+			renderBookingRuleFields(product),
 			gosx.El("h2", gosx.Attrs(gosx.Attr("class", "admin-subhead")), gosx.Text("Stock and shipping")),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-hint")), gosx.Text("Only physical items track stock and ship.")),
 			check("trackStock", product.TrackStock, "Track stock (the shop says \"sold out\" when it runs out)"),
 			stockField,
 			check("ships", product.Ships, "Needs shipping (a physical thing that gets posted)"),
@@ -274,9 +281,29 @@ func (h *Host) handleAdminProductAction(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	product.Price, product.Compare = price, compare
+	product.Kind = normalizeKind(r.PostFormValue("kind"))
+	product.Interval = r.PostFormValue("interval")
 	product.TrackStock = r.PostFormValue("trackStock") == "1"
 	product.Ships = r.PostFormValue("ships") == "1"
 	product.Active = r.PostFormValue("active") == "1"
+	if r.PostFormValue("removeFile") == "1" {
+		product.File, product.FileName = "", ""
+	}
+	if file, header, err := r.FormFile("newFile"); err == nil {
+		stored, err := h.storeFile(file, header.Filename)
+		file.Close()
+		if err != nil {
+			fail("That file didn't upload. Files up to 100 MB work.")
+			return
+		}
+		product.File, product.FileName = stored, filepath.Base(header.Filename)
+		if product.Kind == kindPhysical {
+			product.Kind = kindDigital
+		}
+	}
+	if product.Kind == kindBooking {
+		product.Booking = bookingRulesFromForm(r)
+	}
 	if stock, err := strconv.Atoi(strings.TrimSpace(r.PostFormValue("stock"))); err == nil {
 		product.Stock = stock
 	}
@@ -436,4 +463,51 @@ func (h *Host) productPresetsJSON() string {
 		return "[]"
 	}
 	return strings.ReplaceAll(string(data), "</", "<\\/")
+}
+
+func kindSelect(product Product) gosx.Node {
+	options := make([]gosx.Node, 0, 4)
+	for _, kind := range []string{kindPhysical, kindDigital, kindSubscription, kindBooking} {
+		attrs := []any{gosx.Attr("value", kind)}
+		if normalizeKind(product.Kind) == kind {
+			attrs = append(attrs, gosx.Attr("selected", "selected"))
+		}
+		options = append(options, gosx.El("option", gosx.Attrs(attrs...), gosx.Text(kindLabel(kind))))
+	}
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-field")),
+		gosx.El("label", gosx.Attrs(gosx.Attr("for", "kind")), gosx.Text("This is a")),
+		gosx.El("select", gosx.Attrs(gosx.Attr("id", "kind"), gosx.Attr("name", "kind")), gosx.Fragment(options...)),
+		gosx.El("small", nil, gosx.Text("A physical item gets posted. A digital download is a file buyers get a link to. A subscription charges again every month or year. A bookable service has a calendar.")),
+	)
+}
+
+func intervalSelect(product Product) gosx.Node {
+	options := make([]gosx.Node, 0, 3)
+	for _, interval := range []string{"month", "year", "week"} {
+		attrs := []any{gosx.Attr("value", interval)}
+		if normalizeInterval(product.Interval) == interval {
+			attrs = append(attrs, gosx.Attr("selected", "selected"))
+		}
+		options = append(options, gosx.El("option", gosx.Attrs(attrs...), gosx.Text("every "+interval)))
+	}
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-field")),
+		gosx.El("label", gosx.Attrs(gosx.Attr("for", "interval")), gosx.Text("Subscriptions charge")),
+		gosx.El("select", gosx.Attrs(gosx.Attr("id", "interval"), gosx.Attr("name", "interval")), gosx.Fragment(options...)),
+		gosx.El("small", nil, gosx.Text("Only used when this is a subscription. The price above is the amount each time.")),
+	)
+}
+
+func (h *Host) digitalFileFields(product Product) gosx.Node {
+	var current gosx.Node = gosx.El("small", nil, gosx.Text("No file yet. Buyers get a private link that works for seven days after paying."))
+	if product.File != "" {
+		current = gosx.Fragment(
+			gosx.El("p", nil, gosx.Text("Current file: "), gosx.El("code", nil, gosx.Text(product.FileName))),
+			gosx.El("label", gosx.Attrs(gosx.Attr("class", "admin-check")), gosx.El("input", gosx.Attrs(gosx.Attr("type", "checkbox"), gosx.Attr("name", "removeFile"), gosx.Attr("value", "1"))), gosx.Text(" Remove this file")),
+		)
+	}
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-field")),
+		gosx.El("label", gosx.Attrs(gosx.Attr("for", "newFile")), gosx.Text("The file to download (digital products)")),
+		gosx.El("input", gosx.Attrs(gosx.Attr("type", "file"), gosx.Attr("id", "newFile"), gosx.Attr("name", "newFile"))),
+		current,
+	)
 }

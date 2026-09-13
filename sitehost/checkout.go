@@ -47,12 +47,16 @@ const (
 
 // OrderLine is one thing in an order, priced as it was when bought.
 type OrderLine struct {
-	Product string `json:"product"`
-	Variant string `json:"variant,omitempty"`
-	Name    string `json:"name"`
-	Qty     int    `json:"qty"`
-	Unit    int64  `json:"unit"`
-	Total   int64  `json:"total"`
+	Product  string `json:"product"`
+	Variant  string `json:"variant,omitempty"`
+	Name     string `json:"name"`
+	Qty      int    `json:"qty"`
+	Unit     int64  `json:"unit"`
+	Total    int64  `json:"total"`
+	Kind     string `json:"kind,omitempty"`
+	File     string `json:"file,omitempty"`     // digital: stored file
+	FileName string `json:"fileName,omitempty"` // digital: the buyer's name for it
+	Slot     string `json:"slot,omitempty"`     // bookings: start time, RFC 3339
 }
 
 // Address is where an order goes.
@@ -83,10 +87,18 @@ type Order struct {
 	Ships         bool        `json:"ships"`
 	StripeSession string      `json:"stripeSession,omitempty"`
 	StripePayment string      `json:"stripePayment,omitempty"`
-	Note          string      `json:"note,omitempty"`
-	Created       time.Time   `json:"created"`
-	Paid          *time.Time  `json:"paid,omitempty"`
-	Fulfilled     *time.Time  `json:"fulfilled,omitempty"`
+	// Subscriptions, when the order started one.
+	StripeSubscription string     `json:"stripeSubscription,omitempty"`
+	StripeCustomer     string     `json:"stripeCustomer,omitempty"`
+	SubscriptionStatus string     `json:"subscriptionStatus,omitempty"` // active, cancelled, past_due
+	Renewals           int        `json:"renewals,omitempty"`
+	LastPaid           *time.Time `json:"lastPaid,omitempty"`
+	CartEmail          string     `json:"cartEmail,omitempty"` // the visitor's own address, for a reminder
+	Reminded           bool       `json:"reminded,omitempty"`
+	Note               string     `json:"note,omitempty"`
+	Created            time.Time  `json:"created"`
+	Paid               *time.Time `json:"paid,omitempty"`
+	Fulfilled          *time.Time `json:"fulfilled,omitempty"`
 }
 
 func (o Order) label() string { return "#" + strconv.Itoa(o.Number) }
@@ -476,8 +488,14 @@ func (h *Host) handleCheckout(w http.ResponseWriter, r *http.Request) {
 	base := h.absoluteBase(r)
 
 	order := Order{Currency: currency, Subtotal: subtotal}
+	mode := "payment"
+	for _, line := range resolved {
+		if line.Product.Kind == kindSubscription {
+			mode = "subscription"
+		}
+	}
 	params := url.Values{}
-	params.Set("mode", "payment")
+	params.Set("mode", mode)
 	params.Set("success_url", base+checkoutDonePath+"?session_id={CHECKOUT_SESSION_ID}")
 	params.Set("cancel_url", base+cartPath)
 	for index, line := range resolved {
@@ -486,6 +504,9 @@ func (h *Host) handleCheckout(w http.ResponseWriter, r *http.Request) {
 		params.Set(prefix+"[price_data][currency]", currency)
 		params.Set(prefix+"[price_data][unit_amount]", strconv.FormatInt(line.Unit, 10))
 		params.Set(prefix+"[price_data][product_data][name]", line.Name)
+		if line.Product.Kind == kindSubscription {
+			params.Set(prefix+"[price_data][recurring][interval]", normalizeInterval(line.Product.Interval))
+		}
 		if len(line.Product.Images) > 0 {
 			if image := absoluteURL(base, line.Product.Images[0].URL); strings.HasPrefix(image, "https://") {
 				params.Set(prefix+"[price_data][product_data][images][0]", image)
@@ -494,7 +515,8 @@ func (h *Host) handleCheckout(w http.ResponseWriter, r *http.Request) {
 		if pay.Tax {
 			params.Set(prefix+"[price_data][tax_behavior]", "exclusive")
 		}
-		order.Lines = append(order.Lines, OrderLine{Product: line.Product.ID, Variant: line.Line.Variant, Name: line.Name, Qty: line.Line.Qty, Unit: line.Unit, Total: line.Total})
+		order.Lines = append(order.Lines, OrderLine{Product: line.Product.ID, Variant: line.Line.Variant, Name: line.Name, Qty: line.Line.Qty, Unit: line.Unit, Total: line.Total,
+			Kind: normalizeKind(line.Product.Kind), File: line.Product.File, FileName: line.Product.FileName, Slot: line.Line.Slot})
 		order.Ships = order.Ships || line.Product.Ships
 	}
 	order.Shipping = pay.shippingFor(subtotal, order.Ships)
@@ -621,6 +643,13 @@ type stripeEvent struct {
 				AmountDiscount int64 `json:"amount_discount"`
 			} `json:"total_details"`
 			Metadata map[string]string `json:"metadata"`
+			// Present on sessions in subscription mode, and on the
+			// subscription and invoice objects Stripe sends later.
+			Mode          string `json:"mode"`
+			Subscription  string `json:"subscription"`
+			Customer      string `json:"customer"`
+			Status        string `json:"status"`
+			BillingReason string `json:"billing_reason"`
 		} `json:"object"`
 	} `json:"data"`
 }
@@ -646,8 +675,47 @@ func (h *Host) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 			break // an async method; the succeeded event follows
 		}
 		h.markPaid(event, h.absoluteBase(r))
+	case "customer.subscription.deleted":
+		h.subscriptionChanged(event.Data.Object.ID, "cancelled")
+	case "customer.subscription.updated":
+		switch event.Data.Object.Status {
+		case "canceled", "unpaid", "incomplete_expired":
+			h.subscriptionChanged(event.Data.Object.ID, "cancelled")
+		case "past_due":
+			h.subscriptionChanged(event.Data.Object.ID, "past_due")
+		case "active", "trialing":
+			h.subscriptionChanged(event.Data.Object.ID, "active")
+		}
+	case "invoice.paid":
+		if event.Data.Object.BillingReason == "subscription_cycle" && event.Data.Object.Subscription != "" {
+			h.subscriptionRenewed(event.Data.Object.Subscription)
+		}
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+// subscriptionChanged records what Stripe says about a subscription's life.
+func (h *Host) subscriptionChanged(subscription, status string) {
+	for _, order := range h.orders.list() {
+		if order.StripeSubscription == subscription && subscription != "" {
+			order.SubscriptionStatus = status
+			_ = h.orders.update(order)
+			return
+		}
+	}
+}
+
+func (h *Host) subscriptionRenewed(subscription string) {
+	for _, order := range h.orders.list() {
+		if order.StripeSubscription == subscription {
+			now := timeNow().UTC()
+			order.Renewals++
+			order.LastPaid = &now
+			order.SubscriptionStatus = "active"
+			_ = h.orders.update(order)
+			return
+		}
+	}
 }
 
 // markPaid turns a pending order into a paid one, exactly once.
@@ -682,13 +750,27 @@ func (h *Host) markPaid(event stripeEvent, base string) {
 	if object.Currency != "" {
 		order.Currency = normalizeCurrency(object.Currency)
 	}
+	if object.Subscription != "" {
+		order.StripeSubscription = object.Subscription
+		order.SubscriptionStatus = "active"
+		order.LastPaid = &now
+	}
+	if object.Customer != "" {
+		order.StripeCustomer = object.Customer
+	}
 	if err := h.orders.update(order); err != nil {
 		return
 	}
 	for _, line := range order.Lines {
 		_ = h.products.adjustStock(line.Product, line.Variant, -line.Qty)
+		if line.Slot != "" {
+			h.confirmBooking(order, line)
+		}
 	}
 	h.notify(h.newOrderMail(order, base))
+	if order.CustomerEmail != "" {
+		h.notify(h.newReceiptMail(order, base))
+	}
 }
 
 func (h *Host) newOrderMail(order Order, base string) Mail {
@@ -741,6 +823,8 @@ func (h *Host) handleCheckoutDone(w http.ResponseWriter, r *http.Request) {
 			gosx.El("p", gosx.Attrs(gosx.Attr("class", "site-lede")), gosx.Text("Thanks — your order "+order.label()+" is in. A receipt is on its way to "+firstNonEmpty(order.CustomerEmail, "your email")+".")),
 			gosx.El("ul", gosx.Attrs(gosx.Attr("class", "site-list")), gosx.Fragment(lines...)),
 			gosx.El("p", nil, gosx.Text("Total paid: "+formatMoney(order.Total, order.Currency))),
+			renderDownloads(h.downloadsFor(order, h.absoluteBase(r))),
+			renderBookingConfirmation(order),
 		)
 	case ok:
 		body = gosx.El("p", gosx.Attrs(gosx.Attr("class", "site-lede")), gosx.Text("Thanks — your payment is going through. You'll get a receipt by email in a moment."))
@@ -862,6 +946,27 @@ func (h *Host) renderOrder(w http.ResponseWriter, order Order, status adminStatu
 	}
 	if order.Ships {
 		details = append(details, gosx.El("p", nil, gosx.El("strong", nil, gosx.Text("Send to: ")), gosx.Text(firstNonEmpty(order.ShipTo.oneLine(), "no address given"))))
+	}
+	if order.StripeSubscription != "" {
+		label := map[string]string{"active": "Active subscription", "cancelled": "Cancelled subscription", "past_due": "Subscription payment overdue"}[order.SubscriptionStatus]
+		renewals := ""
+		if order.Renewals > 0 {
+			renewals = " · renewed " + plural(order.Renewals, "time")
+		}
+		details = append(details, gosx.El("p", nil, gosx.El("strong", nil, gosx.Text(firstNonEmpty(label, "Subscription")+": ")),
+			gosx.El("a", gosx.Attrs(gosx.Attr("href", "https://dashboard.stripe.com/subscriptions/"+order.StripeSubscription), gosx.Attr("target", "_blank"), gosx.Attr("rel", "noopener")), gosx.Text("manage in Stripe")), gosx.Text(renewals)))
+	}
+	if links := h.downloadsFor(order, h.absoluteBaseFromSettings()); len(links) > 0 {
+		items := make([]gosx.Node, 0, len(links))
+		for _, link := range links {
+			items = append(items, gosx.El("li", nil, gosx.El("a", gosx.Attrs(gosx.Attr("href", link.URL)), gosx.Text(link.Name))))
+		}
+		details = append(details, gosx.El("p", nil, gosx.El("strong", nil, gosx.Text("Downloads the buyer received: "))), gosx.El("ul", nil, gosx.Fragment(items...)))
+	}
+	for _, line := range order.Lines {
+		if line.Slot != "" {
+			details = append(details, gosx.El("p", nil, gosx.El("strong", nil, gosx.Text("Booked: ")), gosx.Text(line.Name)))
+		}
 	}
 	if order.Note != "" {
 		details = append(details, gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-hint")), gosx.Text(order.Note)))
