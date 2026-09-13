@@ -115,7 +115,7 @@ func (h *Host) renderEditor(w http.ResponseWriter, subject editorSubject) {
 		gosx.Attr("data-preview-url", subject.PreviewURL),
 		gosx.Attr("data-must-request", boolAttr(subject.MustRequest)),
 		gosx.Attr("data-can-lock", boolAttr(subject.CanDesign)),
-		gosx.Attr("data-server-kinds", "section,image,"+compositeKeys()),
+		gosx.Attr("data-server-kinds", "section,image,button,columns,"+compositeKeys()),
 	),
 		h.renderEditorToolbar(subject),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-body")),
@@ -192,6 +192,27 @@ func (h *Host) renderEditorToolbar(subject editorSubject) gosx.Node {
 			), gosx.Text(publishText)),
 		),
 	)
+}
+
+// alignAttrs carries a text block's alignment onto the canvas.
+func alignAttrs(instance blockstudio.BlockInstance) []any {
+	if align := normalizeChoice(instance.Values["align"].String, "", textAligns); align != "" {
+		return []any{gosx.Attr("data-align", align), gosx.Attr("class", "site-align-"+align)}
+	}
+	return []any{}
+}
+
+// choiceSelect is a small select for a block option.
+func choiceSelect(attr, label, current string, options [][2]string) gosx.Node {
+	nodes := make([]gosx.Node, 0, len(options))
+	for _, option := range options {
+		attrs := []any{gosx.Attr("value", option[0])}
+		if option[0] == current {
+			attrs = append(attrs, gosx.Attr("selected", "selected"))
+		}
+		nodes = append(nodes, gosx.El("option", gosx.Attrs(attrs...), gosx.Text(option[1])))
+	}
+	return gosx.El("select", gosx.Attrs(gosx.Attr(attr, "true"), gosx.Attr("aria-label", label)), gosx.Fragment(nodes...))
 }
 
 // canvasTitleClass shows the page name small when a hero leads, so the
@@ -622,26 +643,30 @@ func (h *Host) renderBlockInner(kind string, instance blockstudio.BlockInstance)
 	switch kind {
 	case "heading":
 		level := content.NormalizeHeadingLevel(instance.Values["level"].String)
-		return gosx.El("h"+level, gosx.Attrs(
+		return gosx.El("h"+level, gosx.Attrs(append(alignAttrs(instance),
 			gosx.Attr("data-text", "true"),
 			gosx.Attr("data-level", level),
 			gosx.Attr("contenteditable", "true"),
 			gosx.Attr("spellcheck", "true"),
-		), renderInline(value))
+		)...), renderInline(value))
 	case "quote":
-		return gosx.El("blockquote", gosx.Attrs(
+		return gosx.El("blockquote", gosx.Attrs(append(alignAttrs(instance),
 			gosx.Attr("data-text", "true"),
 			gosx.Attr("contenteditable", "true"),
 			gosx.Attr("spellcheck", "true"),
-		), renderInline(value))
+		)...), renderInline(value))
 	case "button":
-		return gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-button-row")),
+		look := normalizeChoice(instance.Values["look"].String, "primary", buttonLooks)
+		rowAttrs := append(alignAttrs(instance), gosx.Attr("class", "ed-button-row"))
+		return gosx.El("span", gosx.Attrs(rowAttrs...),
 			gosx.El("a", gosx.Attrs(
-				gosx.Attr("class", "site-button"),
+				gosx.Attr("class", "site-button button--"+look),
 				gosx.Attr("data-text", "true"),
 				gosx.Attr("contenteditable", "true"),
 				gosx.Attr("href", "#"),
 			), gosx.Text(instance.Values["label"].String)),
+			gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-variant"), gosx.Attr("contenteditable", "false")), gosx.El("span", nil, gosx.Text("Style")),
+				choiceSelect("data-button-look", "Button style", look, [][2]string{{"primary", "Solid"}, {"ghost", "Outline"}, {"link", "Just a link"}})),
 			gosx.El("input", gosx.Attrs(
 				gosx.Attr("class", "ed-inline-input"),
 				gosx.Attr("type", "text"),
@@ -735,23 +760,29 @@ func (h *Host) renderBlockInner(kind string, instance blockstudio.BlockInstance)
 	case "video":
 		return renderVideoEditor(instance.Values["url"].String)
 	case "columns":
-		return gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-columns ed-columns")),
+		count := normalizeChoice(instance.Values["count"].String, "2", columnCounts)
+		cols := []gosx.Node{
+			gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-variant ed-columns__count"), gosx.Attr("contenteditable", "false")), gosx.El("span", nil, gosx.Text("Columns")),
+				choiceSelect("data-column-count", "How many columns", count, [][2]string{{"2", "Two"}, {"3", "Three"}})),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-columns__col"), gosx.Attr("data-text", "true"), gosx.Attr("data-col", "1"), gosx.Attr("contenteditable", "true"), gosx.Attr("spellcheck", "true")),
-				renderInline(firstNonEmpty(strings.TrimSpace(instance.Values["text"].String), "Left column"))),
+				renderInline(firstNonEmpty(strings.TrimSpace(instance.Values["text"].String), "First column"))),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-columns__col"), gosx.Attr("data-text", "true"), gosx.Attr("data-col", "2"), gosx.Attr("contenteditable", "true"), gosx.Attr("spellcheck", "true")),
-				renderInline(firstNonEmpty(strings.TrimSpace(instance.Values["text2"].String), "Right column"))),
-		)
+				renderInline(firstNonEmpty(strings.TrimSpace(instance.Values["text2"].String), "Second column"))),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-columns__col site-columns__col--third"), gosx.Attr("data-text", "true"), gosx.Attr("data-col", "3"), gosx.Attr("contenteditable", "true"), gosx.Attr("spellcheck", "true")),
+				renderInline(firstNonEmpty(strings.TrimSpace(instance.Values["text3"].String), "Third column"))),
+		}
+		return gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-columns site-columns--"+count+" ed-columns"), gosx.Attr("data-columns", count)), gosx.Fragment(cols...))
 	case "gallery":
 		return renderGalleryEditor(galleryImages(instance))
 	default:
 		if spec, ok := compositeByKey(kind); ok {
 			return h.renderComposite(spec, instance, true)
 		}
-		return gosx.El("p", gosx.Attrs(
+		return gosx.El("p", gosx.Attrs(append(alignAttrs(instance),
 			gosx.Attr("data-text", "true"),
 			gosx.Attr("contenteditable", "true"),
 			gosx.Attr("spellcheck", "true"),
-		), renderInline(value))
+		)...), renderInline(value))
 	}
 }
 
@@ -853,15 +884,20 @@ type editorBlockPayload struct {
 	Fields  map[string]string   `json:"fields,omitempty"`
 	Items   []map[string]string `json:"items,omitempty"`
 	Variant string              `json:"variant,omitempty"`
+	// Text blocks: where they sit. Buttons: how they look. Columns: how many.
+	Align string `json:"align,omitempty"`
+	Look  string `json:"look,omitempty"`
+	Count string `json:"count,omitempty"`
+	Text3 string `json:"text3,omitempty"`
 	// Pictures: how big, what shape, a caption, a link.
 	Size    string `json:"size,omitempty"`
 	Shape   string `json:"shape,omitempty"`
 	Caption string `json:"caption,omitempty"`
 	Link    string `json:"link,omitempty"`
-	// Section breaks: everything beyond the background.
-	Align string `json:"align,omitempty"`
-	Width string `json:"width,omitempty"`
-	Space string `json:"space,omitempty"`
+	// Section breaks: everything beyond the background (Align is shared).
+	Width  string `json:"width,omitempty"`
+	Anchor string `json:"anchor,omitempty"`
+	Space  string `json:"space,omitempty"`
 }
 
 type editorSavePayload struct {
@@ -992,18 +1028,18 @@ func (h *Host) payloadDocument(blocks []editorBlockPayload) blockstudio.Document
 				continue
 			}
 			instances = append(instances, block(order, content.BlockHeading,
-				values("text", value, "level", content.NormalizeHeadingLevel(incoming.Level))))
+				values("text", value, "level", content.NormalizeHeadingLevel(incoming.Level), "align", normalizeChoice(incoming.Align, "", textAligns))))
 		case "quote":
 			if value == "" {
 				continue
 			}
-			instances = append(instances, block(order, content.BlockQuote, values("text", value)))
+			instances = append(instances, block(order, content.BlockQuote, values("text", value, "align", normalizeChoice(incoming.Align, "", textAligns))))
 		case "button":
 			if value == "" {
 				continue
 			}
 			instances = append(instances, block(order, content.BlockButton,
-				values("label", value, "href", firstNonEmpty(strings.TrimSpace(incoming.URL), "/"))))
+				values("label", value, "href", firstNonEmpty(strings.TrimSpace(incoming.URL), "/"), "look", normalizeChoice(incoming.Look, "primary", buttonLooks), "align", normalizeChoice(incoming.Align, "", textAligns))))
 		case "image":
 			url := strings.TrimSpace(incoming.URL)
 			if url == "" {
@@ -1027,7 +1063,7 @@ func (h *Host) payloadDocument(blocks []editorBlockPayload) blockstudio.Document
 		case "divider":
 			instances = append(instances, block(order, blockDivider, values()))
 		case "section":
-			options := sectionOptions{Style: normalizeSectionStyle(incoming.Style), Align: normalizeChoice(incoming.Align, "left", sectionAligns), Width: normalizeChoice(incoming.Width, "normal", sectionWidths), Space: normalizeChoice(incoming.Space, "normal", sectionSpaces), Image: strings.TrimSpace(incoming.URL)}
+			options := sectionOptions{Style: normalizeSectionStyle(incoming.Style), Align: normalizeChoice(incoming.Align, "left", sectionAligns), Width: normalizeChoice(incoming.Width, "normal", sectionWidths), Space: normalizeChoice(incoming.Space, "normal", sectionSpaces), Image: strings.TrimSpace(incoming.URL), Anchor: normalizeSlug(incoming.Anchor)}
 			instances = append(instances, block(order, blockSection, options.values()))
 		case "video":
 			url := strings.TrimSpace(incoming.URL)
@@ -1037,10 +1073,11 @@ func (h *Host) payloadDocument(blocks []editorBlockPayload) blockstudio.Document
 			instances = append(instances, block(order, blockVideo, values("url", url, "text", value)))
 		case "columns":
 			right := strings.TrimSpace(incoming.Text2)
-			if value == "" && right == "" {
+			third := strings.TrimSpace(incoming.Text3)
+			if value == "" && right == "" && third == "" {
 				continue
 			}
-			instances = append(instances, block(order, blockColumns, values("text", value, "text2", right)))
+			instances = append(instances, block(order, blockColumns, values("text", value, "text2", right, "text3", third, "count", normalizeChoice(incoming.Count, "2", columnCounts))))
 		case "gallery":
 			images := make([][2]string, 0, len(incoming.Images))
 			for _, image := range incoming.Images {
@@ -1064,7 +1101,7 @@ func (h *Host) payloadDocument(blocks []editorBlockPayload) blockstudio.Document
 			if value == "" {
 				continue
 			}
-			instances = append(instances, block(order, content.BlockParagraph, values("text", value)))
+			instances = append(instances, block(order, content.BlockParagraph, values("text", value, "align", normalizeChoice(incoming.Align, "", textAligns))))
 		}
 		if len(instances) > before && strings.TrimSpace(incoming.Phone) == phoneHide {
 			instances[len(instances)-1].Values[phoneKey] = text(phoneHide)

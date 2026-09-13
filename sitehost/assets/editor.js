@@ -57,6 +57,8 @@
       var swidth = el.querySelector("[data-section-width]");
       var sspace = el.querySelector("[data-section-space]");
       var simg = el.querySelector("[data-section-src]");
+      var sanchor = el.querySelector("[data-section-anchor]");
+      payload.anchor = sanchor ? sanchor.value.trim() : "";
       payload.align = salign ? salign.value : "left";
       payload.width = swidth ? swidth.value : "normal";
       payload.space = sspace ? sspace.value : "normal";
@@ -89,8 +91,12 @@
     if (kind === "columns") {
       var c1 = el.querySelector('[data-col="1"]');
       var c2 = el.querySelector('[data-col="2"]');
+      var c3 = el.querySelector('[data-col="3"]');
+      var ccount = el.querySelector("[data-column-count]");
       payload.text = c1 ? serializeText(c1) : "";
       payload.text2 = c2 ? serializeText(c2) : "";
+      payload.text3 = c3 ? serializeText(c3) : "";
+      payload.count = ccount ? ccount.value : "2";
     }
     if (kind === "gallery") {
       payload.text = "";
@@ -107,9 +113,15 @@
       var h = el.querySelector("[data-text]");
       payload.level = (h && h.getAttribute("data-level")) || "2";
     }
+    if (kind === "heading" || kind === "paragraph" || kind === "quote" || kind === "button") {
+      var aligned = el.querySelector("[data-align]");
+      payload.align = aligned ? aligned.getAttribute("data-align") : "";
+    }
     if (kind === "button") {
       var href = el.querySelector("[data-href]");
+      var lookSel = el.querySelector("[data-button-look]");
       payload.url = href ? href.value.trim() : "";
+      payload.look = lookSel ? lookSel.value : "";
     }
     if (kind === "image") {
       var src = el.querySelector("[data-src]");
@@ -1182,6 +1194,20 @@
       queueSave();
       return;
     }
+    if (event.target.matches("[data-button-look]")) {
+      snapshot();
+      var a = event.target.closest(".ed-button-row").querySelector("a[data-text]");
+      if (a) a.className = "site-button button--" + event.target.value;
+      queueSave();
+      return;
+    }
+    if (event.target.matches("[data-column-count]")) {
+      snapshot();
+      var colsEl = event.target.closest("[data-columns]");
+      if (colsEl) { colsEl.setAttribute("data-columns", event.target.value); colsEl.className = "site-columns site-columns--" + event.target.value + " ed-columns"; }
+      queueSave();
+      return;
+    }
     if (event.target.matches("[data-img-size],[data-img-shape]")) {
       snapshot();
       var fig = event.target.closest("[data-figure]");
@@ -1203,7 +1229,7 @@
   root.addEventListener("input", function (event) {
     if (event.target.matches("[data-video-url]")) { refreshVideo(event.target); queueSave(); return; }
     if (event.target.matches("[data-galt]")) { queueSave(); return; }
-    var field = event.target.closest("[data-text]") || (event.target.matches("[data-href],[data-src],[data-alt],[data-caption],[data-link],input[data-field]") ? event.target : null);
+    var field = event.target.closest("[data-text]") || (event.target.matches("[data-href],[data-src],[data-alt],[data-caption],[data-link],[data-section-anchor],input[data-field]") ? event.target : null);
     if (field) {
       if (typingSession !== field) {
         typingSession = field;
@@ -1344,9 +1370,14 @@
     '<button type="button" data-fmt="italic" title="Italic (Ctrl+I)"><i>I</i></button>' +
     '<button type="button" data-fmt="link" title="Link">Link</button>' +
     '<button type="button" data-fmt="clear" title="Remove formatting">Clear</button>' +
+    '<span class="ed-bubble__sep"></span>' +
+    '<button type="button" data-fmt="align-left" title="Align left">⇤</button>' +
+    '<button type="button" data-fmt="align-center" title="Centre">≡</button>' +
+    '<button type="button" data-fmt="align-right" title="Align right">⇥</button>' +
     '<span class="ed-bubble__link" hidden><input type="url" placeholder="https:// or /page" aria-label="Link address"><button type="button" data-fmt="apply-link">Add</button></span>';
   root.appendChild(bubble);
   var bubbleLink = bubble.querySelector(".ed-bubble__link");
+  var bubbleTarget = null;
   var bubbleInput = bubble.querySelector("input");
   var savedRange = null;
 
@@ -1373,6 +1404,8 @@
     var range = selectionInText();
     if (!range) { bubble.hidden = true; return; }
     savedRange = range.cloneRange();
+    var startNode = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+    bubbleTarget = startNode ? startNode.closest("[data-text]") : null;
     placeBubble(range);
   });
 
@@ -1388,6 +1421,21 @@
     var btn = event.target.closest("[data-fmt]");
     if (!btn) return;
     var fmt = btn.getAttribute("data-fmt");
+    if (/^align-/.test(fmt)) {
+      event.preventDefault();
+      var want = fmt.slice(6);
+      var blockEl = bubbleTarget && bubbleTarget.closest(".ed-block");
+      if (!blockEl) return;
+      var target = blockEl.getAttribute("data-block") === "button" ? blockEl.querySelector(".ed-button-row") : bubbleTarget;
+      if (target) {
+        snapshot();
+        target.classList.remove("site-align-center", "site-align-right");
+        if (want === "left") target.removeAttribute("data-align");
+        else { target.setAttribute("data-align", want); target.classList.add("site-align-" + want); }
+        queueSave();
+      }
+      return;
+    }
     if (fmt === "link") {
       bubbleLink.hidden = false;
       bubbleInput.value = "";

@@ -160,6 +160,9 @@ func (h *Host) renderBody(doc blockstudio.Document, hooks render.Hooks) gosx.Nod
 			continue
 		}
 		attrs := []any{gosx.Attr("class", s.options.classes())}
+		if s.options.Anchor != "" {
+			attrs = append(attrs, gosx.Attr("id", s.options.Anchor))
+		}
 		if s.options.Style == "image" && s.options.Image != "" {
 			attrs = append(attrs, gosx.Attr("style", "--section-image: url('"+cssURL(s.options.Image)+"')"))
 		}
@@ -176,24 +179,29 @@ func (h *Host) renderBlock(instance blockstudio.BlockInstance, hooks render.Hook
 		if text == "" {
 			return gosx.Fragment(), false
 		}
-		return gosx.El("h"+content.NormalizeHeadingLevel(instance.Values["level"].String), nil, renderInline(text)), true
+		return gosx.El("h"+content.NormalizeHeadingLevel(instance.Values["level"].String), gosx.Attrs(alignClass(instance)...), renderInline(text)), true
 	case content.BlockParagraph:
 		if text == "" {
 			return gosx.Fragment(), false
 		}
-		return gosx.El("p", nil, renderInline(text)), true
+		return gosx.El("p", gosx.Attrs(alignClass(instance)...), renderInline(text)), true
 	case content.BlockQuote:
 		if text == "" {
 			return gosx.Fragment(), false
 		}
-		return gosx.El("blockquote", nil, renderInline(text)), true
+		return gosx.El("blockquote", gosx.Attrs(alignClass(instance)...), renderInline(text)), true
 	case content.BlockButton:
 		label := strings.TrimSpace(instance.Values["label"].String)
 		href := safeLinkHref(instance.Values["href"].String)
 		if label == "" || href == "" {
 			return gosx.Fragment(), false
 		}
-		return gosx.El("a", gosx.Attrs(append([]any{gosx.Attr("class", "button button--primary")}, linkAttrs(href)...)...), gosx.Text(label)), true
+		look := normalizeChoice(instance.Values["look"].String, "primary", buttonLooks)
+		button := gosx.El("a", gosx.Attrs(append([]any{gosx.Attr("class", "button button--"+look)}, linkAttrs(href)...)...), gosx.Text(label))
+		if align := normalizeChoice(instance.Values["align"].String, "", textAligns); align != "" {
+			return gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-button-row site-align-"+align)), button), true
+		}
+		return button, true
 	case blockList:
 		items := make([]gosx.Node, 0, 8)
 		for _, line := range strings.Split(text, "\n") {
@@ -225,13 +233,19 @@ func (h *Host) renderBlock(instance blockstudio.BlockInstance, hooks render.Hook
 	case blockColumns:
 		left := strings.TrimSpace(instance.Values["text"].String)
 		right := strings.TrimSpace(instance.Values["text2"].String)
-		if left == "" && right == "" {
+		third := strings.TrimSpace(instance.Values["text3"].String)
+		count := normalizeChoice(instance.Values["count"].String, "2", columnCounts)
+		if left == "" && right == "" && third == "" {
 			return gosx.Fragment(), false
 		}
-		return gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-columns")),
+		cols := []gosx.Node{
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-columns__col")), renderInline(left)),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-columns__col")), renderInline(right)),
-		), true
+		}
+		if count == "3" {
+			cols = append(cols, gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-columns__col")), renderInline(third)))
+		}
+		return gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-columns site-columns--"+count)), gosx.Fragment(cols...)), true
 	case content.BlockGallery:
 		images := galleryImages(instance)
 		if len(images) == 0 {
@@ -297,4 +311,18 @@ func (h *Host) renderPicture(instance blockstudio.BlockInstance) (gosx.Node, boo
 		nodes = append(nodes, gosx.El("figcaption", nil, renderInline(caption)))
 	}
 	return gosx.El("figure", gosx.Attrs(gosx.Attr("class", "site-figure site-figure--"+size+" site-figure--crop-"+shape)), gosx.Fragment(nodes...)), true
+}
+
+// Text alignment, button looks, and column counts an owner can pick.
+var (
+	textAligns   = map[string]bool{"center": true, "right": true}
+	buttonLooks  = map[string]bool{"primary": true, "ghost": true, "link": true}
+	columnCounts = map[string]bool{"2": true, "3": true}
+)
+
+func alignClass(instance blockstudio.BlockInstance) []any {
+	if align := normalizeChoice(instance.Values["align"].String, "", textAligns); align != "" {
+		return []any{gosx.Attr("class", "site-align-"+align)}
+	}
+	return nil
 }

@@ -263,6 +263,18 @@ details[open] > .site-faq__question::after { content: "–"; }
 .site-video { position: relative; aspect-ratio: 16 / 9; margin: 20px 0 24px; background: var(--site-surface); border-radius: min(var(--site-radius, 2px), 12px); overflow: hidden; }
 .site-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .site-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 0 0 16px; max-width: none; }
+.site-columns--3 { grid-template-columns: 1fr 1fr 1fr; }
+.site-align-center { text-align: center; }
+.site-align-right { text-align: right; }
+.site-button-row { margin: 4px 0 20px; }
+.site-button-row .button { margin: 0; }
+.button--link { background: transparent !important; color: var(--site-accent) !important; padding-left: 0 !important; padding-right: 0 !important; text-decoration: underline !important; text-underline-offset: 3px; }
+.ed-columns:not([data-columns="3"]) .site-columns__col--third { display: none; }
+.ed-columns { position: relative; padding-top: 30px; }
+.ed-columns__count { position: absolute; top: 0; left: 0; margin: 0; }
+.ed-button-row.site-align-center { justify-content: center; }
+.ed-button-row.site-align-right { justify-content: flex-end; }
+.ed-bubble__sep { width: 1px; height: 18px; background: rgba(255,255,255,.3); margin: 0 4px; }
 .site-columns__col { min-width: 0; }
 /* The site is its own container, so phone rules follow the width of the
    site — the real viewport for visitors, the frame inside the editor. */

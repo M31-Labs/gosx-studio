@@ -646,21 +646,24 @@ func normalizeChoice(value, fallback string, allowed map[string]bool) string {
 // sectionOptions is everything a section break carries.
 type sectionOptions struct {
 	Style, Align, Width, Space, Image string
+	// Anchor is the name a link can jump to: /#pricing.
+	Anchor string
 }
 
 func sectionOptionsOf(instance blockstudio.BlockInstance) sectionOptions {
 	get := func(key string) string { return instance.Values[key].String }
 	return sectionOptions{
-		Style: normalizeSectionStyle(get("style")),
-		Align: normalizeChoice(get("align"), "left", sectionAligns),
-		Width: normalizeChoice(get("width"), "normal", sectionWidths),
-		Space: normalizeChoice(get("space"), "normal", sectionSpaces),
-		Image: strings.TrimSpace(get("image")),
+		Style:  normalizeSectionStyle(get("style")),
+		Align:  normalizeChoice(get("align"), "left", sectionAligns),
+		Width:  normalizeChoice(get("width"), "normal", sectionWidths),
+		Space:  normalizeChoice(get("space"), "normal", sectionSpaces),
+		Image:  strings.TrimSpace(get("image")),
+		Anchor: normalizeSlug(get("anchor")),
 	}
 }
 
 func (o sectionOptions) values() blockstudio.Values {
-	return values("style", o.Style, "align", o.Align, "width", o.Width, "space", o.Space, "image", o.Image)
+	return values("style", o.Style, "align", o.Align, "width", o.Width, "space", o.Space, "image", o.Image, "anchor", o.Anchor)
 }
 
 // classes are what the public page hangs its CSS on.
@@ -709,6 +712,9 @@ func renderSectionBar(o sectionOptions) gosx.Node {
 		choice("data-section-align", "Text", o.Align, [][2]string{{"left", "Left"}, {"center", "Centred"}}),
 		choice("data-section-width", "Width", o.Width, [][2]string{{"narrow", "Narrow"}, {"normal", "Normal"}, {"wide", "Wide"}, {"full", "Edge to edge"}}),
 		choice("data-section-space", "Space", o.Space, [][2]string{{"compact", "Compact"}, {"normal", "Normal"}, {"roomy", "Roomy"}}),
+		gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-section-bar__style")),
+			gosx.El("span", nil, gosx.Text("Jump-to name")),
+			gosx.El("input", gosx.Attrs(gosx.Attr("class", "ed-inline-input"), gosx.Attr("type", "text"), gosx.Attr("data-section-anchor", "true"), gosx.Attr("value", o.Anchor), gosx.Attr("placeholder", "pricing"), gosx.Attr("aria-label", "Jump-to name"), gosx.Attr("title", "Buttons can then link to #pricing")))),
 		picture,
 	)
 }
@@ -730,6 +736,10 @@ func (h *Host) handleBlockFresh(w http.ResponseWriter, r *http.Request) {
 		inner = renderSectionBar(sectionOptions{Style: "plain", Align: "left", Width: "normal", Space: "normal"})
 	case kind == "image":
 		inner = h.renderBlockInner("image", blockstudio.BlockInstance{Key: "image", Values: blockstudio.Values{}})
+	case kind == "button":
+		inner = h.renderBlockInner("button", blockstudio.BlockInstance{Key: "button", Values: values("label", "Get in touch", "href", "/contact", "look", "primary")})
+	case kind == "columns":
+		inner = h.renderBlockInner("columns", blockstudio.BlockInstance{Key: "columns", Values: blockstudio.Values{}})
 	default:
 		spec, ok := compositeByKey(kind)
 		if !ok {

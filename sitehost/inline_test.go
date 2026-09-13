@@ -171,7 +171,7 @@ func TestGalleryVideoAndColumnsRoundTrip(t *testing.T) {
 	if strings.Contains(live, "not-a-video") {
 		t.Fatal("a non-video link must not render an embed")
 	}
-	mustContain(t, live, `<div class="site-columns"><div class="site-columns__col"><strong>Left</strong> side</div><div class="site-columns__col">Right side</div></div>`, "columns render side by side with formatting")
+	mustContain(t, live, `<div class="site-columns site-columns--2"><div class="site-columns__col"><strong>Left</strong> side</div><div class="site-columns__col">Right side</div></div>`, "columns render side by side with formatting")
 	csp := get(t, handler, "/menu").Header().Get("Content-Security-Policy")
 	mustContain(t, csp, "frame-src https://www.youtube-nocookie.com https://player.vimeo.com", "the policy lets the players load")
 }
