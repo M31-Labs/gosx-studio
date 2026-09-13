@@ -51,17 +51,11 @@ func run() error {
 		domain   = flag.String("domain", env("GOSX_SITE_DOMAIN", ""), "the owner's domain as connected by the platform")
 		opToken  = flag.String("operator-token", env("GOSX_SITE_OPERATOR_TOKEN", ""), "token the platform uses for /platform/status and /platform/export.zip")
 		agentKey = flag.String("agent-key", env("GOSX_SITE_AGENT_KEY", ""), "pre-provisioned agent key(s), comma-separated, so an agent can build the site before anyone signs in")
-		assist   = flag.String("assistant", env("GOSX_SITE_ASSISTANT", ""), "the in-editor assistant: anthropic://KEY?model=claude-sonnet-5")
 	)
 	if len(os.Args) > 1 && os.Args[1] == "mcp" {
 		return runMCP(os.Args[2:])
 	}
 	flag.Parse()
-	if *assist != "" {
-		if _, err := sitehost.ParseAssistantURL(*assist); err != nil {
-			return fmt.Errorf("-assistant: %w", err)
-		}
-	}
 
 	if *https && *addr == "127.0.0.1:8080" {
 		*addr = ":443"
@@ -106,7 +100,6 @@ func run() error {
 		Domain:          *domain,
 		OperatorToken:   *opToken,
 		AgentKeys:       splitList(*agentKey),
-		AssistantURL:    *assist,
 	})
 	if err != nil {
 		return err

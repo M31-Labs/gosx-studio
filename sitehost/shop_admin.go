@@ -81,7 +81,7 @@ func (h *Host) renderAdminShop(w http.ResponseWriter, status adminStatus) {
 
 	create := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
 		gosx.El("h2", nil, gosx.Text("Add a product")),
-		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/shop")),
+		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/shop"), gosx.Attr("toolname", "create_product_form"), gosx.Attr("tooldescription", "Add a product to the shop with a name and a price.")),
 			h.csrfField(),
 			adminTextField("name", "Name", "", "What it's called on the shelf."),
 			adminTextField("price", "Price", "", "In "+strings.ToUpper(currency)+", such as 12.50. Change the currency under Settings."),

@@ -32,7 +32,7 @@ func TestOwnersGiveAnyBlockMoreOrLessRoom(t *testing.T) {
 		t.Fatal("an unknown spacing must not reach the page")
 	}
 	editor := get(t, handler, "/admin/edit/"+id).Body.String()
-	mustContain(t, editor, `class="ed-block site-space--roomy" data-block="heading" data-index="1" tabindex="0" data-spacing="roomy"`, "the canvas carries the spacing")
+	mustContain(t, editor, `class="ed-block site-space--roomy" data-block="heading" data-label="Heading" data-index="1" tabindex="0" data-spacing="roomy"`, "the canvas carries the spacing")
 	mustContain(t, editor, `<select class="ed-tool ed-tool--select" data-tool-spacing="true"`, "every block has the spacing tool")
 	mustContain(t, editor, `<option value="roomy" selected="selected">Roomy</option>`, "the tool shows the current choice")
 	css := get(t, handler, publicStylesheetPath).Body.String()

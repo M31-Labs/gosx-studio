@@ -31,6 +31,35 @@ func (h *Host) mountEditor(mux *http.ServeMux) {
 	mux.HandleFunc("POST /admin/api/theme", h.handleThemeSave)
 	h.mountBlocks(mux)
 	mux.Handle("GET "+editorScriptPath, editorScriptHandler())
+	mux.Handle("GET "+webMCPScriptPath, webMCPScriptHandler())
+	mux.HandleFunc("GET /admin/preview/{id}", h.handleDraftPreview)
+	mux.HandleFunc("GET /admin/preview/post/{id}", h.handleDraftPostPreview)
+}
+
+// handleDraftPreview shows a page's saved draft exactly as visitors will
+// see it once published, with a way back to the editor.
+func (h *Host) handleDraftPreview(w http.ResponseWriter, r *http.Request) {
+	page, ok, err := h.store.PageByID(r.PathValue("id"))
+	if err != nil || !ok {
+		h.writeAdminNotFound(w, "page")
+		return
+	}
+	view := h.draftView()
+	view.previewBack = "/admin/edit/" + page.ID
+	view.servePublicSlug(w, r, page.Slug)
+}
+
+func (h *Host) handleDraftPostPreview(w http.ResponseWriter, r *http.Request) {
+	post, ok, err := h.store.PostByID(r.PathValue("id"))
+	if err != nil || !ok {
+		h.writeAdminNotFound(w, "post")
+		return
+	}
+	view := h.draftView()
+	view.previewBack = "/admin/edit/post/" + post.ID
+	clone := r.Clone(r.Context())
+	clone.SetPathValue("slug", post.Slug)
+	view.handleBlogPost(w, clone)
 }
 
 // ---------- the editor shell ----------
@@ -121,15 +150,22 @@ func (h *Host) renderEditor(w http.ResponseWriter, subject editorSubject) {
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-body")),
 			h.renderEditorSidebar(subject),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-stage")),
+				renderCoach(),
 				gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-frame"), gosx.Attr("data-frame", "true")),
 					h.renderEditableCanvas(settings, subject),
 				),
 			),
 		),
+		gosx.El("button", gosx.Attrs(gosx.Attr("class", "ed-fab"), gosx.Attr("type", "button"), gosx.Attr("data-side-toggle", "true"), gosx.Attr("aria-expanded", "false"), gosx.Attr("aria-controls", "ed-side")), gosx.Text("+ Add")),
+		renderPalette(),
+		renderShortcuts(),
 		renderInsertMenu(),
+		h.renderLinkList(),
+		gosx.El("script", gosx.Attrs(gosx.Attr("type", "application/json"), gosx.Attr("data-pages", "true")), gosx.RawHTML(h.pagesJSON())),
 		gosx.El("script", gosx.Attrs(gosx.Attr("type", "application/json"), gosx.Attr("data-forms-presets", "true")), gosx.RawHTML(h.formPresetsJSON())),
 		gosx.El("script", gosx.Attrs(gosx.Attr("type", "application/json"), gosx.Attr("data-products-presets", "true")), gosx.RawHTML(h.productPresetsJSON())),
 		gosx.El("script", gosx.Attrs(gosx.Attr("src", editorScriptPath), gosx.Attr("defer", "defer"))),
+		webMCPScript(),
 	)
 
 	meta := h.adminMeta("Editing " + subject.Title)
@@ -149,6 +185,8 @@ func (h *Host) renderEditorToolbar(subject editorSubject) gosx.Node {
 				gosx.Text(subject.BackLabel)),
 			gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-page-name")), gosx.Text(subject.Title)),
 			gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-chip"), gosx.Attr("data-live", boolAttr(live))), gosx.Text(statusText)),
+			gosx.El("button", gosx.Attrs(gosx.Attr("class", "ed-palette-btn"), gosx.Attr("type", "button"), gosx.Attr("data-palette-open", "true"), gosx.Attr("title", "Do anything: add a section, publish, switch page (Ctrl+K)")),
+				gosx.El("span", nil, gosx.Text("Do anything…")), gosx.El("kbd", nil, gosx.Text("Ctrl K"))),
 		),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-bar__right")),
 			renderPeople(),
@@ -181,10 +219,26 @@ func (h *Host) renderEditorToolbar(subject editorSubject) gosx.Node {
 			), gosx.Text("History")),
 			gosx.El("a", gosx.Attrs(
 				gosx.Attr("class", "ed-btn ed-btn--ghost"),
+				gosx.Attr("href", previewHref(subject.Kind, subject.ID)),
+				gosx.Attr("target", "_blank"),
+				gosx.Attr("rel", "noopener"),
+				gosx.Attr("data-preview-draft", "true"),
+				gosx.Attr("title", "See this draft exactly as visitors will, before you publish"),
+			), gosx.Text("Preview")),
+			gosx.El("a", gosx.Attrs(
+				gosx.Attr("class", "ed-btn ed-btn--ghost"),
 				gosx.Attr("href", subject.ViewHref),
 				gosx.Attr("target", "_blank"),
 				gosx.Attr("rel", "noopener"),
-			), gosx.Text("View")),
+				gosx.Attr("title", "Open what visitors see right now"),
+			), gosx.Text("View live")),
+			gosx.El("button", gosx.Attrs(
+				gosx.Attr("class", "ed-btn ed-btn--ghost ed-btn--icon"),
+				gosx.Attr("type", "button"),
+				gosx.Attr("data-shortcuts-open", "true"),
+				gosx.Attr("title", "Keyboard shortcuts (?)"),
+				gosx.Attr("aria-label", "Keyboard shortcuts"),
+			), gosx.Text("?")),
 			gosx.El("button", gosx.Attrs(
 				gosx.Attr("class", "ed-btn ed-btn--primary"),
 				gosx.Attr("type", "button"),
@@ -233,6 +287,138 @@ func renderSectionAdds() gosx.Node {
 	return gosx.Fragment(nodes...)
 }
 
+func previewHref(kind, id string) string {
+	if kind == "post" {
+		return "/admin/preview/post/" + id
+	}
+	return "/admin/preview/" + id
+}
+
+// renderPalette is the "do anything" box: one place to add a section,
+// publish, switch page, or reach any control, by typing a few letters.
+func renderPalette() gosx.Node {
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-palette"), gosx.Attr("data-palette", "true"), gosx.Attr("hidden", "hidden"), gosx.Attr("role", "dialog"), gosx.Attr("aria-modal", "true"), gosx.Attr("aria-label", "Do anything")),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-palette__box")),
+			gosx.El("input", gosx.Attrs(gosx.Attr("class", "ed-palette__input"), gosx.Attr("type", "text"), gosx.Attr("data-palette-input", "true"), gosx.Attr("placeholder", "Type what you want: pricing, publish, about page…"), gosx.Attr("role", "combobox"), gosx.Attr("aria-expanded", "true"), gosx.Attr("aria-controls", "ed-palette-list"), gosx.Attr("aria-autocomplete", "list"), gosx.Attr("autocomplete", "off"), gosx.Attr("spellcheck", "false"))),
+			gosx.El("ul", gosx.Attrs(gosx.Attr("class", "ed-palette__list"), gosx.Attr("id", "ed-palette-list"), gosx.Attr("role", "listbox"), gosx.Attr("data-palette-list", "true"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-palette__hint")), gosx.Text("↑ ↓ to choose · Enter to do it · Esc to close"))))
+}
+
+// renderShortcuts is the keyboard sheet.
+func renderShortcuts() gosx.Node {
+	row := func(keys, what string) gosx.Node {
+		parts := make([]gosx.Node, 0, 3)
+		for i, key := range strings.Split(keys, " ") {
+			if i > 0 {
+				parts = append(parts, gosx.Text(" "))
+			}
+			parts = append(parts, gosx.El("kbd", nil, gosx.Text(key)))
+		}
+		return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-keys__row")), gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-keys__keys")), gosx.Fragment(parts...)), gosx.El("span", nil, gosx.Text(what)))
+	}
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-keys"), gosx.Attr("data-shortcuts", "true"), gosx.Attr("hidden", "hidden"), gosx.Attr("role", "dialog"), gosx.Attr("aria-modal", "true"), gosx.Attr("aria-label", "Keyboard shortcuts")),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-keys__box")),
+			gosx.El("h2", nil, gosx.Text("Keyboard shortcuts")),
+			row("Ctrl+K", "Do anything: add, publish, switch page"),
+			row("Ctrl+S", "Save now"),
+			row("Ctrl+Shift+P", "Publish"),
+			row("Ctrl+Z / Ctrl+Y", "Undo / redo"),
+			row("Ctrl+B / Ctrl+I", "Bold / italic in text"),
+			row("Enter", "New paragraph after this one"),
+			row("Alt+↑ / Alt+↓", "Move the section you're in up or down"),
+			row("Esc", "Step out of the text to the section; Esc again clears"),
+			row("Delete", "Remove the selected section (Undo brings it back)"),
+			row("?", "This sheet"),
+			gosx.El("button", gosx.Attrs(gosx.Attr("class", "ed-keys__close"), gosx.Attr("type", "button"), gosx.Attr("data-shortcuts-close", "true")), gosx.Text("Close"))))
+}
+
+// renderCoach is the three tips a first-time owner sees above the page.
+func renderCoach() gosx.Node {
+	tip := func(glyph, text string) gosx.Node {
+		return gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-coach__tip")), gosx.El("b", nil, gosx.Text(glyph)), gosx.Text(" "+text))
+	}
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-coach"), gosx.Attr("data-coach", "true"), gosx.Attr("hidden", "hidden"), gosx.Attr("role", "note")),
+		tip("✎", "Click any text to change it."),
+		tip("⠿", "Hover a section for its tools; drag ⠿ to move it."),
+		tip("Ctrl K", "Type what you want, from adding a section to publishing."),
+		gosx.El("button", gosx.Attrs(gosx.Attr("class", "ed-coach__dismiss"), gosx.Attr("type", "button"), gosx.Attr("data-coach-dismiss", "true")), gosx.Text("Got it")))
+}
+
+// renderEmptyState invites the first section on a page with none.
+func renderEmptyState(noun string) gosx.Node {
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-empty"), gosx.Attr("data-empty", "true"), gosx.Attr("hidden", "hidden"), gosx.Attr("contenteditable", "false")),
+		gosx.El("p", nil, gosx.Text("This "+noun+" is empty.")),
+		gosx.El("button", gosx.Attrs(gosx.Attr("class", "ed-btn ed-btn--primary"), gosx.Attr("type", "button"), gosx.Attr("data-palette-open", "true")), gosx.Text("Add your first section")),
+		gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-hint")), gosx.Text("or pick one from the list on the left")))
+}
+
+// renderLinkList lists every address on the site, so a link field offers
+// them as you type instead of asking you to remember.
+func (h *Host) renderLinkList() gosx.Node {
+	options := []gosx.Node{}
+	add := func(value, label string) {
+		options = append(options, gosx.El("option", gosx.Attrs(gosx.Attr("value", value), gosx.Attr("label", label))))
+	}
+	if pages, err := h.store.ListPages(cmsstore.PageFilter{}); err == nil {
+		for _, page := range pages {
+			add(publicPath(page.Slug), page.Title)
+		}
+	}
+	if h.featureOn(FeatureBlog) {
+		add(blogPath, "Blog")
+		for i, post := range h.livePosts() {
+			if i >= 20 {
+				break
+			}
+			add(postPath(post.Slug), post.Title)
+		}
+	}
+	if h.featureOn(FeatureShop) && len(h.products.list()) > 0 {
+		add(shopPath, "Shop")
+		for i, product := range h.products.list() {
+			if i >= 30 {
+				break
+			}
+			add(shopPath+"/"+product.Slug, product.Name)
+		}
+	}
+	if email := strings.TrimSpace(h.settings().Metadata["contactEmail"]); email != "" {
+		add("mailto:"+email, "Email us")
+	}
+	if phone := strings.TrimSpace(h.settings().Metadata["contactPhone"]); phone != "" {
+		add("tel:"+strings.ReplaceAll(phone, " ", ""), "Call us")
+	}
+	return gosx.El("datalist", gosx.Attrs(gosx.Attr("id", "site-links")), gosx.Fragment(options...))
+}
+
+// pagesJSON lists the pages for the palette's "go to" commands.
+func (h *Host) pagesJSON() string {
+	type row struct {
+		ID    string `json:"id"`
+		Title string `json:"title"`
+		Href  string `json:"href"`
+		Kind  string `json:"kind"`
+	}
+	rows := []row{}
+	if pages, err := h.store.ListPages(cmsstore.PageFilter{}); err == nil {
+		for _, page := range pages {
+			rows = append(rows, row{ID: page.ID, Title: page.Title, Href: "/admin/edit/" + page.ID, Kind: "page"})
+		}
+	}
+	if h.featureOn(FeatureBlog) {
+		if posts, err := h.store.ListPosts(cmsstore.PostFilter{}); err == nil {
+			for i, post := range posts {
+				if i >= 30 {
+					break
+				}
+				rows = append(rows, row{ID: post.ID, Title: post.Title, Href: "/admin/edit/post/" + post.ID, Kind: "post"})
+			}
+		}
+	}
+	raw, _ := json.Marshal(rows)
+	return strings.ReplaceAll(string(raw), "</", "<\\/")
+}
+
 func publishLabel(live bool) string {
 	if live {
 		return "Publish changes"
@@ -252,11 +438,14 @@ func (h *Host) renderEditorSidebar(subject editorSubject) gosx.Node {
 	if subject.CanDesign {
 		lookSection = h.renderLookSection()
 	}
-	return gosx.El("aside", gosx.Attrs(gosx.Attr("class", "ed-side")),
+	return gosx.El("aside", gosx.Attrs(gosx.Attr("class", "ed-side"), gosx.Attr("id", "ed-side")),
+		gosx.El("button", gosx.Attrs(gosx.Attr("class", "ed-side__close"), gosx.Attr("type", "button"), gosx.Attr("data-side-close", "true"), gosx.Attr("aria-label", "Close")), gosx.Text("✕")),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-side__block")),
 			gosx.El("h2", nil, gosx.Text("Add to this "+subject.Noun)),
 			gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-hint")),
 				gosx.Text("Click a section on the "+subject.Noun+" to edit it. Use these to add something new at the end.")),
+			gosx.El("input", gosx.Attrs(gosx.Attr("class", "ed-find"), gosx.Attr("type", "search"), gosx.Attr("data-add-filter", "true"), gosx.Attr("placeholder", "Find a section… pricing, hours, map"), gosx.Attr("aria-label", "Find a section"), gosx.Attr("autocomplete", "off"))),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-hint ed-find__none"), gosx.Attr("data-add-none", "true"), gosx.Attr("hidden", "hidden")), gosx.Text("Nothing matches. Try “pricing”, “questions”, or “map”.")),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-add-grid")), renderSectionAdds()),
 			gosx.El("h3", gosx.Attrs(gosx.Attr("class", "ed-side__sub")), gosx.Text("Or one piece at a time")),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-add-grid")),
@@ -275,7 +464,6 @@ func (h *Host) renderEditorSidebar(subject editorSubject) gosx.Node {
 				addButton("product", "Product", "Something from your shop"),
 			),
 		),
-		h.renderAssistantBox(subject.Kind, subject.ID, nil, false),
 		lookSection,
 		h.renderPresetAdds(),
 		h.renderSubjectFields(subject),
@@ -528,6 +716,7 @@ func (h *Host) renderEditableCanvas(settings cmsstore.SiteSettings, subject edit
 				), gosx.Text(subject.Title)),
 				metaLine,
 				gosx.Fragment(blocks...),
+				renderEmptyState(subject.Noun),
 			),
 		),
 		h.renderSiteFooterIn(settings, brandFromSettings(settings), true),
@@ -565,6 +754,7 @@ func (h *Host) renderEditableBlock(index int, instance blockstudio.BlockInstance
 	attrs := []any{
 		gosx.Attr("class", class),
 		gosx.Attr("data-block", kind),
+		gosx.Attr("data-label", presetKindLabel(kind)),
 		gosx.Attr("data-index", itoa(index)),
 		gosx.Attr("tabindex", "0"),
 	}
@@ -696,6 +886,7 @@ func (h *Host) renderBlockInner(kind string, instance blockstudio.BlockInstance)
 				gosx.Attr("class", "ed-inline-input"),
 				gosx.Attr("type", "text"),
 				gosx.Attr("data-href", "true"),
+				gosx.Attr("list", "site-links"),
 				gosx.Attr("value", instance.Values["href"].String),
 				gosx.Attr("placeholder", "/contact"),
 				gosx.Attr("aria-label", "Where this button goes"),
@@ -982,8 +1173,8 @@ func (h *Host) handleEditorSave(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, h.applyPageSave(r, page, payload))
 }
 
-// applyPageSave is the one save path for a page: the editor, the agent
-// API, and the assistant all go through it.
+// applyPageSave is the one save path for a page: the editor and the agent
+// API both go through it.
 func (h *Host) applyPageSave(r *http.Request, page cmsstore.Page, payload editorSavePayload) editorSaveResult {
 	title := strings.TrimSpace(payload.Title)
 	if title == "" {

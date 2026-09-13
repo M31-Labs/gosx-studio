@@ -7,7 +7,7 @@ import (
 	"m31labs.dev/gosx"
 )
 
-// agent_admin.go is the Agents page: where an admin gives an assistant a
+// agent_admin.go is the Agents page: where an admin gives an agent a
 // key, sees what each key may do, and copies the settings that connect
 // Claude Code, Claude Desktop, or any MCP client to the site.
 
@@ -32,7 +32,7 @@ func (h *Host) handleAdminAgentCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	name := strings.TrimSpace(r.PostFormValue("name"))
 	if name == "" {
-		h.renderAdminAgents(w, r, adminStatus{Message: "Give the key a name, such as the assistant that will use it.", Error: true}, "", "")
+		h.renderAdminAgents(w, r, adminStatus{Message: "Give the key a name, such as the program that will use it.", Error: true}, "", "")
 		return
 	}
 	if len(name) > 60 {
@@ -107,7 +107,7 @@ func (h *Host) renderAdminAgents(w http.ResponseWriter, r *http.Request, status 
 	}
 	var listing gosx.Node
 	if len(rows) == 0 {
-		listing = gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-hint")), gosx.Text("No keys yet. Make one below to let an assistant work on this site."))
+		listing = gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-hint")), gosx.Text("No keys yet. Make one below to let an agent work on this site."))
 	} else {
 		listing = gosx.El("table", gosx.Attrs(gosx.Attr("class", "admin-table")),
 			gosx.El("thead", nil, gosx.El("tr", nil, gosx.El("th", nil, gosx.Text("Key")), gosx.El("th", nil, gosx.Text("May")), gosx.El("th", nil, gosx.Text("State")), gosx.El("th", nil, gosx.Text("")))),
@@ -126,28 +126,29 @@ func (h *Host) renderAdminAgents(w http.ResponseWriter, r *http.Request, status 
 	}
 	create := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
 		gosx.El("h2", nil, gosx.Text("Make a key")),
-		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", agentsAdminPath), gosx.Attr("class", "admin-form")),
+		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", agentsAdminPath), gosx.Attr("class", "admin-form"), gosx.Attr("toolname", "create_agent_key_form"), gosx.Attr("tooldescription", "Make a new agent key with a name and the scopes it may use.")),
 			h.csrfField(),
 			adminTextField("name", "What will use it", "", "Claude Code on my laptop"),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-field")), gosx.El("span", gosx.Attrs(gosx.Attr("class", "admin-label")), gosx.Text("What it may do")), gosx.Fragment(scopeBoxes...)),
 			gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("type", "submit")), gosx.Text("Create key")),
 		))
 
-	assistantState := "No assistant is connected, so the “Ask your site” box in the editor is off. Start the site with -assistant anthropic://YOUR_KEY (or set GOSX_SITE_ASSISTANT) to turn it on. On a hosted plan the platform does this for you."
-	if h.assistant != nil {
-		assistantState = "The in-editor assistant is on: " + h.assistant.Name() + ". It works as the signed-in person, so editors cannot publish through it and locked sections stay locked."
-	}
 	how := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
 		gosx.El("h2", nil, gosx.Text("How agents see this site")),
 		gosx.El("ul", gosx.Attrs(gosx.Attr("class", "admin-list")),
 			gosx.El("li", nil, gosx.El("strong", nil, gosx.Text("Reading. ")), gosx.Text("Every public page is also Markdown ("), gosx.El("code", nil, gosx.Text("?format=md")), gosx.Text("), and "), gosx.El("a", gosx.Attrs(gosx.Attr("href", llmsPath)), gosx.Text("/llms.txt")), gosx.Text(" describes the whole site. No key needed.")),
 			gosx.El("li", nil, gosx.El("strong", nil, gosx.Text("Editing. ")), gosx.Text("With a key, an agent uses the same operations as the editor: "), gosx.El("a", gosx.Attrs(gosx.Attr("href", agentAPIPrefix+"/openapi.json")), gosx.Text("the API")), gosx.Text(", "), gosx.El("a", gosx.Attrs(gosx.Attr("href", agentAPIPrefix+"/schema")), gosx.Text("the block schema")), gosx.Text(", and MCP at "), gosx.El("code", nil, gosx.Text(base+agentPathPrefix+"/mcp")), gosx.Text(".")),
 			gosx.El("li", nil, gosx.El("strong", nil, gosx.Text("Safety. ")), gosx.Text("Every change is a draft until published, every action is in the audit log under the key's name, and revoking a key stops it at once.")),
-			gosx.El("li", nil, gosx.El("strong", nil, gosx.Text("Assistant. ")), gosx.Text(assistantState)),
+			gosx.El("li", nil, gosx.El("strong", nil, gosx.Text("Your browser. ")), gosx.Text("If your browser has a built-in assistant that speaks WebMCP, it can work this admin and the editor for you: every admin page announces its tools to the browser, and they act as you, with your permissions. No key needed.")),
 		))
+	tools := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel"), gosx.Attr("data-webmcp", "true")),
+		gosx.El("h2", nil, gosx.Text("What your browser's assistant can do here")),
+		gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-hint")), gosx.Text("These tools are announced to the browser on the editor and admin pages (WebMCP). A browser without a built-in assistant ignores them.")),
+		gosx.El("ul", gosx.Attrs(gosx.Attr("class", "admin-list"), gosx.Attr("data-webmcp-tools", "true")),
+			gosx.El("li", gosx.Attrs(gosx.Attr("class", "admin-muted")), gosx.Text("The list appears once the page's script runs."))))
 
 	body := h.renderAdminShell("agents", "Agents",
-		"Let an assistant read and build this site. Keys are like passwords for programs: each has a name, a set of things it may do, and can be revoked.",
-		status, fresh, listing, create, how)
+		"Let agents read and build this site. Keys are like passwords for programs: each has a name, a set of things it may do, and can be revoked.",
+		status, fresh, listing, create, how, tools)
 	h.writeDocument(w, http.StatusOK, h.adminMeta("Agents"), body)
 }

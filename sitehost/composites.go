@@ -315,7 +315,7 @@ func (c canvas) linkNode(class string, label partSpec, labelValue string, link p
 	if c.editable {
 		return gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-link-field")),
 			gosx.El("a", gosx.Attrs(c.attrs(label, gosx.Attr("class", class), gosx.Attr("href", "#"))...), renderInline(labelValue)),
-			gosx.El("input", gosx.Attrs(gosx.Attr("class", "ed-inline-input"), gosx.Attr("type", "text"), gosx.Attr("data-field", link.Key), gosx.Attr("value", href), gosx.Attr("placeholder", "/contact"), gosx.Attr("aria-label", link.Label), gosx.Attr("contenteditable", "false"))))
+			gosx.El("input", gosx.Attrs(gosx.Attr("class", "ed-inline-input"), gosx.Attr("type", "text"), gosx.Attr("data-field", link.Key), gosx.Attr("list", "site-links"), gosx.Attr("value", href), gosx.Attr("placeholder", "/contact"), gosx.Attr("aria-label", link.Label), gosx.Attr("contenteditable", "false"))))
 	}
 	safe := safeLinkHref(href)
 	if labelValue == "" || safe == "" {

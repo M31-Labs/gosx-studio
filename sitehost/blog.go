@@ -693,7 +693,7 @@ func (h *Host) renderAdminPosts(w http.ResponseWriter, status adminStatus) {
 
 	create := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
 		gosx.El("h2", nil, gosx.Text("Write a post")),
-		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/posts")),
+		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/posts"), gosx.Attr("toolname", "create_post_form"), gosx.Attr("tooldescription", "Start a new blog post with a title.")),
 			h.csrfField(),
 			adminTextField("title", "Title", "", "You can change it while you write."),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-actions")),

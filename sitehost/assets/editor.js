@@ -387,10 +387,17 @@
     image: '',
   };
 
+  var BLOCK_LABELS = { heading: "Heading", paragraph: "Text", quote: "Quote", button: "Button", image: "Picture", gallery: "Gallery", video: "Video", columns: "Columns", list: "List", divider: "Divider", section: "Section break", form: "Form", product: "Product" };
+  function labelFor(kind) {
+    var add = root.querySelector('[data-add="' + kind + '"] .ed-add__label');
+    return (add && add.textContent.trim()) || BLOCK_LABELS[kind] || kind;
+  }
+
   function makeBlock(kind) {
     var wrapper = document.createElement("div");
     wrapper.className = "ed-block";
     wrapper.setAttribute("data-block", kind);
+    wrapper.setAttribute("data-label", labelFor(kind));
     wrapper.setAttribute("tabindex", "0");
 
     wrapper.appendChild(makeTools());
@@ -928,6 +935,8 @@
       var insert = nodes[i].querySelector(".ed-insert");
       if (insert) insert.setAttribute("data-insert-at", String(i));
     }
+    var empty = root.querySelector("[data-empty]");
+    if (empty) empty.hidden = nodes.length > 0;
   }
 
   function focusText(blockEl) {
@@ -970,6 +979,7 @@
           var wrapper = document.createElement("div");
           wrapper.className = "ed-block";
           wrapper.setAttribute("data-block", kind);
+          wrapper.setAttribute("data-label", labelFor(kind));
           wrapper.setAttribute("tabindex", "0");
           wrapper.appendChild(makeTools());
           wrapper.appendChild(makeBadge());
@@ -1054,6 +1064,7 @@
         var wrapper = document.createElement("div");
         wrapper.className = "ed-block" + (got.spacing ? " site-space--" + got.spacing : "");
         wrapper.setAttribute("data-block", got.kind);
+        wrapper.setAttribute("data-label", labelFor(got.kind));
         if (got.spacing) wrapper.setAttribute("data-spacing", got.spacing);
         wrapper.setAttribute("tabindex", "0");
         wrapper.appendChild(makeTools());
@@ -1114,67 +1125,295 @@
   root.addEventListener("pointerup", endItemDrag);
   root.addEventListener("pointercancel", endItemDrag);
 
-  /* ---------- the assistant: say it, see it ---------- */
+  /* ---------- do anything: the palette ---------- */
 
-  (function () {
-    var box = root.querySelector("[data-assistant]:not([data-assistant='off'])");
-    if (!box) return;
-    var prompt = box.querySelector("[data-assistant-prompt]");
-    var send = box.querySelector("[data-assistant-send]");
-    var reply = box.querySelector("[data-assistant-reply]");
-    var working = false;
-    function show(text, steps, isError) {
-      reply.innerHTML = "";
-      reply.classList.toggle("ed-assist__reply--error", !!isError);
-      var p = document.createElement("p");
-      p.textContent = text;
-      reply.appendChild(p);
-      if (steps && steps.length) {
-        var list = document.createElement("ul");
-        list.className = "ed-assist__steps";
-        steps.forEach(function (step) { var li = document.createElement("li"); li.textContent = step; list.appendChild(li); });
-        reply.appendChild(list);
+  var palette = root.querySelector("[data-palette]");
+  var paletteInput = palette && palette.querySelector("[data-palette-input]");
+  var paletteList = palette && palette.querySelector("[data-palette-list]");
+  var paletteItems = [];
+  var paletteIndex = 0;
+  var paletteReturnTo = null;
+
+  function pagesForPalette() {
+    var node = root.querySelector("[data-pages]");
+    try { return JSON.parse(node ? node.textContent : "[]") || []; } catch (e) { return []; }
+  }
+
+  function currentBlock() {
+    var active = document.activeElement;
+    var blockEl = active && active.closest ? active.closest(".ed-block") : null;
+    if (blockEl) return blockEl;
+    var nodes = article.querySelectorAll(".ed-block");
+    return nodes.length ? nodes[nodes.length - 1] : null;
+  }
+
+  function buildCommands() {
+    var commands = [];
+    Array.prototype.forEach.call(root.querySelectorAll("[data-add]"), function (button) {
+      var label = button.querySelector(".ed-add__label");
+      var hint = button.querySelector(".ed-add__hint");
+      commands.push({ group: "Add", label: "Add " + (label ? label.textContent.trim() : button.getAttribute("data-add")), hint: hint ? hint.textContent.trim() : "", keys: "add " + button.getAttribute("data-add"), run: function () { addBlock(button.getAttribute("data-add"), null); } });
+    });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-add-preset]"), function (button) {
+      var name = button.querySelector("strong");
+      commands.push({ group: "Presets", label: "Add preset: " + (name ? name.textContent.trim() : "preset"), hint: "A section you saved", keys: "preset", run: function () { button.click(); } });
+    });
+    commands.push({ group: "Page", label: publishBtn ? publishBtn.textContent.trim() : "Publish", hint: "Make the saved draft live", keys: "publish live go", run: function () { if (publishBtn) publishBtn.click(); } });
+    commands.push({ group: "Page", label: "Preview this draft", hint: "Exactly as visitors will see it", keys: "preview draft look", run: function () { var a = root.querySelector("[data-preview-draft]"); if (a) window.open(a.getAttribute("href"), "_blank"); } });
+    commands.push({ group: "Page", label: "Save now", hint: "Ctrl+S", keys: "save", run: function () { if (saveTimer) clearTimeout(saveTimer); save(); } });
+    commands.push({ group: "Page", label: "Undo", hint: "Ctrl+Z", keys: "undo back", run: undo });
+    commands.push({ group: "Page", label: "Redo", hint: "Ctrl+Y", keys: "redo forward", run: redo });
+    commands.push({ group: "Page", label: "See it on a phone", hint: "Narrow preview", keys: "phone mobile preview device", run: function () { var b = root.querySelector('[data-device="phone"]'); if (b) b.click(); } });
+    commands.push({ group: "Page", label: "See it on a computer", hint: "Wide preview", keys: "desktop computer device", run: function () { var b = root.querySelector('[data-device="desktop"]'); if (b) b.click(); } });
+    commands.push({ group: "Page", label: "History", hint: "Every save and publish, with restore", keys: "history versions restore", run: function () { var a = root.querySelector('a[href^="/admin/history"]'); if (a) window.location.href = a.getAttribute("href"); } });
+    commands.push({ group: "Page", label: "Page settings", hint: "Name, address, description, menu", keys: "settings name address slug description seo menu", run: function () { var f = root.querySelector('[data-meta="slug"], input[name="pageSlug"], [data-page-fields]'); openSide(); if (f) { f.scrollIntoView({ block: "center" }); if (f.focus) f.focus(); } } });
+    commands.push({ group: "Look", label: "Change the look", hint: "Colours, fonts, buttons, spacing", keys: "look theme colours colors fonts palette design", run: function () { var s = root.querySelector("#look, [data-look], .ed-look"); openSide(); if (s) s.scrollIntoView({ block: "start" }); } });
+    var here = currentBlock();
+    if (here) {
+      commands.push({ group: "This section", label: "Move this section up", hint: "Alt+↑", keys: "move up", run: function () { moveBlock(here, -1); } });
+      commands.push({ group: "This section", label: "Move this section down", hint: "Alt+↓", keys: "move down", run: function () { moveBlock(here, 1); } });
+      commands.push({ group: "This section", label: "Make a copy of this section", hint: "", keys: "duplicate copy clone", run: function () { var t = here.querySelector('[data-tool="duplicate"]'); if (t) handleTool(t); } });
+      commands.push({ group: "This section", label: "Remove this section", hint: "Undo brings it back", keys: "delete remove", run: function () { snapshot(); removeBlock(here); } });
+    }
+    pagesForPalette().forEach(function (page) {
+      commands.push({ group: "Go to", label: "Edit " + page.title, hint: page.kind === "post" ? "Blog post" : "Page", keys: "go open edit page " + page.title, run: function () { window.location.href = page.href; } });
+    });
+    commands.push({ group: "Help", label: "Keyboard shortcuts", hint: "?", keys: "keys shortcuts help", run: openShortcuts });
+    commands.push({ group: "Help", label: "Back to all pages", hint: "", keys: "pages list back exit", run: function () { var a = root.querySelector(".ed-back"); if (a) window.location.href = a.getAttribute("href"); } });
+    return commands;
+  }
+
+  function scoreCommand(command, query) {
+    if (!query) return 1;
+    var hay = (command.label + " " + command.hint + " " + command.keys).toLowerCase();
+    var words = query.toLowerCase().split(/\s+/).filter(Boolean);
+    var score = 0;
+    for (var i = 0; i < words.length; i++) {
+      var at = hay.indexOf(words[i]);
+      if (at < 0) return 0;
+      score += at === 0 || hay[at - 1] === " " ? 3 : 1;
+      if (command.label.toLowerCase().indexOf(words[i]) === 0) score += 4;
+    }
+    return score;
+  }
+
+  function renderPalette() {
+    if (!paletteList) return;
+    var query = (paletteInput.value || "").trim();
+    var all = buildCommands();
+    var scored = [];
+    for (var i = 0; i < all.length; i++) {
+      var s = scoreCommand(all[i], query);
+      if (s > 0) scored.push({ command: all[i], score: s, order: i });
+    }
+    scored.sort(function (a, b) { return b.score - a.score || a.order - b.order; });
+    paletteItems = scored.slice(0, 14).map(function (entry) { return entry.command; });
+    paletteIndex = 0;
+    paletteList.innerHTML = "";
+    if (!paletteItems.length) {
+      var none = document.createElement("li");
+      none.className = "ed-palette__none";
+      none.textContent = "Nothing matches “" + query + "”. Try a section name, “publish”, or a page.";
+      paletteList.appendChild(none);
+      return;
+    }
+    paletteItems.forEach(function (command, index) {
+      var li = document.createElement("li");
+      li.className = "ed-palette__item" + (index === 0 ? " is-active" : "");
+      li.setAttribute("role", "option");
+      li.setAttribute("aria-selected", index === 0 ? "true" : "false");
+      li.setAttribute("data-palette-index", String(index));
+      li.innerHTML = '<span class="ed-palette__group"></span><span class="ed-palette__label"></span><span class="ed-palette__hint"></span>';
+      li.querySelector(".ed-palette__group").textContent = command.group;
+      li.querySelector(".ed-palette__label").textContent = command.label;
+      li.querySelector(".ed-palette__hint").textContent = command.hint;
+      paletteList.appendChild(li);
+    });
+  }
+
+  function movePaletteSelection(delta) {
+    if (!paletteItems.length) return;
+    paletteIndex = (paletteIndex + delta + paletteItems.length) % paletteItems.length;
+    Array.prototype.forEach.call(paletteList.children, function (li, index) {
+      li.classList.toggle("is-active", index === paletteIndex);
+      li.setAttribute("aria-selected", index === paletteIndex ? "true" : "false");
+    });
+    var active = paletteList.children[paletteIndex];
+    if (active && active.scrollIntoView) active.scrollIntoView({ block: "nearest" });
+  }
+
+  function openPalette(prefill) {
+    if (!palette) return;
+    paletteReturnTo = document.activeElement;
+    palette.hidden = false;
+    paletteInput.value = prefill || "";
+    renderPalette();
+    paletteInput.focus();
+  }
+
+  function closePalette() {
+    if (!palette || palette.hidden) return;
+    palette.hidden = true;
+    if (paletteReturnTo && paletteReturnTo.focus && root.contains(paletteReturnTo)) paletteReturnTo.focus();
+  }
+
+  function runPalette(index) {
+    var command = paletteItems[index];
+    if (!command) return;
+    closePalette();
+    command.run();
+  }
+
+  if (palette) {
+    paletteInput.addEventListener("input", renderPalette);
+    paletteInput.addEventListener("keydown", function (event) {
+      if (event.key === "ArrowDown") { event.preventDefault(); movePaletteSelection(1); }
+      else if (event.key === "ArrowUp") { event.preventDefault(); movePaletteSelection(-1); }
+      else if (event.key === "Enter") { event.preventDefault(); runPalette(paletteIndex); }
+      else if (event.key === "Escape") { event.preventDefault(); closePalette(); }
+    });
+    paletteList.addEventListener("click", function (event) {
+      var item = event.target.closest("[data-palette-index]");
+      if (item) runPalette(parseInt(item.getAttribute("data-palette-index"), 10));
+    });
+    palette.addEventListener("click", function (event) { if (event.target === palette) closePalette(); });
+  }
+
+  /* ---------- keyboard: move, remove, step out, and the sheet ---------- */
+
+  var sheet = root.querySelector("[data-shortcuts]");
+  function openShortcuts() { if (sheet) { sheet.hidden = false; var c = sheet.querySelector("[data-shortcuts-close]"); if (c) c.focus(); } }
+  function closeShortcuts() { if (sheet) sheet.hidden = true; }
+  if (sheet) sheet.addEventListener("click", function (event) { if (event.target === sheet || event.target.closest("[data-shortcuts-close]")) closeShortcuts(); });
+
+  function moveBlock(blockEl, delta) {
+    if (!blockEl) return;
+    var sibling = delta < 0 ? blockEl.previousElementSibling : blockEl.nextElementSibling;
+    if (!sibling || !sibling.classList.contains("ed-block")) return;
+    snapshot();
+    if (delta < 0) article.insertBefore(blockEl, sibling); else article.insertBefore(sibling, blockEl);
+    reindex();
+    blockEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    queueSave();
+  }
+
+  function inTextField(target) {
+    return !!(target && target.closest && (target.closest("[data-text]") || target.closest("input, textarea, select, [contenteditable='true']")));
+  }
+
+  document.addEventListener("keydown", function (event) {
+    var key = event.key;
+    var mod = event.metaKey || event.ctrlKey;
+    if (mod && key.toLowerCase() === "k") { event.preventDefault(); if (palette && !palette.hidden) closePalette(); else openPalette(""); return; }
+    if (mod && event.shiftKey && key.toLowerCase() === "p") { event.preventDefault(); if (publishBtn) publishBtn.click(); return; }
+    if (palette && !palette.hidden) return;
+    if (key === "Escape") {
+      if (sheet && !sheet.hidden) { closeShortcuts(); return; }
+      if (inTextField(event.target)) {
+        var blockEl = event.target.closest(".ed-block");
+        if (blockEl) { event.preventDefault(); blockEl.focus(); }
       }
+      return;
     }
-    function ask() {
-      if (working) return;
-      var text = (prompt.value || "").trim();
-      if (!text) { prompt.focus(); return; }
-      working = true;
-      send.disabled = true;
-      box.classList.add("ed-assist--working");
-      show("Working on it…", [], false);
-      status("dirty", "The assistant is working…");
-      fetch("/admin/api/assistant", {
-        method: "POST", credentials: "same-origin",
-        headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF },
-        body: JSON.stringify({ kind: box.getAttribute("data-assistant"), id: box.getAttribute("data-assistant-id") || "", prompt: text }),
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (result) {
-          show(result.ok ? result.reply : (result.message || "That didn't work."), result.steps || [], !result.ok);
-          if (result.changed) {
-            prompt.value = "";
-            refreshCanvas();
-            status("saved", "The assistant changed this page — undo from History if you like");
-          } else {
-            status("saved", "All changes saved");
-          }
-        })
-        .catch(function () { show("Couldn't reach the server. Try again.", [], true); status("error", "Couldn't reach the server."); })
-        .then(function () { working = false; send.disabled = false; box.classList.remove("ed-assist--working"); });
+    if (key === "?" && !inTextField(event.target)) { event.preventDefault(); openShortcuts(); return; }
+    if (event.altKey && (key === "ArrowUp" || key === "ArrowDown")) {
+      var here = event.target.closest && event.target.closest(".ed-block");
+      if (here) { event.preventDefault(); moveBlock(here, key === "ArrowUp" ? -1 : 1); }
+      return;
     }
-    send.addEventListener("click", ask);
-    prompt.addEventListener("keydown", function (event) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); ask(); }
+    if ((key === "Delete" || key === "Backspace") && event.target.classList && event.target.classList.contains("ed-block")) {
+      event.preventDefault();
+      snapshot();
+      removeBlock(event.target);
+    }
+  });
+
+  root.addEventListener("click", function (event) {
+    if (event.target.closest("[data-palette-open]")) { event.preventDefault(); openPalette(""); }
+    if (event.target.closest("[data-shortcuts-open]")) { event.preventDefault(); openShortcuts(); }
+  });
+
+  /* ---------- first-run tips ---------- */
+
+  var coach = root.querySelector("[data-coach]");
+  if (coach) {
+    var seen = false;
+    try { seen = localStorage.getItem("gosx.editor.coach") === "done"; } catch (e) {}
+    coach.hidden = seen;
+    coach.addEventListener("click", function (event) {
+      if (!event.target.closest("[data-coach-dismiss]")) return;
+      coach.hidden = true;
+      try { localStorage.setItem("gosx.editor.coach", "done"); } catch (e) {}
     });
-    box.addEventListener("click", function (event) {
-      var chip = event.target.closest("[data-assistant-example]");
-      if (!chip) return;
-      prompt.value = chip.getAttribute("data-assistant-example");
-      prompt.focus();
+  }
+
+  /* ---------- find a section ---------- */
+
+  var finder = root.querySelector("[data-add-filter]");
+  if (finder) {
+    var noneNote = root.querySelector("[data-add-none]");
+    function applyFilter() {
+      var query = finder.value.trim().toLowerCase();
+      var shown = 0;
+      Array.prototype.forEach.call(root.querySelectorAll(".ed-side [data-add]"), function (button) {
+        var hit = !query || button.textContent.toLowerCase().indexOf(query) >= 0 || button.getAttribute("data-add").indexOf(query) >= 0;
+        button.hidden = !hit;
+        if (hit) shown++;
+      });
+      Array.prototype.forEach.call(root.querySelectorAll(".ed-side .ed-side__sub"), function (heading) { heading.hidden = !!query; });
+      if (noneNote) noneNote.hidden = shown > 0;
+    }
+    finder.addEventListener("input", applyFilter);
+    finder.addEventListener("keydown", function (event) {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      var first = root.querySelector(".ed-side [data-add]:not([hidden])");
+      if (first) { addBlock(first.getAttribute("data-add"), null); finder.value = ""; applyFilter(); }
     });
-  })();
+  }
+
+  /* ---------- the sidebar as a drawer on small screens ---------- */
+
+  var side = root.querySelector("#ed-side");
+  var fab = root.querySelector("[data-side-toggle]");
+  function openSide() { if (side) { side.classList.add("is-open"); if (fab) fab.setAttribute("aria-expanded", "true"); } }
+  function closeSide() { if (side) { side.classList.remove("is-open"); if (fab) fab.setAttribute("aria-expanded", "false"); } }
+  if (fab) fab.addEventListener("click", function () { if (side.classList.contains("is-open")) closeSide(); else { openSide(); var f = root.querySelector("[data-add-filter]"); if (f) f.focus(); } });
+  root.addEventListener("click", function (event) {
+    if (event.target.closest("[data-side-close]")) closeSide();
+    if (event.target.closest(".ed-side [data-add]") && window.matchMedia("(max-width: 820px)").matches) closeSide();
+  });
+
+  /* ---------- what the page exposes to its own scripts (WebMCP) ---------- */
+
+  /* flushSave settles any save that is queued or in flight, so a change
+     made from outside the canvas (the browser's own assistant) cannot be
+     overwritten by an older autosave a moment later. */
+  function flushSave() {
+    return new Promise(function (resolve) {
+      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; save(); }
+      var tries = 0;
+      (function check() {
+        if ((!saving && !pending && !saveTimer) || tries++ > 200) resolve();
+        else setTimeout(check, 50);
+      })();
+    });
+  }
+
+  window.gosxEditor = {
+    clientId: clientId,
+    flush: flushSave,
+    refresh: function () {
+      /* The person asked their browser for this change, so show it even if
+         their cursor was in the page a moment ago. */
+      var active = document.activeElement;
+      if (active && article.contains(active) && active.blur) active.blur();
+      refreshCanvas();
+    },
+    addBlock: addBlock, undo: undo, redo: redo, save: save,
+    publish: function () { if (publishBtn) publishBtn.click(); },
+    openPalette: openPalette,
+  };
 
   /* ---------- interactions ---------- */
 
@@ -1299,9 +1538,8 @@
     snapshot();
 
     if (action === "delete") {
-      var next = blockEl.nextElementSibling || blockEl.previousElementSibling;
-      blockEl.remove();
-      if (next && next.classList.contains("ed-block")) focusText(next);
+      removeBlock(blockEl);
+      return;
     } else if (action === "up") {
       var prev = blockEl.previousElementSibling;
       if (prev && prev.classList.contains("ed-block")) article.insertBefore(blockEl, prev);
@@ -1949,7 +2187,7 @@
     return saving;
   }
 
-  function toast(text) {
+  function toast(text, actionLabel, action) {
     var node = root.querySelector(".ed-toast");
     if (!node) {
       node = document.createElement("div");
@@ -1958,9 +2196,28 @@
       root.appendChild(node);
     }
     node.textContent = text;
+    if (actionLabel && action) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "ed-toast__action";
+      button.textContent = actionLabel;
+      button.addEventListener("click", function () { node.hidden = true; action(); });
+      node.appendChild(button);
+    }
     node.hidden = false;
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { node.hidden = true; }, 7000);
+  }
+
+  /* Removing a section never asks "are you sure": it just offers Undo. */
+  function removeBlock(blockEl) {
+    var label = blockEl.getAttribute("data-label") || "Section";
+    var next = blockEl.nextElementSibling || blockEl.previousElementSibling;
+    blockEl.remove();
+    reindex();
+    if (next && next.classList.contains("ed-block")) next.focus();
+    queueSave();
+    toast(label + " removed", "Undo", function () { undo(); });
   }
 
   function initials(name) {

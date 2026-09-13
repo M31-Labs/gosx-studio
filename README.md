@@ -176,7 +176,7 @@ canvas; imports and anything that isn't plain CSS are stripped.
 
 ### Agents: the site is a set of tools
 
-Everything the editor can do, an assistant can do too. The site is agent-native in four ways.
+Everything the editor can do, an agent can do too. The site is agent-native in four ways.
 
 **Reading.** Every public page is also Markdown: add `?format=md` or send `Accept: text/markdown`. `/llms.txt` describes the site (pages, contact, shop) and `/llms-full.txt` carries every page as one Markdown file. No key is needed.
 
@@ -190,7 +190,23 @@ Pages are lists of blocks in the shape the editor uses. `PATCH /agent/v1/pages/{
 
 **Building from nothing.** A platform can pass `-agent-key gsk_…` (or `GOSX_SITE_AGENT_KEY`) so an agent can call `POST /agent/v1/setup` and build the whole site before anyone signs in.
 
-**The owner's assistant.** Start the site with `-assistant anthropic://YOUR_KEY` (or `GOSX_SITE_ASSISTANT`; add `?model=` to pick a model) and every page gets an **Ask your site** box: "Add a pricing section with three plans", "Rewrite the intro so it sounds warmer". The dashboard gets one for the whole site: "We're a family bakery in Oakland; write the home page". The assistant works as the signed-in person with the same tools, so editors cannot publish through it and locked sections stay locked. Changes are drafts and show up on the canvas at once; undo them from History. `-assistant echo://` turns the box on without a model, for trying it out.
+**Your browser's assistant (WebMCP).** The editor and every admin page announce their tools to the browser through WebMCP. A browser with a built-in assistant can then work the editor for you: "add a pricing section with three plans", "publish this page", "make the look warmer". The tools act as you, with your permissions, and every change is a draft you can undo from History. Browsers without an assistant ignore them.
+
+## Getting around the editor
+
+**Do anything.** Press **Ctrl+K** (or click the box at the top) and type what you want: "pricing" adds a pricing section, "publish" publishes, "visit" opens the Visit page, "look" jumps to colours and fonts. Arrow keys choose, Enter does it.
+
+**Find a section.** The sidebar has a search box; type "hours" or "map" and press Enter to add the first match.
+
+**Keyboard.** Press **?** for the sheet. Alt+↑ and Alt+↓ move the section you're in. Delete removes the selected section and offers Undo instead of asking "are you sure". Esc steps out of the text to the section. Ctrl+S saves now, Ctrl+Shift+P publishes.
+
+**Know where you are.** Hover any section and its name shows at the top left: Hero, Pricing, Text. Every link field offers the site's own pages as you type.
+
+**Preview before you publish.** The Preview button opens your draft exactly as visitors will see it, with a banner and a way back. View live opens what they see right now.
+
+**On a phone.** The editor fits a phone: the sidebar becomes a drawer behind the + Add button, and every tool works with a thumb.
+
+**First time.** Three tips sit above the page until you say Got it.
 
 ## Rearranging, spacing, and presets
 

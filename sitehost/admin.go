@@ -138,16 +138,13 @@ func (h *Host) renderAdminShell(active, heading, lede string, status adminStatus
 		),
 		gosx.El("main", gosx.Attrs(gosx.Attr("class", "admin-main"), gosx.Attr("id", "main")),
 			gosx.Fragment(body...)),
+		webMCPScript(),
 	)
 }
 
 // ---------- dashboard ----------
 
 func (h *Host) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
-	h.renderDashboard(w, r, nil)
-}
-
-func (h *Host) renderDashboard(w http.ResponseWriter, r *http.Request, outcome *assistantOutcome) {
 	pages, _ := h.store.ListPages(cmsstore.PageFilter{})
 	published, drafts := 0, 0
 	for _, page := range pages {
@@ -184,13 +181,9 @@ func (h *Host) renderDashboard(w http.ResponseWriter, r *http.Request, outcome *
 		),
 	)
 
-	var ask gosx.Node = gosx.Fragment()
-	if h.assistant != nil {
-		ask = h.renderAssistantBox("site", "", outcome, true)
-	}
 	body := h.renderAdminShell("dashboard", "Your site",
 		"Everything you publish here appears on your public website.",
-		adminStatus{}, stats, ask, next)
+		adminStatus{}, stats, next)
 	h.writeDocument(w, http.StatusOK, h.adminMeta("Your site"), body)
 }
 
@@ -276,7 +269,7 @@ func (h *Host) renderAdminPages(w http.ResponseWriter, r *http.Request, status a
 
 	create := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
 		gosx.El("h2", nil, gosx.Text("Add a page")),
-		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/pages")),
+		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/pages"), gosx.Attr("toolname", "create_page_form"), gosx.Attr("tooldescription", "Add a new page to the site by name, address, and layout.")),
 			h.csrfField(),
 			adminTextField("title", "Page name", "", "Shown as the heading and in your site menu."),
 			adminTextField("slug", "Web address", "", "Letters and dashes only. \"about-us\" becomes yoursite.com/about-us."),
@@ -514,7 +507,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 	}
 	form := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
 		gosx.El("h2", nil, gosx.Text("Site details")),
-		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/settings"), gosx.Attr("enctype", "multipart/form-data")),
+		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/settings"), gosx.Attr("enctype", "multipart/form-data"), gosx.Attr("toolname", "site_settings_form"), gosx.Attr("tooldescription", "Change the site's name, description, contact details, header, footer, and social links.")),
 			h.csrfField(),
 			adminTextField("title", "Site name", settings.Title, "Shown in the browser tab, your site menu, and search results."),
 			adminTextField("description", "Site description", settings.Description,

@@ -99,11 +99,6 @@ type Options struct {
 	// AgentKeys are bearer tokens the platform pre-provisions so an agent
 	// can build the site from nothing, before an owner ever signs in.
 	AgentKeys []string
-	// AssistantURL configures the in-editor assistant: anthropic://KEY?model=…
-	// or log:// for a dry run. Empty means no assistant.
-	AssistantURL string
-	// Assistant overrides AssistantURL with a ready provider. Tests use it.
-	Assistant AssistantProvider
 }
 
 func (o Options) normalize() Options {
@@ -143,7 +138,6 @@ type Host struct {
 	agents    *agentStore
 	agentOnce sync.Once
 	agentMux  http.Handler
-	assistant AssistantProvider
 	collab    *collabHub
 	users     *userStore
 	auditLog  *auditStore
@@ -158,6 +152,9 @@ type Host struct {
 	// draft marks the staging view: livePage and livePost answer with the
 	// working record. See staging.go.
 	draft bool
+	// previewBack, on a draft view, turns the staging banner into a preview
+	// banner with a way back to the editor.
+	previewBack string
 
 	// Migrated is the JSON file a SQLite site was created from on this
 	// start, or empty.
@@ -176,7 +173,7 @@ func Open(opts Options) (*Host, error) {
 		return nil, fmt.Errorf("sitehost: open site data: %w", err)
 	}
 
-	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath()), products: newProductStore(opts.productsPath()), orders: newOrderStore(opts.ordersPath()), bookings: newBookingStore(opts.bookingsPath()), carts: newCartStore(opts.cartsPath()), presets: newPresetStore(opts.presetsPath()), agents: newAgentStore(opts.agentsPath()), assistant: opts.assistantProvider(), collab: newCollabHub(), users: newUserStore(opts.usersPath()), auditLog: newAuditStore(opts.auditPath()), metrics: newMetrics()}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath()), products: newProductStore(opts.productsPath()), orders: newOrderStore(opts.ordersPath()), bookings: newBookingStore(opts.bookingsPath()), carts: newCartStore(opts.cartsPath()), presets: newPresetStore(opts.presetsPath()), agents: newAgentStore(opts.agentsPath()), collab: newCollabHub(), users: newUserStore(opts.usersPath()), auditLog: newAuditStore(opts.auditPath()), metrics: newMetrics()}
 	host.Migrated = migrated
 	if err := host.configureMail(); err != nil {
 		return nil, err
@@ -203,7 +200,7 @@ func Open(opts Options) (*Host, error) {
 // this to supply in-memory storage.
 func NewWithStore(store LifecycleContentStore, opts Options) *Host {
 	opts = opts.normalize()
-	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath()), products: newProductStore(opts.productsPath()), orders: newOrderStore(opts.ordersPath()), bookings: newBookingStore(opts.bookingsPath()), carts: newCartStore(opts.cartsPath()), presets: newPresetStore(opts.presetsPath()), agents: newAgentStore(opts.agentsPath()), assistant: opts.assistantProvider(), collab: newCollabHub(), users: newUserStore(opts.usersPath()), auditLog: newAuditStore(opts.auditPath()), metrics: newMetrics()}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath()), products: newProductStore(opts.productsPath()), orders: newOrderStore(opts.ordersPath()), bookings: newBookingStore(opts.bookingsPath()), carts: newCartStore(opts.cartsPath()), presets: newPresetStore(opts.presetsPath()), agents: newAgentStore(opts.agentsPath()), collab: newCollabHub(), users: newUserStore(opts.usersPath()), auditLog: newAuditStore(opts.auditPath()), metrics: newMetrics()}
 	_ = host.configureMail()
 	return host
 }
@@ -289,7 +286,6 @@ func (h *Host) routes() *http.ServeMux {
 	h.mountAgent(mux)
 	h.mountAgentAdmin(mux)
 	h.mountAgentPublic(mux)
-	h.mountAssistant(mux)
 	h.mountPlatform(mux)
 	h.mountPublic(mux)
 	return mux
@@ -324,7 +320,13 @@ func (h *Host) writeDocument(w http.ResponseWriter, status int, meta PageMeta, b
 	}
 	if h.draft && !meta.AdminChrome {
 		meta.NoIndex = true
-		body = gosx.Fragment(h.stagingBanner(), body)
+		banner := h.stagingBanner()
+		if h.previewBack != "" {
+			banner = gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-preview-banner"), gosx.Attr("role", "status"), gosx.Attr("data-preview-banner", "true")),
+				gosx.El("span", nil, gosx.Text("Preview — this is your draft, exactly as visitors will see it once you publish.")),
+				gosx.El("a", gosx.Attrs(gosx.Attr("href", h.previewBack)), gosx.Text("Back to editing")))
+		}
+		body = gosx.Fragment(banner, body)
 	}
 	// The visitor beacon goes on public pages that were actually served,
 	// never on the admin, a 404, or the wizard.

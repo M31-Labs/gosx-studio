@@ -23,9 +23,9 @@ import (
 
 // agent.go makes the site agent-native: every editor operation is also a
 // bearer-authenticated JSON call under /agent/v1, described by a schema and
-// an OpenAPI document, so any assistant can read, build, and publish a
-// site the same way the editor does. The MCP endpoint (mcp.go) and the
-// in-editor assistant (assistant.go) are two clients of this one API.
+// an OpenAPI document, so any agent can read, build, and publish a site
+// the same way the editor does. The MCP endpoint (mcp.go) and the owner's
+// own browser assistant (WebMCP, webmcp.js) are two clients of this API.
 
 const (
 	agentPathPrefix = "/agent"
@@ -51,7 +51,7 @@ var agentScopeBlurbs = map[string]string{
 	scopeSettings: "Change the site's name, description, header, footer, and Look.",
 }
 
-// AgentKey is one credential an owner gave to an assistant.
+// AgentKey is one credential an owner gave to an agent.
 type AgentKey struct {
 	ID       string    `json:"id"`
 	Name     string    `json:"name"`
@@ -201,7 +201,7 @@ func (s *agentStore) revoke(id string) error {
 // ---------- identity ----------
 
 // agentIdentity is who is calling the agent API: a key, a pre-provisioned
-// platform key, or (for the in-editor assistant) the signed-in owner.
+// platform key, or the signed-in person's own browser (WebMCP).
 type agentIdentity struct {
 	Name   string
 	KeyID  string
@@ -237,6 +237,26 @@ func identityFromUser(user User) agentIdentity {
 
 func scopeSettingsForAdmin(scopes map[string]bool) { scopes[scopeSettings] = true }
 
+// browserIdentity is the signed-in person calling from a page this site
+// served: a valid CSRF token, plus a session (or a laptop site with no
+// accounts, where the owner is whoever sits at it).
+func (h *Host) browserIdentity(r *http.Request) (agentIdentity, bool) {
+	token := strings.TrimSpace(r.Header.Get(csrfHeader))
+	if token == "" || !tokensEqual(token, h.csrfToken()) {
+		return agentIdentity{}, false
+	}
+	if site := strings.ToLower(strings.TrimSpace(r.Header.Get("Sec-Fetch-Site"))); site != "" && site != "same-origin" && site != "none" {
+		return agentIdentity{}, false
+	}
+	if user, ok := h.sessionUser(r); ok {
+		return identityFromUser(user), true
+	}
+	if h.users.count() == 0 && strings.TrimSpace(h.opts.AdminPassword) == "" {
+		return agentIdentity{Name: "the owner", Scopes: map[string]bool{scopeRead: true, scopeWrite: true, scopePublish: true, scopeSettings: true}}, true
+	}
+	return agentIdentity{}, false
+}
+
 // lookupAgentToken resolves a bearer token to an identity: a stored key, or
 // one of the platform's pre-provisioned keys.
 func (h *Host) lookupAgentToken(token string) (agentIdentity, bool) {
@@ -269,6 +289,15 @@ func (h *Host) agentAuth(next http.Handler) http.Handler {
 			return
 		}
 		raw := strings.TrimSpace(r.Header.Get("Authorization"))
+		if raw == "" {
+			// The person's own browser (WebMCP, or the editor itself): the
+			// session cookie says who, and the CSRF token proves the call
+			// came from a page this site served, not from another site.
+			if identity, ok := h.browserIdentity(r); ok {
+				next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), agentIdentityKey{}, identity)))
+				return
+			}
+		}
 		token := ""
 		if len(raw) > 7 && strings.EqualFold(raw[:7], "Bearer ") {
 			token = strings.TrimSpace(raw[7:])
@@ -438,8 +467,8 @@ func (h *Host) mountAgent(mux *http.ServeMux) {
 }
 
 // agentDispatch runs one agent API call in-process as the given identity.
-// The MCP tools and the in-editor assistant both go through it, so there is
-// exactly one implementation of every operation.
+// The MCP tools go through it, so there is exactly one implementation of
+// every operation.
 func (h *Host) agentDispatch(ctx context.Context, identity agentIdentity, method, path string, body []byte, from *http.Request) (int, http.Header, []byte) {
 	var reader io.Reader
 	if len(body) > 0 {
