@@ -41,7 +41,7 @@ func (h *Host) livePage(page cmsstore.Page) (cmsstore.Page, bool) {
 	if PageOffline(page) || PageArchived(page) {
 		return cmsstore.Page{}, false
 	}
-	if page.State.Publish == cmsstore.PublishStatePublished {
+	if h.draft || page.State.Publish == cmsstore.PublishStatePublished {
 		return page, true
 	}
 	return h.lastPublishedSnapshot(page.ID)
@@ -62,7 +62,9 @@ func (h *Host) lastPublishedSnapshot(pageID string) (cmsstore.Page, bool) {
 
 // livePages is every page as a visitor currently sees it, home first.
 func (h *Host) livePages() []cmsstore.Page {
-	h.PublishDue()
+	if !h.draft {
+		h.PublishDue()
+	}
 	pages, err := h.store.ListPages(cmsstore.PageFilter{})
 	if err != nil {
 		return nil

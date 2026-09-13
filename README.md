@@ -145,6 +145,20 @@ not ready can ask the cart page to email them a link to their cart; if they
 have not bought within two hours, one reminder goes out, and never a second.
 Both need an email transport (`-mail`).
 
+### Staging and publishing everything at once
+
+Saving in the editor never changes what visitors see; publishing does. The
+**Staging** page lists every page and post with unpublished changes and
+publishes them one at a time or all together with one button.
+
+To walk through the whole site with those changes in place, give it a
+staging address such as `staging.yourbusiness.com` on the Staging page and
+point that name at the server like the main domain. The staging address
+shows drafts, menus and all, under a banner. It opens only for people who
+have the link, which carries a key you can renew. Search engines are told to
+stay away, nothing is counted, and anything that writes or pays is sent to
+the real site.
+
 ### Backups and export
 
 **Settings → Backups and export** downloads the whole site as one zip: pages,

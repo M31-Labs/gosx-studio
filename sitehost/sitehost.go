@@ -129,6 +129,10 @@ type Host struct {
 	due       dueChecker
 	backups   backupState
 
+	// draft marks the staging view: livePage and livePost answer with the
+	// working record. See staging.go.
+	draft bool
+
 	// Migrated is the JSON file a SQLite site was created from on this
 	// start, or empty.
 	Migrated string
@@ -204,6 +208,19 @@ func (m muxMounter) Mount(pattern string, handler http.Handler) {
 // Handler builds the complete site: runtime assets, the public site, and the
 // back office.
 func (h *Host) Handler() http.Handler {
+	mux := h.routes()
+	drafts := h.draftView().routes()
+	// Outermost first: headers on everything, then the staging address,
+	// then sign-in, then CSRF on what is signed in, then the setup gate,
+	// then the routes. Staging only ever reads content, so it needs none of
+	// the sign-in or CSRF layers.
+	site := h.guardAdmin(h.requireCSRF(h.requireSetup(mux)))
+	return h.observe(h.housekeeping(h.securityHeaders(h.hostRedirect(h.stagingGate(site, h.requireSetup(drafts))))))
+}
+
+// routes is every handler on one mux, for the site and for its staging
+// view alike.
+func (h *Host) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// Studio's own editor runtime assets and stylesheet.
@@ -237,11 +254,9 @@ func (h *Host) Handler() http.Handler {
 	h.mountSSO(mux)
 	h.mountPrivacy(mux)
 	h.mountCustomers(mux)
+	h.mountStaging(mux)
 	h.mountPublic(mux)
-
-	// Outermost first: headers on everything, then sign-in, then CSRF on
-	// what is signed in, then the setup gate, then the routes.
-	return h.observe(h.housekeeping(h.securityHeaders(h.hostRedirect(h.guardAdmin(h.requireCSRF(h.requireSetup(mux)))))))
+	return mux
 }
 
 // settings reads site settings, falling back to the configured defaults so the
@@ -270,6 +285,10 @@ func (h *Host) writeDocument(w http.ResponseWriter, status int, meta PageMeta, b
 	}
 	if meta.AdminChrome {
 		meta.CSRF = h.csrfToken()
+	}
+	if h.draft && !meta.AdminChrome {
+		meta.NoIndex = true
+		body = gosx.Fragment(h.stagingBanner(), body)
 	}
 	// The visitor beacon goes on public pages that were actually served,
 	// never on the admin, a 404, or the wizard.

@@ -77,6 +77,11 @@ func (h *Host) renderAdminShell(active, heading, lede string, status adminStatus
 	if h.reviewRequired() || len(h.reviewQueue()) > 0 {
 		navItems = append(navItems, struct{ Key, Label, Href string }{"review", reviewLabel, reviewPath})
 	}
+	stagingLabel := "Staging"
+	if waiting := len(h.waiting()); waiting > 0 {
+		stagingLabel = "Staging (" + itoa(waiting) + ")"
+	}
+	navItems = append(navItems, struct{ Key, Label, Href string }{"staging", stagingLabel, stagingAdminPath})
 	navItems = append(navItems, []struct{ Key, Label, Href string }{
 		{"settings", "Settings", "/admin/settings"},
 	}...)

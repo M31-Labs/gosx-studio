@@ -119,6 +119,9 @@ func (h *Host) HostPolicy(_ context.Context, host string) error {
 	if domain != "" && (host == domain || host == "www."+domain) {
 		return nil
 	}
+	if staging := h.stagingHost(); staging != "" && host == staging {
+		return nil
+	}
 	return errors.New("sitehost: no certificate for " + host + "; connect the domain in Settings first")
 }
 

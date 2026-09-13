@@ -109,7 +109,7 @@ func (h *Host) handleSitemap(w http.ResponseWriter, r *http.Request) {
 
 func (h *Host) handleRobots(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	if !h.SetupComplete() {
+	if !h.SetupComplete() || h.draft {
 		_, _ = w.Write([]byte("User-agent: *\nDisallow: /\n"))
 		return
 	}

@@ -137,7 +137,7 @@ func (h *Host) livePost(post cmsstore.Post) (cmsstore.Post, bool) {
 	if PostOffline(post) || PostArchived(post) {
 		return cmsstore.Post{}, false
 	}
-	if post.State.Publish == cmsstore.PublishStatePublished {
+	if h.draft || post.State.Publish == cmsstore.PublishStatePublished {
 		return post, true
 	}
 	revision, ok := h.latestPublished(cmsstore.ResourceKindPost, post.ID, cmsstore.ActionPostPublished)
@@ -153,7 +153,9 @@ func (h *Host) livePost(post cmsstore.Post) (cmsstore.Post, bool) {
 
 // livePosts is every post a visitor can read, newest first.
 func (h *Host) livePosts() []cmsstore.Post {
-	h.PublishDue()
+	if !h.draft {
+		h.PublishDue()
+	}
 	posts, err := h.store.ListPosts(cmsstore.PostFilter{})
 	if err != nil {
 		return nil
