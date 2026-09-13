@@ -67,6 +67,33 @@ func TestManagedSitesLeaveDomainsToThePlatform(t *testing.T) {
 		t.Fatalf("export = %d %q %d bytes", rec.Code, rec.Header().Get("Content-Type"), rec.Body.Len())
 	}
 
+	// Before the owner has run the wizard, the platform can still ask.
+	fresh, err := Open(Options{DataPath: filepath.Join(t.TempDir(), "site.json"), SiteTitle: "New", NoBackups: true, ManagedBy: "GoSX Platform", OperatorToken: "0123456789abcdef0123456789abcdef"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	freshHandler := fresh.Handler()
+	req = httptest.NewRequest(http.MethodGet, platformStatusPath, nil)
+	req.Header.Set("Authorization", "Bearer 0123456789abcdef0123456789abcdef")
+	rec = httptest.NewRecorder()
+	freshHandler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"setupComplete":false`) {
+		t.Fatalf("status before setup = %d %s", rec.Code, rec.Body.String())
+	}
+	req = httptest.NewRequest(http.MethodGet, platformExportPath, nil)
+	req.Header.Set("Authorization", "Bearer 0123456789abcdef0123456789abcdef")
+	rec = httptest.NewRecorder()
+	freshHandler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "application/zip" {
+		t.Fatalf("export before setup = %d %q", rec.Code, rec.Header().Get("Content-Type"))
+	}
+	req = httptest.NewRequest(http.MethodGet, platformStatusPath, nil)
+	rec = httptest.NewRecorder()
+	freshHandler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status before setup without token = %d", rec.Code)
+	}
+
 	// A site on its own has no door at all.
 	_, plain := newTestHost(t)
 	req = httptest.NewRequest(http.MethodGet, platformStatusPath, nil)
