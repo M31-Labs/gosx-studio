@@ -413,6 +413,15 @@ func (h *Host) handleSSOCallback(w http.ResponseWriter, r *http.Request) {
 
 // ---------- settings and the login button ----------
 
+// ssoFieldsIfPlanned is the settings section, or nothing when the plan
+// has no single sign-on.
+func (h *Host) ssoFieldsIfPlanned(settings cmsstore.SiteSettings) gosx.Node {
+	if !h.featureOn(FeatureSSO) {
+		return gosx.Fragment()
+	}
+	return h.renderSSOFields(settings, h.absoluteBaseFromSettings())
+}
+
 func (h *Host) renderSSOFields(settings cmsstore.SiteSettings, base string) gosx.Node {
 	sso := h.sso()
 	state, label := "draft", "Off"
@@ -424,7 +433,7 @@ func (h *Host) renderSSOFields(settings cmsstore.SiteSettings, base string) gosx
 			gosx.Text(" "), gosx.El("span", gosx.Attrs(gosx.Attr("class", "admin-badge"), gosx.Attr("data-state", state)), gosx.Text(label))),
 		gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-hint")),
 			gosx.Text("Let your team sign in with the account they already have at work: Google Workspace, Microsoft 365, Okta, Keycloak, or any OpenID Connect provider. Register this site there with the redirect address "),
-			gosx.El("code", nil, gosx.Text(base+ssoCallback)), gosx.Text(", then paste what it gives you.")),
+			gosx.El("code", nil, gosx.Text(base+ssoCallback)), gosx.Text(", then paste what it gives you. If your company uses SAML instead, its identity provider (Okta, Entra ID, OneLogin, Keycloak) can publish the same directory as an OpenID Connect app; connect that here. There is no SAML to configure on this side.")),
 		adminTextField("ssoIssuer", "Provider address (issuer)", settings.Metadata[ssoIssuerKey], "For Google: https://accounts.google.com. For Microsoft: https://login.microsoftonline.com/YOUR-TENANT-ID/v2.0. Others show it in their settings."),
 		adminTextField("ssoClientId", "Client ID", settings.Metadata[ssoClientIDKey], ""),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-field")),
@@ -460,7 +469,7 @@ func applySSOFields(r *http.Request, metadata cmsstore.Metadata) string {
 // ssoButton is the extra way in on the sign-in page.
 func (h *Host) ssoButton(next string) gosx.Node {
 	settings := h.sso()
-	if !settings.ready() {
+	if !settings.ready() || !h.featureOn(FeatureSSO) {
 		return gosx.Fragment()
 	}
 	href := ssoStartPath

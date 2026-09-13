@@ -46,6 +46,7 @@ func run() error {
 		publicIP = flag.String("public-ip", env("GOSX_SITE_PUBLIC_IP", ""), "this server's public IP address, shown in the domain instructions")
 		noBackup = flag.Bool("no-backups", env("GOSX_SITE_NO_BACKUPS", "") == "true", "turn off the daily backup zip written beside the data file")
 		logReqs  = flag.Bool("log-requests", env("GOSX_SITE_LOG_REQUESTS", "true") != "false", "write one JSON line per request to stderr")
+		features = flag.String("features", env("GOSX_SITE_FEATURES", ""), "what the site's plan includes, comma-separated: blog,forms,shop,stats,domain,team,staging,sso (empty: everything)")
 	)
 	flag.Parse()
 
@@ -87,6 +88,7 @@ func run() error {
 		PublicIP:        *publicIP,
 		NoBackups:       *noBackup,
 		LogRequests:     *logReqs,
+		Features:        sitehost.ParseFeatures(*features),
 	})
 	if err != nil {
 		return err

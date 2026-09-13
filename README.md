@@ -63,6 +63,19 @@ appears on the sign-in page. Someone whose email already has an account
 signs in as that account; someone from the allowed email domain gets an
 editor account; everyone else is turned away.
 
+There is no SAML on the site's side, on purpose. A company that runs SAML
+(Okta, Entra ID, OneLogin, Keycloak) publishes the same directory as an
+OpenID Connect application in a few clicks, and that is what you connect.
+
+### Plans
+
+A site run on its own has everything. A platform that hosts many sites
+starts each one with `-features` (or `GOSX_SITE_FEATURES`), a list such as
+`blog,forms,stats,domain,team`, and the parts left out disappear from the
+admin menu and answer with a short "not part of your plan" page. The names
+are `blog`, `forms`, `shop` (products, orders, bookings, downloads,
+subscriptions), `stats`, `domain`, `team`, `staging`, and `sso`.
+
 ### Review before publishing
 
 Turn on **Settings → Team → Publishing needs approval** and editors' Publish

@@ -87,6 +87,9 @@ func (h *Host) renderAdminShell(active, heading, lede string, status adminStatus
 	}...)
 	links := make([]gosx.Node, 0, len(navItems)+1)
 	for _, item := range navItems {
+		if feature := navFeature(item.Key); feature != "" && !h.featureOn(feature) {
+			continue
+		}
 		attrs := []any{gosx.Attr("href", item.Href)}
 		if item.Key == active {
 			attrs = append(attrs, gosx.Attr("aria-current", "page"))
@@ -468,7 +471,10 @@ func (h *Host) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 
 func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 	settings := h.settings()
-	domainPanel := h.renderDomainPanel()
+	var domainPanel gosx.Node = gosx.Fragment()
+	if h.featureOn(FeatureDomain) {
+		domainPanel = h.renderDomainPanel()
+	}
 	form := gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),
 		gosx.El("h2", nil, gosx.Text("Site details")),
 		gosx.El("form", gosx.Attrs(gosx.Attr("method", "post"), gosx.Attr("action", "/admin/settings"), gosx.Attr("enctype", "multipart/form-data")),
@@ -485,7 +491,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 			renderShopFields(settings),
 			h.renderPaymentFields(settings, h.absoluteBaseFromSettings()),
 			renderReviewField(settings),
-			h.renderSSOFields(settings, h.absoluteBaseFromSettings()),
+			h.ssoFieldsIfPlanned(settings),
 			h.renderPrivacyFields(settings),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-actions")),
 				gosx.El("button", gosx.Attrs(gosx.Attr("class", "admin-button"), gosx.Attr("type", "submit")), gosx.Text("Save settings")),

@@ -322,7 +322,7 @@ func (h *Host) mountStats(mux *http.ServeMux) {
 
 // statsEnabled is the owner's switch, on unless turned off in Settings.
 func (h *Host) statsEnabled() bool {
-	return h.settings().Metadata[statsOffKey] != "true"
+	return h.featureOn(FeatureStats) && h.settings().Metadata[statsOffKey] != "true"
 }
 
 type statsPayload struct {

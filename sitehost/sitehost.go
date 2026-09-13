@@ -84,6 +84,9 @@ type Options struct {
 	LogRequests bool
 	// LogWriter receives request log lines when LogRequests is set.
 	LogWriter io.Writer
+	// Features is what the site's plan includes, by name (see AllFeatures).
+	// Empty means everything. The platform that runs the site sets it.
+	Features []string
 }
 
 func (o Options) normalize() Options {
@@ -215,7 +218,7 @@ func (h *Host) Handler() http.Handler {
 	// then sign-in, then CSRF on what is signed in, then the setup gate,
 	// then the routes. Staging only ever reads content, so it needs none of
 	// the sign-in or CSRF layers.
-	site := h.guardAdmin(h.requireCSRF(h.requireSetup(mux)))
+	site := h.guardAdmin(h.requireCSRF(h.requireSetup(h.featureGate(mux))))
 	return h.observe(h.housekeeping(h.securityHeaders(h.hostRedirect(h.stagingGate(site, h.requireSetup(drafts))))))
 }
 
