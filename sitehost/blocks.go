@@ -251,18 +251,28 @@ func (h *Host) renderBlock(instance blockstudio.BlockInstance, hooks render.Hook
 		if len(images) == 0 {
 			return gosx.Fragment(), false
 		}
+		style := normalizeChoice(instance.Values["style"].String, "grid", galleryStyles)
 		items := make([]gosx.Node, 0, len(images))
-		for _, image := range images {
+		boxes := make([]gosx.Node, 0, len(images))
+		for index, image := range images {
 			attrs, ok := h.imageAttrs(image[0], image[1], gallerySizes)
 			if !ok {
 				continue
 			}
-			items = append(items, gosx.El("figure", gosx.Attrs(gosx.Attr("class", "site-gallery__item")), gosx.El("img", gosx.Attrs(attrs...))))
+			// Each picture opens large, with no script: the lightbox is a
+			// box that shows itself when its name is in the address.
+			box := "lb-" + instance.ID + "-" + itoa(index)
+			items = append(items, gosx.El("figure", gosx.Attrs(gosx.Attr("class", "site-gallery__item")),
+				gosx.El("a", gosx.Attrs(gosx.Attr("href", "#"+box), gosx.Attr("class", "site-gallery__open"), gosx.Attr("aria-label", "See larger")), gosx.El("img", gosx.Attrs(attrs...)))))
+			full, _ := h.imageAttrs(image[0], image[1], "100vw")
+			boxes = append(boxes, gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-lightbox"), gosx.Attr("id", box), gosx.Attr("role", "dialog"), gosx.Attr("aria-label", firstNonEmpty(image[1], "Picture"))),
+				gosx.El("a", gosx.Attrs(gosx.Attr("href", "#_"), gosx.Attr("class", "site-lightbox__close"), gosx.Attr("aria-label", "Close")), gosx.Text("✕")),
+				gosx.El("img", gosx.Attrs(full...))))
 		}
 		if len(items) == 0 {
 			return gosx.Fragment(), false
 		}
-		return gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-gallery")), gosx.Fragment(items...)), true
+		return gosx.Fragment(gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-gallery site-gallery--"+style)), gosx.Fragment(items...)), gosx.Fragment(boxes...)), true
 	}
 
 	if spec, ok := compositeByKey(instance.Key); ok {
@@ -315,9 +325,10 @@ func (h *Host) renderPicture(instance blockstudio.BlockInstance) (gosx.Node, boo
 
 // Text alignment, button looks, and column counts an owner can pick.
 var (
-	textAligns   = map[string]bool{"center": true, "right": true}
-	buttonLooks  = map[string]bool{"primary": true, "ghost": true, "link": true}
-	columnCounts = map[string]bool{"2": true, "3": true}
+	textAligns    = map[string]bool{"center": true, "right": true}
+	buttonLooks   = map[string]bool{"primary": true, "ghost": true, "link": true}
+	columnCounts  = map[string]bool{"2": true, "3": true}
+	galleryStyles = map[string]bool{"grid": true, "strip": true, "masonry": true, "big": true}
 )
 
 func alignClass(instance blockstudio.BlockInstance) []any {

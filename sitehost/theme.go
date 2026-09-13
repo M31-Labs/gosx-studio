@@ -53,6 +53,9 @@ type Theme struct {
 	// Ground and Ink are the owner's own colours when Palette is the custom
 	// one; the rest of the palette is mixed from them.
 	Ground, Ink string
+	// FontHead and FontBody are the owner's own Google Fonts family names
+	// when Fonts is the custom pairing.
+	FontHead, FontBody string
 	// CustomCSS is the owner's own stylesheet, already sanitised.
 	CustomCSS string
 }
@@ -69,8 +72,53 @@ const (
 	themeInkKey      = "themeInk"
 	customCSSKey     = "customCss"
 	customPaletteKey = "custom"
+	customFontsKey   = "custom"
+	themeFontHeadKey = "themeFontHead"
+	themeFontBodyKey = "themeFontBody"
 	customCSSMax     = 20 << 10
 )
+
+// fontName keeps a Google Fonts family name to letters, digits, and
+// spaces, so it can go into a stylesheet and a URL unescaped.
+func fontName(raw string) string {
+	var b strings.Builder
+	for _, r := range strings.TrimSpace(raw) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == ' ':
+			b.WriteRune(r)
+		}
+	}
+	name := strings.Join(strings.Fields(b.String()), " ")
+	if len(name) > 40 {
+		name = name[:40]
+	}
+	return name
+}
+
+// customFonts builds a pairing from two Google Fonts family names. Either
+// may be empty, in which case the body font stands in.
+func customFonts(head, body string) FontPair {
+	head, body = fontName(head), fontName(body)
+	if head == "" && body == "" {
+		return FontPairs()[0]
+	}
+	if head == "" {
+		head = body
+	}
+	if body == "" {
+		body = head
+	}
+	google := []string{strings.ReplaceAll(head, " ", "+") + ":wght@400;600;700"}
+	if body != head {
+		google = append(google, strings.ReplaceAll(body, " ", "+")+":wght@400;600")
+	}
+	return FontPair{
+		Key: customFontsKey, Label: "Custom", Blurb: "Fonts you named.",
+		Display: `"` + head + `", ui-sans-serif, system-ui, sans-serif`,
+		Body:    `"` + body + `", ui-sans-serif, system-ui, sans-serif`,
+		Google:  google,
+	}
+}
 
 // HeadingScale is how big headings are next to the text.
 type HeadingScale struct {
@@ -338,10 +386,15 @@ func ThemeFromSettings(settings cmsstore.SiteSettings) Theme {
 		Width:     PageWidthByKey(m[themeWidthKey]).Key,
 		Ground:    NormalizeAccent(m[themeGroundKey]),
 		Ink:       NormalizeAccent(m[themeInkKey]),
+		FontHead:  fontName(m[themeFontHeadKey]),
+		FontBody:  fontName(m[themeFontBodyKey]),
 		CustomCSS: sanitizeCustomCSS(m[customCSSKey]),
 	}
 	if strings.EqualFold(strings.TrimSpace(m[themePaletteKey]), customPaletteKey) && theme.Ground != "" && theme.Ink != "" {
 		theme.Palette = customPalette(theme.Ground, theme.Ink, theme.Accent)
+	}
+	if strings.EqualFold(strings.TrimSpace(m[themeFontsKey]), customFontsKey) && (theme.FontHead != "" || theme.FontBody != "") {
+		theme.Fonts = customFonts(theme.FontHead, theme.FontBody)
 	}
 	return theme
 }
@@ -416,14 +469,15 @@ func RenderThemeHead(t Theme) gosx.Node {
 
 // themeView is what the editor's Look controls and JS need to know.
 type themeView struct {
-	PaletteKey  string
-	FontsKey    string
-	Accent      string
-	ButtonsKey  string
-	SpacingKey  string
-	HeadingsKey string
-	WidthKey    string
-	Ground, Ink string
+	PaletteKey         string
+	FontsKey           string
+	Accent             string
+	ButtonsKey         string
+	SpacingKey         string
+	HeadingsKey        string
+	WidthKey           string
+	Ground, Ink        string
+	FontHead, FontBody string
 }
 
 func (t Theme) view() themeView {
@@ -432,12 +486,14 @@ func (t Theme) view() themeView {
 		ButtonsKey: ButtonShapeByKey(t.Buttons).Key, SpacingKey: SpacingScaleByKey(t.Spacing).Key,
 		HeadingsKey: HeadingScaleByKey(t.Headings).Key, WidthKey: PageWidthByKey(t.Width).Key,
 		Ground: firstNonEmpty(t.Ground, "#ffffff"), Ink: firstNonEmpty(t.Ink, "#1a1a1a"),
+		FontHead: t.FontHead, FontBody: t.FontBody,
 	}
 }
 
 // ThemeChoice is everything the Look panel can set at once.
 type ThemeChoice struct {
 	Palette, Fonts, Accent, Buttons, Spacing, Headings, Width, Ground, Ink string
+	FontHead, FontBody                                                     string
 }
 
 // SaveTheme writes the Look to the site's settings, preserving every other
@@ -461,7 +517,16 @@ func (h *Host) SaveTheme(choice ThemeChoice) (Theme, error) {
 		delete(metadata, themeGroundKey)
 		delete(metadata, themeInkKey)
 	}
-	metadata[themeFontsKey] = fonts.Key
+	head, body := fontName(choice.FontHead), fontName(choice.FontBody)
+	if strings.EqualFold(strings.TrimSpace(choice.Fonts), customFontsKey) && (head != "" || body != "") {
+		metadata[themeFontsKey] = customFontsKey
+		metadata[themeFontHeadKey] = head
+		metadata[themeFontBodyKey] = body
+	} else {
+		metadata[themeFontsKey] = fonts.Key
+		delete(metadata, themeFontHeadKey)
+		delete(metadata, themeFontBodyKey)
+	}
 	metadata[themeButtonsKey] = ButtonShapeByKey(choice.Buttons).Key
 	metadata[themeSpacingKey] = SpacingScaleByKey(choice.Spacing).Key
 	metadata[themeHeadingsKey] = HeadingScaleByKey(choice.Headings).Key

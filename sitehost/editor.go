@@ -115,7 +115,7 @@ func (h *Host) renderEditor(w http.ResponseWriter, subject editorSubject) {
 		gosx.Attr("data-preview-url", subject.PreviewURL),
 		gosx.Attr("data-must-request", boolAttr(subject.MustRequest)),
 		gosx.Attr("data-can-lock", boolAttr(subject.CanDesign)),
-		gosx.Attr("data-server-kinds", "section,image,button,columns,"+compositeKeys()),
+		gosx.Attr("data-server-kinds", "section,image,button,columns,gallery,"+compositeKeys()),
 	),
 		h.renderEditorToolbar(subject),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-body")),
@@ -773,7 +773,7 @@ func (h *Host) renderBlockInner(kind string, instance blockstudio.BlockInstance)
 		}
 		return gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-columns site-columns--"+count+" ed-columns"), gosx.Attr("data-columns", count)), gosx.Fragment(cols...))
 	case "gallery":
-		return renderGalleryEditor(galleryImages(instance))
+		return renderGalleryEditor(galleryImages(instance), normalizeChoice(instance.Values["style"].String, "grid", galleryStyles))
 	default:
 		if spec, ok := compositeByKey(kind); ok {
 			return h.renderComposite(spec, instance, true)
@@ -1089,7 +1089,7 @@ func (h *Host) payloadDocument(blocks []editorBlockPayload) blockstudio.Document
 			}
 			instances = append(instances, blockstudio.BlockInstance{
 				ID: content.BlockGallery + "-" + itoa(order), Key: content.BlockGallery, Enabled: true, Order: order,
-				Values: blockstudio.Values{"images": galleryList},
+				Values: blockstudio.Values{"images": galleryList, "style": text(normalizeChoice(incoming.Style, "grid", galleryStyles))},
 			})
 		default:
 			if spec, ok := compositeByKey(kind); ok {
@@ -1197,6 +1197,19 @@ func (h *Host) renderLookSection() gosx.Node {
 		))
 	}
 
+	customFontAttrs := []any{gosx.Attr("type", "radio"), gosx.Attr("name", "lookFonts"), gosx.Attr("id", "look-fonts-custom"), gosx.Attr("value", customFontsKey), gosx.Attr("data-look-fonts", customFontsKey)}
+	if view.FontsKey == customFontsKey {
+		customFontAttrs = append(customFontAttrs, gosx.Attr("checked", "checked"))
+	}
+	fonts = append(fonts, gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-font"), gosx.Attr("for", "look-fonts-custom"), gosx.Attr("title", "Name any Google Font")),
+		gosx.El("input", gosx.Attrs(customFontAttrs...)),
+		gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-font__sample")), gosx.Text("Aa")),
+		gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-font__name")), gosx.Text("Custom"))))
+	customFontFields := gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-custom-fonts"), gosx.Attr("data-look-custom-fonts", "true")),
+		gosx.El("label", nil, gosx.El("span", nil, gosx.Text("Headings")), gosx.El("input", gosx.Attrs(gosx.Attr("type", "text"), gosx.Attr("data-look-font-head", "true"), gosx.Attr("value", view.FontHead), gosx.Attr("placeholder", "Playfair Display"), gosx.Attr("aria-label", "Heading font")))),
+		gosx.El("label", nil, gosx.El("span", nil, gosx.Text("Text")), gosx.El("input", gosx.Attrs(gosx.Attr("type", "text"), gosx.Attr("data-look-font-body", "true"), gosx.Attr("value", view.FontBody), gosx.Attr("placeholder", "Inter"), gosx.Attr("aria-label", "Text font")))),
+		gosx.El("small", nil, gosx.Text("Any name from fonts.google.com, spelled as it is there.")))
+
 	shapes := make([]gosx.Node, 0, 3)
 	for _, shape := range ButtonShapes() {
 		inputAttrs := []any{
@@ -1256,6 +1269,9 @@ func (h *Host) renderLookSection() gosx.Node {
 	if view.PaletteKey == customPaletteKey {
 		lookAttrs = append(lookAttrs, gosx.Attr("data-custom", "true"))
 	}
+	if view.FontsKey == customFontsKey {
+		lookAttrs = append(lookAttrs, gosx.Attr("data-custom-fonts", "true"))
+	}
 	return gosx.El("div", gosx.Attrs(lookAttrs...),
 		gosx.El("h2", nil, gosx.Text("Look")),
 		gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-hint")),
@@ -1270,6 +1286,7 @@ func (h *Host) renderLookSection() gosx.Node {
 			gosx.El("span", nil, gosx.Text("Fonts")),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-fonts"), gosx.Attr("role", "radiogroup"), gosx.Attr("aria-label", "Font pairing")),
 				gosx.Fragment(fonts...)),
+			customFontFields,
 		),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-look-group")),
 			gosx.El("span", nil, gosx.Text("Accent colour")),
@@ -1377,6 +1394,8 @@ type themeSavePayload struct {
 	Width    string `json:"width"`
 	Ground   string `json:"ground"`
 	Ink      string `json:"ink"`
+	FontHead string `json:"fontHead"`
+	FontBody string `json:"fontBody"`
 }
 
 type themeSaveResult struct {
@@ -1392,7 +1411,7 @@ func (h *Host) handleThemeSave(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, themeSaveResult{Message: "We couldn't read that change. Try again."})
 		return
 	}
-	theme, err := h.SaveTheme(ThemeChoice{Palette: payload.Palette, Fonts: payload.Fonts, Accent: payload.Accent, Buttons: payload.Buttons, Spacing: payload.Spacing, Headings: payload.Headings, Width: payload.Width, Ground: payload.Ground, Ink: payload.Ink})
+	theme, err := h.SaveTheme(ThemeChoice{Palette: payload.Palette, Fonts: payload.Fonts, Accent: payload.Accent, Buttons: payload.Buttons, Spacing: payload.Spacing, Headings: payload.Headings, Width: payload.Width, Ground: payload.Ground, Ink: payload.Ink, FontHead: payload.FontHead, FontBody: payload.FontBody})
 	if err != nil {
 		writeJSON(w, http.StatusOK, themeSaveResult{Message: "We couldn't save the look. Try again."})
 		return
@@ -1424,13 +1443,15 @@ func renderVideoEditor(rawURL string) gosx.Node {
 
 // renderGalleryEditor is the gallery on the canvas: its pictures with a
 // remove control each, plus upload and library controls.
-func renderGalleryEditor(images [][2]string) gosx.Node {
+func renderGalleryEditor(images [][2]string, style string) gosx.Node {
 	items := make([]gosx.Node, 0, len(images))
 	for _, image := range images {
 		items = append(items, galleryEditorItem(image[0], image[1]))
 	}
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-gallery"), gosx.Attr("data-picker-target", "gallery"), gosx.Attr("contenteditable", "false")),
-		gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-gallery ed-gallery__grid"), gosx.Attr("data-gallery-items", "true")), gosx.Fragment(items...)),
+		gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-variant")), gosx.El("span", nil, gosx.Text("Layout")),
+			choiceSelect("data-gallery-style", "Gallery layout", style, [][2]string{{"grid", "Grid"}, {"strip", "Strip, one row"}, {"masonry", "Masonry"}, {"big", "One big at a time"}})),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-gallery site-gallery--"+style+" ed-gallery__grid"), gosx.Attr("data-gallery-items", "true")), gosx.Fragment(items...)),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-gallery__controls")),
 			gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-upload")),
 				gosx.El("input", gosx.Attrs(gosx.Attr("type", "file"), gosx.Attr("multiple", "multiple"), gosx.Attr("accept", "image/png,image/jpeg,image/gif,image/webp"), gosx.Attr("data-upload", "true"), gosx.Attr("aria-label", "Add pictures"))),

@@ -195,7 +195,13 @@ have an add button and a remove button.
 
 A section break sets the mood for everything beneath it: a plain, tinted,
 accent, dark, or picture background; left or centred text; narrow, normal,
-wide, or edge-to-edge width; compact, normal, or roomy spacing.
+wide, or edge-to-edge width; compact, normal, or roomy spacing; and a
+jump-to name, so a button can link to `#pricing`.
+
+Small things are adjustable too. Select any text and the floating toolbar
+aligns it left, centre, or right. A button can be solid, outlined, or just
+a link. Columns come in two or three. "Latest posts" and "From the shop"
+sections fill themselves from the blog and the shop and stay current.
 
 ### Editing together
 

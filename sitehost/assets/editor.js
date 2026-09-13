@@ -101,6 +101,8 @@
     if (kind === "gallery") {
       payload.text = "";
       payload.images = [];
+      var gstyle = el.querySelector("[data-gallery-style]");
+      payload.style = gstyle ? gstyle.value : "grid";
       var gitems = el.querySelectorAll(".ed-gallery__item");
       for (var g = 0; g < gitems.length; g++) {
         var gimg = gitems[g].querySelector("[data-gimg]");
@@ -1194,6 +1196,13 @@
       queueSave();
       return;
     }
+    if (event.target.matches("[data-gallery-style]")) {
+      snapshot();
+      var grid = event.target.closest(".ed-gallery").querySelector("[data-gallery-items]");
+      if (grid) grid.className = "site-gallery site-gallery--" + event.target.value + " ed-gallery__grid";
+      queueSave();
+      return;
+    }
     if (event.target.matches("[data-button-look]")) {
       snapshot();
       var a = event.target.closest(".ed-button-row").querySelector("a[data-text]");
@@ -1836,6 +1845,8 @@
 
   var groundInput = look.querySelector("[data-look-ground]");
   var inkInput = look.querySelector("[data-look-ink]");
+  var fontHeadInput = look.querySelector("[data-look-font-head]");
+  var fontBodyInput = look.querySelector("[data-look-font-body]");
 
   function current() {
     var palette = look.querySelector("[data-look-palette]:checked");
@@ -1854,7 +1865,22 @@
       width: width ? width.value : "",
       ground: groundInput ? groundInput.value : "",
       ink: inkInput ? inkInput.value : "",
+      fontHead: fontHeadInput ? fontHeadInput.value.trim() : "",
+      fontBody: fontBodyInput ? fontBodyInput.value.trim() : "",
     };
+  }
+
+  /* Custom fonts, the way the server builds them. */
+  function customFonts(state) {
+    var clean = function (n) { return (n || "").replace(/[^A-Za-z0-9 ]/g, "").replace(/\s+/g, " ").trim().slice(0, 40); };
+    var head = clean(state.fontHead), body = clean(state.fontBody);
+    if (!head && !body) return null;
+    if (!head) head = body;
+    if (!body) body = head;
+    var families = ["family=" + head.replace(/ /g, "+") + ":wght@400;600;700"];
+    if (body !== head) families.push("family=" + body.replace(/ /g, "+") + ":wght@400;600");
+    return { key: "custom", display: '"' + head + '", ui-sans-serif, system-ui, sans-serif', body: '"' + body + '", ui-sans-serif, system-ui, sans-serif',
+      fontsUrl: "https://fonts.googleapis.com/css2?" + families.join("&") + "&display=swap" };
   }
 
   /* The custom palette, mixed the way the server mixes it. */
@@ -1879,7 +1905,8 @@
   function apply(state) {
     var p = state.palette === "custom" ? customPalette(state) : (find(presets.palettes, state.palette) || {});
     look.toggleAttribute("data-custom", state.palette === "custom");
-    var f = find(presets.fonts, state.fonts) || {};
+    look.toggleAttribute("data-custom-fonts", state.fonts === "custom");
+    var f = (state.fonts === "custom" ? customFonts(state) : null) || find(presets.fonts, state.fonts) || {};
     var accent = state.accent || p.accent;
     if (canvas) {
       canvas.style.setProperty("color-scheme", p.scheme || "light");
@@ -1952,6 +1979,14 @@
   });
   look.addEventListener("input", function (event) {
     if (event.target.matches("[data-look-accent]")) { accentInput.dataset.custom = "1"; apply(current()); }
+    if (event.target.matches("[data-look-font-head],[data-look-font-body]")) {
+      var customFontRadio = look.querySelector('[data-look-fonts="custom"]');
+      if (customFontRadio) customFontRadio.checked = true;
+      apply(current());
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(save, 900);
+      return;
+    }
     if (event.target.matches("[data-look-ground],[data-look-ink]")) {
       var customRadio = look.querySelector('[data-look-palette="custom"]');
       if (customRadio) customRadio.checked = true;

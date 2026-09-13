@@ -162,7 +162,7 @@ func TestGalleryVideoAndColumnsRoundTrip(t *testing.T) {
 
 	post(t, handler, "/admin/api/pages/"+id+"/publish", map[string][]string{})
 	live := get(t, handler, "/menu").Body.String()
-	mustContain(t, live, `<div class="site-gallery">`, "the gallery reaches visitors")
+	mustContain(t, live, `<div class="site-gallery site-gallery--grid">`, "the gallery reaches visitors")
 	mustContain(t, live, `-w480.png 480w`, "gallery pictures get responsive renditions")
 	mustContain(t, live, `sizes="(max-width: 720px) 50vw, 360px"`, "gallery sizes match its grid")
 	mustContain(t, live, `alt="Loaves"`, "gallery alt text survives")

@@ -740,6 +740,8 @@ func (h *Host) handleBlockFresh(w http.ResponseWriter, r *http.Request) {
 		inner = h.renderBlockInner("button", blockstudio.BlockInstance{Key: "button", Values: values("label", "Get in touch", "href", "/contact", "look", "primary")})
 	case kind == "columns":
 		inner = h.renderBlockInner("columns", blockstudio.BlockInstance{Key: "columns", Values: blockstudio.Values{}})
+	case kind == "gallery":
+		inner = h.renderBlockInner("gallery", blockstudio.BlockInstance{Key: "gallery", Values: blockstudio.Values{}})
 	default:
 		spec, ok := compositeByKey(kind)
 		if !ok {

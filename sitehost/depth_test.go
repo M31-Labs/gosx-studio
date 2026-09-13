@@ -44,3 +44,18 @@ func TestTextAlignmentButtonStylesColumnsAndAnchors(t *testing.T) {
 		}
 	}
 }
+
+func TestGalleriesHaveLayoutsAndALightbox(t *testing.T) {
+	host, handler := newTestHost(t)
+	id := firstPageID(t, host, "menu")
+	postJSON(t, handler, "/admin/api/pages/"+id, `{"title":"Menu","slug":"menu","description":"x","blocks":[{"kind":"gallery","style":"masonry","images":[{"url":"/uploads/a.png","alt":"Loaf"},{"url":"/uploads/b.png","alt":""}]}]}`)
+	post(t, handler, "/admin/api/pages/"+id+"/publish", url.Values{})
+	public := get(t, handler, "/menu").Body.String()
+	mustContain(t, public, `<div class="site-gallery site-gallery--masonry">`, "the layout is on the gallery")
+	mustContain(t, public, `<a href="#lb-gallery-0-0" class="site-gallery__open" aria-label="See larger"><img src="/uploads/a.png" alt="Loaf"`, "each picture opens large")
+	mustContain(t, public, `<div class="site-lightbox" id="lb-gallery-0-0" role="dialog" aria-label="Loaf"><a href="#_" class="site-lightbox__close" aria-label="Close">✕</a><img src="/uploads/a.png"`, "in a box with a close link")
+	mustContain(t, public, `id="lb-gallery-0-1" role="dialog" aria-label="Picture"`, "with a fallback name")
+	editor := get(t, handler, "/admin/edit/"+id).Body.String()
+	mustContain(t, editor, `<select data-gallery-style="true" aria-label="Gallery layout"><option value="grid">Grid</option><option value="strip">Strip, one row</option><option value="masonry" selected="selected">`, "the canvas shows the layout")
+	mustContain(t, get(t, handler, "/admin/api/blocks/gallery").Body.String(), `data-gallery-style="true"`, "a fresh gallery comes from the server")
+}

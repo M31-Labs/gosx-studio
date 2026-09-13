@@ -62,3 +62,23 @@ func TestPicturesHaveSizeShapeCaptionAndLink(t *testing.T) {
 	mustContain(t, fresh, `data-img-shape="true"`, "a fresh picture block comes from the server")
 	mustContain(t, fresh, "No picture yet", "empty")
 }
+
+func TestOwnersCanNameTheirOwnFonts(t *testing.T) {
+	host, handler := newTestHost(t)
+	mustContain(t, postJSON(t, handler, "/admin/api/theme", `{"palette":"fresh","fonts":"custom","fontHead":"Playfair Display","fontBody":"Inter; drop table","headings":"regular","width":"regular"}`).Body.String(), `"ok":true`, "saves")
+	theme := host.theme()
+	if theme.Fonts.Key != "custom" || theme.FontHead != "Playfair Display" || theme.FontBody != "Inter drop table" {
+		t.Fatalf("theme fonts: %+v head=%q body=%q", theme.Fonts, theme.FontHead, theme.FontBody)
+	}
+	home := get(t, handler, "/").Body.String()
+	mustContain(t, home, `--site-font-display:"Playfair Display", ui-sans-serif, system-ui, sans-serif;`, "headings use the named font")
+	mustContain(t, home, `https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&amp;family=Inter+drop+table:wght@400;600&amp;display=swap`, "and the fonts are loaded from Google")
+	postJSON(t, handler, "/admin/api/theme", `{"palette":"fresh","fonts":"custom","fontHead":"","fontBody":""}`)
+	if host.theme().Fonts.Key != "clean" {
+		t.Fatal("custom with no names falls back to the first pairing")
+	}
+	postJSON(t, handler, "/admin/api/theme", `{"palette":"fresh","fonts":"modern","fontHead":"Lobster"}`)
+	if theme := host.theme(); theme.Fonts.Key != "modern" || theme.FontHead != "" {
+		t.Fatalf("a preset forgets the custom names: %+v", theme)
+	}
+}

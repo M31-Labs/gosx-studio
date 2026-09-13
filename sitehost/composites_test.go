@@ -72,7 +72,7 @@ func TestReadyMadeSectionsRoundTripFromEditorToPage(t *testing.T) {
 	editor := get(t, handler, "/admin/edit/"+id).Body.String()
 	for _, want := range []string{
 		`data-composite="hero"`, `data-field="headline"`, `<select data-variant="true"`, `data-item-add="features"`, `data-item="true"`, `data-item-remove="true"`,
-		`data-section-align="true"`, `data-section-width="true"`, `data-section-src="true"`, `data-server-kinds="section,image,button,columns,hero,`, `data-add="testimonials"`,
+		`data-section-align="true"`, `data-section-width="true"`, `data-section-src="true"`, `data-server-kinds="section,image,button,columns,gallery,hero,`, `data-add="testimonials"`,
 		`type="checkbox" data-field="highlight" value="yes" checked="checked"`,
 	} {
 		if !strings.Contains(editor, want) {
