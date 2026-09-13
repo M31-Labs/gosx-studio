@@ -450,37 +450,49 @@ func TestVisitorsSeeComingSoonBeforeSetup(t *testing.T) {
 	mustContain(t, rec.Body.String(), `content="noindex, nofollow"`, "an unbuilt site must not be indexed")
 }
 
-func TestWizardWalksThreeStepsAndBuildsTheSite(t *testing.T) {
+func TestWizardWalksSixStepsAndBuildsTheSite(t *testing.T) {
 	host, handler := newUnbuiltHost(t)
-
-	step1 := post(t, handler, "/setup", url.Values{
-		"step": {"1"}, "siteTitle": {"Wildflower Bakery"}, "tagline": {"Sourdough, every morning."},
-	})
-	mustContain(t, step1.Body.String(), "Which sounds most like you?", "step one advances to step two")
-	mustContain(t, step1.Body.String(), `value="Wildflower Bakery"`, "step two carries the name forward")
-
-	step2 := post(t, handler, "/setup", url.Values{
-		"step": {"2"}, "siteTitle": {"Wildflower Bakery"}, "tagline": {"Sourdough, every morning."},
-		"kind": {"food"},
-	})
-	mustContain(t, step2.Body.String(), "Pick a look", "step two advances to the look step")
-	mustContain(t, step2.Body.String(), `id="template-bakery"`, "with looks that suit a food business")
-
-	step3 := post(t, handler, "/setup", url.Values{
-		"step": {"3"}, "siteTitle": {"Wildflower Bakery"}, "tagline": {"Sourdough, every morning."},
-		"kind": {"food"}, "template": {"bistro"},
-	})
-	mustContain(t, step3.Body.String(), "How should people reach you?", "the look step advances to contact details")
-	mustContain(t, step3.Body.String(), `name="template" value="bistro"`, "and carries the chosen look forward")
-
-	done := post(t, handler, "/setup", url.Values{
-		"step": {"4"}, "siteTitle": {"Wildflower Bakery"}, "tagline": {"Sourdough, every morning."},
-		"kind": {"food"}, "template": {"bistro"}, "email": {"hello@wildflower.example"}, "location": {"42 Mill Lane"},
-	})
-	if done.Code != http.StatusSeeOther {
-		t.Fatalf("finishing the wizard = %d, want 303: %s", done.Code, done.Body.String())
+	base := url.Values{"siteTitle": {"Wildflower Bakery"}, "tagline": {"Sourdough, every morning."}, "description": {"A small bakery on Mill Lane, open since 2014."}}
+	with := func(step string, extra url.Values) url.Values {
+		form := url.Values{}
+		for key, values := range base {
+			form[key] = values
+		}
+		for key, values := range extra {
+			form[key] = values
+		}
+		form.Set("step", step)
+		return form
 	}
 
+	step1 := post(t, handler, "/setup", with("1", nil))
+	mustContain(t, step1.Body.String(), "Which sounds most like you?", "step one advances to the kind")
+	mustContain(t, step1.Body.String(), `value="Wildflower Bakery"`, "and carries the name forward")
+	mustContain(t, step1.Body.String(), `value="A small bakery on Mill Lane, open since 2014."`, "and the description")
+
+	step2 := post(t, handler, "/setup", with("2", url.Values{"kind": {"food"}}))
+	mustContain(t, step2.Body.String(), "Three things people come for", "the kind step advances to the offers, worded for a food business")
+
+	step3 := post(t, handler, "/setup", with("3", url.Values{"kind": {"food"}, "offer1Name": {"Sourdough loaf"}, "offer1Text": {"Baked before dawn"}, "offer1Price": {"$8"}}))
+	mustContain(t, step3.Body.String(), "Where and when can people find you?", "the offers advance to where and when")
+	mustContain(t, step3.Body.String(), `name="offer1Name" value="Sourdough loaf"`, "and carry the offer forward")
+	mustContain(t, step3.Body.String(), `name="hoursmonOpen" value="9:00"`, "with a plausible week filled in")
+
+	step4 := post(t, handler, "/setup", with("4", url.Values{"kind": {"food"}, "offer1Name": {"Sourdough loaf"}, "offer1Price": {"$8"}, "email": {"hello@wildflower.example"}, "location": {"42 Mill Lane"}, "hoursSet": {"1"}, "hoursmonOpen": {"7:00"}, "hoursmonClose": {"15:00"}, "hourssunClosed": {"1"}}))
+	mustContain(t, step4.Body.String(), "Pick a look", "where and when advances to the look")
+	mustContain(t, step4.Body.String(), `id="template-bakery"`, "with looks that suit a food business")
+	mustContain(t, step4.Body.String(), `name="hoursmonOpen" value="7:00"`, "and carries the hours forward")
+
+	step5 := post(t, handler, "/setup", with("5", url.Values{"kind": {"food"}, "template": {"bistro"}, "email": {"hello@wildflower.example"}, "location": {"42 Mill Lane"}, "hoursSet": {"1"}, "hoursmonOpen": {"7:00"}, "hoursmonClose": {"15:00"}}))
+	mustContain(t, step5.Body.String(), "Which pages do you want?", "the look advances to the pages")
+	mustContain(t, step5.Body.String(), `name="template" value="bistro"`, "and carries the chosen look forward")
+	mustContain(t, step5.Body.String(), `id="wz-pagemain" checked="checked"`, "the menu page is ticked for a food business")
+	mustContain(t, step5.Body.String(), `id="wz-publish" checked="checked"`, "and publishing is on")
+
+	done := post(t, handler, "/setup", with("6", url.Values{"kind": {"food"}, "template": {"bistro"}, "email": {"hello@wildflower.example"}, "location": {"42 Mill Lane"}, "offer1Name": {"Sourdough loaf"}, "offer1Text": {"Baked before dawn"}, "offer1Price": {"$8"}, "hoursSet": {"1"}, "hoursmonOpen": {"7:00"}, "hoursmonClose": {"15:00"}, "hourssunClosed": {"1"}, "pagesSet": {"1"}, "pagemain": {"1"}, "pageabout": {"1"}, "pageprivacy": {"1"}, "publish": {"1"}}))
+	if done.Code != http.StatusSeeOther || done.Header().Get("Location") != "/admin?welcome=1" {
+		t.Fatalf("finishing the wizard = %d %q: %s", done.Code, done.Header().Get("Location"), done.Body.String())
+	}
 	if !host.SetupComplete() {
 		t.Fatal("finishing the wizard must mark setup complete")
 	}
@@ -491,22 +503,31 @@ func TestWizardWalksThreeStepsAndBuildsTheSite(t *testing.T) {
 	}
 	mustContain(t, home.Body.String(), "Wildflower Bakery", "the site carries the name from step one")
 	mustContain(t, home.Body.String(), "Sourdough, every morning.", "the tagline lands on the home page")
+	mustContain(t, home.Body.String(), "A small bakery on Mill Lane, open since 2014.", "and the description leads the hero")
+	mustContain(t, home.Body.String(), "Sourdough loaf", "what they offer is on the home page")
+	mustContain(t, home.Body.String(), "7:00 – 15:00", "with the hours they gave")
 
-	// The food template's pages exist and are live.
-	for _, path := range []string{"/menu", "/visit", "/contact"} {
+	for _, path := range []string{"/menu", "/visit", "/about", "/contact", "/privacy"} {
 		if code := get(t, handler, path).Code; code != http.StatusOK {
 			t.Fatalf("GET %s after setup = %d, want 200", path, code)
 		}
 	}
-	mustContain(t, get(t, handler, "/contact").Body.String(), "hello@wildflower.example",
-		"the email from step three reaches the contact page")
-	mustContain(t, get(t, handler, "/contact").Body.String(), "42 Mill Lane",
-		"the location from step three reaches the contact page")
+	mustContain(t, get(t, handler, "/menu").Body.String(), "Sourdough loaf", "the menu lists the offer")
+	mustContain(t, get(t, handler, "/menu").Body.String(), "$8", "with its price")
+	mustContain(t, get(t, handler, "/about").Body.String(), "A small bakery on Mill Lane, open since 2014.", "the about page opens with the description")
+	mustContain(t, get(t, handler, "/contact").Body.String(), "hello@wildflower.example", "the email reaches the contact page")
+	mustContain(t, get(t, handler, "/contact").Body.String(), "42 Mill Lane", "the location reaches the contact page")
+	mustContain(t, get(t, handler, "/visit").Body.String(), "Closed", "Sunday is closed on the visit page")
+	nav := siteNav(t, handler)
+	if strings.Contains(nav, `href="/privacy"`) {
+		t.Fatal("the privacy page stays out of the menu")
+	}
+	mustContain(t, nav, `href="mailto:hello@wildflower.example"`, "the header button emails when there is no phone")
 	if theme := host.theme(); theme.Palette.Key != "night" || theme.Fonts.Key != "editorial" || theme.Buttons != "square" || theme.Spacing != "airy" {
 		t.Fatalf("the Bistro look was not applied: %+v", theme.view())
 	}
-	if host.settings().Metadata["siteTemplate"] != "bistro" {
-		t.Fatal("the chosen template is remembered")
+	if host.settings().Metadata["siteTemplate"] != "bistro" || host.settings().Metadata["tagline"] != "Sourdough, every morning." {
+		t.Fatal("the chosen template and the tagline are remembered")
 	}
 }
 
@@ -528,12 +549,12 @@ func TestWizardBackButtonKeepsAnswers(t *testing.T) {
 
 func TestEachSiteKindProducesItsOwnPages(t *testing.T) {
 	expected := map[string][]string{
-		"shop":      {"home", "about", "contact"}, // /shop is the product shop itself
-		"services":  {"home", "services", "about", "contact"},
-		"food":      {"home", "menu", "visit", "contact"},
-		"portfolio": {"home", "work", "about", "contact"},
-		"community": {"home", "whats-on", "about", "contact"},
-		"simple":    {"home", "contact"},
+		"shop":      {"home", "about", "contact", "privacy"}, // /shop is the product shop itself
+		"services":  {"home", "services", "about", "contact", "privacy"},
+		"food":      {"home", "menu", "visit", "about", "contact", "privacy"},
+		"portfolio": {"home", "work", "about", "contact", "privacy"},
+		"community": {"home", "whats-on", "about", "contact", "privacy"},
+		"simple":    {"home", "about", "contact", "privacy"},
 	}
 	for kind, want := range expected {
 		pages := StarterSiteFor(SetupAnswers{SiteTitle: "Test", Kind: kind})

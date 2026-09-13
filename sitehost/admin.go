@@ -181,9 +181,15 @@ func (h *Host) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		),
 	)
 
+	sections := []gosx.Node{stats, next}
+	if r.URL.Query().Get("welcome") == "1" {
+		// The welcome carries its own next steps; the generic list would only
+		// repeat them.
+		sections = []gosx.Node{h.renderWelcomePanel(r), stats}
+	}
 	body := h.renderAdminShell("dashboard", "Your site",
 		"Everything you publish here appears on your public website.",
-		adminStatus{}, stats, next)
+		adminStatus{}, sections...)
 	h.writeDocument(w, http.StatusOK, h.adminMeta("Your site"), body)
 }
 

@@ -192,6 +192,19 @@ Pages are lists of blocks in the shape the editor uses. `PATCH /agent/v1/pages/{
 
 **Your browser's assistant (WebMCP).** The editor and every admin page announce their tools to the browser through WebMCP. A browser with a built-in assistant can then work the editor for you: "add a pricing section with three plans", "publish this page", "make the look warmer". The tools act as you, with your permissions, and every change is a draft you can undo from History. Browsers without an assistant ignore them.
 
+## The first visit builds the whole site
+
+A new site's first visit to `/admin` is a six-step wizard, and the answers become the site:
+
+1. **Your business.** Name, a one-line tagline (search results and shares), and two or three sentences about you (the About page and the hero).
+2. **What you do.** Food, services, shop, portfolio, community, or something else. This picks the pages and the words.
+3. **What you offer.** Three things, each with a line and an optional price. They become feature cards on the home page, the menu or services page, and a pricing page when priced.
+4. **Where and when.** Email, phone, address, opening hours (a plausible week to correct, or "we don't have hours"), Instagram and Facebook. They fill the contact page, the hours and map sections, the footer, the header button (Call us / Email us), and what Google shows.
+5. **Your look.** Three starting points for colours and type.
+6. **Your pages.** What a business like yours usually needs is ticked: Home and Contact always, the kind's own page, About, a privacy policy kept out of the menu; Photos, Questions, and Pricing to opt into. "Publish everything now" is on; untick it to keep drafts.
+
+On a hosted site the wizard is followed by the one-time password from the welcome mail, which creates the owner's account. Then the dashboard opens on **Your site is ready**: every page with its state and an Edit link, the live address, and the next few things to do.
+
 ## Getting around the editor
 
 **Do anything.** Press **Ctrl+K** (or click the box at the top) and type what you want: "pricing" adds a pricing section, "publish" publishes, "visit" opens the Visit page, "look" jumps to colours and fonts. Arrow keys choose, Enter does it.

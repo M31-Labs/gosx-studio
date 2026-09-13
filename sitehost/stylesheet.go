@@ -602,6 +602,39 @@ details[open] > .site-faq__question::after { content: "–"; }
   border-radius: 2px; cursor: pointer; text-decoration: none; display: inline-block;
 }
 .wz-btn--ghost { background: transparent; color: var(--site-ink); border-color: var(--site-rule); }
+.wz-field textarea { width: 100%; box-sizing: border-box; padding: 11px 13px; font: inherit; font-size: 16px; border: 1px solid var(--site-rule); border-radius: 2px; background: var(--site-ground); color: var(--site-ink); resize: vertical; min-height: 84px; }
+.wz-field textarea:focus-visible { outline: 2px solid var(--site-accent); outline-offset: 1px; }
+.wz-sub { font-size: 16px; margin: 22px 0 10px; }
+.wz-offer { display: grid; grid-template-columns: 1fr 1.4fr 110px; gap: 8px; border: 1px solid var(--site-rule); border-radius: 4px; padding: 12px 12px 12px 40px; margin: 0 0 12px; position: relative; }
+.wz-offer legend { position: absolute; left: 12px; top: 14px; font-weight: 600; color: var(--site-muted); }
+.wz-offer input { width: 100%; box-sizing: border-box; padding: 9px 10px; font: inherit; font-size: 15px; border: 1px solid var(--site-rule); border-radius: 2px; background: var(--site-ground); color: var(--site-ink); }
+.wz-offer input:focus-visible { outline: 2px solid var(--site-accent); outline-offset: 1px; }
+.wz-check { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: baseline; padding: 10px 12px; border: 1px solid var(--site-rule); border-radius: 4px; margin: 0 0 8px; cursor: pointer; }
+.wz-check:has(input:checked) { border-color: var(--site-accent); }
+.wz-check input { width: 18px; height: 18px; margin: 0; accent-color: var(--site-accent); }
+.wz-check__label { font-weight: 600; }
+.wz-check__hint { grid-column: 2; font-size: 13.5px; color: var(--site-muted); }
+.wz-hours { display: grid; gap: 6px; margin: 0 0 8px; }
+.wz-hours__row { display: grid; grid-template-columns: 96px 1fr auto 1fr auto; gap: 8px; align-items: center; }
+.wz-hours__row input[type="text"] { width: 100%; box-sizing: border-box; padding: 8px 9px; font: inherit; font-size: 15px; border: 1px solid var(--site-rule); border-radius: 2px; background: var(--site-ground); color: var(--site-ink); }
+.wz-hours__day { font-size: 14.5px; }
+.wz-hours__to { font-size: 13px; color: var(--site-muted); }
+.wz-hours__closed { font-size: 13.5px; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.wz-hours__closed input { accent-color: var(--site-accent); }
+.wz-check:has(#wz-noHours:checked) + .wz-hours { display: none; }
+.wz-pages { margin: 0 0 8px; }
+.admin-welcome { border: 2px solid var(--site-accent); }
+.admin-welcome__pages { list-style: none; margin: 12px 0 18px; padding: 0; display: grid; gap: 6px; }
+.admin-welcome__page { display: grid; grid-template-columns: 58px 1fr auto auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--site-rule); border-radius: 6px; }
+.admin-welcome__state { font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--site-muted); }
+.admin-welcome__state[data-live="true"] { color: var(--site-accent); font-weight: 700; }
+@media (max-width: 640px) {
+  .wz-offer { grid-template-columns: 1fr; padding-left: 12px; padding-top: 34px; }
+  .wz-hours__row { grid-template-columns: 1fr 1fr; }
+  .wz-hours__day { grid-column: 1 / -1; }
+  .wz-hours__to { display: none; }
+  .admin-welcome__page { grid-template-columns: 58px 1fr; }
+}
 
 /* ---------- Look (site-wide theme) ---------- */
 .ed-look-group { margin: 0 0 14px; }

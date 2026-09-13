@@ -41,6 +41,8 @@ type StarterPage struct {
 	Description string
 	Body        blockstudio.Document
 	Publish     bool
+	// HideFromMenu keeps a page (the privacy policy) out of the main menu.
+	HideFromMenu bool
 }
 
 // StarterSettings is the site-wide starter configuration.

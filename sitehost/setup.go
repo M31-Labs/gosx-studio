@@ -36,18 +36,6 @@ func (h *Host) mountSetup(mux *http.ServeMux) {
 	mux.HandleFunc("POST /setup/{$}", h.handleSetupStep)
 }
 
-func answersFromForm(r *http.Request) SetupAnswers {
-	return SetupAnswers{
-		SiteTitle: r.FormValue("siteTitle"),
-		Tagline:   r.FormValue("tagline"),
-		Kind:      r.FormValue("kind"),
-		Template:  r.FormValue("template"),
-		Email:     r.FormValue("email"),
-		Phone:     r.FormValue("phone"),
-		Location:  r.FormValue("location"),
-	}.trimmed()
-}
-
 func (h *Host) handleSetupStep(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	answers := answersFromForm(r)
@@ -84,13 +72,21 @@ func (h *Host) handleSetupStep(w http.ResponseWriter, r *http.Request) {
 		}
 		h.renderSetup(w, "3", answers, "")
 	case "3":
+		h.renderSetup(w, "4", answers, "")
+	case "4":
+		if answers.Email != "" && !strings.Contains(answers.Email, "@") {
+			h.renderSetup(w, "4", answers, "That email address doesn't look right.")
+			return
+		}
+		h.renderSetup(w, "5", answers, "")
+	case "5":
 		// A look is always chosen: the first card is preselected, and an
 		// unknown key falls back to the kind's default.
 		answers.Template = templateFor(answers).Key
-		h.renderSetup(w, "4", answers, "")
-	case "4":
+		h.renderSetup(w, "6", answers, "")
+	case "6":
 		if err := h.CompleteSetup(answers); err != nil {
-			h.renderSetup(w, "4", answers, "Something went wrong building your site. Try again.")
+			h.renderSetup(w, "6", answers, "Something went wrong building your site. Try again.")
 			return
 		}
 		http.Redirect(w, r, "/admin?welcome=1", http.StatusSeeOther)
@@ -101,6 +97,10 @@ func (h *Host) handleSetupStep(w http.ResponseWriter, r *http.Request) {
 
 func previousStep(step string) string {
 	switch step {
+	case "6":
+		return "5"
+	case "5":
+		return "4"
 	case "4":
 		return "3"
 	case "3":
@@ -132,6 +132,24 @@ func (h *Host) CompleteSetup(answers SetupAnswers) error {
 	if answers.Kind != "" {
 		metadata["siteKind"] = SiteKindByKey(answers.Kind).Key
 	}
+	if answers.Tagline != "" {
+		metadata["tagline"] = answers.Tagline
+	}
+	for network, link := range answers.Social {
+		if safe := safeLinkHref(link); safe != "" {
+			metadata[socialKey(network)] = safe
+		}
+	}
+	// A header button that does the one thing most visitors came for.
+	switch {
+	case answers.Phone != "":
+		metadata[menuButtonKey] = "Call us"
+		metadata[menuButtonURLKey] = "tel:" + strings.ReplaceAll(answers.Phone, " ", "")
+	case answers.Email != "":
+		metadata[menuButtonKey] = "Email us"
+		metadata[menuButtonURLKey] = "mailto:" + answers.Email
+	}
+	metadata[footerMenuKey] = "true"
 	// The chosen starting point sets the Look; the owner changes any of it
 	// later from the editor.
 	template := templateFor(answers)
@@ -163,12 +181,16 @@ func (h *Host) CompleteSetup(answers SetupAnswers) error {
 	}
 
 	for _, starter := range StarterSiteFor(answers) {
+		pageMetadata := cmsstore.Metadata{"metaDescription": starter.Description}
+		if starter.HideFromMenu {
+			pageMetadata[pageNavHiddenKey] = "true"
+		}
 		page, err := h.store.CreatePage(cmsstore.PageInput{
 			Slug:        starter.Slug,
 			Title:       starter.Title,
 			Description: starter.Description,
 			Body:        starter.Body,
-			Metadata:    cmsstore.Metadata{"metaDescription": starter.Description},
+			Metadata:    pageMetadata,
 		})
 		if err != nil {
 			return err
@@ -197,12 +219,16 @@ func (h *Host) renderSetup(w http.ResponseWriter, step string, answers SetupAnsw
 	case "2":
 		panel = setupStepTwo(answers)
 	case "3":
+		panel = setupStepOffers(answers)
+	case "4":
+		panel = setupStepWhere(answers)
+	case "5":
 		panel = setupStepLook(answers)
 		if fonts := fontsPreviewURL(); fonts != "" {
 			extras = gosx.El("link", gosx.Attrs(gosx.Attr("rel", "stylesheet"), gosx.Attr("href", fonts)))
 		}
-	case "4":
-		panel = setupStepThree(answers)
+	case "6":
+		panel = setupStepPages(answers)
 	default:
 		panel = setupStepOne(answers)
 	}
@@ -231,8 +257,10 @@ func setupProgress(step string) gosx.Node {
 	steps := []struct{ Key, Label string }{
 		{"1", "Your business"},
 		{"2", "What you do"},
-		{"3", "Your look"},
-		{"4", "Getting in touch"},
+		{"3", "What you offer"},
+		{"4", "Where and when"},
+		{"5", "Your look"},
+		{"6", "Your pages"},
 	}
 	dots := make([]gosx.Node, 0, len(steps))
 	for _, item := range steps {
@@ -259,12 +287,14 @@ func setupStepOne(answers SetupAnswers) gosx.Node {
 	return gosx.Fragment(
 		gosx.El("h1", nil, gosx.Text("Let's build your website")),
 		gosx.El("p", gosx.Attrs(gosx.Attr("class", "wz-lede")),
-			gosx.Text("Three questions. Then you'll have a real site you can edit and publish. Nothing here is permanent.")),
+			gosx.Text("A few questions, and you'll have a real site: pages written from your answers, live if you want it. Nothing here is permanent.")),
 		wizardField("siteTitle", "What's your business called?", answers.SiteTitle, "Wildflower Bakery", true),
 		wizardField("tagline", "What do you do, in one line?", answers.Tagline,
 			"Sourdough and pastries, baked every morning in Oakland", false),
 		gosx.El("p", gosx.Attrs(gosx.Attr("class", "wz-hint")),
 			gosx.Text("This line shows up in Google results and when someone shares your site.")),
+		wizardArea("description", "Tell us a little more (optional)", answers.Description, "Who you are, what you do, and who it's for. Two or three sentences; they go on your About page and your home page."),
+		carry(answers, "siteTitle", "tagline", "description"),
 		hidden("step", "1"),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "wz-actions")),
 			gosx.El("button", gosx.Attrs(gosx.Attr("class", "wz-btn"), gosx.Attr("type", "submit")), gosx.Text("Next")),
@@ -297,33 +327,11 @@ func setupStepTwo(answers SetupAnswers) gosx.Node {
 		gosx.El("p", gosx.Attrs(gosx.Attr("class", "wz-lede")),
 			gosx.Text("This decides which pages we start you with. Pick the closest one — you can add, rename, and delete pages afterwards.")),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "wz-choices")), gosx.Fragment(cards...)),
-		hidden("siteTitle", answers.SiteTitle),
-		hidden("tagline", answers.Tagline),
-		hidden("template", answers.Template),
+		carry(answers, "kind"),
 		hidden("step", "2"),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "wz-actions")),
 			gosx.El("button", gosx.Attrs(gosx.Attr("class", "wz-btn wz-btn--ghost"), gosx.Attr("type", "submit"), gosx.Attr("name", "back"), gosx.Attr("value", "1")), gosx.Text("Back")),
 			gosx.El("button", gosx.Attrs(gosx.Attr("class", "wz-btn"), gosx.Attr("type", "submit")), gosx.Text("Next")),
-		),
-	)
-}
-
-func setupStepThree(answers SetupAnswers) gosx.Node {
-	return gosx.Fragment(
-		gosx.El("h1", nil, gosx.Text("How should people reach you?")),
-		gosx.El("p", gosx.Attrs(gosx.Attr("class", "wz-lede")),
-			gosx.Text("We'll put these on your contact page. Skip anything you'd rather not share — you can add it later.")),
-		wizardField("email", "Email address", answers.Email, "hello@wildflower.com", false),
-		wizardField("phone", "Phone number", answers.Phone, "0161 496 0000", false),
-		wizardField("location", "Where you are", answers.Location, "42 Mill Lane, Oakland", false),
-		hidden("siteTitle", answers.SiteTitle),
-		hidden("tagline", answers.Tagline),
-		hidden("kind", answers.Kind),
-		hidden("template", answers.Template),
-		hidden("step", "4"),
-		gosx.El("div", gosx.Attrs(gosx.Attr("class", "wz-actions")),
-			gosx.El("button", gosx.Attrs(gosx.Attr("class", "wz-btn wz-btn--ghost"), gosx.Attr("type", "submit"), gosx.Attr("name", "back"), gosx.Attr("value", "3")), gosx.Text("Back")),
-			gosx.El("button", gosx.Attrs(gosx.Attr("class", "wz-btn"), gosx.Attr("type", "submit")), gosx.Text("Build my site")),
 		),
 	)
 }
@@ -421,12 +429,10 @@ func setupStepLook(answers SetupAnswers) gosx.Node {
 		gosx.El("p", gosx.Attrs(gosx.Attr("class", "wz-lede")),
 			gosx.Text("Three starting points that suit what you do. Colours, fonts, and shapes can all be changed later, from the editor, while you watch.")),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "wz-choices")), gosx.Fragment(cards...)),
-		hidden("siteTitle", answers.SiteTitle),
-		hidden("tagline", answers.Tagline),
-		hidden("kind", answers.Kind),
-		hidden("step", "3"),
+		carry(answers, "template"),
+		hidden("step", "5"),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "wz-actions")),
-			gosx.El("button", gosx.Attrs(gosx.Attr("class", "wz-btn wz-btn--ghost"), gosx.Attr("type", "submit"), gosx.Attr("name", "back"), gosx.Attr("value", "2")), gosx.Text("Back")),
+			gosx.El("button", gosx.Attrs(gosx.Attr("class", "wz-btn wz-btn--ghost"), gosx.Attr("type", "submit"), gosx.Attr("name", "back"), gosx.Attr("value", "4")), gosx.Text("Back")),
 			gosx.El("button", gosx.Attrs(gosx.Attr("class", "wz-btn"), gosx.Attr("type", "submit")), gosx.Text("Next")),
 		),
 	)

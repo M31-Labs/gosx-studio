@@ -96,7 +96,7 @@ func TestLogoAndFaviconUploadThroughSettings(t *testing.T) {
 func TestFooterCarriesWizardContactDetails(t *testing.T) {
 	host, handler := newUnbuiltHost(t)
 	post(t, handler, "/setup", map[string][]string{
-		"step": {"4"}, "siteTitle": {"Corner Shop"}, "kind": {"shop"},
+		"step": {"6"}, "siteTitle": {"Corner Shop"}, "kind": {"shop"},
 		"email": {"hi@corner.example"}, "phone": {"0161 496 0000"},
 	})
 	if !host.SetupComplete() {

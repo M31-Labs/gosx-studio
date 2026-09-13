@@ -104,12 +104,12 @@ func TestReadinessChecksBeforePublish(t *testing.T) {
 		{"kind":"image","url":"/uploads/x.png","alt":""},
 		{"kind":"gallery","images":[{"url":"/uploads/a.png","alt":""},{"url":"/uploads/b.png","alt":"fine"}]},
 		{"kind":"button","text":"Book","url":"/bookings"},
-		{"kind":"paragraph","text":"See [our story](/about) and [the menu](/menu) and [the blog](/blog)."}
+		{"kind":"paragraph","text":"See [our story](/careers) and [the menu](/menu) and [the blog](/blog)."}
 	]}`).Body.String()
 	mustContain(t, body, "No description for search results yet", "a missing description is flagged")
 	mustContain(t, body, "2 pictures have no description", "pictures without alt text are counted")
 	mustContain(t, body, "A link points at /bookings, which doesn't exist", "a broken button is flagged")
-	mustContain(t, body, "A link points at /about, which doesn't exist", "a broken inline link is flagged")
+	mustContain(t, body, "A link points at /careers, which doesn't exist", "a broken inline link is flagged")
 	if strings.Contains(body, "/menu, which") || strings.Contains(body, "/blog, which") {
 		t.Fatal("links to real pages must not be flagged")
 	}
