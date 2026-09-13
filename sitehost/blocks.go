@@ -1,6 +1,7 @@
 package sitehost
 
 import (
+	"m31labs.dev/gosx-studio/internal/mediaurl"
 	"net/url"
 	"regexp"
 	"strings"
@@ -264,10 +265,12 @@ func (h *Host) renderBlock(instance blockstudio.BlockInstance, hooks render.Hook
 			box := "lb-" + instance.ID + "-" + itoa(index)
 			items = append(items, gosx.El("figure", gosx.Attrs(gosx.Attr("class", "site-gallery__item")),
 				gosx.El("a", gosx.Attrs(gosx.Attr("href", "#"+box), gosx.Attr("class", "site-gallery__open"), gosx.Attr("aria-label", "See larger")), gosx.El("img", gosx.Attrs(attrs...)))))
-			full, _ := h.imageAttrs(image[0], image[1], "100vw")
+			// The large copy is the plain file: a srcset with sizes would make
+			// the browser treat it as viewport-wide and blow small pictures up.
+			large, _ := mediaurl.ForImage(strings.TrimSpace(image[0]))
 			boxes = append(boxes, gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-lightbox"), gosx.Attr("id", box), gosx.Attr("role", "dialog"), gosx.Attr("aria-label", firstNonEmpty(image[1], "Picture"))),
 				gosx.El("a", gosx.Attrs(gosx.Attr("href", "#_"), gosx.Attr("class", "site-lightbox__close"), gosx.Attr("aria-label", "Close")), gosx.Text("✕")),
-				gosx.El("img", gosx.Attrs(full...))))
+				gosx.El("img", gosx.Attrs(gosx.Attr("src", large), gosx.Attr("alt", image[1]), gosx.Attr("loading", "lazy")))))
 		}
 		if len(items) == 0 {
 			return gosx.Fragment(), false
