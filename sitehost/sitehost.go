@@ -96,6 +96,14 @@ type Options struct {
 	// OperatorToken lets the platform read /platform/status and download
 	// /platform/export.zip. Empty closes both.
 	OperatorToken string
+	// AgentKeys are bearer tokens the platform pre-provisions so an agent
+	// can build the site from nothing, before an owner ever signs in.
+	AgentKeys []string
+	// AssistantURL configures the in-editor assistant: anthropic://KEY?model=…
+	// or log:// for a dry run. Empty means no assistant.
+	AssistantURL string
+	// Assistant overrides AssistantURL with a ready provider. Tests use it.
+	Assistant AssistantProvider
 }
 
 func (o Options) normalize() Options {
@@ -132,6 +140,10 @@ type Host struct {
 	bookings  *bookingStore
 	carts     *cartStore
 	presets   *presetStore
+	agents    *agentStore
+	agentOnce sync.Once
+	agentMux  http.Handler
+	assistant AssistantProvider
 	collab    *collabHub
 	users     *userStore
 	auditLog  *auditStore
@@ -164,7 +176,7 @@ func Open(opts Options) (*Host, error) {
 		return nil, fmt.Errorf("sitehost: open site data: %w", err)
 	}
 
-	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath()), products: newProductStore(opts.productsPath()), orders: newOrderStore(opts.ordersPath()), bookings: newBookingStore(opts.bookingsPath()), carts: newCartStore(opts.cartsPath()), presets: newPresetStore(opts.presetsPath()), collab: newCollabHub(), users: newUserStore(opts.usersPath()), auditLog: newAuditStore(opts.auditPath()), metrics: newMetrics()}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath()), products: newProductStore(opts.productsPath()), orders: newOrderStore(opts.ordersPath()), bookings: newBookingStore(opts.bookingsPath()), carts: newCartStore(opts.cartsPath()), presets: newPresetStore(opts.presetsPath()), agents: newAgentStore(opts.agentsPath()), assistant: opts.assistantProvider(), collab: newCollabHub(), users: newUserStore(opts.usersPath()), auditLog: newAuditStore(opts.auditPath()), metrics: newMetrics()}
 	host.Migrated = migrated
 	if err := host.configureMail(); err != nil {
 		return nil, err
@@ -191,7 +203,7 @@ func Open(opts Options) (*Host, error) {
 // this to supply in-memory storage.
 func NewWithStore(store LifecycleContentStore, opts Options) *Host {
 	opts = opts.normalize()
-	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath()), products: newProductStore(opts.productsPath()), orders: newOrderStore(opts.ordersPath()), bookings: newBookingStore(opts.bookingsPath()), carts: newCartStore(opts.cartsPath()), presets: newPresetStore(opts.presetsPath()), collab: newCollabHub(), users: newUserStore(opts.usersPath()), auditLog: newAuditStore(opts.auditPath()), metrics: newMetrics()}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath()), products: newProductStore(opts.productsPath()), orders: newOrderStore(opts.ordersPath()), bookings: newBookingStore(opts.bookingsPath()), carts: newCartStore(opts.cartsPath()), presets: newPresetStore(opts.presetsPath()), agents: newAgentStore(opts.agentsPath()), assistant: opts.assistantProvider(), collab: newCollabHub(), users: newUserStore(opts.usersPath()), auditLog: newAuditStore(opts.auditPath()), metrics: newMetrics()}
 	_ = host.configureMail()
 	return host
 }
@@ -274,6 +286,10 @@ func (h *Host) routes() *http.ServeMux {
 	h.mountStaging(mux)
 	h.mountCollab(mux)
 	h.mountPresets(mux)
+	h.mountAgent(mux)
+	h.mountAgentAdmin(mux)
+	h.mountAgentPublic(mux)
+	h.mountAssistant(mux)
 	h.mountPlatform(mux)
 	h.mountPublic(mux)
 	return mux

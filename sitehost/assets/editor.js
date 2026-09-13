@@ -1114,6 +1114,68 @@
   root.addEventListener("pointerup", endItemDrag);
   root.addEventListener("pointercancel", endItemDrag);
 
+  /* ---------- the assistant: say it, see it ---------- */
+
+  (function () {
+    var box = root.querySelector("[data-assistant]:not([data-assistant='off'])");
+    if (!box) return;
+    var prompt = box.querySelector("[data-assistant-prompt]");
+    var send = box.querySelector("[data-assistant-send]");
+    var reply = box.querySelector("[data-assistant-reply]");
+    var working = false;
+    function show(text, steps, isError) {
+      reply.innerHTML = "";
+      reply.classList.toggle("ed-assist__reply--error", !!isError);
+      var p = document.createElement("p");
+      p.textContent = text;
+      reply.appendChild(p);
+      if (steps && steps.length) {
+        var list = document.createElement("ul");
+        list.className = "ed-assist__steps";
+        steps.forEach(function (step) { var li = document.createElement("li"); li.textContent = step; list.appendChild(li); });
+        reply.appendChild(list);
+      }
+    }
+    function ask() {
+      if (working) return;
+      var text = (prompt.value || "").trim();
+      if (!text) { prompt.focus(); return; }
+      working = true;
+      send.disabled = true;
+      box.classList.add("ed-assist--working");
+      show("Working on it…", [], false);
+      status("dirty", "The assistant is working…");
+      fetch("/admin/api/assistant", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF },
+        body: JSON.stringify({ kind: box.getAttribute("data-assistant"), id: box.getAttribute("data-assistant-id") || "", prompt: text }),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (result) {
+          show(result.ok ? result.reply : (result.message || "That didn't work."), result.steps || [], !result.ok);
+          if (result.changed) {
+            prompt.value = "";
+            refreshCanvas();
+            status("saved", "The assistant changed this page — undo from History if you like");
+          } else {
+            status("saved", "All changes saved");
+          }
+        })
+        .catch(function () { show("Couldn't reach the server. Try again.", [], true); status("error", "Couldn't reach the server."); })
+        .then(function () { working = false; send.disabled = false; box.classList.remove("ed-assist--working"); });
+    }
+    send.addEventListener("click", ask);
+    prompt.addEventListener("keydown", function (event) {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); ask(); }
+    });
+    box.addEventListener("click", function (event) {
+      var chip = event.target.closest("[data-assistant-example]");
+      if (!chip) return;
+      prompt.value = chip.getAttribute("data-assistant-example");
+      prompt.focus();
+    });
+  })();
+
   /* ---------- interactions ---------- */
 
   root.addEventListener("click", function (event) {

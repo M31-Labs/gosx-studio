@@ -50,8 +50,18 @@ func run() error {
 		managed  = flag.String("managed-by", env("GOSX_SITE_MANAGED_BY", ""), "name of the hosting platform running this site, when one does")
 		domain   = flag.String("domain", env("GOSX_SITE_DOMAIN", ""), "the owner's domain as connected by the platform")
 		opToken  = flag.String("operator-token", env("GOSX_SITE_OPERATOR_TOKEN", ""), "token the platform uses for /platform/status and /platform/export.zip")
+		agentKey = flag.String("agent-key", env("GOSX_SITE_AGENT_KEY", ""), "pre-provisioned agent key(s), comma-separated, so an agent can build the site before anyone signs in")
+		assist   = flag.String("assistant", env("GOSX_SITE_ASSISTANT", ""), "the in-editor assistant: anthropic://KEY?model=claude-sonnet-5")
 	)
+	if len(os.Args) > 1 && os.Args[1] == "mcp" {
+		return runMCP(os.Args[2:])
+	}
 	flag.Parse()
+	if *assist != "" {
+		if _, err := sitehost.ParseAssistantURL(*assist); err != nil {
+			return fmt.Errorf("-assistant: %w", err)
+		}
+	}
 
 	if *https && *addr == "127.0.0.1:8080" {
 		*addr = ":443"
@@ -95,6 +105,8 @@ func run() error {
 		ManagedBy:       *managed,
 		Domain:          *domain,
 		OperatorToken:   *opToken,
+		AgentKeys:       splitList(*agentKey),
+		AssistantURL:    *assist,
 	})
 	if err != nil {
 		return err
@@ -214,4 +226,31 @@ func env(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// runMCP bridges a stdio MCP client (Claude Desktop, an IDE) to a site's
+// agent API over HTTP: gosx-site mcp -site https://example.com -key gsk_…
+func runMCP(args []string) error {
+	set := flag.NewFlagSet("mcp", flag.ContinueOnError)
+	site := set.String("site", env("GOSX_SITE_URL", ""), "the site's address, e.g. https://yourbusiness.com")
+	key := set.String("key", env("GOSX_SITE_AGENT_KEY", ""), "an agent key from the site's Agents page")
+	if err := set.Parse(args); err != nil {
+		return err
+	}
+	if *site == "" {
+		return errors.New("mcp: -site is required (or set GOSX_SITE_URL)")
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return sitehost.RunMCPStdio(ctx, os.Stdin, os.Stdout, *site, *key, &http.Client{Timeout: 90 * time.Second})
+}
+
+func splitList(raw string) []string {
+	out := []string{}
+	for _, part := range strings.Split(raw, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }

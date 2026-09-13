@@ -103,6 +103,10 @@ func (h *Host) servePublicSlug(w http.ResponseWriter, r *http.Request, slug stri
 		return
 	}
 
+	if wantsMarkdown(r) {
+		writeMarkdown(w, h.pageMarkdown(page, h.absoluteBase(r)))
+		return
+	}
 	meta := metaFromSettings(settings)
 	meta.Title = page.Title
 	meta.Description = firstNonEmpty(page.Description, settings.Description)

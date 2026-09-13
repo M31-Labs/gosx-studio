@@ -174,7 +174,25 @@ it is, wide crop, square, round), a caption, and a link. For owners who know
 CSS, **Settings → Your own CSS** applies to every page and to the editor's
 canvas; imports and anything that isn't plain CSS are stripped.
 
-### Rearranging, spacing, and presets
+### Agents: the site is a set of tools
+
+Everything the editor can do, an assistant can do too. The site is agent-native in four ways.
+
+**Reading.** Every public page is also Markdown: add `?format=md` or send `Accept: text/markdown`. `/llms.txt` describes the site (pages, contact, shop) and `/llms-full.txt` carries every page as one Markdown file. No key is needed.
+
+**Editing.** An admin makes a key under **Agents** (name it after what will use it, tick what it may do: read, write, publish, settings). With the key, an agent uses the same operations as the editor:
+
+- the JSON API at `/agent/v1` (OpenAPI at `/agent/v1/openapi.json`, block schema at `/agent/v1/schema`);
+- MCP at `/agent/mcp` (Streamable HTTP, bearer key). Claude Code: `claude mcp add --transport http my-site https://yoursite.com/agent/mcp --header "Authorization: Bearer gsk_…"`;
+- a stdio bridge for clients that lack HTTP MCP: `gosx-site mcp -site https://yoursite.com -key gsk_…`.
+
+Pages are lists of blocks in the shape the editor uses. `PATCH /agent/v1/pages/{id}` edits by index (`replace`, `remove`, `insert`, `append`, `move`); `PUT` replaces; `POST /agent/v1/pages` creates from a template or from blocks. Posts, products, pictures, the Look, presets, messages, and visitor counts have calls of their own. Every write is a draft until `publish`, every action is audited under the key's name, and a revoked key stops at once.
+
+**Building from nothing.** A platform can pass `-agent-key gsk_…` (or `GOSX_SITE_AGENT_KEY`) so an agent can call `POST /agent/v1/setup` and build the whole site before anyone signs in.
+
+**The owner's assistant.** Start the site with `-assistant anthropic://YOUR_KEY` (or `GOSX_SITE_ASSISTANT`; add `?model=` to pick a model) and every page gets an **Ask your site** box: "Add a pricing section with three plans", "Rewrite the intro so it sounds warmer". The dashboard gets one for the whole site: "We're a family bakery in Oakland; write the home page". The assistant works as the signed-in person with the same tools, so editors cannot publish through it and locked sections stay locked. Changes are drafts and show up on the canvas at once; undo them from History. `-assistant echo://` turns the box on without a model, for trying it out.
+
+## Rearranging, spacing, and presets
 
 Every card, plan, question, person, row, and gallery picture has a small toolbar when you hover it. Drag the ⠿ handle to move it, or use the ↑ and ↓ buttons. The page saves on its own.
 

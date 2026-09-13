@@ -355,6 +355,7 @@ func (h *Host) requireSetup(next http.Handler) http.Handler {
 			strings.HasPrefix(path, "/_gosx/") ||
 			strings.HasPrefix(path, uploadsURLPrefix) ||
 			strings.HasPrefix(path, "/platform/") ||
+			strings.HasPrefix(path, agentPathPrefix+"/") ||
 			path == sitemapPath || path == robotsPath ||
 			path == "/healthz"
 		if exempt || h.SetupComplete() {

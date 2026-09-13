@@ -275,6 +275,7 @@ func (h *Host) renderEditorSidebar(subject editorSubject) gosx.Node {
 				addButton("product", "Product", "Something from your shop"),
 			),
 		),
+		h.renderAssistantBox(subject.Kind, subject.ID, nil, false),
 		lookSection,
 		h.renderPresetAdds(),
 		h.renderSubjectFields(subject),
@@ -978,22 +979,22 @@ func (h *Host) handleEditorSave(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, editorSaveResult{Message: "We couldn't read that change. Try again."})
 		return
 	}
+	writeJSON(w, http.StatusOK, h.applyPageSave(r, page, payload))
+}
 
+// applyPageSave is the one save path for a page: the editor, the agent
+// API, and the assistant all go through it.
+func (h *Host) applyPageSave(r *http.Request, page cmsstore.Page, payload editorSavePayload) editorSaveResult {
 	title := strings.TrimSpace(payload.Title)
 	if title == "" {
-		writeJSON(w, http.StatusOK, editorSaveResult{Message: "Give the page a name."})
-		return
+		return editorSaveResult{Message: "Give the page a name."}
 	}
 	slug := normalizeSlug(firstNonEmpty(payload.Slug, title))
 	if message := reservedSlugMessage(slug); message != "" && page.Slug != slug {
-		writeJSON(w, http.StatusOK, editorSaveResult{Message: message})
-		return
+		return editorSaveResult{Message: message}
 	}
 	if other, exists, _ := h.store.PageBySlug(slug); exists && other.ID != page.ID {
-		writeJSON(w, http.StatusOK, editorSaveResult{
-			Message: "Another page already uses /" + slug + ".",
-		})
-		return
+		return editorSaveResult{Message: "Another page already uses /" + slug + "."}
 	}
 
 	metadata := cmsstore.Metadata{}
@@ -1006,15 +1007,13 @@ func (h *Host) handleEditorSave(w http.ResponseWriter, r *http.Request) {
 		delete(metadata, "metaDescription")
 	}
 	if message := applyPublishAt(metadata, payload.PublishAt); message != "" {
-		writeJSON(w, http.StatusOK, editorSaveResult{Message: message})
-		return
+		return editorSaveResult{Message: message}
 	}
 	h.applyNavParent(page, metadata, payload.NavParent)
 
 	body := h.payloadDocument(payload.Blocks)
 	if !h.roleAtLeast(r, roleAdmin) && !lockedBlocksUnchanged(page.Body, body) {
-		writeJSON(w, http.StatusOK, editorSaveResult{Message: "This page has locked sections that only an admin can change. Your other edits are still here; undo the change to the locked part and save again."})
-		return
+		return editorSaveResult{Message: "This page has locked sections that only an admin can change. Your other edits are still here; undo the change to the locked part and save again."}
 	}
 	input := cmsstore.PageInput{
 		Slug:        slug,
@@ -1025,19 +1024,18 @@ func (h *Host) handleEditorSave(w http.ResponseWriter, r *http.Request) {
 		State:       page.State,
 	}
 	if _, _, err := h.store.PreviewPage(page.ID, input); err != nil {
-		writeJSON(w, http.StatusOK, editorSaveResult{Message: "We couldn't save that. Try again."})
-		return
+		return editorSaveResult{Message: "We couldn't save that. Try again."}
 	}
 	if slug != page.Slug && page.Slug != homeSlug {
 		_ = h.recordRedirect(publicPath(page.Slug), publicPath(slug))
 	}
 	h.notifyChanged(r, "page", page.ID)
-	writeJSON(w, http.StatusOK, editorSaveResult{
+	return editorSaveResult{
 		OK:     true,
 		Slug:   slug,
 		Live:   h.isLive(page),
 		Checks: h.readinessChecks("page", strings.TrimSpace(payload.Description), input.Body),
-	})
+	}
 }
 
 func (h *Host) payloadDocument(blocks []editorBlockPayload) blockstudio.Document {

@@ -42,7 +42,7 @@ const AdminUser = "admin"
 // /admin is open to editors.
 var adminOnlyPrefixes = []string{
 	"/admin/settings", "/admin/domain", "/admin/backups", "/admin/export.zip",
-	"/admin/users", "/admin/orders", stagingAdminPath, "/admin/api/theme", "/admin/metrics", "/admin/messages/prune", "/admin/messages/export.csv", "/admin/privacy-page",
+	"/admin/users", "/admin/orders", agentsAdminPath, stagingAdminPath, "/admin/api/theme", "/admin/metrics", "/admin/messages/prune", "/admin/messages/export.csv", "/admin/privacy-page",
 }
 
 func adminOnly(path string) bool {

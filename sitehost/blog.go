@@ -460,6 +460,10 @@ func (h *Host) handleBlogPost(w http.ResponseWriter, r *http.Request) {
 		h.servePublicNotFound(w, settings, strings.TrimPrefix(postPath(slug), "/"))
 		return
 	}
+	if wantsMarkdown(r) {
+		writeMarkdown(w, h.postMarkdown(post, h.absoluteBase(r)))
+		return
+	}
 
 	brand := brandFromSettings(settings)
 	meta := metaFromSettings(settings)
@@ -895,30 +899,31 @@ func (h *Host) handlePostSave(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, editorSaveResult{Message: "We couldn't read that change. Try again."})
 		return
 	}
+	writeJSON(w, http.StatusOK, h.applyPostSave(r, post, payload))
+}
+
+// applyPostSave is the one save path for a post.
+func (h *Host) applyPostSave(r *http.Request, post cmsstore.Post, payload postSavePayload) editorSaveResult {
 	title := strings.TrimSpace(payload.Title)
 	if title == "" {
-		writeJSON(w, http.StatusOK, editorSaveResult{Message: "Give the post a title."})
-		return
+		return editorSaveResult{Message: "Give the post a title."}
 	}
 	slug := normalizeSlug(firstNonEmpty(payload.Slug, title))
 	if slug == "" {
 		slug = post.Slug
 	}
 	if other, exists, _ := h.store.PostBySlug(slug); exists && other.ID != post.ID {
-		writeJSON(w, http.StatusOK, editorSaveResult{Message: "Another post already uses " + postPath(slug) + "."})
-		return
+		return editorSaveResult{Message: "Another post already uses " + postPath(slug) + "."}
 	}
 
 	metadata := cloneMetadata(post.Metadata)
 	if message := applyPublishAt(metadata, payload.PublishAt); message != "" {
-		writeJSON(w, http.StatusOK, editorSaveResult{Message: message})
-		return
+		return editorSaveResult{Message: message}
 	}
 
 	body := h.payloadDocument(payload.Blocks)
 	if !h.roleAtLeast(r, roleAdmin) && !lockedBlocksUnchanged(post.Body, body) {
-		writeJSON(w, http.StatusOK, editorSaveResult{Message: "This post has locked sections that only an admin can change. Undo the change to the locked part and save again."})
-		return
+		return editorSaveResult{Message: "This post has locked sections that only an admin can change. Undo the change to the locked part and save again."}
 	}
 	input := cmsstore.PostInput{
 		Slug:     slug,
@@ -931,8 +936,7 @@ func (h *Host) handlePostSave(w http.ResponseWriter, r *http.Request) {
 		State:    post.State,
 	}
 	if _, _, err := h.store.PreviewPost(post.ID, input); err != nil {
-		writeJSON(w, http.StatusOK, editorSaveResult{Message: "We couldn't save that. Try again."})
-		return
+		return editorSaveResult{Message: "We couldn't save that. Try again."}
 	}
 	if slug != post.Slug {
 		_ = h.recordRedirect(postPath(post.Slug), postPath(slug))
@@ -940,7 +944,7 @@ func (h *Host) handlePostSave(w http.ResponseWriter, r *http.Request) {
 	updated, _, _ := h.store.PostByID(post.ID)
 	_, live := h.livePost(updated)
 	h.notifyChanged(r, "post", post.ID)
-	writeJSON(w, http.StatusOK, editorSaveResult{OK: true, Slug: slug, Live: live, Checks: h.readinessChecks("post", "", updated.Body)})
+	return editorSaveResult{OK: true, Slug: slug, Live: live, Checks: h.readinessChecks("post", "", updated.Body)}
 }
 
 func (h *Host) handlePostPublish(w http.ResponseWriter, r *http.Request) {

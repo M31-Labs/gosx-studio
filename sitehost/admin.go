@@ -72,6 +72,7 @@ func (h *Host) renderAdminShell(active, heading, lede string, status adminStatus
 		{"stats", "Visitors", "/admin/stats"},
 		{"media", "Pictures", "/admin/media"},
 		{"users", "People", peoplePath},
+		{"agents", "Agents", agentsAdminPath},
 	}
 	if h.reviewRequired() || len(h.reviewQueue()) > 0 {
 		navItems = append(navItems, struct{ Key, Label, Href string }{"review", reviewLabel, reviewPath})
@@ -143,6 +144,10 @@ func (h *Host) renderAdminShell(active, heading, lede string, status adminStatus
 // ---------- dashboard ----------
 
 func (h *Host) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
+	h.renderDashboard(w, r, nil)
+}
+
+func (h *Host) renderDashboard(w http.ResponseWriter, r *http.Request, outcome *assistantOutcome) {
 	pages, _ := h.store.ListPages(cmsstore.PageFilter{})
 	published, drafts := 0, 0
 	for _, page := range pages {
@@ -179,9 +184,13 @@ func (h *Host) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		),
 	)
 
+	var ask gosx.Node = gosx.Fragment()
+	if h.assistant != nil {
+		ask = h.renderAssistantBox("site", "", outcome, true)
+	}
 	body := h.renderAdminShell("dashboard", "Your site",
 		"Everything you publish here appears on your public website.",
-		adminStatus{}, stats, next)
+		adminStatus{}, stats, ask, next)
 	h.writeDocument(w, http.StatusOK, h.adminMeta("Your site"), body)
 }
 
