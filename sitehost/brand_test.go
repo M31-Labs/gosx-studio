@@ -74,7 +74,7 @@ func TestLogoAndFaviconUploadThroughSettings(t *testing.T) {
 	mustContain(t, home, `<link rel="icon" href="`+brand.FaviconURL+`"`, "the uploaded favicon is linked")
 	mustContain(t, home, "42 Mill Lane, Oakland", "footer text renders")
 	mustContain(t, home, `href="https://instagram.com/wildflower" rel="me noopener"`, "social links open safely")
-	mustContain(t, home, `>Instagram</a>`, "social links are labelled")
+	mustContain(t, home, `Instagram</span></a>`, "social links are labelled")
 	mustContain(t, home, `property="og:image" content="https://wildflower.example`+brand.LogoURL+`"`, "the logo is the share image when a page has none")
 	if !host.SetupComplete() {
 		t.Fatal("saving brand settings wiped the setup marker")

@@ -503,6 +503,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 			adminTextField("baseURL", "Website address", settings.BaseURL,
 				"For example https://yourbusiness.com. Needed so shared links and search results point at the right place."),
 			h.renderBrandFields(settings),
+			h.renderChromeFields(settings),
 			h.renderMailFields(settings),
 			h.renderGrowthFields(settings),
 			renderStatsField(settings),
@@ -543,6 +544,7 @@ func (h *Host) handleAdminSaveSettings(w http.ResponseWriter, r *http.Request) {
 			metadata[key] = value
 		}
 	}
+	applyChromeFields(r, metadata)
 	if problem := h.applyBrandFields(r, metadata); problem != "" {
 		h.renderAdminSettings(w, adminStatus{Message: problem, Error: true})
 		return
@@ -677,7 +679,11 @@ func (h *Host) renderPageRow(page cmsstore.Page, first, last bool) gosx.Node {
 		actions = append(actions, h.pageActionButton(page.ID, "archive", "Archive"))
 	}
 
-	name := gosx.El("a", gosx.Attrs(gosx.Attr("href", "/admin/edit/"+page.ID)), gosx.Text(page.Title))
+	title := page.Title
+	if PageNavParent(page) != "" {
+		title = "↳ " + title
+	}
+	name := gosx.El("a", gosx.Attrs(gosx.Attr("href", "/admin/edit/"+page.ID)), gosx.Text(title))
 	if PageNavHidden(page) {
 		name = gosx.Fragment(name, gosx.Text(" "), gosx.El("span", gosx.Attrs(gosx.Attr("class", "admin-badge")), gosx.Text("not in menu")))
 	}

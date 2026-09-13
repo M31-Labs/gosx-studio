@@ -164,6 +164,15 @@ not ready can ask the cart page to email them a link to their cart; if they
 have not bought within two hours, one reminder goes out, and never a second.
 Both need an email transport (`-mail`).
 
+### Header and footer
+
+**Settings → Brand** now shapes the whole frame: an announcement bar
+across the top with an optional link, a standout button at the end of the
+menu ("Book a table"), a header that stays put while scrolling, the menu
+repeated in the footer, extra footer links, and social profiles drawn as
+icons. In the editor, "In the menu" on any page tucks it under another
+page as a drop-down; menus stay one level deep on purpose.
+
 ### Ready-made sections
 
 The editor's sidebar starts with whole sections, not just pieces: a hero,

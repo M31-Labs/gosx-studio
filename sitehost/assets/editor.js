@@ -190,6 +190,7 @@
       tags: fieldValue("pageTags"),
       author: fieldValue("pageAuthor"),
       publishAt: localToISO(fieldValue("pagePublishAt")),
+      navParent: fieldValue("pageParent"),
       blocks: blocks,
     };
   }
@@ -1197,9 +1198,10 @@
     if (event.target.matches("[data-meta]")) { refreshPostMeta(); queueSave(); }
   });
 
-  /* A date picker commits on change, not on every keystroke. */
+  /* A date picker or a drop-down commits on change, not on every keystroke. */
   root.addEventListener("change", function (event) {
     if (event.target.matches("input[type=datetime-local][data-meta]")) { refreshPostMeta(); queueSave(); }
+    if (event.target.matches("select[data-meta]")) { snapshot(); queueSave(); }
   });
 
   /* beforeinput fires before the DOM changes, which is the only moment the

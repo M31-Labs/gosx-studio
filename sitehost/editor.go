@@ -246,7 +246,7 @@ func (h *Host) renderEditorSidebar(subject editorSubject) gosx.Node {
 			),
 		),
 		lookSection,
-		renderSubjectFields(subject),
+		h.renderSubjectFields(subject),
 		renderReviewNotes(subject),
 		renderChecks(subject.Checks),
 		renderShareBlock(subject),
@@ -299,7 +299,7 @@ func renderChecks(checks []string) gosx.Node {
 }
 
 // renderSubjectFields is the "This page" or "This post" block of the sidebar.
-func renderSubjectFields(subject editorSubject) gosx.Node {
+func (h *Host) renderSubjectFields(subject editorSubject) gosx.Node {
 	if subject.Post != nil {
 		post := subject.Post
 		publishAt := ""
@@ -327,8 +327,45 @@ func renderSubjectFields(subject editorSubject) gosx.Node {
 		editorField("pageSlug", "Web address", subject.Slug, addressHint(subject.Slug)),
 		editorField("pageDescription", "Description for search results", subject.Description,
 			"One or two sentences. Also used when someone shares the link."),
+		h.renderParentField(subject),
 		editorDateField("pagePublishAt", "Publish date", publishAt, "Leave it blank to go live when you press Publish. Pick a future date, then press Publish, to schedule the change."),
 	)
+}
+
+// renderParentField lets a page sit under another one in the menu.
+func (h *Host) renderParentField(subject editorSubject) gosx.Node {
+	if subject.Page == nil || subject.Page.Slug == homeSlug {
+		return gosx.Fragment()
+	}
+	current := PageNavParent(*subject.Page)
+	options := []gosx.Node{gosx.El("option", gosx.Attrs(gosx.Attr("value", "")), gosx.Text("On its own"))}
+	for _, parent := range h.menuParents(*subject.Page) {
+		attrs := []any{gosx.Attr("value", parent.ID)}
+		if parent.ID == current {
+			attrs = append(attrs, gosx.Attr("selected", "selected"))
+		}
+		options = append(options, gosx.El("option", gosx.Attrs(attrs...), gosx.Text(parent.Title)))
+	}
+	return gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-field"), gosx.Attr("for", "pageParent")),
+		gosx.El("span", nil, gosx.Text("In the menu")),
+		gosx.El("select", gosx.Attrs(gosx.Attr("id", "pageParent"), gosx.Attr("data-meta", "parent")), gosx.Fragment(options...)),
+		gosx.El("small", nil, gosx.Text("Sit this page under another one to make a drop-down.")))
+}
+
+// applyNavParent records which page this one sits under, or clears it.
+// Only a top-level page can be a parent, so menus stay one level deep.
+func (h *Host) applyNavParent(page cmsstore.Page, metadata cmsstore.Metadata, parentID string) {
+	parentID = strings.TrimSpace(parentID)
+	if parentID == "" || parentID == page.ID {
+		delete(metadata, pageNavParentKey)
+		return
+	}
+	parent, ok, _ := h.store.PageByID(parentID)
+	if !ok || parent.Slug == homeSlug || PageNavParent(parent) != "" || PageArchived(parent) {
+		delete(metadata, pageNavParentKey)
+		return
+	}
+	metadata[pageNavParentKey] = parentID
 }
 
 // editorDateField is a date-and-time picker. The stored value is UTC; the
@@ -461,7 +498,7 @@ func (h *Host) renderEditableCanvas(settings cmsstore.SiteSettings, subject edit
 				gosx.Fragment(blocks...),
 			),
 		),
-		h.renderSiteFooter(settings, brandFromSettings(settings)),
+		h.renderSiteFooterIn(settings, brandFromSettings(settings), true),
 	)
 }
 
@@ -799,6 +836,7 @@ type editorSavePayload struct {
 	Slug        string               `json:"slug"`
 	Description string               `json:"description"`
 	PublishAt   string               `json:"publishAt"`
+	NavParent   string               `json:"navParent"`
 	Blocks      []editorBlockPayload `json:"blocks"`
 }
 
@@ -877,6 +915,7 @@ func (h *Host) handleEditorSave(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, editorSaveResult{Message: message})
 		return
 	}
+	h.applyNavParent(page, metadata, payload.NavParent)
 
 	body := h.payloadDocument(payload.Blocks)
 	if !h.roleAtLeast(r, roleAdmin) && !lockedBlocksUnchanged(page.Body, body) {
