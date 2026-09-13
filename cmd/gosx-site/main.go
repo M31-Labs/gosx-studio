@@ -47,6 +47,9 @@ func run() error {
 		noBackup = flag.Bool("no-backups", env("GOSX_SITE_NO_BACKUPS", "") == "true", "turn off the daily backup zip written beside the data file")
 		logReqs  = flag.Bool("log-requests", env("GOSX_SITE_LOG_REQUESTS", "true") != "false", "write one JSON line per request to stderr")
 		features = flag.String("features", env("GOSX_SITE_FEATURES", ""), "what the site's plan includes, comma-separated: blog,forms,shop,stats,domain,team,staging,sso (empty: everything)")
+		managed  = flag.String("managed-by", env("GOSX_SITE_MANAGED_BY", ""), "name of the hosting platform running this site, when one does")
+		domain   = flag.String("domain", env("GOSX_SITE_DOMAIN", ""), "the owner's domain as connected by the platform")
+		opToken  = flag.String("operator-token", env("GOSX_SITE_OPERATOR_TOKEN", ""), "token the platform uses for /platform/status and /platform/export.zip")
 	)
 	flag.Parse()
 
@@ -89,6 +92,9 @@ func run() error {
 		NoBackups:       *noBackup,
 		LogRequests:     *logReqs,
 		Features:        sitehost.ParseFeatures(*features),
+		ManagedBy:       *managed,
+		Domain:          *domain,
+		OperatorToken:   *opToken,
 	})
 	if err != nil {
 		return err

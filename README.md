@@ -76,6 +76,12 @@ admin menu and answer with a short "not part of your plan" page. The names
 are `blog`, `forms`, `shop` (products, orders, bookings, downloads,
 subscriptions), `stats`, `domain`, `team`, `staging`, and `sso`.
 
+A platform also sets `-managed-by` (its name), `-domain` (the owner's
+domain it connected), and `-operator-token`. The site then tells its owner
+to ask the platform about domains instead of walking them through DNS, and
+answers `GET /platform/status` (JSON) and `GET /platform/export.zip` (the
+full backup) to callers who present the token as a bearer token.
+
 ### Review before publishing
 
 Turn on **Settings → Team → Publishing needs approval** and editors' Publish

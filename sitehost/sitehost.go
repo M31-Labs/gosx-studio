@@ -87,6 +87,15 @@ type Options struct {
 	// Features is what the site's plan includes, by name (see AllFeatures).
 	// Empty means everything. The platform that runs the site sets it.
 	Features []string
+	// ManagedBy names the hosting platform that runs the site, when one
+	// does. The site then leaves domains, certificates, and backups to it
+	// and says so to the owner.
+	ManagedBy string
+	// Domain is the owner's domain as connected by the platform.
+	Domain string
+	// OperatorToken lets the platform read /platform/status and download
+	// /platform/export.zip. Empty closes both.
+	OperatorToken string
 }
 
 func (o Options) normalize() Options {
@@ -170,6 +179,9 @@ func Open(opts Options) (*Host, error) {
 		}); err != nil {
 			return nil, fmt.Errorf("sitehost: build starter site: %w", err)
 		}
+	}
+	if err := host.applyManagedDomain(); err != nil {
+		return nil, fmt.Errorf("sitehost: connect domain: %w", err)
 	}
 	return host, nil
 }
@@ -260,6 +272,7 @@ func (h *Host) routes() *http.ServeMux {
 	h.mountCustomers(mux)
 	h.mountStaging(mux)
 	h.mountCollab(mux)
+	h.mountPlatform(mux)
 	h.mountPublic(mux)
 	return mux
 }

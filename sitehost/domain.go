@@ -218,6 +218,10 @@ func (h *Host) handleAdminDomain(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Host) renderAdminDomain(w http.ResponseWriter, r *http.Request, status adminStatus, checks []dnsCheck) {
+	if h.managed() {
+		h.renderManagedDomainPage(w)
+		return
+	}
 	domain := h.Domain()
 	ip := h.serverIP(r)
 	sections := []gosx.Node{}
@@ -344,6 +348,10 @@ func (h *Host) renderAdminDomain(w http.ResponseWriter, r *http.Request, status 
 }
 
 func (h *Host) handleAdminSaveDomain(w http.ResponseWriter, r *http.Request) {
+	if h.managed() {
+		http.Redirect(w, r, "/admin/domain", http.StatusSeeOther)
+		return
+	}
 	if err := r.ParseForm(); err != nil {
 		h.renderAdminDomain(w, r, adminStatus{Message: "We couldn't read that form. Try again.", Error: true}, nil)
 		return
@@ -408,6 +416,10 @@ func (h *Host) handleAdminCheckDomain(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Host) handleAdminRemoveDomain(w http.ResponseWriter, r *http.Request) {
+	if h.managed() {
+		http.Redirect(w, r, "/admin/domain", http.StatusSeeOther)
+		return
+	}
 	previous := h.publicScheme() + "://" + h.canonicalHost()
 	if err := h.updateSettingsMetadata(func(m cmsstore.Metadata) {
 		delete(m, domainKey)
@@ -424,6 +436,9 @@ func (h *Host) handleAdminRemoveDomain(w http.ResponseWriter, r *http.Request) {
 
 // renderDomainPanel is the short card on the Settings page.
 func (h *Host) renderDomainPanel() gosx.Node {
+	if h.managed() {
+		return h.renderManagedDomainPanel()
+	}
 	domain := h.Domain()
 	if domain == "" {
 		return gosx.El("section", gosx.Attrs(gosx.Attr("class", "admin-panel")),

@@ -81,7 +81,7 @@ func stagingContent(r *http.Request) bool {
 		return false
 	}
 	path := r.URL.Path
-	for _, prefix := range []string{adminPathPrefix, "/setup", "/preview", "/stripe", checkoutPath, downloadPrefix, "/book", customerPath, cartPath, formSendPrefix} {
+	for _, prefix := range []string{adminPathPrefix, "/setup", "/preview", "/stripe", "/platform", checkoutPath, downloadPrefix, "/book", customerPath, cartPath, formSendPrefix} {
 		if path == prefix || strings.HasPrefix(path, strings.TrimSuffix(prefix, "/")+"/") {
 			return false
 		}
