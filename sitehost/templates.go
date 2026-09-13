@@ -127,11 +127,8 @@ func StarterSiteFor(answers SetupAnswers) []StarterPage {
 		)
 		pages = []StarterPage{
 			home,
-			{Slug: "shop", Title: "Shop", Description: "Everything currently available from " + name + ".", Publish: true, Body: document(
-				heading(0, 2, "What's in stock"),
-				para(1, "List what you have right now. Add a line about how long things take to make, and what shipping costs."),
-				para(2, "When a piece sells, say so here rather than deleting it — people like seeing what you've made."),
-			)},
+			// No "Shop" page: /shop belongs to the products in Shop and joins
+			// the menu the moment the first one goes on sale.
 			{Slug: "about", Title: "About", Description: "The story behind " + name + ".", Publish: true, Body: document(
 				heading(0, 2, "About "+name),
 				para(1, "Who you are and how you got here. People buy from people, so write this the way you'd tell a customer standing in front of you."),

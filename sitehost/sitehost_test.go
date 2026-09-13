@@ -528,7 +528,7 @@ func TestWizardBackButtonKeepsAnswers(t *testing.T) {
 
 func TestEachSiteKindProducesItsOwnPages(t *testing.T) {
 	expected := map[string][]string{
-		"shop":      {"home", "shop", "about", "contact"},
+		"shop":      {"home", "about", "contact"}, // /shop is the product shop itself
 		"services":  {"home", "services", "about", "contact"},
 		"food":      {"home", "menu", "visit", "contact"},
 		"portfolio": {"home", "work", "about", "contact"},

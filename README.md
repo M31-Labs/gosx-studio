@@ -128,6 +128,23 @@ Payment happens on Stripe's hosted page; card details never reach the site.
 Paid orders appear under **Shop → Orders** with the buyer's address, a link
 to the payment in Stripe for refunds, and a "Mark as sent" button.
 
+A product is one of four kinds. **Something you ship** is the default.
+**A download** takes a file up to 100 MB; the buyer gets a link that works
+for seven days, on the thank-you page and in the receipt. **A subscription**
+charges every week, month, or year through Stripe; renewals and
+cancellations flow back through the webhook. **An appointment** offers time
+slots from the days, hours, and slot length you set; free appointments book
+without checkout, paid ones go through the cart. Bookings appear under
+**Shop → Bookings**, where you can cancel one.
+
+Buyers have no passwords. The **Your orders** link in the footer asks for
+their email and sends a sign-in link good for thirty minutes; the page then
+shows their orders, downloads, and subscriptions, with a button that opens
+Stripe's billing portal to change or cancel a subscription. A visitor who is
+not ready can ask the cart page to email them a link to their cart; if they
+have not bought within two hours, one reminder goes out, and never a second.
+Both need an email transport (`-mail`).
+
 ### Backups and export
 
 **Settings → Backups and export** downloads the whole site as one zip: pages,

@@ -1038,6 +1038,9 @@ func (h *Host) handleCart(w http.ResponseWriter, r *http.Request) {
 				h.renderCheckoutButton(resolved),
 			),
 		)
+		if h.mailer != nil {
+			body = gosx.Fragment(body, renderCartEmailForm(r.URL.Query().Get("saved")))
+		}
 	}
 	meta, shell := h.publicShell(r, "cart", meta, gosx.El("section", gosx.Attrs(gosx.Attr("class", "site-article site-cart-page")),
 		gosx.El("h1", gosx.Attrs(gosx.Attr("class", "site-title")), gosx.Text("Your cart")),

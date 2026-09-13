@@ -50,7 +50,7 @@ func (h *Host) siteFiles() [][2]string {
 		return nil
 	}
 	out := [][2]string{}
-	for _, path := range []string{h.opts.DataPath, h.opts.messagesPath(), h.opts.formsPath(), h.opts.statsPath(), h.opts.productsPath(), h.opts.ordersPath(), h.opts.usersPath(), h.opts.auditPath()} {
+	for _, path := range []string{h.opts.DataPath, h.opts.messagesPath(), h.opts.formsPath(), h.opts.statsPath(), h.opts.productsPath(), h.opts.ordersPath(), h.opts.bookingsPath(), h.opts.cartsPath(), h.opts.usersPath(), h.opts.auditPath()} {
 		if path == "" {
 			continue
 		}
@@ -265,6 +265,7 @@ var backupAsync = true
 func (h *Host) housekeeping(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.pruneIfDue()
+		h.remindIfDue()
 		if !h.opts.NoBackups && h.opts.backupDir() != "" {
 			h.backups.mu.Lock()
 			due := h.backups.lastCheck.IsZero() || timeNow().Sub(h.backups.lastCheck) >= backupCheck
@@ -369,4 +370,16 @@ func (h *Host) renderBackupPanel() gosx.Node {
 		list,
 		gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-hint")), gosx.Text("To restore one: stop the site, unzip the backup, and start the site from the site.json inside it. The README in the zip has the exact command.")),
 	)
+}
+
+// remindIfDue runs the cart reminder sweep at most every ten minutes.
+func (h *Host) remindIfDue() {
+	h.reminders.mu.Lock()
+	if !h.reminders.lastRun.IsZero() && timeNow().Sub(h.reminders.lastRun) < 10*time.Minute {
+		h.reminders.mu.Unlock()
+		return
+	}
+	h.reminders.lastRun = timeNow()
+	h.reminders.mu.Unlock()
+	h.remindCarts()
 }

@@ -130,6 +130,9 @@ a { color: var(--site-accent); }
 .site-buy__row { display: flex; gap: 12px; align-items: flex-end; }
 .site-buy__qty { max-width: 110px; }
 .site-product__stock { display: block; font-size: 14px; color: var(--site-muted); margin-top: 6px; }
+.site-cart__save { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--site-rule); max-width: 520px; }
+.site-cart__save .site-form__field { flex: 1 1 220px; }
+.site-inline-form { display: inline; }
 .site-slots { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
 .site-slot { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--site-rule); border-radius: var(--site-radius, 2px); cursor: pointer; }
 .site-slot:has(input:checked) { border-color: var(--site-accent); box-shadow: inset 0 0 0 1px var(--site-accent); }

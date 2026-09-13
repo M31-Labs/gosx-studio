@@ -89,7 +89,7 @@ func tokensEqual(a, b string) bool {
 // csrfExempt paths are unauthenticated by design: the wizard runs before
 // there is an owner to protect, and the contact form is for the public.
 func csrfExempt(path string) bool {
-	return strings.HasPrefix(path, "/setup") || path == contactSendPath || path == statsHitPath || path == loginPath || path == loginCodePath || strings.HasPrefix(path, joinPrefix) || strings.HasPrefix(path, formSendPrefix) || strings.HasPrefix(path, cartPath+"/") || path == checkoutPath || path == stripeWebhookPath || strings.HasPrefix(path, "/book/")
+	return strings.HasPrefix(path, "/setup") || path == contactSendPath || path == statsHitPath || path == loginPath || path == loginCodePath || strings.HasPrefix(path, joinPrefix) || strings.HasPrefix(path, formSendPrefix) || strings.HasPrefix(path, cartPath+"/") || path == checkoutPath || path == stripeWebhookPath || strings.HasPrefix(path, "/book/") || path == customerPath || strings.HasPrefix(path, customerPath+"/")
 }
 
 // requireCSRF rejects any state-changing request that did not originate from

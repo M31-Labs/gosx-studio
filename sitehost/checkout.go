@@ -93,8 +93,6 @@ type Order struct {
 	SubscriptionStatus string     `json:"subscriptionStatus,omitempty"` // active, cancelled, past_due
 	Renewals           int        `json:"renewals,omitempty"`
 	LastPaid           *time.Time `json:"lastPaid,omitempty"`
-	CartEmail          string     `json:"cartEmail,omitempty"` // the visitor's own address, for a reminder
-	Reminded           bool       `json:"reminded,omitempty"`
 	Note               string     `json:"note,omitempty"`
 	Created            time.Time  `json:"created"`
 	Paid               *time.Time `json:"paid,omitempty"`
@@ -770,6 +768,7 @@ func (h *Host) markPaid(event stripeEvent, base string) {
 	h.notify(h.newOrderMail(order, base))
 	if order.CustomerEmail != "" {
 		h.notify(h.newReceiptMail(order, base))
+		h.carts.remove(normalizeEmail(order.CustomerEmail))
 	}
 }
 

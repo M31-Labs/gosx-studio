@@ -200,6 +200,10 @@ func (h *Host) renderSiteFooter(settings cmsstore.SiteSettings, brand Brand) gos
 	if brand.FooterText != "" {
 		nodes = append(nodes, gosx.El("p", gosx.Attrs(gosx.Attr("class", "site-footer__text")), gosx.Text(brand.FooterText)))
 	}
+	if h.shopInMenu() {
+		nodes = append(nodes, gosx.El("p", gosx.Attrs(gosx.Attr("class", "site-footer__text")),
+			gosx.El("a", gosx.Attrs(gosx.Attr("href", customerPath)), gosx.Text("Your orders"))))
+	}
 
 	social := make([]gosx.Node, 0, 6)
 	for _, network := range SocialNetworks() {
