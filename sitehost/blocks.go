@@ -118,7 +118,7 @@ func galleryValue(images [][2]string) blockstudio.Value {
 }
 
 // sectionStyles are the backgrounds a section break can choose.
-var sectionStyles = map[string]bool{"plain": true, "tinted": true, "accent": true}
+var sectionStyles = map[string]bool{"plain": true, "tinted": true, "accent": true, "dark": true, "image": true}
 
 func normalizeSectionStyle(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
@@ -131,10 +131,10 @@ func normalizeSectionStyle(value string) string {
 // renderBody renders a document as sections of blocks.
 func (h *Host) renderBody(doc blockstudio.Document, hooks render.Hooks) gosx.Node {
 	type section struct {
-		style  string
-		blocks []gosx.Node
+		options sectionOptions
+		blocks  []gosx.Node
 	}
-	sections := []section{{style: "plain"}}
+	sections := []section{{options: sectionOptions{Style: "plain", Align: "left", Width: "normal", Space: "normal"}}}
 	current := &sections[0]
 
 	for _, instance := range doc.Blocks {
@@ -142,7 +142,7 @@ func (h *Host) renderBody(doc blockstudio.Document, hooks render.Hooks) gosx.Nod
 			continue // kept in the document, not shown
 		}
 		if instance.Key == blockSection {
-			sections = append(sections, section{style: normalizeSectionStyle(instance.Values["style"].String)})
+			sections = append(sections, section{options: sectionOptionsOf(instance)})
 			current = &sections[len(sections)-1]
 			continue
 		}
@@ -159,7 +159,11 @@ func (h *Host) renderBody(doc blockstudio.Document, hooks render.Hooks) gosx.Nod
 		if len(s.blocks) == 0 {
 			continue
 		}
-		out = append(out, gosx.El("section", gosx.Attrs(gosx.Attr("class", "site-section site-section--"+s.style)),
+		attrs := []any{gosx.Attr("class", s.options.classes())}
+		if s.options.Style == "image" && s.options.Image != "" {
+			attrs = append(attrs, gosx.Attr("style", "--section-image: url('"+cssURL(s.options.Image)+"')"))
+		}
+		out = append(out, gosx.El("section", gosx.Attrs(attrs...),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-section__inner")), gosx.Fragment(s.blocks...))))
 	}
 	return gosx.Fragment(out...)
@@ -245,6 +249,10 @@ func (h *Host) renderBlock(instance blockstudio.BlockInstance, hooks render.Hook
 			return gosx.Fragment(), false
 		}
 		return gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-gallery")), gosx.Fragment(items...)), true
+	}
+
+	if spec, ok := compositeByKey(instance.Key); ok {
+		return h.renderComposite(spec, instance, false), true
 	}
 
 	// Pictures and the contact form: cms/render's hooks, exactly as before.

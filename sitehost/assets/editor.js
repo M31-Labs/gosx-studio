@@ -53,6 +53,33 @@
     if (kind === "section") {
       var style = el.querySelector("[data-section-style]");
       payload.style = style ? style.value : "plain";
+      var salign = el.querySelector("[data-section-align]");
+      var swidth = el.querySelector("[data-section-width]");
+      var sspace = el.querySelector("[data-section-space]");
+      var simg = el.querySelector("[data-section-src]");
+      payload.align = salign ? salign.value : "left";
+      payload.width = swidth ? swidth.value : "normal";
+      payload.space = sspace ? sspace.value : "normal";
+      payload.url = simg ? simg.value.trim() : "";
+    }
+    var composite = el.querySelector("[data-composite]");
+    if (composite) {
+      payload.text = "";
+      payload.fields = {};
+      payload.items = [];
+      var variant = composite.querySelector("[data-variant]");
+      payload.variant = variant ? variant.value : "";
+      Array.prototype.forEach.call(composite.querySelectorAll("[data-field]"), function (node) {
+        if (node.closest("[data-item]")) return;
+        payload.fields[node.getAttribute("data-field")] = fieldValue2(node);
+      });
+      Array.prototype.forEach.call(composite.querySelectorAll("[data-item]"), function (item) {
+        var values = {};
+        Array.prototype.forEach.call(item.querySelectorAll("[data-field]"), function (node) {
+          values[node.getAttribute("data-field")] = fieldValue2(node);
+        });
+        payload.items.push(values);
+      });
     }
     if (kind === "video") {
       var vurl = el.querySelector("[data-video-url]");
@@ -102,6 +129,15 @@
       payload.product = psel ? psel.value : "";
     }
     return payload;
+  }
+
+  /* A field's value: text with markers, an input's value, or a checkbox. */
+  function fieldValue2(node) {
+    if (node.tagName === "INPUT") {
+      if (node.type === "checkbox") return node.checked ? "yes" : "";
+      return node.value.trim();
+    }
+    return serializeText(node);
   }
 
   /* ---------- inline formatting <-> markers ---------- */
@@ -861,9 +897,9 @@
     sel.addRange(range);
   }
 
-  function addBlock(kind, atIndex) {
-    snapshot();
-    var el = makeBlock(kind);
+  var SERVER_KINDS = (root.getAttribute("data-server-kinds") || "").split(",");
+
+  function placeBlock(el, atIndex) {
     var nodes = article.querySelectorAll(".ed-block");
     if (atIndex === null || atIndex === undefined || atIndex >= nodes.length) {
       article.appendChild(el);
@@ -871,8 +907,59 @@
       article.insertBefore(el, nodes[atIndex]);
     }
     reindex();
+    freezeLocked();
     focusText(el);
+    el.scrollIntoView({ block: "nearest", behavior: "smooth" });
     queueSave();
+  }
+
+  /* Ready-made sections come from the server, rendered exactly as they
+     will look; the browser only wraps them in the usual tools. */
+  function addBlock(kind, atIndex) {
+    if (SERVER_KINDS.indexOf(kind) >= 0) {
+      status("dirty", "Adding…");
+      fetch("/admin/api/blocks/" + encodeURIComponent(kind), { credentials: "same-origin" })
+        .then(function (r) { if (!r.ok) throw new Error("no block"); return r.text(); })
+        .then(function (html) {
+          snapshot();
+          var wrapper = document.createElement("div");
+          wrapper.className = "ed-block";
+          wrapper.setAttribute("data-block", kind);
+          wrapper.setAttribute("tabindex", "0");
+          wrapper.appendChild(makeTools());
+          wrapper.appendChild(makeBadge());
+          var holder = document.createElement("div");
+          holder.innerHTML = html;
+          while (holder.firstChild) wrapper.appendChild(holder.firstChild);
+          wrapper.appendChild(makeInsertPoint());
+          placeBlock(wrapper, atIndex);
+        })
+        .catch(function () { status("error", "Couldn't add that. Try again."); });
+      return;
+    }
+    snapshot();
+    placeBlock(makeBlock(kind), atIndex);
+  }
+
+  function addItem(button) {
+    var kind = button.getAttribute("data-item-add");
+    var composite = button.closest("[data-composite]");
+    var list = composite && composite.querySelector("[data-items]");
+    if (!list) return;
+    fetch("/admin/api/blocks/" + encodeURIComponent(kind) + "/item", { credentials: "same-origin" })
+      .then(function (r) { if (!r.ok) throw new Error("no item"); return r.text(); })
+      .then(function (html) {
+        snapshot();
+        var holder = document.createElement("div");
+        holder.innerHTML = html;
+        var item = holder.firstElementChild;
+        if (!item) return;
+        list.appendChild(item);
+        var first = item.querySelector("[data-text]");
+        if (first) first.focus();
+        queueSave();
+      })
+      .catch(function () { status("error", "Couldn't add that. Try again."); });
   }
 
   /* ---------- interactions ---------- */
@@ -903,6 +990,25 @@
     if (add) {
       event.preventDefault();
       addBlock(add.getAttribute("data-add"), null);
+      return;
+    }
+
+    var itemAdd = event.target.closest("[data-item-add]");
+    if (itemAdd) {
+      event.preventDefault();
+      addItem(itemAdd);
+      return;
+    }
+
+    var itemRemove = event.target.closest("[data-item-remove]");
+    if (itemRemove) {
+      event.preventDefault();
+      var item = itemRemove.closest("[data-item]");
+      if (item) {
+        snapshot();
+        item.parentNode.removeChild(item);
+        queueSave();
+      }
       return;
     }
 
@@ -1047,17 +1153,38 @@
   });
   root.addEventListener("change", function (event) {
     var style = event.target.closest("[data-section-style]");
-    if (!style) return;
-    snapshot();
-    var bar = style.closest(".ed-section-bar");
-    if (bar) bar.setAttribute("data-section", style.value);
-    queueSave();
+    if (style) {
+      snapshot();
+      var bar = style.closest(".ed-section-bar");
+      if (bar) bar.setAttribute("data-section", style.value);
+      queueSave();
+      return;
+    }
+    if (event.target.matches("[data-section-align],[data-section-width],[data-section-space]")) { snapshot(); queueSave(); return; }
+    var variant = event.target.closest("[data-variant]");
+    if (variant) {
+      snapshot();
+      var composite = variant.closest("[data-composite]");
+      if (composite) {
+        var kind = composite.getAttribute("data-composite");
+        composite.className = composite.className.replace(new RegExp("\\bsite-" + kind + "--[a-z]+"), "site-" + kind + "--" + variant.value);
+        composite.setAttribute("data-variant-value", variant.value);
+      }
+      queueSave();
+      return;
+    }
+    if (event.target.matches("input[type=checkbox][data-field]")) {
+      snapshot();
+      var card = event.target.closest("[data-item]");
+      if (card) card.classList.toggle("site-pricing__card--highlight", event.target.checked);
+      queueSave();
+    }
   });
 
   root.addEventListener("input", function (event) {
     if (event.target.matches("[data-video-url]")) { refreshVideo(event.target); queueSave(); return; }
     if (event.target.matches("[data-galt]")) { queueSave(); return; }
-    var field = event.target.closest("[data-text]") || (event.target.matches("[data-href],[data-src],[data-alt]") ? event.target : null);
+    var field = event.target.closest("[data-text]") || (event.target.matches("[data-href],[data-src],[data-alt],input[data-field]") ? event.target : null);
     if (field) {
       if (typingSession !== field) {
         typingSession = field;

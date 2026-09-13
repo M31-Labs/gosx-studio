@@ -164,6 +164,20 @@ not ready can ask the cart page to email them a link to their cart; if they
 have not bought within two hours, one reminder goes out, and never a second.
 Both need an email transport (`-mail`).
 
+### Ready-made sections
+
+The editor's sidebar starts with whole sections, not just pieces: a hero,
+feature cards, testimonials, pricing, questions and answers, a call to
+action, numbers, people, opening hours, a picture beside text, a map, and
+plain space. Each drops in with sensible starter copy, is edited in place
+like everything else, has a Layout switch (centred, split, cards, one big
+quote, and so on), and repeated things (cards, plans, questions, people)
+have an add button and a remove button.
+
+A section break sets the mood for everything beneath it: a plain, tinted,
+accent, dark, or picture background; left or centred text; narrow, normal,
+wide, or edge-to-edge width; compact, normal, or roomy spacing.
+
 ### Editing together
 
 Two people can open the same page. Each sees the other's initials in the

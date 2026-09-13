@@ -29,6 +29,7 @@ func (h *Host) mountEditor(mux *http.ServeMux) {
 	mux.HandleFunc("POST /admin/api/pages/{id}", h.handleEditorSave)
 	mux.HandleFunc("POST /admin/api/pages/{id}/publish", h.handleEditorPublish)
 	mux.HandleFunc("POST /admin/api/theme", h.handleThemeSave)
+	h.mountBlocks(mux)
 	mux.Handle("GET "+editorScriptPath, editorScriptHandler())
 }
 
@@ -114,6 +115,7 @@ func (h *Host) renderEditor(w http.ResponseWriter, subject editorSubject) {
 		gosx.Attr("data-preview-url", subject.PreviewURL),
 		gosx.Attr("data-must-request", boolAttr(subject.MustRequest)),
 		gosx.Attr("data-can-lock", boolAttr(subject.CanDesign)),
+		gosx.Attr("data-server-kinds", "section,"+compositeKeys()),
 	),
 		h.renderEditorToolbar(subject),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-body")),
@@ -192,6 +194,15 @@ func (h *Host) renderEditorToolbar(subject editorSubject) gosx.Node {
 	)
 }
 
+// renderSectionAdds lists the ready-made sections in the sidebar.
+func renderSectionAdds() gosx.Node {
+	nodes := make([]gosx.Node, 0, len(composites))
+	for _, spec := range composites {
+		nodes = append(nodes, addButton(spec.Key, spec.Label, spec.Blurb))
+	}
+	return gosx.Fragment(nodes...)
+}
+
 func publishLabel(live bool) string {
 	if live {
 		return "Publish changes"
@@ -216,6 +227,8 @@ func (h *Host) renderEditorSidebar(subject editorSubject) gosx.Node {
 			gosx.El("h2", nil, gosx.Text("Add to this "+subject.Noun)),
 			gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-hint")),
 				gosx.Text("Click a section on the "+subject.Noun+" to edit it. Use these to add something new at the end.")),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-add-grid")), renderSectionAdds()),
+			gosx.El("h3", gosx.Attrs(gosx.Attr("class", "ed-side__sub")), gosx.Text("Or one piece at a time")),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-add-grid")),
 				addButton("heading", "Heading", "A section title"),
 				addButton("paragraph", "Text", "A paragraph"),
@@ -374,6 +387,14 @@ func editorField(id, label, value, hint string) gosx.Node {
 	)
 }
 
+func renderSectionMenuItems() gosx.Node {
+	nodes := make([]gosx.Node, 0, len(composites))
+	for _, spec := range composites {
+		nodes = append(nodes, menuItem(spec.Key, spec.Label))
+	}
+	return gosx.Fragment(nodes...)
+}
+
 func renderInsertMenu() gosx.Node {
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-menu"), gosx.Attr("data-insert-menu", "true"), gosx.Attr("hidden", "hidden")),
 		gosx.Fragment(
@@ -385,6 +406,7 @@ func renderInsertMenu() gosx.Node {
 			menuItem("gallery", "Gallery"),
 			menuItem("video", "Video"),
 			menuItem("columns", "Two columns"),
+			renderSectionMenuItems(),
 			menuItem("list", "List"),
 			menuItem("divider", "Divider"),
 			menuItem("section", "Section"),
@@ -644,7 +666,7 @@ func (h *Host) renderBlockInner(kind string, instance blockstudio.BlockInstance)
 	case "divider":
 		return gosx.El("hr", gosx.Attrs(gosx.Attr("class", "site-divider"), gosx.Attr("contenteditable", "false")))
 	case "section":
-		return renderSectionBar(normalizeSectionStyle(instance.Values["style"].String))
+		return renderSectionBar(sectionOptionsOf(instance))
 	case "video":
 		return renderVideoEditor(instance.Values["url"].String)
 	case "columns":
@@ -657,32 +679,15 @@ func (h *Host) renderBlockInner(kind string, instance blockstudio.BlockInstance)
 	case "gallery":
 		return renderGalleryEditor(galleryImages(instance))
 	default:
+		if spec, ok := compositeByKey(kind); ok {
+			return h.renderComposite(spec, instance, true)
+		}
 		return gosx.El("p", gosx.Attrs(
 			gosx.Attr("data-text", "true"),
 			gosx.Attr("contenteditable", "true"),
 			gosx.Attr("spellcheck", "true"),
 		), renderInline(value))
 	}
-}
-
-// renderSectionBar is a section break on the canvas: a labelled rule with
-// the background choice for everything beneath it.
-func renderSectionBar(style string) gosx.Node {
-	options := make([]gosx.Node, 0, 3)
-	for _, candidate := range []struct{ key, label string }{{"plain", "Plain"}, {"tinted", "Tinted"}, {"accent", "Accent colour"}} {
-		attrs := []any{gosx.Attr("value", candidate.key)}
-		if candidate.key == style {
-			attrs = append(attrs, gosx.Attr("selected", "selected"))
-		}
-		options = append(options, gosx.El("option", gosx.Attrs(attrs...), gosx.Text(candidate.label)))
-	}
-	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-section-bar"), gosx.Attr("data-section", style), gosx.Attr("contenteditable", "false")),
-		gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-section-bar__label")), gosx.Text("New section")),
-		gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-section-bar__style")),
-			gosx.El("span", nil, gosx.Text("Background")),
-			gosx.El("select", gosx.Attrs(gosx.Attr("data-section-style", "true"), gosx.Attr("aria-label", "Section background")), gosx.Fragment(options...)),
-		),
-	)
 }
 
 func imagePreview(url string) gosx.Node {
@@ -721,6 +726,9 @@ func editorKind(key string) string {
 	case content.BlockProduct:
 		return "product"
 	default:
+		if _, ok := compositeByKey(key); ok {
+			return key
+		}
 		return "paragraph"
 	}
 }
@@ -776,6 +784,14 @@ type editorBlockPayload struct {
 	Phone   string               `json:"phone,omitempty"`
 	Locked  string               `json:"locked,omitempty"`
 	Images  []editorImagePayload `json:"images,omitempty"`
+	// Ready-made sections: their named fields, repeated items, and layout.
+	Fields  map[string]string   `json:"fields,omitempty"`
+	Items   []map[string]string `json:"items,omitempty"`
+	Variant string              `json:"variant,omitempty"`
+	// Section breaks: everything beyond the background.
+	Align string `json:"align,omitempty"`
+	Width string `json:"width,omitempty"`
+	Space string `json:"space,omitempty"`
 }
 
 type editorSavePayload struct {
@@ -939,7 +955,8 @@ func (h *Host) payloadDocument(blocks []editorBlockPayload) blockstudio.Document
 		case "divider":
 			instances = append(instances, block(order, blockDivider, values()))
 		case "section":
-			instances = append(instances, block(order, blockSection, values("style", normalizeSectionStyle(incoming.Style))))
+			options := sectionOptions{Style: normalizeSectionStyle(incoming.Style), Align: normalizeChoice(incoming.Align, "left", sectionAligns), Width: normalizeChoice(incoming.Width, "normal", sectionWidths), Space: normalizeChoice(incoming.Space, "normal", sectionSpaces), Image: strings.TrimSpace(incoming.URL)}
+			instances = append(instances, block(order, blockSection, options.values()))
 		case "video":
 			url := strings.TrimSpace(incoming.URL)
 			if url == "" {
@@ -966,6 +983,12 @@ func (h *Host) payloadDocument(blocks []editorBlockPayload) blockstudio.Document
 				Values: blockstudio.Values{"images": galleryList},
 			})
 		default:
+			if spec, ok := compositeByKey(kind); ok {
+				if instance, ok := compositeFromPayload(spec, incoming, order); ok {
+					instances = append(instances, instance)
+				}
+				break
+			}
 			if value == "" {
 				continue
 			}
