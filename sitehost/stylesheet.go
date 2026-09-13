@@ -430,6 +430,10 @@ a { color: var(--site-accent); }
 .ed-bar__left, .ed-bar__right { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .ed-back { text-decoration: none; font-size: 14px; color: var(--site-muted); white-space: nowrap; }
 .ed-page-name { font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ed-people { display: inline-flex; align-items: center; gap: 2px; margin-right: 6px; }
+.ed-person { width: 26px; height: 26px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: .02em; color: #fff; background: hsl(var(--person, 200) 55% 42%); border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.12); cursor: default; }
+.ed-person + .ed-person { margin-left: -8px; }
+.ed-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #1f2933; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 14px; line-height: 1.4; z-index: 60; max-width: min(90vw, 560px); box-shadow: 0 6px 24px rgba(0,0,0,.25); }
 .ed-chip {
   font-size: 11px; letter-spacing: .05em; text-transform: uppercase;
   border: 1px solid var(--site-rule); padding: 2px 8px; border-radius: 999px; color: var(--site-muted); white-space: nowrap;

@@ -939,6 +939,7 @@ func (h *Host) handlePostSave(w http.ResponseWriter, r *http.Request) {
 	}
 	updated, _, _ := h.store.PostByID(post.ID)
 	_, live := h.livePost(updated)
+	h.notifyChanged(r, "post", post.ID)
 	writeJSON(w, http.StatusOK, editorSaveResult{OK: true, Slug: slug, Live: live, Checks: h.readinessChecks("post", "", updated.Body)})
 }
 
@@ -963,6 +964,7 @@ func (h *Host) handlePostPublish(w http.ResponseWriter, r *http.Request) {
 	result.Checks = h.readinessChecks("post", "", post.Body)
 	if result.OK {
 		h.auditContent(r, "post.published", firstNonEmpty(result.Message, "Published")+": “"+post.Title+"”")
+		h.notifyChanged(r, "post", post.ID)
 	}
 	writeJSON(w, http.StatusOK, result)
 }

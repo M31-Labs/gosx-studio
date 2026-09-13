@@ -119,6 +119,7 @@ type Host struct {
 	orders    *orderStore
 	bookings  *bookingStore
 	carts     *cartStore
+	collab    *collabHub
 	users     *userStore
 	auditLog  *auditStore
 	ssoState  ssoCache
@@ -150,7 +151,7 @@ func Open(opts Options) (*Host, error) {
 		return nil, fmt.Errorf("sitehost: open site data: %w", err)
 	}
 
-	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath()), products: newProductStore(opts.productsPath()), orders: newOrderStore(opts.ordersPath()), bookings: newBookingStore(opts.bookingsPath()), carts: newCartStore(opts.cartsPath()), users: newUserStore(opts.usersPath()), auditLog: newAuditStore(opts.auditPath()), metrics: newMetrics()}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath()), products: newProductStore(opts.productsPath()), orders: newOrderStore(opts.ordersPath()), bookings: newBookingStore(opts.bookingsPath()), carts: newCartStore(opts.cartsPath()), collab: newCollabHub(), users: newUserStore(opts.usersPath()), auditLog: newAuditStore(opts.auditPath()), metrics: newMetrics()}
 	host.Migrated = migrated
 	if err := host.configureMail(); err != nil {
 		return nil, err
@@ -174,7 +175,7 @@ func Open(opts Options) (*Host, error) {
 // this to supply in-memory storage.
 func NewWithStore(store LifecycleContentStore, opts Options) *Host {
 	opts = opts.normalize()
-	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath()), products: newProductStore(opts.productsPath()), orders: newOrderStore(opts.ordersPath()), bookings: newBookingStore(opts.bookingsPath()), carts: newCartStore(opts.cartsPath()), users: newUserStore(opts.usersPath()), auditLog: newAuditStore(opts.auditPath()), metrics: newMetrics()}
+	host := &Host{store: store, opts: opts, messages: newMessageStore(opts.messagesPath()), authFailures: newRateLimiter(authFailLimit, authFailWindow), media: newMediaIndex(opts.uploadDir()), stats: newStatsStore(opts.statsPath()), forms: newFormStore(opts.formsPath()), products: newProductStore(opts.productsPath()), orders: newOrderStore(opts.ordersPath()), bookings: newBookingStore(opts.bookingsPath()), carts: newCartStore(opts.cartsPath()), collab: newCollabHub(), users: newUserStore(opts.usersPath()), auditLog: newAuditStore(opts.auditPath()), metrics: newMetrics()}
 	_ = host.configureMail()
 	return host
 }
@@ -255,6 +256,7 @@ func (h *Host) routes() *http.ServeMux {
 	h.mountPrivacy(mux)
 	h.mountCustomers(mux)
 	h.mountStaging(mux)
+	h.mountCollab(mux)
 	h.mountPublic(mux)
 	return mux
 }

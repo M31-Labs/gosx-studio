@@ -145,6 +145,14 @@ not ready can ask the cart page to email them a link to their cart; if they
 have not bought within two hours, one reminder goes out, and never a second.
 Both need an email transport (`-mail`).
 
+### Editing together
+
+Two people can open the same page. Each sees the other's initials in the
+editor's top bar, and when one of them saves, the other's canvas refreshes
+with the new blocks. If that person is typing, the refresh waits for a
+pause and a note says who changed what. There is no merging: the last save
+wins, and History keeps every version.
+
 ### Staging and publishing everything at once
 
 Saving in the editor never changes what visitors see; publishing does. The

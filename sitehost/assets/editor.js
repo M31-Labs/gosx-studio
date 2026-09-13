@@ -13,6 +13,8 @@
 
   var csrfMeta = document.querySelector('meta[name="csrf-token"]');
   var CSRF = csrfMeta ? csrfMeta.getAttribute("content") : "";
+  /* This tab's name in the room, so its own saves don't bounce back. */
+  var clientId = Math.random().toString(36).slice(2, 10);
   var pageId = root.getAttribute("data-page-id");
   var saveURL = root.getAttribute("data-save-url") || "/admin/api/pages/" + encodeURIComponent(pageId);
   var publishURL = root.getAttribute("data-publish-url") || saveURL + "/publish";
@@ -218,7 +220,7 @@
 
     fetch(saveURL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF },
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF, "X-Editor-Client": clientId },
       credentials: "same-origin",
       body: JSON.stringify(payload),
     })
@@ -239,6 +241,8 @@
         if (pending) {
           pending = false;
           save();
+        } else if (refreshWanted && !editingHere()) {
+          refreshCanvas();
         }
       })
       .catch(function () {
@@ -1439,7 +1443,7 @@
         fetch(publishURL, {
           method: "POST",
           credentials: "same-origin",
-          headers: { "X-CSRF-Token": CSRF },
+          headers: { "X-CSRF-Token": CSRF, "X-Editor-Client": clientId },
         })
           .then(function (r) {
             return r.json();
@@ -1497,6 +1501,112 @@
       input.select();
       try { navigator.clipboard.writeText(input.value); copy.textContent = "Copied"; setTimeout(function () { copy.textContent = "Copy"; }, 1500); } catch (e) { document.execCommand("copy"); }
     });
+  }
+
+  /* ---------- other people on this page ---------- */
+
+  var noun = root.getAttribute("data-kind") === "post" ? "post" : "page";
+  var peopleNode = root.querySelector("[data-people]");
+  var refreshWanted = false;
+  var toastTimer = null;
+
+  function editingHere() {
+    var active = document.activeElement;
+    if (active && article.contains(active)) return true;
+    if (saveNode && saveNode.getAttribute("data-save-status") === "dirty") return true;
+    return saving;
+  }
+
+  function toast(text) {
+    var node = root.querySelector(".ed-toast");
+    if (!node) {
+      node = document.createElement("div");
+      node.className = "ed-toast";
+      node.setAttribute("role", "status");
+      root.appendChild(node);
+    }
+    node.textContent = text;
+    node.hidden = false;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { node.hidden = true; }, 7000);
+  }
+
+  function initials(name) {
+    return String(name || "?").split(/\s+/).map(function (word) { return word.charAt(0); }).join("").slice(0, 2).toUpperCase();
+  }
+
+  function hue(name) {
+    var n = 0;
+    for (var i = 0; i < name.length; i++) n = (n * 31 + name.charCodeAt(i)) % 360;
+    return String(n);
+  }
+
+  function renderPeople(list) {
+    if (!peopleNode || !Array.isArray(list)) return;
+    var others = list.filter(function (person) { return person.client !== clientId; });
+    peopleNode.textContent = "";
+    peopleNode.hidden = others.length === 0;
+    others.forEach(function (person) {
+      var dot = document.createElement("span");
+      dot.className = "ed-person";
+      dot.title = person.name + " is also editing this " + noun;
+      dot.setAttribute("aria-label", dot.title);
+      dot.textContent = initials(person.name);
+      dot.style.setProperty("--person", hue(person.name || ""));
+      peopleNode.appendChild(dot);
+    });
+  }
+
+  /* Swap in the blocks as the server now has them. Nothing here touches
+     the caret: it only runs when nobody is typing in this tab. */
+  function refreshCanvas() {
+    refreshWanted = false;
+    fetch(saveURL + "/canvas", { credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (result) {
+        if (!result.ok) return;
+        if (editingHere()) { refreshWanted = true; return; }
+        var holder = document.createElement("div");
+        holder.innerHTML = result.html;
+        Array.prototype.forEach.call(article.querySelectorAll(".ed-block"), function (el) {
+          if (el.parentNode) el.parentNode.removeChild(el);
+        });
+        while (holder.firstChild) article.appendChild(holder.firstChild);
+        if (titleNode && document.activeElement !== titleNode) titleNode.textContent = result.title;
+        if (chip && result.chip) {
+          chip.setAttribute("data-live", result.live ? "true" : "false");
+          chip.textContent = result.chip;
+        }
+        reindex();
+        history = [];
+        future = [];
+        updateHistoryButtons();
+      })
+      .catch(function () {});
+  }
+
+  if (window.EventSource && saveURL) {
+    var stream = new EventSource(saveURL + "/events?client=" + encodeURIComponent(clientId));
+    stream.addEventListener("presence", function (event) {
+      try { renderPeople(JSON.parse(event.data)); } catch (e) {}
+    });
+    stream.addEventListener("changed", function (event) {
+      var change = {};
+      try { change = JSON.parse(event.data); } catch (e) {}
+      if (change.client === clientId) return;
+      var who = change.by || "Someone";
+      if (editingHere()) {
+        refreshWanted = true;
+        toast(who + " just changed this " + noun + ". You'll see it when you pause. The last save wins, and History keeps every version.");
+      } else {
+        toast(who + " just changed this " + noun + ".");
+        refreshCanvas();
+      }
+    });
+    article.addEventListener("focusout", function () {
+      setTimeout(function () { if (refreshWanted && !editingHere()) refreshCanvas(); }, 900);
+    });
+    window.addEventListener("pagehide", function () { stream.close(); });
   }
 
   window.addEventListener("beforeunload", function (event) {

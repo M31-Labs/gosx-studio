@@ -99,7 +99,9 @@ func (h *Host) observe(next http.Handler) http.Handler {
 			sw.status = http.StatusOK
 		}
 		area := requestArea(r.URL.Path)
-		h.metrics.record(area, sw.status, elapsed)
+		if !strings.HasSuffix(r.URL.Path, "/events") {
+			h.metrics.record(area, sw.status, elapsed)
+		}
 		if h.opts.LogRequests && h.logWriter() != nil && area != "assets" {
 			line := map[string]any{
 				"ts": timeNow().UTC().Format(time.RFC3339Nano), "id": id, "method": r.Method, "path": r.URL.Path,

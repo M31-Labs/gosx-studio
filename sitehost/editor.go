@@ -136,15 +136,7 @@ func (h *Host) renderEditor(w http.ResponseWriter, subject editorSubject) {
 
 func (h *Host) renderEditorToolbar(subject editorSubject) gosx.Node {
 	live := subject.Live
-	statusText := "Not published yet"
-	switch {
-	case subject.Review.Requested:
-		statusText = "Waiting for review"
-	case !subject.Scheduled.IsZero():
-		statusText = "Scheduled for " + formatPostDate(subject.Scheduled)
-	case live:
-		statusText = "Live"
-	}
+	statusText := subjectChip(subject)
 	publishText := publishLabel(live || !subject.Scheduled.IsZero())
 	if subject.MustRequest {
 		publishText = "Request review"
@@ -157,6 +149,7 @@ func (h *Host) renderEditorToolbar(subject editorSubject) gosx.Node {
 			gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-chip"), gosx.Attr("data-live", boolAttr(live))), gosx.Text(statusText)),
 		),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-bar__right")),
+			renderPeople(),
 			gosx.El("span", gosx.Attrs(
 				gosx.Attr("class", "ed-save"),
 				gosx.Attr("data-save-status", "idle"),
@@ -889,6 +882,7 @@ func (h *Host) handleEditorSave(w http.ResponseWriter, r *http.Request) {
 	if slug != page.Slug && page.Slug != homeSlug {
 		_ = h.recordRedirect(publicPath(page.Slug), publicPath(slug))
 	}
+	h.notifyChanged(r, "page", page.ID)
 	writeJSON(w, http.StatusOK, editorSaveResult{
 		OK:     true,
 		Slug:   slug,
@@ -1003,6 +997,7 @@ func (h *Host) handleEditorPublish(w http.ResponseWriter, r *http.Request) {
 	result.Checks = h.readinessChecks("page", pageMetaValue(page, "metaDescription", page.Description), page.Body)
 	if result.OK {
 		h.auditContent(r, "page.published", firstNonEmpty(result.Message, "Published")+": “"+page.Title+"”")
+		h.notifyChanged(r, "page", page.ID)
 	}
 	writeJSON(w, http.StatusOK, result)
 }
