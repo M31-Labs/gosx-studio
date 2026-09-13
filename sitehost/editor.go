@@ -115,7 +115,7 @@ func (h *Host) renderEditor(w http.ResponseWriter, subject editorSubject) {
 		gosx.Attr("data-preview-url", subject.PreviewURL),
 		gosx.Attr("data-must-request", boolAttr(subject.MustRequest)),
 		gosx.Attr("data-can-lock", boolAttr(subject.CanDesign)),
-		gosx.Attr("data-server-kinds", "section,"+compositeKeys()),
+		gosx.Attr("data-server-kinds", "section,image,"+compositeKeys()),
 	),
 		h.renderEditorToolbar(subject),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-body")),
@@ -649,8 +649,27 @@ func (h *Host) renderBlockInner(kind string, instance blockstudio.BlockInstance)
 		return h.renderProductPreview(instance.Values["productRef"].String)
 	case "image":
 		url := instance.Values["url"].String
-		return gosx.El("figure", gosx.Attrs(gosx.Attr("class", "ed-figure")),
+		size := normalizeChoice(instance.Values["size"].String, "full", imageSizes)
+		shape := normalizeChoice(instance.Values["shape"].String, "natural", imageShapes)
+		pick := func(attr, label, current string, options [][2]string) gosx.Node {
+			nodes := make([]gosx.Node, 0, len(options))
+			for _, option := range options {
+				attrs := []any{gosx.Attr("value", option[0])}
+				if option[0] == current {
+					attrs = append(attrs, gosx.Attr("selected", "selected"))
+				}
+				nodes = append(nodes, gosx.El("option", gosx.Attrs(attrs...), gosx.Text(option[1])))
+			}
+			return gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-variant")), gosx.El("span", nil, gosx.Text(label)),
+				gosx.El("select", gosx.Attrs(gosx.Attr(attr, "true"), gosx.Attr("aria-label", label)), gosx.Fragment(nodes...)))
+		}
+		return gosx.El("figure", gosx.Attrs(gosx.Attr("class", "ed-figure site-figure site-figure--"+size+" site-figure--crop-"+shape), gosx.Attr("data-figure", "true")),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-figure__options"), gosx.Attr("contenteditable", "false")),
+				pick("data-img-size", "Size", size, [][2]string{{"full", "Full width"}, {"wide", "Wider than the text"}, {"medium", "Medium"}, {"small", "Small"}}),
+				pick("data-img-shape", "Shape", shape, [][2]string{{"natural", "As it is"}, {"wide", "Wide crop"}, {"square", "Square"}, {"round", "Round"}})),
 			imagePreview(url),
+			gosx.El("input", gosx.Attrs(gosx.Attr("class", "ed-inline-input ed-caption"), gosx.Attr("type", "text"), gosx.Attr("data-caption", "true"), gosx.Attr("value", instance.Values["caption"].String), gosx.Attr("placeholder", "A caption under the picture (optional)"), gosx.Attr("aria-label", "Caption"), gosx.Attr("contenteditable", "false"))),
+			gosx.El("input", gosx.Attrs(gosx.Attr("class", "ed-inline-input"), gosx.Attr("type", "text"), gosx.Attr("data-link", "true"), gosx.Attr("value", instance.Values["link"].String), gosx.Attr("placeholder", "Where a click goes (optional), such as /menu"), gosx.Attr("aria-label", "Picture link"), gosx.Attr("contenteditable", "false"))),
 			gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-upload"), gosx.Attr("contenteditable", "false")),
 				gosx.El("input", gosx.Attrs(
 					gosx.Attr("type", "file"),
@@ -825,6 +844,11 @@ type editorBlockPayload struct {
 	Fields  map[string]string   `json:"fields,omitempty"`
 	Items   []map[string]string `json:"items,omitempty"`
 	Variant string              `json:"variant,omitempty"`
+	// Pictures: how big, what shape, a caption, a link.
+	Size    string `json:"size,omitempty"`
+	Shape   string `json:"shape,omitempty"`
+	Caption string `json:"caption,omitempty"`
+	Link    string `json:"link,omitempty"`
 	// Section breaks: everything beyond the background.
 	Align string `json:"align,omitempty"`
 	Width string `json:"width,omitempty"`
@@ -977,7 +1001,7 @@ func (h *Host) payloadDocument(blocks []editorBlockPayload) blockstudio.Document
 				continue
 			}
 			instances = append(instances, block(order, content.BlockImage,
-				values("url", url, "alt", strings.TrimSpace(incoming.Alt))))
+				values("url", url, "alt", strings.TrimSpace(incoming.Alt), "size", normalizeChoice(incoming.Size, "full", imageSizes), "shape", normalizeChoice(incoming.Shape, "natural", imageShapes), "caption", strings.TrimSpace(incoming.Caption), "link", strings.TrimSpace(incoming.Link))))
 		case "form":
 			instances = append(instances, block(order, content.BlockFlow, values("flowKey", h.formRefForPayload(incoming.Form))))
 		case "product":
@@ -1095,6 +1119,19 @@ func (h *Host) renderLookSection() gosx.Node {
 		))
 	}
 
+	customAttrs := []any{gosx.Attr("type", "radio"), gosx.Attr("name", "lookPalette"), gosx.Attr("id", "look-palette-custom"), gosx.Attr("value", customPaletteKey), gosx.Attr("data-look-palette", customPaletteKey)}
+	if view.PaletteKey == customPaletteKey {
+		customAttrs = append(customAttrs, gosx.Attr("checked", "checked"))
+	}
+	swatches = append(swatches, gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-swatch"), gosx.Attr("for", "look-palette-custom"), gosx.Attr("title", "Pick your own background and text colours")),
+		gosx.El("input", gosx.Attrs(customAttrs...)),
+		gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-swatch__chip ed-swatch__chip--custom"), gosx.Attr("style", "background:"+view.Ground+";border:1px solid "+view.Ink)), gosx.El("i", gosx.Attrs(gosx.Attr("style", "background:"+view.Ink)))),
+		gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-swatch__name")), gosx.Text("Custom"))))
+	custom := gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-custom-colours"), gosx.Attr("data-look-custom", "true")),
+		gosx.El("label", nil, gosx.El("input", gosx.Attrs(gosx.Attr("type", "color"), gosx.Attr("data-look-ground", "true"), gosx.Attr("value", view.Ground), gosx.Attr("aria-label", "Background colour"))), gosx.Text(" Background")),
+		gosx.El("label", nil, gosx.El("input", gosx.Attrs(gosx.Attr("type", "color"), gosx.Attr("data-look-ink", "true"), gosx.Attr("value", view.Ink), gosx.Attr("aria-label", "Text colour"))), gosx.Text(" Text")),
+		gosx.El("small", nil, gosx.Text("Everything else is mixed from these two and the accent.")))
+
 	fonts := make([]gosx.Node, 0, 5)
 	for _, pair := range FontPairs() {
 		inputAttrs := []any{
@@ -1147,9 +1184,33 @@ func (h *Host) renderLookSection() gosx.Node {
 		))
 	}
 
+	radios := func(name, attr, current string, items [][2]string) gosx.Node {
+		nodes := make([]gosx.Node, 0, len(items))
+		for _, item := range items {
+			inputAttrs := []any{gosx.Attr("type", "radio"), gosx.Attr("name", name), gosx.Attr("id", name+"-"+item[0]), gosx.Attr("value", item[0]), gosx.Attr(attr, item[0])}
+			if item[0] == current {
+				inputAttrs = append(inputAttrs, gosx.Attr("checked", "checked"))
+			}
+			nodes = append(nodes, gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-shape ed-shape--text"), gosx.Attr("for", name+"-"+item[0])),
+				gosx.El("input", gosx.Attrs(inputAttrs...)), gosx.El("span", nil, gosx.Text(item[1]))))
+		}
+		return gosx.Fragment(nodes...)
+	}
+	headingItems := [][2]string{}
+	for _, scale := range HeadingScales() {
+		headingItems = append(headingItems, [2]string{scale.Key, scale.Label})
+	}
+	widthItems := [][2]string{}
+	for _, width := range PageWidths() {
+		widthItems = append(widthItems, [2]string{width.Key, width.Label})
+	}
 	presets := lookPresetsJSON()
 
-	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-side__block"), gosx.Attr("data-look", "true"), gosx.Attr("id", "look")),
+	lookAttrs := []any{gosx.Attr("class", "ed-side__block"), gosx.Attr("data-look", "true"), gosx.Attr("id", "look")}
+	if view.PaletteKey == customPaletteKey {
+		lookAttrs = append(lookAttrs, gosx.Attr("data-custom", "true"))
+	}
+	return gosx.El("div", gosx.Attrs(lookAttrs...),
 		gosx.El("h2", nil, gosx.Text("Look")),
 		gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-hint")),
 			gosx.Text("Changes here apply to your whole site, and you can see them on the page as you pick.")),
@@ -1157,6 +1218,7 @@ func (h *Host) renderLookSection() gosx.Node {
 			gosx.El("span", nil, gosx.Text("Colours")),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-swatches"), gosx.Attr("role", "radiogroup"), gosx.Attr("aria-label", "Colour palette")),
 				gosx.Fragment(swatches...)),
+			custom,
 		),
 		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-look-group")),
 			gosx.El("span", nil, gosx.Text("Fonts")),
@@ -1184,6 +1246,16 @@ func (h *Host) renderLookSection() gosx.Node {
 			gosx.El("span", nil, gosx.Text("Spacing")),
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-shapes"), gosx.Attr("role", "radiogroup"), gosx.Attr("aria-label", "Spacing")),
 				gosx.Fragment(spacing...)),
+		),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-look-group")),
+			gosx.El("span", nil, gosx.Text("Headings")),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-shapes"), gosx.Attr("role", "radiogroup"), gosx.Attr("aria-label", "Heading size")),
+				radios("lookHeadings", "data-look-headings", view.HeadingsKey, headingItems)),
+		),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-look-group")),
+			gosx.El("span", nil, gosx.Text("Text width")),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-shapes"), gosx.Attr("role", "radiogroup"), gosx.Attr("aria-label", "Text width")),
+				radios("lookWidth", "data-look-width", view.WidthKey, widthItems)),
 		),
 		gosx.El("link", gosx.Attrs(gosx.Attr("rel", "stylesheet"), gosx.Attr("href", fontsPreviewURL()))),
 		gosx.El("script", gosx.Attrs(gosx.Attr("type", "application/json"), gosx.Attr("data-look-presets", "true")),
@@ -1233,7 +1305,15 @@ func lookPresetsJSON() string {
 	for _, scale := range SpacingScales() {
 		spacing = append(spacing, lookPresetShape{scale.Key, scale.Scale})
 	}
-	data, err := json.Marshal(map[string]any{"palettes": palettes, "fonts": fonts, "buttons": shapes, "spacing": spacing})
+	headings := make([]lookPresetShape, 0, 3)
+	for _, scale := range HeadingScales() {
+		headings = append(headings, lookPresetShape{scale.Key, scale.Scale})
+	}
+	widths := make([]lookPresetShape, 0, 3)
+	for _, width := range PageWidths() {
+		widths = append(widths, lookPresetShape{width.Key, width.Measure})
+	}
+	data, err := json.Marshal(map[string]any{"palettes": palettes, "fonts": fonts, "buttons": shapes, "spacing": spacing, "headings": headings, "widths": widths})
 	if err != nil {
 		return "{}"
 	}
@@ -1242,11 +1322,15 @@ func lookPresetsJSON() string {
 }
 
 type themeSavePayload struct {
-	Palette string `json:"palette"`
-	Fonts   string `json:"fonts"`
-	Accent  string `json:"accent"`
-	Buttons string `json:"buttons"`
-	Spacing string `json:"spacing"`
+	Palette  string `json:"palette"`
+	Fonts    string `json:"fonts"`
+	Accent   string `json:"accent"`
+	Buttons  string `json:"buttons"`
+	Spacing  string `json:"spacing"`
+	Headings string `json:"headings"`
+	Width    string `json:"width"`
+	Ground   string `json:"ground"`
+	Ink      string `json:"ink"`
 }
 
 type themeSaveResult struct {
@@ -1262,7 +1346,7 @@ func (h *Host) handleThemeSave(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, themeSaveResult{Message: "We couldn't read that change. Try again."})
 		return
 	}
-	theme, err := h.SaveTheme(payload.Palette, payload.Fonts, payload.Accent, payload.Buttons, payload.Spacing)
+	theme, err := h.SaveTheme(ThemeChoice{Palette: payload.Palette, Fonts: payload.Fonts, Accent: payload.Accent, Buttons: payload.Buttons, Spacing: payload.Spacing, Headings: payload.Headings, Width: payload.Width, Ground: payload.Ground, Ink: payload.Ink})
 	if err != nil {
 		writeJSON(w, http.StatusOK, themeSaveResult{Message: "We couldn't save the look. Try again."})
 		return

@@ -669,6 +669,8 @@ func (h *Host) handleBlockFresh(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case kind == "section":
 		inner = renderSectionBar(sectionOptions{Style: "plain", Align: "left", Width: "normal", Space: "normal"})
+	case kind == "image":
+		inner = h.renderBlockInner("image", blockstudio.BlockInstance{Key: "image", Values: blockstudio.Values{}})
 	default:
 		spec, ok := compositeByKey(kind)
 		if !ok {

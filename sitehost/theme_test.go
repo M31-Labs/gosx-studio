@@ -69,7 +69,7 @@ func TestThemeCSSIsScopedAndComplete(t *testing.T) {
 func TestSaveThemeRoundTripsAndPreservesSettings(t *testing.T) {
 	host, handler := newTestHost(t)
 
-	saved, err := host.SaveTheme("night", "editorial", "#ff8800", "", "")
+	saved, err := host.SaveTheme(ThemeChoice{Palette: "night", Fonts: "editorial", Accent: "#ff8800"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestSaveThemeRoundTripsAndPreservesSettings(t *testing.T) {
 	mustContain(t, body, "fonts.googleapis.com/css2?family=Newsreader", "the pairing's fonts are linked")
 
 	// Choosing the palette's own accent drops the override.
-	saved, err = host.SaveTheme("night", "clean", "#4cbba0", "", "")
+	saved, err = host.SaveTheme(ThemeChoice{Palette: "night", Fonts: "clean", Accent: "#4cbba0"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestSaveThemeRoundTripsAndPreservesSettings(t *testing.T) {
 
 func TestUnknownThemeKeysFallBackToDefaults(t *testing.T) {
 	host, _ := newTestHost(t)
-	saved, err := host.SaveTheme("nope", "nope", "javascript:alert(1)", "nope", "nope")
+	saved, err := host.SaveTheme(ThemeChoice{Palette: "nope", Fonts: "nope", Accent: "javascript:alert(1)", Buttons: "nope", Spacing: "nope"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +146,7 @@ func TestThemeAPISavesAndReturnsCSS(t *testing.T) {
 
 func TestButtonShapeAndSpacingReachTheCSS(t *testing.T) {
 	host, handler := newTestHost(t)
-	saved, err := host.SaveTheme("fresh", "clean", "", "pill", "airy")
+	saved, err := host.SaveTheme(ThemeChoice{Palette: "fresh", Fonts: "clean", Buttons: "pill", Spacing: "airy"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestButtonShapeAndSpacingReachTheCSS(t *testing.T) {
 	mustContain(t, saved.CSS(), "--site-space:1.35;", "airy spacing reaches the CSS")
 	mustContain(t, get(t, handler, "/").Body.String(), "--site-radius:999px;", "visitors get the corners")
 
-	saved, _ = host.SaveTheme("fresh", "clean", "", "what", "ever")
+	saved, _ = host.SaveTheme(ThemeChoice{Palette: "fresh", Fonts: "clean", Buttons: "what", Spacing: "ever"})
 	mustContain(t, saved.CSS(), "--site-radius:2px;", "unknown shapes fall back to square")
 	mustContain(t, saved.CSS(), "--site-space:1;", "unknown spacing falls back to regular")
 

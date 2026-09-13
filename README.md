@@ -164,6 +164,16 @@ not ready can ask the cart page to email them a link to their cart; if they
 have not bought within two hours, one reminder goes out, and never a second.
 Both need an email transport (`-mail`).
 
+### Look, deeper
+
+Beside the six palettes there is **Custom**: pick a background and a text
+colour and the rest of the palette is mixed from them. Headings can be
+quiet, regular, or big; the text column narrow, regular, or wide. Every
+picture has a size (full, wider than the text, medium, small), a shape (as
+it is, wide crop, square, round), a caption, and a link. For owners who know
+CSS, **Settings → Your own CSS** applies to every page and to the editor's
+canvas; imports and anything that isn't plain CSS are stripped.
+
 ### Header and footer
 
 **Settings → Brand** now shapes the whole frame: an announcement bar

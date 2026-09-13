@@ -114,8 +114,16 @@
     if (kind === "image") {
       var src = el.querySelector("[data-src]");
       var alt = el.querySelector("[data-alt]");
+      var isize = el.querySelector("[data-img-size]");
+      var ishape = el.querySelector("[data-img-shape]");
+      var icap = el.querySelector("[data-caption]");
+      var ilink = el.querySelector("[data-link]");
       payload.url = src ? src.value.trim() : "";
       payload.alt = alt ? alt.value.trim() : "";
+      payload.size = isize ? isize.value : "";
+      payload.shape = ishape ? ishape.value : "";
+      payload.caption = icap ? icap.value.trim() : "";
+      payload.link = ilink ? ilink.value.trim() : "";
       payload.text = "";
     }
     if (kind === "form") {
@@ -1174,6 +1182,16 @@
       queueSave();
       return;
     }
+    if (event.target.matches("[data-img-size],[data-img-shape]")) {
+      snapshot();
+      var fig = event.target.closest("[data-figure]");
+      if (fig) {
+        var sz = fig.querySelector("[data-img-size]"), sh = fig.querySelector("[data-img-shape]");
+        fig.className = "ed-figure site-figure site-figure--" + (sz ? sz.value : "full") + " site-figure--crop-" + (sh ? sh.value : "natural");
+      }
+      queueSave();
+      return;
+    }
     if (event.target.matches("input[type=checkbox][data-field]")) {
       snapshot();
       var card = event.target.closest("[data-item]");
@@ -1185,7 +1203,7 @@
   root.addEventListener("input", function (event) {
     if (event.target.matches("[data-video-url]")) { refreshVideo(event.target); queueSave(); return; }
     if (event.target.matches("[data-galt]")) { queueSave(); return; }
-    var field = event.target.closest("[data-text]") || (event.target.matches("[data-href],[data-src],[data-alt],input[data-field]") ? event.target : null);
+    var field = event.target.closest("[data-text]") || (event.target.matches("[data-href],[data-src],[data-alt],[data-caption],[data-link],input[data-field]") ? event.target : null);
     if (field) {
       if (typingSession !== field) {
         typingSession = field;
@@ -1768,18 +1786,38 @@
   var accentInput = look.querySelector("[data-look-accent]");
   var timer = null;
 
+  var groundInput = look.querySelector("[data-look-ground]");
+  var inkInput = look.querySelector("[data-look-ink]");
+
   function current() {
     var palette = look.querySelector("[data-look-palette]:checked");
     var fonts = look.querySelector("[data-look-fonts]:checked");
     var buttons = look.querySelector("[data-look-buttons]:checked");
     var spacing = look.querySelector("[data-look-spacing]:checked");
+    var headings = look.querySelector("[data-look-headings]:checked");
+    var width = look.querySelector("[data-look-width]:checked");
     return {
       palette: palette ? palette.value : (presets.palettes[0] || {}).key,
       fonts: fonts ? fonts.value : (presets.fonts[0] || {}).key,
       accent: accentInput ? accentInput.value : "",
       buttons: buttons ? buttons.value : "",
       spacing: spacing ? spacing.value : "",
+      headings: headings ? headings.value : "",
+      width: width ? width.value : "",
+      ground: groundInput ? groundInput.value : "",
+      ink: inkInput ? inkInput.value : "",
     };
+  }
+
+  /* The custom palette, mixed the way the server mixes it. */
+  function customPalette(state) {
+    var g = state.ground || "#ffffff", k = state.ink || "#1a1a1a";
+    var hex = g.replace("#", ""); if (hex.length === 3) hex = hex.replace(/(.)/g, "$1$1");
+    var r = parseInt(hex.slice(0, 2), 16) / 255, gg = parseInt(hex.slice(2, 4), 16) / 255, b = parseInt(hex.slice(4, 6), 16) / 255;
+    var lum = 0.2126 * r + 0.7152 * gg + 0.0722 * b;
+    return { key: "custom", scheme: lum < 0.4 ? "dark" : "light", ground: g, ink: k,
+      surface: "color-mix(in srgb, " + k + " 6%, " + g + ")", muted: "color-mix(in srgb, " + k + " 62%, " + g + ")",
+      rule: "color-mix(in srgb, " + k + " 14%, " + g + ")", accent: state.accent || k };
   }
 
   function find(list, key) {
@@ -1791,7 +1829,8 @@
      emits, written straight onto the canvas root, so the page changes under
      the cursor before the save returns. */
   function apply(state) {
-    var p = find(presets.palettes, state.palette) || {};
+    var p = state.palette === "custom" ? customPalette(state) : (find(presets.palettes, state.palette) || {});
+    look.toggleAttribute("data-custom", state.palette === "custom");
     var f = find(presets.fonts, state.fonts) || {};
     var accent = state.accent || p.accent;
     if (canvas) {
@@ -1808,6 +1847,10 @@
       var space = find(presets.spacing || [], state.spacing);
       if (shape) canvas.style.setProperty("--site-radius", shape.value);
       if (space) canvas.style.setProperty("--site-space", space.value);
+      var heads = find(presets.headings || [], state.headings);
+      var width = find(presets.widths || [], state.width);
+      if (heads) canvas.style.setProperty("--site-heading-scale", heads.value);
+      if (width) canvas.style.setProperty("--site-measure", width.value);
     }
     if (f.fontsUrl) ensureFontLink(f.fontsUrl);
   }
@@ -1861,6 +1904,13 @@
   });
   look.addEventListener("input", function (event) {
     if (event.target.matches("[data-look-accent]")) { accentInput.dataset.custom = "1"; apply(current()); }
+    if (event.target.matches("[data-look-ground],[data-look-ink]")) {
+      var customRadio = look.querySelector('[data-look-palette="custom"]');
+      if (customRadio) customRadio.checked = true;
+      apply(current());
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(save, 600);
+    }
   });
   var reset = look.querySelector("[data-look-accent-reset]");
   if (reset) reset.addEventListener("click", function () {

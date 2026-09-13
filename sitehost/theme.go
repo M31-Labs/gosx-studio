@@ -43,20 +43,150 @@ type FontPair struct {
 
 // Theme is the resolved Look for a site.
 type Theme struct {
-	Palette Palette
-	Fonts   FontPair
-	Accent  string // hex, overrides Palette.Accent when set
-	Buttons string // ButtonShape key
-	Spacing string // SpacingScale key
+	Palette  Palette
+	Fonts    FontPair
+	Accent   string // hex, overrides Palette.Accent when set
+	Buttons  string // ButtonShape key
+	Spacing  string // SpacingScale key
+	Headings string // HeadingScale key
+	Width    string // PageWidth key
+	// Ground and Ink are the owner's own colours when Palette is the custom
+	// one; the rest of the palette is mixed from them.
+	Ground, Ink string
+	// CustomCSS is the owner's own stylesheet, already sanitised.
+	CustomCSS string
 }
 
 const (
-	themePaletteKey = "themePalette"
-	themeFontsKey   = "themeFonts"
-	themeAccentKey  = "themeAccent"
-	themeButtonsKey = "themeButtons"
-	themeSpacingKey = "themeSpacing"
+	themePaletteKey  = "themePalette"
+	themeFontsKey    = "themeFonts"
+	themeAccentKey   = "themeAccent"
+	themeButtonsKey  = "themeButtons"
+	themeSpacingKey  = "themeSpacing"
+	themeHeadingsKey = "themeHeadings"
+	themeWidthKey    = "themeWidth"
+	themeGroundKey   = "themeGround"
+	themeInkKey      = "themeInk"
+	customCSSKey     = "customCss"
+	customPaletteKey = "custom"
+	customCSSMax     = 20 << 10
 )
+
+// HeadingScale is how big headings are next to the text.
+type HeadingScale struct {
+	Key, Label, Scale string
+}
+
+// HeadingScales are the sizes the owner can pick. The second is the default.
+func HeadingScales() []HeadingScale {
+	return []HeadingScale{
+		{Key: "quiet", Label: "Quiet", Scale: "0.88"},
+		{Key: "regular", Label: "Regular", Scale: "1"},
+		{Key: "big", Label: "Big", Scale: "1.2"},
+	}
+}
+
+func HeadingScaleByKey(key string) HeadingScale {
+	key = strings.ToLower(strings.TrimSpace(key))
+	for _, scale := range HeadingScales() {
+		if scale.Key == key {
+			return scale
+		}
+	}
+	return HeadingScales()[1]
+}
+
+// PageWidth is how wide a column of text runs.
+type PageWidth struct {
+	Key, Label, Measure string
+}
+
+// PageWidths are the widths the owner can pick. The second is the default.
+func PageWidths() []PageWidth {
+	return []PageWidth{
+		{Key: "narrow", Label: "Narrow", Measure: "56ch"},
+		{Key: "regular", Label: "Regular", Measure: "68ch"},
+		{Key: "wide", Label: "Wide", Measure: "84ch"},
+	}
+}
+
+func PageWidthByKey(key string) PageWidth {
+	key = strings.ToLower(strings.TrimSpace(key))
+	for _, width := range PageWidths() {
+		if width.Key == key {
+			return width
+		}
+	}
+	return PageWidths()[1]
+}
+
+// customPalette mixes a whole palette from two colours the owner chose.
+// The mixes are left to the browser, which is exact and needs no maths.
+func customPalette(ground, ink, accent string) Palette {
+	scheme := "light"
+	if luminance(ground) < 0.4 {
+		scheme = "dark"
+	}
+	if accent == "" {
+		accent = ink
+	}
+	return Palette{
+		Key: customPaletteKey, Label: "Custom", Blurb: "Your own colours.", Scheme: scheme,
+		Ground:  ground,
+		Surface: "color-mix(in srgb, " + ink + " 6%, " + ground + ")",
+		Ink:     ink,
+		Muted:   "color-mix(in srgb, " + ink + " 62%, " + ground + ")",
+		Rule:    "color-mix(in srgb, " + ink + " 14%, " + ground + ")",
+		Accent:  accent,
+	}
+}
+
+// luminance is a rough brightness of a hex colour, 0 dark to 1 light.
+func luminance(hex string) float64 {
+	hex = strings.TrimPrefix(NormalizeAccent(hex), "#")
+	if len(hex) == 3 {
+		hex = string([]byte{hex[0], hex[0], hex[1], hex[1], hex[2], hex[2]})
+	}
+	if len(hex) != 6 {
+		return 1
+	}
+	channel := func(from int) float64 {
+		var value int
+		for _, r := range hex[from : from+2] {
+			value *= 16
+			switch {
+			case r >= '0' && r <= '9':
+				value += int(r - '0')
+			case r >= 'a' && r <= 'f':
+				value += int(r-'a') + 10
+			}
+		}
+		return float64(value) / 255
+	}
+	return 0.2126*channel(0) + 0.7152*channel(2) + 0.0722*channel(4)
+}
+
+// sanitizeCustomCSS keeps the owner's stylesheet from breaking out of its
+// style element or pulling in other people's code. It is not a parser;
+// it removes the few things that matter and caps the size.
+func sanitizeCustomCSS(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) > customCSSMax {
+		raw = raw[:customCSSMax]
+	}
+	lower := strings.ToLower(raw)
+	for _, banned := range []string{"</style", "<script", "@import", "expression(", "javascript:", "behavior:", "-moz-binding"} {
+		for {
+			at := strings.Index(lower, banned)
+			if at < 0 {
+				break
+			}
+			raw = raw[:at] + raw[at+len(banned):]
+			lower = lower[:at] + lower[at+len(banned):]
+		}
+	}
+	return strings.TrimSpace(raw)
+}
 
 // ButtonShape is how corners on buttons, pictures, and fields look.
 type ButtonShape struct {
@@ -197,13 +327,23 @@ func DefaultTheme() Theme {
 
 // ThemeFromSettings reads the Look off the site's settings metadata.
 func ThemeFromSettings(settings cmsstore.SiteSettings) Theme {
-	return Theme{
-		Palette: PaletteByKey(settings.Metadata[themePaletteKey]),
-		Fonts:   FontPairByKey(settings.Metadata[themeFontsKey]),
-		Accent:  NormalizeAccent(settings.Metadata[themeAccentKey]),
-		Buttons: ButtonShapeByKey(settings.Metadata[themeButtonsKey]).Key,
-		Spacing: SpacingScaleByKey(settings.Metadata[themeSpacingKey]).Key,
+	m := settings.Metadata
+	theme := Theme{
+		Palette:   PaletteByKey(m[themePaletteKey]),
+		Fonts:     FontPairByKey(m[themeFontsKey]),
+		Accent:    NormalizeAccent(m[themeAccentKey]),
+		Buttons:   ButtonShapeByKey(m[themeButtonsKey]).Key,
+		Spacing:   SpacingScaleByKey(m[themeSpacingKey]).Key,
+		Headings:  HeadingScaleByKey(m[themeHeadingsKey]).Key,
+		Width:     PageWidthByKey(m[themeWidthKey]).Key,
+		Ground:    NormalizeAccent(m[themeGroundKey]),
+		Ink:       NormalizeAccent(m[themeInkKey]),
+		CustomCSS: sanitizeCustomCSS(m[customCSSKey]),
 	}
+	if strings.EqualFold(strings.TrimSpace(m[themePaletteKey]), customPaletteKey) && theme.Ground != "" && theme.Ink != "" {
+		theme.Palette = customPalette(theme.Ground, theme.Ink, theme.Accent)
+	}
+	return theme
 }
 
 // theme resolves the running site's Look.
@@ -251,6 +391,8 @@ func (t Theme) CSS() string {
 	b.WriteString("--site-font-body:" + t.Fonts.Body + ";")
 	b.WriteString("--site-radius:" + ButtonShapeByKey(t.Buttons).Radius + ";")
 	b.WriteString("--site-space:" + SpacingScaleByKey(t.Spacing).Scale + ";")
+	b.WriteString("--site-heading-scale:" + HeadingScaleByKey(t.Headings).Scale + ";")
+	b.WriteString("--site-measure:" + PageWidthByKey(t.Width).Measure + ";")
 	b.WriteString("}")
 	return b.String()
 }
@@ -266,40 +408,65 @@ func RenderThemeHead(t Theme) gosx.Node {
 		)
 	}
 	nodes = append(nodes, gosx.El("style", gosx.Attrs(gosx.Attr("data-site-theme", "true")), gosx.RawHTML(t.CSS())))
+	if t.CustomCSS != "" {
+		nodes = append(nodes, gosx.El("style", gosx.Attrs(gosx.Attr("data-site-custom", "true")), gosx.RawHTML(t.CustomCSS)))
+	}
 	return gosx.Fragment(nodes...)
 }
 
 // themeView is what the editor's Look controls and JS need to know.
 type themeView struct {
-	PaletteKey string
-	FontsKey   string
-	Accent     string
-	ButtonsKey string
-	SpacingKey string
+	PaletteKey  string
+	FontsKey    string
+	Accent      string
+	ButtonsKey  string
+	SpacingKey  string
+	HeadingsKey string
+	WidthKey    string
+	Ground, Ink string
 }
 
 func (t Theme) view() themeView {
 	return themeView{
 		PaletteKey: t.Palette.Key, FontsKey: t.Fonts.Key, Accent: t.EffectiveAccent(),
 		ButtonsKey: ButtonShapeByKey(t.Buttons).Key, SpacingKey: SpacingScaleByKey(t.Spacing).Key,
+		HeadingsKey: HeadingScaleByKey(t.Headings).Key, WidthKey: PageWidthByKey(t.Width).Key,
+		Ground: firstNonEmpty(t.Ground, "#ffffff"), Ink: firstNonEmpty(t.Ink, "#1a1a1a"),
 	}
+}
+
+// ThemeChoice is everything the Look panel can set at once.
+type ThemeChoice struct {
+	Palette, Fonts, Accent, Buttons, Spacing, Headings, Width, Ground, Ink string
 }
 
 // SaveTheme writes the Look to the site's settings, preserving every other
 // setting and metadata key, and publishes it so visitors see it at once.
-func (h *Host) SaveTheme(paletteKey, fontsKey, accent, buttonsKey, spacingKey string) (Theme, error) {
+func (h *Host) SaveTheme(choice ThemeChoice) (Theme, error) {
 	current := h.settings()
 	metadata := cmsstore.Metadata{}
 	for key, value := range current.Metadata {
 		metadata[key] = value
 	}
-	palette := PaletteByKey(paletteKey)
-	fonts := FontPairByKey(fontsKey)
-	metadata[themePaletteKey] = palette.Key
+	palette := PaletteByKey(choice.Palette)
+	fonts := FontPairByKey(choice.Fonts)
+	ground, ink := NormalizeAccent(choice.Ground), NormalizeAccent(choice.Ink)
+	if strings.EqualFold(strings.TrimSpace(choice.Palette), customPaletteKey) && ground != "" && ink != "" {
+		metadata[themePaletteKey] = customPaletteKey
+		metadata[themeGroundKey] = ground
+		metadata[themeInkKey] = ink
+		palette = customPalette(ground, ink, NormalizeAccent(choice.Accent))
+	} else {
+		metadata[themePaletteKey] = palette.Key
+		delete(metadata, themeGroundKey)
+		delete(metadata, themeInkKey)
+	}
 	metadata[themeFontsKey] = fonts.Key
-	metadata[themeButtonsKey] = ButtonShapeByKey(buttonsKey).Key
-	metadata[themeSpacingKey] = SpacingScaleByKey(spacingKey).Key
-	if normalized := NormalizeAccent(accent); normalized != "" && normalized != palette.Accent {
+	metadata[themeButtonsKey] = ButtonShapeByKey(choice.Buttons).Key
+	metadata[themeSpacingKey] = SpacingScaleByKey(choice.Spacing).Key
+	metadata[themeHeadingsKey] = HeadingScaleByKey(choice.Headings).Key
+	metadata[themeWidthKey] = PageWidthByKey(choice.Width).Key
+	if normalized := NormalizeAccent(choice.Accent); normalized != "" && (normalized != palette.Accent || palette.Key == customPaletteKey) {
 		metadata[themeAccentKey] = normalized
 	} else {
 		delete(metadata, themeAccentKey)

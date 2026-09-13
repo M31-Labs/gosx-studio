@@ -284,6 +284,16 @@ func (h *Host) renderAdminPages(w http.ResponseWriter, r *http.Request, status a
 	h.writeDocument(w, http.StatusOK, h.adminMeta("Pages"), body)
 }
 
+// renderCustomCSSField is the escape hatch for owners who know CSS.
+func renderCustomCSSField(settings cmsstore.SiteSettings) gosx.Node {
+	return gosx.Fragment(
+		gosx.El("h2", gosx.Attrs(gosx.Attr("class", "admin-subhead")), gosx.Text("Your own CSS")),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "admin-field")),
+			gosx.El("label", gosx.Attrs(gosx.Attr("for", "customCss")), gosx.Text("Extra styles")),
+			gosx.El("textarea", gosx.Attrs(gosx.Attr("id", "customCss"), gosx.Attr("name", "customCss"), gosx.Attr("rows", "6"), gosx.Attr("spellcheck", "false"), gosx.Attr("placeholder", ".site-title { letter-spacing: -0.02em; }")), gosx.Text(settings.Metadata[customCSSKey])),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "admin-hint")), gosx.Text("For when the Look panel isn't enough. Applies to every page and to the editor's canvas. Imports and anything that isn't plain CSS are removed."))))
+}
+
 // renderPageTemplatePicker is the "start from" choice on Add a page.
 func renderPageTemplatePicker() gosx.Node {
 	choices := make([]gosx.Node, 0, 9)
@@ -504,6 +514,7 @@ func (h *Host) renderAdminSettings(w http.ResponseWriter, status adminStatus) {
 				"For example https://yourbusiness.com. Needed so shared links and search results point at the right place."),
 			h.renderBrandFields(settings),
 			h.renderChromeFields(settings),
+			renderCustomCSSField(settings),
 			h.renderMailFields(settings),
 			h.renderGrowthFields(settings),
 			renderStatsField(settings),
@@ -545,6 +556,11 @@ func (h *Host) handleAdminSaveSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	applyChromeFields(r, metadata)
+	if css := sanitizeCustomCSS(r.PostFormValue("customCss")); css != "" {
+		metadata[customCSSKey] = css
+	} else {
+		delete(metadata, customCSSKey)
+	}
 	if problem := h.applyBrandFields(r, metadata); problem != "" {
 		h.renderAdminSettings(w, adminStatus{Message: problem, Error: true})
 		return

@@ -254,6 +254,9 @@ func (h *Host) renderBlock(instance blockstudio.BlockInstance, hooks render.Hook
 	if spec, ok := compositeByKey(instance.Key); ok {
 		return h.renderComposite(spec, instance, false), true
 	}
+	if instance.Key == content.BlockImage {
+		return h.renderPicture(instance)
+	}
 
 	// Pictures and the contact form: cms/render's hooks, exactly as before.
 	view := content.ViewBlocksFromDocument(blockstudio.Document{Version: 1, Kind: "body", Blocks: []blockstudio.BlockInstance{instance}})
@@ -267,4 +270,31 @@ func (h *Host) renderBlock(instance blockstudio.BlockInstance, hooks render.Hook
 // blockPlainText is a block's text with formatting markers removed.
 func blockPlainText(instance blockstudio.BlockInstance) string {
 	return inlineToPlain(strings.TrimSpace(instance.Values["text"].String))
+}
+
+// Picture options: how big and what shape.
+var (
+	imageSizes  = map[string]bool{"full": true, "wide": true, "medium": true, "small": true}
+	imageShapes = map[string]bool{"natural": true, "wide": true, "square": true, "round": true}
+)
+
+// renderPicture draws a picture block with its size, shape, caption, and
+// link, or nothing when there is no picture.
+func (h *Host) renderPicture(instance blockstudio.BlockInstance) (gosx.Node, bool) {
+	alt := strings.TrimSpace(instance.Values["alt"].String)
+	attrs, ok := h.imageAttrs(instance.Values["url"].String, alt, mediaSizes)
+	if !ok {
+		return gosx.Fragment(), false
+	}
+	size := normalizeChoice(instance.Values["size"].String, "full", imageSizes)
+	shape := normalizeChoice(instance.Values["shape"].String, "natural", imageShapes)
+	var picture gosx.Node = gosx.El("img", gosx.Attrs(attrs...))
+	if href := safeLinkHref(instance.Values["link"].String); href != "" {
+		picture = gosx.El("a", gosx.Attrs(linkAttrs(href)...), picture)
+	}
+	nodes := []gosx.Node{picture}
+	if caption := strings.TrimSpace(instance.Values["caption"].String); caption != "" {
+		nodes = append(nodes, gosx.El("figcaption", nil, renderInline(caption)))
+	}
+	return gosx.El("figure", gosx.Attrs(gosx.Attr("class", "site-figure site-figure--"+size+" site-figure--crop-"+shape)), gosx.Fragment(nodes...)), true
 }
