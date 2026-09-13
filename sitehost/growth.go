@@ -3,6 +3,7 @@ package sitehost
 import (
 	"encoding/json"
 	"encoding/xml"
+	"m31labs.dev/gosx-admin/blockstudio"
 	"net/http"
 	"sort"
 	"strings"
@@ -291,7 +292,34 @@ func (h *Host) structuredData(settings cmsstore.SiteSettings, brand Brand, page 
 	if !page.Updated.IsZero() {
 		webpage["dateModified"] = page.Updated.UTC().Format(time.RFC3339)
 	}
-	return []map[string]any{org, site, webpage}
+	out := []map[string]any{org, site, webpage}
+	if faq := faqStructuredData(page.Body); faq != nil {
+		out = append(out, faq)
+	}
+	return out
+}
+
+// faqStructuredData turns the page's questions and answers into the shape
+// search engines show as rich results.
+func faqStructuredData(doc blockstudio.Document) map[string]any {
+	spec, _ := compositeByKey("faq")
+	entries := []map[string]any{}
+	for _, instance := range doc.Blocks {
+		if !instance.Enabled || instance.Key != "faq" {
+			continue
+		}
+		for _, item := range compositeItems(spec, instance) {
+			question, answer := inlineToPlain(item["question"]), inlineToPlain(item["answer"])
+			if question == "" || answer == "" {
+				continue
+			}
+			entries = append(entries, map[string]any{"@type": "Question", "name": question, "acceptedAnswer": map[string]any{"@type": "Answer", "text": answer}})
+		}
+	}
+	if len(entries) == 0 {
+		return nil
+	}
+	return map[string]any{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": entries}
 }
 
 func absoluteURL(base, path string) string {

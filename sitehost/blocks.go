@@ -148,6 +148,9 @@ func (h *Host) renderBody(doc blockstudio.Document, hooks render.Hooks) gosx.Nod
 			continue
 		}
 		if node, ok := h.renderBlock(instance, hooks); ok {
+			if spacing := normalizeChoice(instance.Values[spacingKey].String, "", blockSpacings); spacing != "" {
+				node = gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-space site-space--"+spacing)), node)
+			}
 			if instance.Values[phoneKey].String == phoneHide {
 				node = gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-no-phone")), node)
 			}
@@ -325,6 +328,11 @@ func (h *Host) renderPicture(instance blockstudio.BlockInstance) (gosx.Node, boo
 	}
 	return gosx.El("figure", gosx.Attrs(gosx.Attr("class", "site-figure site-figure--"+size+" site-figure--crop-"+shape)), gosx.Fragment(nodes...)), true
 }
+
+// spacingKey is how much room a block gets around it.
+const spacingKey = "spacing"
+
+var blockSpacings = map[string]bool{"tight": true, "roomy": true, "extra": true}
 
 // Text alignment, button looks, and column counts an owner can pick.
 var (

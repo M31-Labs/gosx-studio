@@ -50,6 +50,7 @@
     var payload = { kind: kind, text: textNode ? serializeText(textNode) : "" };
     if (el.getAttribute("data-phone") === "hide") payload.phone = "hide";
     if (el.getAttribute("data-locked") === "true") payload.locked = "true";
+    if (el.getAttribute("data-spacing")) payload.spacing = el.getAttribute("data-spacing");
     if (kind === "section") {
       var style = el.querySelector("[data-section-style]");
       payload.style = style ? style.value : "plain";
@@ -408,10 +409,26 @@
     tools.appendChild(toolBtn("up", "↑", "Move up"));
     tools.appendChild(toolBtn("down", "↓", "Move down"));
     tools.appendChild(toolBtn("duplicate", "⧉", "Make a copy"));
+    tools.appendChild(spacingSelect(""));
     tools.appendChild(toolBtn("phone", "📱", "Hide on phones"));
     tools.appendChild(toolBtn("lock", "🔒", "Lock: only admins can change this"));
+    tools.appendChild(toolBtn("preset", "★", "Save as a preset"));
     tools.appendChild(toolBtn("delete", "✕", "Delete"));
     return tools;
+  }
+
+  function spacingSelect(current) {
+    var select = document.createElement("select");
+    select.className = "ed-tool ed-tool--select";
+    select.setAttribute("data-tool-spacing", "true");
+    select.title = "Space around this";
+    select.setAttribute("aria-label", "Space around this");
+    [["", "Normal space"], ["tight", "Tight"], ["roomy", "Roomy"], ["extra", "Extra room"]].forEach(function (pair) {
+      var opt = document.createElement("option");
+      opt.value = pair[0]; opt.textContent = pair[1]; if (pair[0] === current) opt.selected = true;
+      select.appendChild(opt);
+    });
+    return select;
   }
 
   /* Editors see locked blocks but cannot touch them. */
@@ -675,11 +692,16 @@
 
   function galleryItem(url, alt) {
     var fig = document.createElement("figure");
-    fig.className = "site-gallery__item ed-gallery__item";
+    fig.className = "site-gallery__item ed-gallery__item ed-item";
+    fig.setAttribute("data-item", "true");
     fig.innerHTML =
+      '<span class="ed-item__tools" contenteditable="false">' +
+      '<button type="button" class="ed-item__tool" data-item-grab="true" title="Drag to reorder" aria-label="Drag to reorder">⠿</button>' +
+      '<button type="button" class="ed-item__tool" data-item-up="true" title="Move up" aria-label="Move up">↑</button>' +
+      '<button type="button" class="ed-item__tool" data-item-down="true" title="Move down" aria-label="Move down">↓</button>' +
+      '<button type="button" class="ed-item__tool" data-item-remove="true" title="Remove" aria-label="Remove">✕</button></span>' +
       '<img src="" alt="" data-gimg="true" loading="lazy">' +
-      '<input class="ed-inline-input" type="text" data-galt="true" value="" placeholder="Describe this picture" aria-label="Picture description">' +
-      '<button type="button" class="ed-tool ed-gallery__remove" data-gremove="true" aria-label="Remove this picture">✕</button>';
+      '<input class="ed-inline-input" type="text" data-galt="true" value="" placeholder="Describe this picture" aria-label="Picture description">';
     fig.querySelector("[data-gimg]").setAttribute("src", url);
     fig.querySelector("[data-galt]").value = alt || "";
     return fig;
@@ -985,6 +1007,113 @@
       .catch(function () { status("error", "Couldn't add that. Try again."); });
   }
 
+  /* ---------- presets: keep a section, drop it elsewhere ---------- */
+
+  function savePreset(blockEl) {
+    var name = window.prompt("Name this preset (you'll see it in the sidebar):", "");
+    if (name === null) return;
+    name = name.trim();
+    if (!name) { status("error", "Give the preset a name."); return; }
+    status("dirty", "Saving the preset…");
+    fetch("/admin/api/presets", {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF },
+      body: JSON.stringify({ name: name, block: blockPayload(blockEl) }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (result) {
+        if (!result.ok) { status("error", result.message || "That didn't save."); return; }
+        var list = root.querySelector("[data-presets-list]");
+        if (list) {
+          var wrap = document.createElement("div");
+          wrap.className = "ed-preset"; wrap.setAttribute("data-preset", result.id);
+          wrap.innerHTML = '<button type="button" class="ed-add ed-preset__add" data-add-preset=""><strong></strong><span></span></button>' +
+            '<button type="button" class="ed-preset__delete" data-preset-delete="" title="Forget this preset" aria-label="Forget this preset">✕</button>';
+          wrap.querySelector("[data-add-preset]").setAttribute("data-add-preset", result.id);
+          wrap.querySelector("[data-preset-delete]").setAttribute("data-preset-delete", result.id);
+          wrap.querySelector("strong").textContent = result.name;
+          wrap.querySelector("span").textContent = result.label || result.kind;
+          list.appendChild(wrap);
+          var hint = root.querySelector("[data-presets-hint]");
+          if (hint) hint.textContent = "A copy of a section you saved. Change the copy without touching the preset.";
+        }
+        status("saved", "Preset saved — it's in the sidebar for every page");
+      })
+      .catch(function () { status("error", "Couldn't reach the server. Try again."); });
+  }
+
+  function addPreset(id) {
+    status("dirty", "Adding…");
+    fetch("/admin/api/presets/" + encodeURIComponent(id), { credentials: "same-origin" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("gone");
+        return r.text().then(function (html) { return { html: html, kind: r.headers.get("X-Block-Kind") || "paragraph", spacing: r.headers.get("X-Block-Spacing") || "" }; });
+      })
+      .then(function (got) {
+        snapshot();
+        var wrapper = document.createElement("div");
+        wrapper.className = "ed-block" + (got.spacing ? " site-space--" + got.spacing : "");
+        wrapper.setAttribute("data-block", got.kind);
+        if (got.spacing) wrapper.setAttribute("data-spacing", got.spacing);
+        wrapper.setAttribute("tabindex", "0");
+        wrapper.appendChild(makeTools());
+        wrapper.appendChild(makeBadge());
+        var holder = document.createElement("div");
+        holder.innerHTML = got.html;
+        while (holder.firstChild) wrapper.appendChild(holder.firstChild);
+        wrapper.appendChild(makeInsertPoint());
+        var sp = wrapper.querySelector("[data-tool-spacing]");
+        if (sp) sp.value = got.spacing;
+        placeBlock(wrapper, null);
+      })
+      .catch(function () { status("error", "That preset is gone. Save it again from a page that has it."); });
+  }
+
+  function deletePreset(id) {
+    if (!window.confirm("Forget this preset? Pages that used it keep their copies.")) return;
+    fetch("/admin/api/presets/" + encodeURIComponent(id) + "/delete", { method: "POST", credentials: "same-origin", headers: { "X-CSRF-Token": CSRF } })
+      .then(function (r) { return r.json(); })
+      .then(function (result) {
+        var node = root.querySelector('[data-preset="' + id + '"]');
+        if (node) node.parentNode.removeChild(node);
+        if (!result.ok) status("error", result.message || "Couldn't remove it.");
+      })
+      .catch(function () { status("error", "Couldn't reach the server. Try again."); });
+  }
+
+  /* ---------- dragging a card, a plan, a picture within its list ---------- */
+
+  var itemDrag = null;
+  root.addEventListener("pointerdown", function (event) {
+    var grab = event.target.closest("[data-item-grab]");
+    if (!grab) return;
+    var item = grab.closest("[data-item]");
+    if (!item) return;
+    event.preventDefault();
+    itemDrag = { item: item, list: item.parentNode, moved: false };
+    item.classList.add("ed-item--dragging");
+    snapshot();
+  });
+  root.addEventListener("pointermove", function (event) {
+    if (!itemDrag) return;
+    var under = document.elementFromPoint(event.clientX, event.clientY);
+    var target = under && under.closest("[data-item]");
+    if (!target || target === itemDrag.item || target.parentNode !== itemDrag.list) return;
+    var rect = target.getBoundingClientRect();
+    var horizontal = rect.width < itemDrag.list.getBoundingClientRect().width * 0.8;
+    var before = horizontal ? event.clientX < rect.left + rect.width / 2 : event.clientY < rect.top + rect.height / 2;
+    itemDrag.list.insertBefore(itemDrag.item, before ? target : target.nextSibling);
+    itemDrag.moved = true;
+  });
+  function endItemDrag() {
+    if (!itemDrag) return;
+    itemDrag.item.classList.remove("ed-item--dragging");
+    if (itemDrag.moved) queueSave();
+    itemDrag = null;
+  }
+  root.addEventListener("pointerup", endItemDrag);
+  root.addEventListener("pointercancel", endItemDrag);
+
   /* ---------- interactions ---------- */
 
   root.addEventListener("click", function (event) {
@@ -1035,6 +1164,35 @@
       return;
     }
 
+    var itemMove = event.target.closest("[data-item-up],[data-item-down]");
+    if (itemMove) {
+      event.preventDefault();
+      var moving = itemMove.closest("[data-item]");
+      if (!moving) return;
+      var up = itemMove.hasAttribute("data-item-up");
+      var sibling = up ? moving.previousElementSibling : moving.nextElementSibling;
+      if (!sibling || !sibling.hasAttribute("data-item")) return;
+      snapshot();
+      if (up) moving.parentNode.insertBefore(moving, sibling); else moving.parentNode.insertBefore(sibling, moving);
+      itemMove.focus();
+      queueSave();
+      return;
+    }
+
+    var presetAdd = event.target.closest("[data-add-preset]");
+    if (presetAdd) {
+      event.preventDefault();
+      addPreset(presetAdd.getAttribute("data-add-preset"));
+      return;
+    }
+
+    var presetDelete = event.target.closest("[data-preset-delete]");
+    if (presetDelete) {
+      event.preventDefault();
+      deletePreset(presetDelete.getAttribute("data-preset-delete"));
+      return;
+    }
+
     var library = event.target.closest("[data-library]");
     if (library) {
       event.preventDefault();
@@ -1057,15 +1215,6 @@
       return;
     }
 
-    var gremove = event.target.closest("[data-gremove]");
-    if (gremove) {
-      event.preventDefault();
-      snapshot();
-      var item = gremove.closest(".ed-gallery__item");
-      if (item) item.remove();
-      queueSave();
-      return;
-    }
     if (picker && !event.target.closest("[data-picker]")) closePicker();
 
     var choose = event.target.closest("[data-insert]");
@@ -1084,6 +1233,7 @@
     var blockEl = tool.closest(".ed-block");
     if (!blockEl) return;
     var action = tool.getAttribute("data-tool");
+    if (action === "preset") { savePreset(blockEl); return; }
     snapshot();
 
     if (action === "delete") {
@@ -1193,6 +1343,16 @@
         composite.className = composite.className.replace(new RegExp("\\bsite-" + kind + "--[a-z]+"), "site-" + kind + "--" + variant.value);
         composite.setAttribute("data-variant-value", variant.value);
       }
+      queueSave();
+      return;
+    }
+    if (event.target.matches("[data-tool-spacing]")) {
+      var spacedBlock = event.target.closest(".ed-block");
+      if (!spacedBlock) return;
+      snapshot();
+      spacedBlock.classList.remove("site-space--tight", "site-space--roomy", "site-space--extra");
+      if (event.target.value) { spacedBlock.setAttribute("data-spacing", event.target.value); spacedBlock.classList.add("site-space--" + event.target.value); }
+      else spacedBlock.removeAttribute("data-spacing");
       queueSave();
       return;
     }
@@ -1354,6 +1514,12 @@
       }
     }
     if (event.key === "Escape") { closeInsertMenu(); closePicker(); }
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+      event.preventDefault();
+      if (saveTimer) clearTimeout(saveTimer);
+      save();
+      return;
+    }
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
       event.preventDefault();
       if (event.shiftKey) redo(); else undo();

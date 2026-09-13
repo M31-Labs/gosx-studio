@@ -58,7 +58,7 @@ func (h *Host) draftView() *Host {
 		store: h.store, opts: h.opts, messages: h.messages, authFailures: h.authFailures,
 		mailer: h.mailer, media: h.media, stats: h.stats, forms: h.forms, products: h.products,
 		orders: h.orders, bookings: h.bookings, carts: h.carts, users: h.users, auditLog: h.auditLog,
-		metrics: h.metrics, collab: h.collab, draft: true,
+		metrics: h.metrics, collab: h.collab, presets: h.presets, draft: true,
 	}
 	// One install, one secret: the view must verify what the site signed.
 	view.secret = h.installSecret()

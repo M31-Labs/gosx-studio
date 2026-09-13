@@ -133,6 +133,7 @@ func (h *Host) servePublicSlug(w http.ResponseWriter, r *http.Request, slug stri
 	}
 
 	body := gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-shell")),
+		gosx.El("a", gosx.Attrs(gosx.Attr("class", "site-skip"), gosx.Attr("href", "#main")), gosx.Text("Skip to content")),
 		h.renderPublicNav(settings, page.Slug),
 		gosx.El("main", gosx.Attrs(gosx.Attr("class", "site-main"), gosx.Attr("id", "main")),
 			gosx.El("article", gosx.Attrs(gosx.Attr("class", "site-article")),

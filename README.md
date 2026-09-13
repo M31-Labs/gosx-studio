@@ -174,7 +174,19 @@ it is, wide crop, square, round), a caption, and a link. For owners who know
 CSS, **Settings → Your own CSS** applies to every page and to the editor's
 canvas; imports and anything that isn't plain CSS are stripped.
 
-### Header and footer
+### Rearranging, spacing, and presets
+
+Every card, plan, question, person, row, and gallery picture has a small toolbar when you hover it. Drag the ⠿ handle to move it, or use the ↑ and ↓ buttons. The page saves on its own.
+
+Every block has a **space** choice in its toolbar: tight, normal, roomy, or extra room. Use it to pull two blocks together or to give a section air.
+
+Got a section right? Click ★ **Save as a preset** and give it a name. It appears under **Your presets** in the sidebar of every page. Adding a preset drops in a copy; the copy is yours to change. Forget a preset with ✕; pages that used it keep their copies.
+
+Press **Ctrl+S** (⌘S on a Mac) to save at once.
+
+Pages carry the polish a visitor expects: a skip link for keyboard users, visible focus rings, smooth scrolling that respects reduced-motion settings, a browser theme colour that matches the Look, a print stylesheet, and FAQ rich results for search engines when a page has a questions section.
+
+## Header and footer
 
 **Settings → Brand** now shapes the whole frame: an announcement bar
 across the top with an optional link, a standout button at the end of the

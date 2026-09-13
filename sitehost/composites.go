@@ -364,8 +364,21 @@ func (c canvas) itemWrap(tag, class string, body ...gosx.Node) gosx.Node {
 		return gosx.El(tag, gosx.Attrs(gosx.Attr("class", class)), gosx.Fragment(body...))
 	}
 	return gosx.El(tag, gosx.Attrs(gosx.Attr("class", class+" ed-item"), gosx.Attr("data-item", "true")),
-		gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("class", "ed-item__remove"), gosx.Attr("data-item-remove", "true"), gosx.Attr("title", "Remove"), gosx.Attr("aria-label", "Remove"), gosx.Attr("contenteditable", "false")), gosx.Text("✕")),
+		itemTools(),
 		gosx.Fragment(body...))
+}
+
+// itemTools are the grab handle, the arrows, and the remove button that a
+// repeated item shows when hovered or focused.
+func itemTools() gosx.Node {
+	button := func(attr, glyph, label string) gosx.Node {
+		return gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("class", "ed-item__tool"), gosx.Attr(attr, "true"), gosx.Attr("title", label), gosx.Attr("aria-label", label)), gosx.Text(glyph))
+	}
+	return gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-item__tools"), gosx.Attr("contenteditable", "false")),
+		button("data-item-grab", "⠿", "Drag to reorder"),
+		button("data-item-up", "↑", "Move up"),
+		button("data-item-down", "↓", "Move down"),
+		button("data-item-remove", "✕", "Remove"))
 }
 
 // itemsWrap holds the repeated items, and the add button on the canvas.

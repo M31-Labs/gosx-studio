@@ -401,7 +401,7 @@ func (h *Host) handleContactSend(w http.ResponseWriter, r *http.Request) {
 	if len(body) > messageMaxLen {
 		body = body[:messageMaxLen]
 	}
-	now := time.Now().UTC()
+	now := timeNow().UTC()
 	if !h.messages.allow(remoteHost(r), now) {
 		fail("rate")
 		return

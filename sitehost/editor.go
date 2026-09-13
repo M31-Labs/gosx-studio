@@ -276,6 +276,7 @@ func (h *Host) renderEditorSidebar(subject editorSubject) gosx.Node {
 			),
 		),
 		lookSection,
+		h.renderPresetAdds(),
 		h.renderSubjectFields(subject),
 		renderReviewNotes(subject),
 		renderChecks(subject.Checks),
@@ -555,8 +556,13 @@ func (h *Host) renderEditableBlock(index int, instance blockstudio.BlockInstance
 
 	hiddenOnPhone := instance.Values[phoneKey].String == phoneHide
 	locked := instance.Values[lockedKey].String == "true"
+	spacing := normalizeChoice(instance.Values[spacingKey].String, "", blockSpacings)
+	class := "ed-block"
+	if spacing != "" {
+		class += " site-space--" + spacing
+	}
 	attrs := []any{
-		gosx.Attr("class", "ed-block"),
+		gosx.Attr("class", class),
 		gosx.Attr("data-block", kind),
 		gosx.Attr("data-index", itoa(index)),
 		gosx.Attr("tabindex", "0"),
@@ -566,6 +572,9 @@ func (h *Host) renderEditableBlock(index int, instance blockstudio.BlockInstance
 	}
 	if locked {
 		attrs = append(attrs, gosx.Attr("data-locked", "true"))
+	}
+	if spacing != "" {
+		attrs = append(attrs, gosx.Attr("data-spacing", spacing))
 	}
 	lockTool := toolButton("lock", "🔒", "Lock: only admins can change this")
 	if locked {
@@ -587,8 +596,10 @@ func (h *Host) renderEditableBlock(index int, instance blockstudio.BlockInstance
 			toolButton("up", "↑", "Move up"),
 			toolButton("down", "↓", "Move down"),
 			toolButton("duplicate", "⧉", "Make a copy"),
+			spacingTool(spacing),
 			phoneTool,
 			lockTool,
+			toolButton("preset", "★", "Save as a preset"),
 			toolButton("delete", "✕", "Delete"),
 		),
 		gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-block__badge"), gosx.Attr("contenteditable", "false")), gosx.Text("Hidden on phones")),
@@ -603,6 +614,19 @@ func (h *Host) renderEditableBlock(index int, instance blockstudio.BlockInstance
 			gosx.Attr("aria-label", "Add a section here"),
 		), gosx.Text("+")),
 	)
+}
+
+// spacingTool is the room-around-this-block choice in the tools.
+func spacingTool(current string) gosx.Node {
+	options := make([]gosx.Node, 0, 4)
+	for _, option := range [][2]string{{"", "Normal space"}, {"tight", "Tight"}, {"roomy", "Roomy"}, {"extra", "Extra room"}} {
+		attrs := []any{gosx.Attr("value", option[0])}
+		if option[0] == current {
+			attrs = append(attrs, gosx.Attr("selected", "selected"))
+		}
+		options = append(options, gosx.El("option", gosx.Attrs(attrs...), gosx.Text(option[1])))
+	}
+	return gosx.El("select", gosx.Attrs(gosx.Attr("class", "ed-tool ed-tool--select"), gosx.Attr("data-tool-spacing", "true"), gosx.Attr("title", "Space around this"), gosx.Attr("aria-label", "Space around this")), gosx.Fragment(options...))
 }
 
 func toolButton(action, glyph, label string) gosx.Node {
@@ -879,6 +903,7 @@ type editorBlockPayload struct {
 	Product string               `json:"product,omitempty"`
 	Phone   string               `json:"phone,omitempty"`
 	Locked  string               `json:"locked,omitempty"`
+	Spacing string               `json:"spacing,omitempty"`
 	Images  []editorImagePayload `json:"images,omitempty"`
 	// Ready-made sections: their named fields, repeated items, and layout.
 	Fields  map[string]string   `json:"fields,omitempty"`
@@ -1102,6 +1127,11 @@ func (h *Host) payloadDocument(blocks []editorBlockPayload) blockstudio.Document
 				continue
 			}
 			instances = append(instances, block(order, content.BlockParagraph, values("text", value, "align", normalizeChoice(incoming.Align, "", textAligns))))
+		}
+		if len(instances) > before {
+			if spacing := normalizeChoice(incoming.Spacing, "", blockSpacings); spacing != "" {
+				instances[len(instances)-1].Values[spacingKey] = text(spacing)
+			}
 		}
 		if len(instances) > before && strings.TrimSpace(incoming.Phone) == phoneHide {
 			instances[len(instances)-1].Values[phoneKey] = text(phoneHide)
@@ -1463,10 +1493,10 @@ func renderGalleryEditor(images [][2]string, style string) gosx.Node {
 }
 
 func galleryEditorItem(url, alt string) gosx.Node {
-	return gosx.El("figure", gosx.Attrs(gosx.Attr("class", "site-gallery__item ed-gallery__item")),
+	return gosx.El("figure", gosx.Attrs(gosx.Attr("class", "site-gallery__item ed-gallery__item ed-item"), gosx.Attr("data-item", "true")),
+		itemTools(),
 		gosx.El("img", gosx.Attrs(gosx.Attr("src", url), gosx.Attr("alt", ""), gosx.Attr("data-gimg", "true"), gosx.Attr("loading", "lazy"))),
 		gosx.El("input", gosx.Attrs(gosx.Attr("class", "ed-inline-input"), gosx.Attr("type", "text"), gosx.Attr("data-galt", "true"), gosx.Attr("value", alt), gosx.Attr("placeholder", "Describe this picture"), gosx.Attr("aria-label", "Picture description"))),
-		gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("class", "ed-tool ed-gallery__remove"), gosx.Attr("data-gremove", "true"), gosx.Attr("aria-label", "Remove this picture")), gosx.Text("✕")),
 	)
 }
 

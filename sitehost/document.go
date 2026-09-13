@@ -143,6 +143,9 @@ func RenderHead(meta PageMeta) gosx.Node {
 	if meta.NoIndex {
 		nodes = append(nodes, metaTag("robots", "noindex, nofollow"))
 	}
+	if !meta.AdminChrome && meta.Theme.Palette.Ground != "" {
+		nodes = append(nodes, metaTag("theme-color", meta.Theme.Palette.Ground))
+	}
 	if meta.Stats {
 		nodes = append(nodes, gosx.El("script", gosx.Attrs(gosx.Attr("src", statsScriptPath), gosx.Attr("defer", "defer"))))
 	}
