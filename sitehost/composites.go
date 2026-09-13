@@ -46,6 +46,9 @@ type compositeSpec struct {
 	ItemDefaults      []map[string]string
 	MaxItems          int
 	Variants          []variantSpec
+	// Live sections draw from the site itself (posts, products) rather
+	// than from fields, so they are never empty by the owner's doing.
+	Live bool
 }
 
 func (s compositeSpec) variant(value string) string {
@@ -162,6 +165,12 @@ var composites = []compositeSpec{
 		Variants: []variantSpec{{"wide", "Wide"}, {"compact", "Compact"}}},
 	{Key: "spacer", Label: "Space", Blurb: "Empty room between things",
 		Variants: []variantSpec{{"medium", "Medium"}, {"small", "Small"}, {"large", "Large"}}},
+	{Key: "posts", Label: "Latest posts", Blurb: "Your newest blog posts, kept up to date by themselves", Live: true,
+		Fields:   []partSpec{{Key: "heading", Label: "Heading", Kind: partText, Default: "From the blog"}},
+		Variants: []variantSpec{{"three", "The latest three"}, {"six", "The latest six"}, {"one", "Just the newest"}}},
+	{Key: "products", Label: "From the shop", Blurb: "A few products, straight from your shop", Live: true,
+		Fields:   []partSpec{{Key: "heading", Label: "Heading", Kind: partText, Default: "From the shop"}},
+		Variants: []variantSpec{{"three", "Three products"}, {"six", "Six products"}, {"all", "Everything on sale"}}},
 }
 
 func compositeByKey(key string) (compositeSpec, bool) {
@@ -240,7 +249,7 @@ func compositeItems(spec compositeSpec, instance blockstudio.BlockInstance) []ma
 // nothing when the block is empty.
 func compositeFromPayload(spec compositeSpec, incoming editorBlockPayload, order int) (blockstudio.BlockInstance, bool) {
 	values := blockstudio.Values{}
-	filled := len(spec.Fields) == 0 && spec.Item == nil
+	filled := (len(spec.Fields) == 0 && spec.Item == nil) || spec.Live
 	for _, field := range spec.Fields {
 		value := strings.TrimSpace(incoming.Fields[field.Key])
 		if field.Kind == partFlag {
@@ -556,6 +565,44 @@ func (h *Host) renderComposite(spec compositeSpec, instance blockstudio.BlockIns
 			body = []gosx.Node{gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-spacer__label"), gosx.Attr("contenteditable", "false")), gosx.Text("Space"))}
 		}
 		rootAttrs = append(rootAttrs, gosx.Attr("aria-hidden", "true"))
+	case "posts":
+		count := map[string]int{"one": 1, "three": 3, "six": 6}[variant]
+		posts := h.livePosts()
+		if len(posts) > count {
+			posts = posts[:count]
+		}
+		var list gosx.Node = gosx.Fragment()
+		switch {
+		case len(posts) > 0:
+			list = renderPostList(posts)
+		case editable:
+			list = gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-live-hint"), gosx.Attr("contenteditable", "false")), gosx.Text("Your newest posts appear here once you publish one under Blog."))
+		default:
+			return gosx.Fragment()
+		}
+		if editable {
+			list = gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-live"), gosx.Attr("contenteditable", "false")), list)
+		}
+		body = []gosx.Node{c.textNode("h2", "site-posts__heading", f("heading"), get("heading")), list}
+	case "products":
+		count := map[string]int{"three": 3, "six": 6, "all": 1 << 20}[variant]
+		products := h.activeProducts()
+		if len(products) > count {
+			products = products[:count]
+		}
+		var grid gosx.Node = gosx.Fragment()
+		switch {
+		case len(products) > 0:
+			grid = h.renderProductGrid(products)
+		case editable:
+			grid = gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-live-hint"), gosx.Attr("contenteditable", "false")), gosx.Text("Products on sale appear here. Add one under Shop."))
+		default:
+			return gosx.Fragment()
+		}
+		if editable {
+			grid = gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-live"), gosx.Attr("contenteditable", "false")), grid)
+		}
+		body = []gosx.Node{c.textNode("h2", "site-products__heading", f("heading"), get("heading")), grid}
 	}
 	if editable {
 		body = append([]gosx.Node{c.variantPicker(spec, variant)}, body...)

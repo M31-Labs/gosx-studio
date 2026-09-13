@@ -116,14 +116,29 @@ func StarterSiteFor(answers SetupAnswers) []StarterPage {
 		Publish:     true,
 	}
 
+	hero := func(order int, button, target, second, secondTarget string) blockstudio.BlockInstance {
+		fields := map[string]string{"eyebrow": "Welcome", "headline": tagline, "text": "A sentence or two on what you do and who it's for. The rest of the page can do the explaining.", "button": button, "url": target}
+		if second != "" {
+			fields["button2"] = second
+			fields["url2"] = secondTarget
+		}
+		return comp(order, "hero", "center", fields, nil)
+	}
+	cta := func(order int, headline, text, button, target string) blockstudio.BlockInstance {
+		return comp(order, "cta", "band", map[string]string{"headline": headline, "text": text, "button": button, "url": target}, nil)
+	}
+
 	var pages []StarterPage
 	switch SiteKindByKey(answers.Kind).Key {
 	case "shop":
 		home.Body = document(
-			para(0, tagline),
-			button(1, "See what's in stock", "/shop"),
-			heading(2, 3, "Why people buy from us"),
-			para(3, "Three sentences on what makes your work different. Materials, care, the person behind it — whatever a customer would want to know before they spend money."),
+			hero(0, "See what's in stock", "/shop", "", ""),
+			comp(1, "features", "plain", map[string]string{"heading": "Why people buy from us"}, []map[string]string{
+				{"icon": "✦", "title": "Made with care", "text": "Materials, process, the person behind it — whatever a customer would want to know before they spend money."},
+				{"icon": "✦", "title": "Made to last", "text": "A sentence on quality, and what happens if something isn't right."},
+				{"icon": "✦", "title": "Made nearby", "text": "Where it's made, how it ships, and how long that takes."}}),
+			comp(2, "products", "three", map[string]string{"heading": "From the shop"}, nil),
+			cta(3, "Something you can't see here?", "Get in touch and we'll sort it out.", "Get in touch", "/contact"),
 		)
 		pages = []StarterPage{
 			home,
@@ -137,10 +152,13 @@ func StarterSiteFor(answers SetupAnswers) []StarterPage {
 		}
 	case "services":
 		home.Body = document(
-			para(0, tagline),
-			button(1, "See what I do", "/services"),
-			heading(2, 3, "Who I work with"),
-			para(3, "Name the kind of client you want. Being specific here brings you better enquiries than trying to appeal to everyone."),
+			hero(0, "See what I do", "/services", "Get in touch", "/contact"),
+			comp(1, "features", "cards", map[string]string{"heading": "How I can help"}, []map[string]string{
+				{"icon": "1", "title": "The first service", "text": "Say what the client gets, not how you do it."},
+				{"icon": "2", "title": "The second service", "text": "One or two sentences is plenty."},
+				{"icon": "3", "title": "The third service", "text": "If you can name a price or a range, do."}}),
+			comp(2, "testimonials", "grid", map[string]string{"heading": "What clients say"}, nil),
+			cta(3, "Tell me about the job", "I reply within a working day.", "Get in touch", "/contact"),
 		)
 		pages = []StarterPage{
 			home,
@@ -158,10 +176,9 @@ func StarterSiteFor(answers SetupAnswers) []StarterPage {
 		}
 	case "food":
 		home.Body = document(
-			para(0, tagline),
-			button(1, "See the menu", "/menu"),
-			heading(2, 3, "Come and find us"),
-			para(3, firstNonEmpty(answers.Location, "Add your address here, plus a line about parking, the nearest stop, or the door that's easy to miss.")),
+			hero(0, "See the menu", "/menu", "Find us", "/visit"),
+			comp(1, "hours", "inline", map[string]string{"heading": "Opening hours", "note": ""}, nil),
+			cta(2, "Come and find us", firstNonEmpty(answers.Location, "Add your address here, plus a line about parking, the nearest stop, or the door that's easy to miss."), "How to find us", "/visit"),
 		)
 		pages = []StarterPage{
 			home,
@@ -173,16 +190,18 @@ func StarterSiteFor(answers SetupAnswers) []StarterPage {
 				para(4, "Add a line about anything you're known for, and note what you can do for allergies."),
 			)},
 			{Slug: "visit", Title: "Visit", Description: "Opening hours and directions for " + name + ".", Publish: true, Body: document(
-				heading(0, 2, "When we're open"),
-				para(1, "Days and times, written the way you'd say them out loud. \"Tuesday to Sunday, 8 till 3\" beats a table."),
-				heading(2, 3, "Where we are"),
-				para(3, firstNonEmpty(answers.Location, "Your address, and how to find the door.")),
+				comp(0, "hours", "table", map[string]string{"heading": "When we're open"}, nil),
+				comp(1, "map", "wide", map[string]string{"address": firstNonEmpty(answers.Location, "Your address"), "note": "How to find the door, where to park, the nearest stop."}, nil),
 			)},
 		}
 	case "portfolio":
 		home.Body = document(
-			para(0, tagline),
-			button(1, "See the work", "/work"),
+			hero(0, "See the work", "/work", "", ""),
+			comp(1, "features", "plain", map[string]string{"heading": "What I do"}, []map[string]string{
+				{"icon": "✦", "title": "The first thing", "text": "A line on it."},
+				{"icon": "✦", "title": "The second thing", "text": "A line on it."},
+				{"icon": "✦", "title": "The third thing", "text": "A line on it."}}),
+			cta(2, "Working on something?", "Tell me about it.", "Get in touch", "/contact"),
 		)
 		pages = []StarterPage{
 			home,
@@ -198,10 +217,12 @@ func StarterSiteFor(answers SetupAnswers) []StarterPage {
 		}
 	case "community":
 		home.Body = document(
-			para(0, tagline),
-			button(1, "What's coming up", "/whats-on"),
-			heading(2, 3, "New here?"),
-			para(3, "Tell someone who has never been what to expect: when to arrive, what happens, and whether they need to bring anything."),
+			hero(0, "What's coming up", "/whats-on", "", ""),
+			comp(1, "features", "numbered", map[string]string{"heading": "New here?"}, []map[string]string{
+				{"icon": "", "title": "Come along", "text": "When to arrive and where to go."},
+				{"icon": "", "title": "Say hello", "text": "Who to look for when you get there."},
+				{"icon": "", "title": "Join in", "text": "What happens, and whether you need to bring anything."}}),
+			cta(2, "Questions before you come?", "We're happy to help.", "Get in touch", "/contact"),
 		)
 		pages = []StarterPage{
 			home,
@@ -217,8 +238,12 @@ func StarterSiteFor(answers SetupAnswers) []StarterPage {
 		}
 	default:
 		home.Body = document(
-			para(0, tagline),
-			button(1, "Get in touch", "/contact"),
+			hero(0, "Get in touch", "/contact", "", ""),
+			comp(1, "features", "plain", map[string]string{"heading": "What you'll find here"}, []map[string]string{
+				{"icon": "✦", "title": "One thing", "text": "A line on it."},
+				{"icon": "✦", "title": "Another", "text": "A line on it."},
+				{"icon": "✦", "title": "And a third", "text": "A line on it."}}),
+			cta(2, "Ready when you are", "One line on what happens when they get in touch.", "Get in touch", "/contact"),
 		)
 		pages = []StarterPage{home}
 	}

@@ -253,6 +253,10 @@ details[open] > .site-faq__question::after { content: "–"; }
 .site-map__frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .site-map__address { font-weight: 600; margin: 0; }
 .site-map__note { color: var(--site-muted); font-size: 14px; }
+.site-posts__heading, .site-products__heading { margin-top: 0 !important; }
+.site-posts, .site-products { max-width: none; }
+.ed-live { pointer-events: none; opacity: .92; }
+.ed-live-hint { padding: 18px; border: 1px dashed var(--site-rule); border-radius: 8px; color: var(--site-muted); font-size: 14px; text-align: center; }
 .site-spacer { height: 32px; }
 .site-spacer--small { height: 16px; }
 .site-spacer--large { height: 72px; }
