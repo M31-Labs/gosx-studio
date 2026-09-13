@@ -48,3 +48,12 @@ func TestStartersAreBuiltFromSections(t *testing.T) {
 	mustContain(t, home, `class="site-cta site-cta--band"`, "then a call to action")
 	mustContain(t, get(t, handler, "/visit").Body.String(), "maps.google.com/maps?q=", "and its visit page has a map")
 }
+
+func TestAHeroCarriesThePageTitle(t *testing.T) {
+	host, handler := newTestHost(t)
+	home := get(t, handler, "/").Body.String()
+	mustContain(t, home, `<h1 class="site-title site-title--quiet">Wildflower Bakery</h1>`, "the title stays for search engines but out of sight")
+	mustContain(t, get(t, handler, "/menu").Body.String(), `<h1 class="site-title">Menu</h1>`, "pages without a hero keep their title")
+	id := firstPageID(t, host, "home")
+	mustContain(t, get(t, handler, "/admin/edit/"+id).Body.String(), `class="site-title ed-title--quiet"`, "the canvas shows the name small")
+}

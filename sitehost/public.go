@@ -2,6 +2,7 @@ package sitehost
 
 import (
 	"encoding/json"
+	"m31labs.dev/gosx-admin/blockstudio"
 	"net/http"
 	"strings"
 
@@ -135,7 +136,7 @@ func (h *Host) servePublicSlug(w http.ResponseWriter, r *http.Request, slug stri
 		h.renderPublicNav(settings, page.Slug),
 		gosx.El("main", gosx.Attrs(gosx.Attr("class", "site-main"), gosx.Attr("id", "main")),
 			gosx.El("article", gosx.Attrs(gosx.Attr("class", "site-article")),
-				gosx.El("h1", gosx.Attrs(gosx.Attr("class", "site-title")), gosx.Text(page.Title)),
+				gosx.El("h1", gosx.Attrs(gosx.Attr("class", titleClass(page.Body))), gosx.Text(page.Title)),
 				h.renderBody(page.Body, h.hooksFor(publicPath(page.Slug), formStateFromQuery(r))),
 			),
 		),
@@ -162,6 +163,15 @@ func (h *Host) servePublicNotFound(w http.ResponseWriter, settings cmsstore.Site
 		h.renderPublicFooter(settings),
 	)
 	h.writeDocument(w, http.StatusNotFound, meta, body)
+}
+
+// titleClass keeps the page title for search engines and screen readers
+// but out of sight when a hero opens the page and carries the headline.
+func titleClass(doc blockstudio.Document) string {
+	if leadsWithHero(doc) {
+		return "site-title site-title--quiet"
+	}
+	return "site-title"
 }
 
 // navPages lists the pages that appear in the site menu: live, and not

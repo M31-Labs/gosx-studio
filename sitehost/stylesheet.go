@@ -84,6 +84,9 @@ a { color: var(--site-accent); }
 .site-main { flex: 1 1 auto; padding: calc(clamp(28px, 6vw, 64px) * var(--site-space, 1)) max(16px, 5vw); }
 .site-article, .site-main > * { max-width: var(--site-measure); }
 .site-title { font-size: calc(clamp(30px, 5vw, 44px) * var(--site-heading-scale, 1)); line-height: 1.1; margin: 0 0 20px; text-wrap: balance; }
+.site-title--quiet { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; margin: 0; }
+.ed-title--quiet { font-size: 13px !important; font-family: var(--site-font-body); font-weight: 500; color: var(--site-muted); margin: 0 0 14px !important; padding: 4px 8px; border: 1px dashed var(--site-rule); border-radius: 4px; display: inline-block; }
+.ed-title--quiet::before { content: "Page name (menu and tab): "; opacity: .7; }
 .site-lede { color: var(--site-muted); }
 .site-article h2 { font-size: calc(clamp(21px, 3vw, 27px) * var(--site-heading-scale, 1)); line-height: 1.2; margin: calc(32px * var(--site-space, 1)) 0 12px; text-wrap: balance; }
 .site-figure { margin: 24px 0; }
@@ -110,19 +113,19 @@ a { color: var(--site-accent); }
 .site-section--tinted { background: var(--site-surface); margin: calc(28px * var(--site-space, 1)) calc(-1 * max(16px, 5vw)); padding: calc(28px * var(--site-space, 1)) max(16px, 5vw); }
 .site-section--accent { background: var(--site-accent); color: var(--site-ground); margin: calc(28px * var(--site-space, 1)) calc(-1 * max(16px, 5vw)); padding: calc(28px * var(--site-space, 1)) max(16px, 5vw); }
 .site-section--accent a, .site-section--accent h2, .site-section--accent h3, .site-section--accent blockquote { color: inherit; }
-.site-section--accent .button { background: var(--site-ground); color: var(--site-accent); }
+.gosx-site .site-section--accent .button { background: var(--site-ground); color: var(--site-accent); }
 .site-section--accent blockquote { border-left-color: currentColor; }
 .site-section--dark { --site-ground: #16201d; --site-surface: rgba(255,255,255,.07); --site-ink: #f4f1ea; --site-muted: rgba(244,241,234,.72); --site-rule: rgba(255,255,255,.18); background: #16201d; color: #f4f1ea; margin: calc(28px * var(--site-space, 1)) calc(-1 * max(16px, 5vw)); padding: calc(28px * var(--site-space, 1)) max(16px, 5vw); }
 .site-section--accent { --site-surface: rgba(255,255,255,.12); --site-muted: color-mix(in srgb, var(--site-ground) 78%, transparent); --site-rule: color-mix(in srgb, var(--site-ground) 30%, transparent); }
 .site-section--accent .site-features__card, .site-section--accent .site-pricing__card, .site-section--dark .site-features__card, .site-section--dark .site-pricing__card { background: var(--site-surface); border-color: var(--site-rule); }
 .site-section--accent .site-features__icon, .site-section--accent .site-stats__value, .site-section--accent .site-hero__eyebrow, .site-section--accent .site-team__role { color: inherit; }
 .site-section--dark a, .site-section--dark h2, .site-section--dark h3, .site-section--dark blockquote, .site-section--dark .site-hero__headline { color: inherit; }
-.site-section--dark .button--primary { background: #f4f1ea; color: #16201d; }
+.gosx-site .site-section--dark .button--primary { background: #f4f1ea; color: #16201d; }
 .site-section--image { position: relative; isolation: isolate; color: #fff; margin: calc(28px * var(--site-space, 1)) calc(-1 * max(16px, 5vw)); padding: calc(48px * var(--site-space, 1)) max(16px, 5vw); background: #222 var(--section-image) center / cover no-repeat; }
 .site-section--image { --site-ground: #1b1b1b; --site-surface: rgba(255,255,255,.1); --site-ink: #fff; --site-muted: rgba(255,255,255,.78); --site-rule: rgba(255,255,255,.25); }
 .site-section--image::before { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.45); z-index: -1; }
 .site-section--image a, .site-section--image h2, .site-section--image h3, .site-section--image blockquote, .site-section--image p { color: inherit; }
-.site-section--image .button--primary { background: #fff; color: #16201d; }
+.gosx-site .site-section--image .button--primary { background: #fff; color: #16201d; }
 .site-section--align-center { text-align: center; }
 .site-section--align-center .site-section__inner { margin-inline: auto; }
 .site-section--align-center .site-hero__actions, .site-section--align-center .site-cta { justify-content: center; }
@@ -140,16 +143,6 @@ a { color: var(--site-accent); }
    text, so they take the wide measure while the article's text keeps its
    own; the container query keeps them inside the frame on a phone. */
 .site-hero, .site-features, .site-testimonials, .site-pricing, .site-cta, .site-stats, .site-team, .site-imagetext, .site-map, .site-faq { width: min(calc(100cqw - 2 * max(16px, 5vw)), 1120px); }
-.site-section--tinted .site-hero, .site-section--accent .site-hero, .site-section--dark .site-hero, .site-section--image .site-hero,
-.site-section--tinted .site-features, .site-section--accent .site-features, .site-section--dark .site-features, .site-section--image .site-features,
-.site-section--tinted .site-testimonials, .site-section--accent .site-testimonials, .site-section--dark .site-testimonials, .site-section--image .site-testimonials,
-.site-section--tinted .site-pricing, .site-section--accent .site-pricing, .site-section--dark .site-pricing, .site-section--image .site-pricing,
-.site-section--tinted .site-cta, .site-section--accent .site-cta, .site-section--dark .site-cta, .site-section--image .site-cta,
-.site-section--tinted .site-stats, .site-section--accent .site-stats, .site-section--dark .site-stats, .site-section--image .site-stats,
-.site-section--tinted .site-team, .site-section--accent .site-team, .site-section--dark .site-team, .site-section--image .site-team,
-.site-section--tinted .site-imagetext, .site-section--accent .site-imagetext, .site-section--dark .site-imagetext, .site-section--image .site-imagetext,
-.site-section--tinted .site-map, .site-section--accent .site-map, .site-section--dark .site-map, .site-section--image .site-map,
-.site-section--tinted .site-faq, .site-section--accent .site-faq, .site-section--dark .site-faq, .site-section--image .site-faq { width: auto; }
 .site-section--width-narrow .site-section__inner > * { width: auto; }
 
 .site-hero { display: grid; gap: 28px; align-items: center; margin: 0 0 32px; max-width: none; }
@@ -161,7 +154,7 @@ a { color: var(--site-accent); }
 .site-hero--cover::before { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.42); border-radius: inherit; z-index: -1; }
 .site-hero--cover .site-hero__headline, .site-hero--cover .site-hero__text, .site-hero--cover .site-hero__eyebrow { color: inherit; }
 .site-hero--cover .site-hero__actions { justify-content: center; }
-.site-hero--cover .button--primary { background: #fff; color: #16201d; }
+.gosx-site .site-hero--cover .button--primary { background: #fff; color: #16201d; }
 .site-hero__eyebrow { margin: 0 0 8px; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--site-accent); font-weight: 600; }
 .site-hero__headline { font-size: clamp(32px, 5.5vw, 56px); line-height: 1.05; margin: 0 0 16px !important; text-wrap: balance; }
 .site-hero__text { font-size: 18px; color: var(--site-muted); line-height: 1.55; max-width: 60ch; }
@@ -216,7 +209,7 @@ details[open] > .site-faq__question::after { content: "–"; }
 .site-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; margin: 0 0 32px; max-width: none; }
 .site-cta--band { padding: 28px 30px; border-radius: calc(var(--site-radius, 2px) * 2); background: var(--site-accent); color: var(--site-ground); }
 .site-cta--band .site-cta__headline, .site-cta--band .site-cta__text { color: inherit; }
-.site-cta--band .button--primary { background: var(--site-ground); color: var(--site-accent); }
+.gosx-site .site-cta--band .button--primary { background: var(--site-ground); color: var(--site-accent); margin: 0; }
 .site-cta__headline { margin: 0 !important; font-size: clamp(20px, 3vw, 26px); flex: 1 1 260px; }
 .site-cta__text { margin: 0; flex: 2 1 320px; opacity: .9; }
 .site-stats { max-width: none; margin: 0 0 32px; }

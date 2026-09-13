@@ -614,6 +614,18 @@ func cssURL(raw string) string {
 	return strings.NewReplacer("'", "%27", "\\", "%5C", "\n", "", ")", "%29", "(", "%28").Replace(strings.TrimSpace(raw))
 }
 
+// leadsWithHero reports whether a page opens with a hero, whose headline
+// then does the title's job on the page.
+func leadsWithHero(doc blockstudio.Document) bool {
+	for _, instance := range doc.Blocks {
+		if !instance.Enabled {
+			continue
+		}
+		return instance.Key == "hero"
+	}
+	return false
+}
+
 // ---------- sections ----------
 
 // Section options beyond the background.

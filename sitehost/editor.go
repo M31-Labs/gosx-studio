@@ -194,6 +194,15 @@ func (h *Host) renderEditorToolbar(subject editorSubject) gosx.Node {
 	)
 }
 
+// canvasTitleClass shows the page name small when a hero leads, so the
+// owner sees what visitors see and still has the name to hand.
+func canvasTitleClass(doc blockstudio.Document) string {
+	if leadsWithHero(doc) {
+		return "site-title ed-title--quiet"
+	}
+	return "site-title"
+}
+
 // renderSectionAdds lists the ready-made sections in the sidebar.
 func renderSectionAdds() gosx.Node {
 	nodes := make([]gosx.Node, 0, len(composites))
@@ -489,7 +498,7 @@ func (h *Host) renderEditableCanvas(settings cmsstore.SiteSettings, subject edit
 		gosx.El("main", gosx.Attrs(gosx.Attr("class", "site-main")),
 			gosx.El("article", gosx.Attrs(gosx.Attr("class", "site-article"), gosx.Attr("data-blocks", "true")),
 				gosx.El("h1", gosx.Attrs(
-					gosx.Attr("class", "site-title"),
+					gosx.Attr("class", canvasTitleClass(subject.Body)),
 					gosx.Attr("data-page-title", "true"),
 					gosx.Attr("contenteditable", "true"),
 					gosx.Attr("spellcheck", "true"),
