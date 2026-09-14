@@ -3,6 +3,7 @@ package sitehost
 import (
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"m31labs.dev/gosx"
@@ -24,16 +25,92 @@ import (
 type partKind string
 
 const (
-	partText  partKind = "text"  // inline-formatted text, edited in place
-	partURL   partKind = "url"   // a link, edited in a small input
-	partImage partKind = "image" // a picture, uploaded or picked
-	partFlag  partKind = "flag"  // yes or no, a checkbox
+	partText   partKind = "text"   // inline-formatted text, edited in place
+	partURL    partKind = "url"    // a link, edited in a small input
+	partImage  partKind = "image"  // a picture, uploaded or picked
+	partFlag   partKind = "flag"   // yes or no, a checkbox
+	partChoice partKind = "choice" // one of a fixed set, a small select
+	partSeed   partKind = "seed"   // a variation number, with a shuffle button
 )
 
 type partSpec struct {
 	Key, Label string
 	Kind       partKind
 	Default    string
+	Choices    [][2]string // for partChoice: key, label
+}
+
+// Backdrops are generative canvas effects behind a section or hero; the
+// engine lives in assets/effects.js and this is the vocabulary it shares
+// with the editor and the agent API.
+var (
+	fxChoices       = [][2]string{{"none", "None"}, {"aurora", "Aurora"}, {"particles", "Particles"}, {"waves", "Waves"}, {"orbs", "Orbs"}, {"grid", "Grid"}, {"stars", "Stars"}, {"topo", "Contours"}, {"ribbons", "Ribbons"}}
+	fxMotionChoices = [][2]string{{"normal", "Moving"}, {"slow", "Slow"}, {"still", "Still"}}
+	fxIntensities   = [][2]string{{"subtle", "Subtle"}, {"normal", "Normal"}, {"bold", "Bold"}}
+	fxDepths        = [][2]string{{"flat", "Flat"}, {"tilt", "Cards tilt toward the pointer"}}
+	fxEffects       = choiceSet(fxChoices)
+	fxMotions       = choiceSet(fxMotionChoices)
+	fxIntensitySet  = choiceSet(fxIntensities)
+	fxDepthSet      = choiceSet(fxDepths)
+)
+
+func choiceSet(choices [][2]string) map[string]bool {
+	set := map[string]bool{}
+	for _, choice := range choices {
+		set[choice[0]] = true
+	}
+	return set
+}
+
+// normalizeSeed keeps a variation short and plain.
+func normalizeSeed(value string) string {
+	var b strings.Builder
+	for _, r := range strings.TrimSpace(value) {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' {
+			b.WriteRune(r)
+		}
+		if b.Len() >= 16 {
+			break
+		}
+	}
+	return b.String()
+}
+
+// fxSeedFor is the variation a fresh site starts with: its own name, so no
+// two sites look alike and the same site always looks like itself.
+func fxSeedFor(name string) string {
+	h := uint32(2166136261)
+	for i := 0; i < len(name); i++ {
+		h ^= uint32(name[i])
+		h *= 16777619
+	}
+	return strconv.FormatUint(uint64(h), 36)
+}
+
+// fxDefaultFor is the backdrop a kind of business starts with.
+func fxDefaultFor(kind string) string {
+	switch SiteKindByKey(kind).Key {
+	case "food":
+		return "aurora"
+	case "services":
+		return "topo"
+	case "shop":
+		return "orbs"
+	case "portfolio":
+		return "stars"
+	case "community":
+		return "waves"
+	}
+	return "particles"
+}
+
+// fxAttrs are the data attributes the engine reads from a host.
+func fxAttrs(effect, motion, intensity, seed string) []any {
+	return []any{gosx.Attr("data-fx", effect), gosx.Attr("data-fx-motion", motion), gosx.Attr("data-fx-intensity", intensity), gosx.Attr("data-fx-seed", seed)}
+}
+
+func fxCanvas() gosx.Node {
+	return gosx.El("canvas", gosx.Attrs(gosx.Attr("class", "site-fx"), gosx.Attr("aria-hidden", "true")))
 }
 
 type variantSpec struct{ Key, Label string }
@@ -84,8 +161,12 @@ var composites = []compositeSpec{
 			{Key: "button2", Label: "Second button", Kind: partText},
 			{Key: "url2", Label: "Second button link", Kind: partURL},
 			{Key: "image", Label: "Picture", Kind: partImage},
+			{Key: "effect", Label: "Backdrop", Kind: partChoice, Default: "none", Choices: fxChoices},
+			{Key: "motion", Label: "Motion", Kind: partChoice, Default: "normal", Choices: fxMotionChoices},
+			{Key: "intensity", Label: "Strength", Kind: partChoice, Default: "normal", Choices: fxIntensities},
+			{Key: "seed", Label: "Variation", Kind: partSeed},
 		},
-		Variants: []variantSpec{{"center", "Centred"}, {"left", "Text on the left"}, {"split", "Text beside the picture"}, {"cover", "Text over the picture"}}},
+		Variants: []variantSpec{{"center", "Centred"}, {"left", "Text on the left"}, {"split", "Text beside the picture"}, {"cover", "Text over the picture"}, {"poster", "Poster: big type over a backdrop"}, {"stage", "Stage: centred on a floor"}}},
 	{Key: "features", Label: "Feature cards", Blurb: "Three things you offer, side by side",
 		Fields:   []partSpec{{Key: "heading", Label: "Heading", Kind: partText, Default: "What we do"}, {Key: "intro", Label: "Intro", Kind: partText}},
 		Item:     []partSpec{{Key: "icon", Label: "Icon or emoji", Kind: partText}, {Key: "title", Label: "Title", Kind: partText}, {Key: "text", Label: "Text", Kind: partText}},
@@ -252,14 +333,22 @@ func compositeFromPayload(spec compositeSpec, incoming editorBlockPayload, order
 	filled := (len(spec.Fields) == 0 && spec.Item == nil) || spec.Live
 	for _, field := range spec.Fields {
 		value := strings.TrimSpace(incoming.Fields[field.Key])
-		if field.Kind == partFlag {
+		switch field.Kind {
+		case partFlag:
 			if value != "" && value != "no" && value != "false" {
 				value = "yes"
 			} else {
 				value = ""
 			}
+		case partChoice:
+			value = normalizeChoice(value, field.Default, choiceSet(field.Choices))
+			if value == field.Default {
+				value = ""
+			}
+		case partSeed:
+			value = normalizeSeed(value)
 		}
-		if value != "" {
+		if value != "" && field.Kind != partChoice && field.Kind != partSeed {
 			filled = true
 		}
 		values[field.Key] = text(value)
@@ -450,7 +539,22 @@ func (h *Host) renderComposite(spec compositeSpec, instance blockstudio.BlockIns
 			rootAttrs = append(rootAttrs, gosx.Attr("style", "--hero-image: url('"+cssURL(get("image"))+"')"))
 			picture = gosx.Fragment()
 		}
-		body = []gosx.Node{copyNode, picture}
+		effect := normalizeChoice(get("effect"), "none", fxEffects)
+		if variant == "stage" && effect == "none" && !editable {
+			effect = "grid"
+		}
+		var fx gosx.Node = gosx.Fragment()
+		if effect != "none" {
+			rootAttrs = append(rootAttrs, fxAttrs(effect, normalizeChoice(get("motion"), "normal", fxMotions), normalizeChoice(get("intensity"), "normal", fxIntensitySet), normalizeSeed(get("seed")))...)
+			rootAttrs[0] = gosx.Attr("class", class+" site-hero--fx site-fx-host")
+			fx = fxCanvas()
+		}
+		controls := gosx.Fragment()
+		if editable {
+			controls = gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-hero-options"), gosx.Attr("contenteditable", "false")),
+				c.choiceNode(f("effect"), get("effect")), c.choiceNode(f("motion"), get("motion")), c.choiceNode(f("intensity"), get("intensity")), c.seedNode(f("seed"), get("seed")))
+		}
+		body = []gosx.Node{fx, controls, copyNode, picture}
 	case "features":
 		cards := make([]gosx.Node, 0, len(items))
 		for index, item := range items {
@@ -661,22 +765,32 @@ type sectionOptions struct {
 	Style, Align, Width, Space, Image string
 	// Anchor is the name a link can jump to: /#pricing.
 	Anchor string
+	// Effect is the backdrop behind the band; Motion, Intensity, and Seed
+	// shape it; Depth tilts the band's cards toward the pointer.
+	Effect, Motion, Intensity, Seed, Depth string
 }
+
+func (o sectionOptions) hasEffect() bool { return o.Effect != "" && o.Effect != "none" }
 
 func sectionOptionsOf(instance blockstudio.BlockInstance) sectionOptions {
 	get := func(key string) string { return instance.Values[key].String }
 	return sectionOptions{
-		Style:  normalizeSectionStyle(get("style")),
-		Align:  normalizeChoice(get("align"), "left", sectionAligns),
-		Width:  normalizeChoice(get("width"), "normal", sectionWidths),
-		Space:  normalizeChoice(get("space"), "normal", sectionSpaces),
-		Image:  strings.TrimSpace(get("image")),
-		Anchor: normalizeSlug(get("anchor")),
+		Style:     normalizeSectionStyle(get("style")),
+		Align:     normalizeChoice(get("align"), "left", sectionAligns),
+		Width:     normalizeChoice(get("width"), "normal", sectionWidths),
+		Space:     normalizeChoice(get("space"), "normal", sectionSpaces),
+		Image:     strings.TrimSpace(get("image")),
+		Anchor:    normalizeSlug(get("anchor")),
+		Effect:    normalizeChoice(get("effect"), "none", fxEffects),
+		Motion:    normalizeChoice(get("motion"), "normal", fxMotions),
+		Intensity: normalizeChoice(get("intensity"), "normal", fxIntensitySet),
+		Seed:      normalizeSeed(get("seed")),
+		Depth:     normalizeChoice(get("depth"), "flat", fxDepthSet),
 	}
 }
 
 func (o sectionOptions) values() blockstudio.Values {
-	return values("style", o.Style, "align", o.Align, "width", o.Width, "space", o.Space, "image", o.Image, "anchor", o.Anchor)
+	return values("style", o.Style, "align", o.Align, "width", o.Width, "space", o.Space, "image", o.Image, "anchor", o.Anchor, "effect", o.Effect, "motion", o.Motion, "intensity", o.Intensity, "seed", o.Seed, "depth", o.Depth)
 }
 
 // classes are what the public page hangs its CSS on.
@@ -691,7 +805,25 @@ func (o sectionOptions) classes() string {
 	if o.Space != "normal" {
 		out += " site-section--space-" + o.Space
 	}
+	if o.hasEffect() {
+		out += " site-fx-host"
+	}
+	if o.Depth == "tilt" {
+		out += " site-tilt"
+	}
 	return out
+}
+
+// hostAttrs are the attributes a band with a backdrop or depth carries.
+func (o sectionOptions) hostAttrs() []any {
+	attrs := []any{}
+	if o.hasEffect() {
+		attrs = append(attrs, fxAttrs(o.Effect, o.Motion, o.Intensity, o.Seed)...)
+	}
+	if o.Depth == "tilt" {
+		attrs = append(attrs, gosx.Attr("data-tilt", "true"))
+	}
+	return attrs
 }
 
 // renderSectionBar is a section break on the canvas: a labelled rule with
@@ -719,6 +851,20 @@ func renderSectionBar(o sectionOptions) gosx.Node {
 					gosx.El("span", nil, gosx.Text("Upload"))),
 				gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("class", "ed-library-btn"), gosx.Attr("data-library", "true")), gosx.Text("Choose")),
 				gosx.El("input", gosx.Attrs(gosx.Attr("class", "ed-inline-input"), gosx.Attr("type", "text"), gosx.Attr("data-src", "true"), gosx.Attr("data-section-src", "true"), gosx.Attr("value", o.Image), gosx.Attr("placeholder", "or paste a link"), gosx.Attr("aria-label", "Background picture link"))))))
+	previewAttrs := []any{gosx.Attr("class", "ed-fx-preview"), gosx.Attr("data-fx-preview", "true")}
+	if o.hasEffect() {
+		previewAttrs = append(previewAttrs, fxAttrs(o.Effect, o.Motion, o.Intensity, o.Seed)...)
+	}
+	preview := gosx.El("div", gosx.Attrs(previewAttrs...),
+		gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-fx-preview__note")), gosx.Text("Backdrop preview: the band behind everything up to the next section")))
+	backdrop := gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-section-bar__fx")),
+		choice("data-section-fx", "Backdrop", firstNonEmpty(o.Effect, "none"), fxChoices),
+		choice("data-section-motion", "Motion", firstNonEmpty(o.Motion, "normal"), fxMotionChoices),
+		choice("data-section-intensity", "Strength", firstNonEmpty(o.Intensity, "normal"), fxIntensities),
+		choice("data-section-depth", "Depth", firstNonEmpty(o.Depth, "flat"), fxDepths),
+		gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("data-section-seed", "true"), gosx.Attr("value", o.Seed))),
+		gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("class", "ed-library-btn"), gosx.Attr("data-section-shuffle", "true"), gosx.Attr("title", "Another variation of the same backdrop")), gosx.Text("Shuffle")),
+		preview)
 	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-section-bar"), gosx.Attr("data-section", o.Style), gosx.Attr("contenteditable", "false")),
 		gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-section-bar__label")), gosx.Text("New section")),
 		choice("data-section-style", "Background", o.Style, [][2]string{{"plain", "Plain"}, {"tinted", "Tinted"}, {"accent", "Accent colour"}, {"dark", "Dark"}, {"image", "Picture"}}),
@@ -729,7 +875,37 @@ func renderSectionBar(o sectionOptions) gosx.Node {
 			gosx.El("span", nil, gosx.Text("Jump-to name")),
 			gosx.El("input", gosx.Attrs(gosx.Attr("class", "ed-inline-input"), gosx.Attr("type", "text"), gosx.Attr("data-section-anchor", "true"), gosx.Attr("value", o.Anchor), gosx.Attr("placeholder", "pricing"), gosx.Attr("aria-label", "Jump-to name"), gosx.Attr("title", "Buttons can then link to #pricing")))),
 		picture,
+		backdrop,
 	)
+}
+
+// choiceNode and seedNode are the editor's controls for choice and seed
+// parts; the page shows nothing for them, they only shape the backdrop.
+func (c canvas) choiceNode(spec partSpec, value string) gosx.Node {
+	if !c.editable {
+		return gosx.Fragment()
+	}
+	current := normalizeChoice(value, spec.Default, choiceSet(spec.Choices))
+	options := make([]gosx.Node, 0, len(spec.Choices))
+	for _, choice := range spec.Choices {
+		attrs := []any{gosx.Attr("value", choice[0])}
+		if choice[0] == current {
+			attrs = append(attrs, gosx.Attr("selected", "selected"))
+		}
+		options = append(options, gosx.El("option", gosx.Attrs(attrs...), gosx.Text(choice[1])))
+	}
+	return gosx.El("label", gosx.Attrs(gosx.Attr("class", "ed-variant"), gosx.Attr("contenteditable", "false")),
+		gosx.El("span", nil, gosx.Text(spec.Label)),
+		gosx.El("select", gosx.Attrs(gosx.Attr("data-field", spec.Key), gosx.Attr("data-fx-field", spec.Key), gosx.Attr("aria-label", spec.Label)), gosx.Fragment(options...)))
+}
+
+func (c canvas) seedNode(spec partSpec, value string) gosx.Node {
+	if !c.editable {
+		return gosx.Fragment()
+	}
+	return gosx.El("span", gosx.Attrs(gosx.Attr("class", "ed-variant"), gosx.Attr("contenteditable", "false")),
+		gosx.El("input", gosx.Attrs(gosx.Attr("type", "hidden"), gosx.Attr("data-field", spec.Key), gosx.Attr("data-fx-seed", "true"), gosx.Attr("value", normalizeSeed(value)))),
+		gosx.El("button", gosx.Attrs(gosx.Attr("type", "button"), gosx.Attr("class", "ed-library-btn"), gosx.Attr("data-shuffle", "true"), gosx.Attr("title", "Another variation of the same backdrop")), gosx.Text("Shuffle")))
 }
 
 // ---------- the editor's block service ----------

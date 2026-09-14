@@ -152,7 +152,8 @@ func StarterSiteFor(answers SetupAnswers) []StarterPage {
 			target, second, secondTarget = "/contact", "", ""
 			button = "Get in touch"
 		}
-		fields := map[string]string{"eyebrow": "Welcome", "headline": tagline, "text": firstNonEmpty(answers.Description, "A sentence or two on what you do and who it's for. The rest of the page can do the explaining."), "button": button, "url": target}
+		fields := map[string]string{"eyebrow": "Welcome", "headline": tagline, "text": firstNonEmpty(answers.Description, "A sentence or two on what you do and who it's for. The rest of the page can do the explaining."), "button": button, "url": target,
+			"effect": fxDefaultFor(answers.Kind), "motion": "slow", "intensity": "subtle", "seed": fxSeedFor(name)}
 		if second != "" {
 			fields["button2"] = second
 			fields["url2"] = secondTarget

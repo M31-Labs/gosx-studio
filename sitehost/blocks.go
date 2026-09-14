@@ -170,7 +170,12 @@ func (h *Host) renderBody(doc blockstudio.Document, hooks render.Hooks) gosx.Nod
 		if s.options.Style == "image" && s.options.Image != "" {
 			attrs = append(attrs, gosx.Attr("style", "--section-image: url('"+cssURL(s.options.Image)+"')"))
 		}
-		out = append(out, gosx.El("section", gosx.Attrs(attrs...),
+		attrs = append(attrs, s.options.hostAttrs()...)
+		var backdrop gosx.Node = gosx.Fragment()
+		if s.options.hasEffect() {
+			backdrop = fxCanvas()
+		}
+		out = append(out, gosx.El("section", gosx.Attrs(attrs...), backdrop,
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "site-section__inner")), gosx.Fragment(s.blocks...))))
 	}
 	return gosx.Fragment(out...)

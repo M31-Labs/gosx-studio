@@ -60,6 +60,7 @@ func (h *Host) blockPayload(instance blockstudio.BlockInstance) editorBlockPaylo
 	case blockSection:
 		options := sectionOptionsOf(instance)
 		payload.Style, payload.Align, payload.Width, payload.Space, payload.URL, payload.Anchor = options.Style, options.Align, options.Width, options.Space, options.Image, options.Anchor
+		payload.Fx, payload.Motion, payload.Intensity, payload.Seed, payload.Depth = options.Effect, options.Motion, options.Intensity, options.Seed, options.Depth
 	case blockVideo:
 		payload.URL, payload.Text = str("url"), str("text")
 	case blockColumns:
@@ -518,8 +519,20 @@ func partType(kind partKind) string {
 		return "image"
 	case partFlag:
 		return "flag"
+	case partChoice:
+		return "choice"
+	case partSeed:
+		return "seed"
 	}
 	return "text"
+}
+
+func choiceKeysOf(choices [][2]string) []string {
+	keys := make([]string, 0, len(choices))
+	for _, choice := range choices {
+		keys = append(keys, choice[0])
+	}
+	return keys
 }
 
 // agentSchema is what an agent needs to compose a page: every block kind,
@@ -540,13 +553,18 @@ func (h *Host) agentSchema() map[string]any {
 	simple("video", "Video", "A YouTube or Vimeo link.", schemaField{Key: "url", Label: "Link", Type: "url"}, schemaField{Key: "text", Label: "Caption", Type: "text", Optional: true})
 	simple("columns", "Columns", "Two or three columns of text.", schemaField{Key: "text", Label: "First column", Type: "text"}, schemaField{Key: "text2", Label: "Second column", Type: "text"}, schemaField{Key: "text3", Label: "Third column", Type: "text", Optional: true}, schemaField{Key: "count", Type: "choice", Choices: choiceKeys(columnCounts), Default: "2", Optional: true})
 	simple("divider", "Divider", "A thin line.")
-	simple("section", "Section break", "Starts a band that styles every block after it until the next break.", schemaField{Key: "style", Type: "choice", Choices: choiceKeys(sectionStyles), Default: "plain"}, schemaField{Key: "align", Type: "choice", Choices: choiceKeys(sectionAligns), Default: "left", Optional: true}, schemaField{Key: "width", Type: "choice", Choices: choiceKeys(sectionWidths), Default: "normal", Optional: true}, schemaField{Key: "space", Type: "choice", Choices: choiceKeys(sectionSpaces), Default: "normal", Optional: true}, schemaField{Key: "url", Label: "Background picture (style image)", Type: "image", Optional: true}, schemaField{Key: "anchor", Label: "Jump-to name", Type: "text", Optional: true})
+	simple("section", "Section break", "Starts a band that styles every block after it until the next break.", schemaField{Key: "style", Type: "choice", Choices: choiceKeys(sectionStyles), Default: "plain"}, schemaField{Key: "align", Type: "choice", Choices: choiceKeys(sectionAligns), Default: "left", Optional: true}, schemaField{Key: "width", Type: "choice", Choices: choiceKeys(sectionWidths), Default: "normal", Optional: true}, schemaField{Key: "space", Type: "choice", Choices: choiceKeys(sectionSpaces), Default: "normal", Optional: true}, schemaField{Key: "url", Label: "Background picture (style image)", Type: "image", Optional: true}, schemaField{Key: "anchor", Label: "Jump-to name", Type: "text", Optional: true},
+		schemaField{Key: "fx", Label: "Backdrop: a generative canvas effect behind the band", Type: "choice", Choices: choiceKeysOf(fxChoices), Default: "none", Optional: true}, schemaField{Key: "motion", Type: "choice", Choices: choiceKeysOf(fxMotionChoices), Default: "normal", Optional: true}, schemaField{Key: "intensity", Type: "choice", Choices: choiceKeysOf(fxIntensities), Default: "normal", Optional: true}, schemaField{Key: "seed", Label: "Variation (any short word; change it for a different picture)", Type: "seed", Optional: true}, schemaField{Key: "depth", Label: "Cards tilt toward the pointer", Type: "choice", Choices: choiceKeysOf(fxDepths), Default: "flat", Optional: true})
 	simple("form", "Form", "A form; \"form\" is an id from GET /agent/v1/forms (\"contact\" is built in).", schemaField{Key: "form", Label: "Form id", Type: "text", Default: "contact"})
 	simple("product", "Product", "One product from the shop; \"product\" is its id or address.", schemaField{Key: "product", Label: "Product id", Type: "text"})
 	for _, spec := range composites {
 		kind := schemaKind{Kind: spec.Key, Label: spec.Label, Blurb: spec.Blurb, Variants: spec.Variants, Live: spec.Live}
 		for _, field := range spec.Fields {
-			kind.Fields = append(kind.Fields, schemaField{Key: field.Key, Label: field.Label, Type: partType(field.Kind), Default: field.Default, Optional: true})
+			entry := schemaField{Key: field.Key, Label: field.Label, Type: partType(field.Kind), Default: field.Default, Optional: true}
+			if field.Kind == partChoice {
+				entry.Choices = choiceKeysOf(field.Choices)
+			}
+			kind.Fields = append(kind.Fields, entry)
 		}
 		if spec.Item != nil {
 			item := &schemaItem{Name: spec.ItemName, MaxItems: spec.MaxItems}
@@ -620,8 +638,9 @@ func (h *Host) agentSchema() map[string]any {
 		"pageTemplates": templates,
 		"siteKinds":     siteKinds,
 		"starters":      starters,
+		"backdrops":     map[string]any{"effects": choiceKeysOf(fxChoices), "motion": choiceKeysOf(fxMotionChoices), "intensity": choiceKeysOf(fxIntensities), "depth": choiceKeysOf(fxDepths), "note": "Backdrops draw from the site's palette and a seed. Set them on a section break (fx, motion, intensity, seed, depth) or on a hero (effect, motion, intensity, seed)."},
 		"look": map[string]any{
-			"palettes": palettes, "fonts": fonts, "buttons": buttons, "spacing": spacing, "headings": headings, "widths": widths,
+			"palettes": palettes, "fonts": fonts, "buttons": buttons, "spacing": spacing, "headings": headings, "widths": widths, "motion": []string{"full", "calm", "off"},
 			"custom": "palette \"custom\" uses ground and ink (hex colours); fonts \"custom\" uses fontHead and fontBody (Google Fonts family names); accent is a hex colour on any palette.",
 		},
 		"pageActions": []string{"offline", "online", "archive", "restore", "hide", "show", "up", "down"},

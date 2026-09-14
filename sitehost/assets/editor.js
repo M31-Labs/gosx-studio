@@ -64,6 +64,16 @@
       payload.width = swidth ? swidth.value : "normal";
       payload.space = sspace ? sspace.value : "normal";
       payload.url = simg ? simg.value.trim() : "";
+      var sfx = el.querySelector("[data-section-fx]");
+      var smotion = el.querySelector("[data-section-motion]");
+      var sintensity = el.querySelector("[data-section-intensity]");
+      var sdepth = el.querySelector("[data-section-depth]");
+      var sseed = el.querySelector("[data-section-seed]");
+      payload.fx = sfx ? sfx.value : "none";
+      payload.motion = smotion ? smotion.value : "normal";
+      payload.intensity = sintensity ? sintensity.value : "normal";
+      payload.depth = sdepth ? sdepth.value : "flat";
+      payload.seed = sseed ? sseed.value : "";
     }
     var composite = el.querySelector("[data-composite]");
     if (composite) {
@@ -156,6 +166,7 @@
 
   /* A field's value: text with markers, an input's value, or a checkbox. */
   function fieldValue2(node) {
+    if (node.tagName === "SELECT") return node.value;
     if (node.tagName === "INPUT") {
       if (node.type === "checkbox") return node.checked ? "yes" : "";
       return node.value.trim();
@@ -580,8 +591,19 @@
         '<span class="ed-section-bar__label">New section</span>' +
         '<label class="ed-section-bar__style"><span>Background</span>' +
         '<select data-section-style="true" aria-label="Section background">' +
-        '<option value="plain" selected>Plain</option><option value="tinted">Tinted</option><option value="accent">Accent colour</option>' +
-        '</select></label>';
+        '<option value="plain" selected>Plain</option><option value="tinted">Tinted</option><option value="accent">Accent colour</option><option value="dark">Dark</option>' +
+        '</select></label>' +
+        '<div class="ed-section-bar__fx">' +
+        '<label class="ed-section-bar__style"><span>Backdrop</span><select data-section-fx="true" aria-label="Backdrop">' +
+        '<option value="none" selected>None</option><option value="aurora">Aurora</option><option value="particles">Particles</option><option value="waves">Waves</option><option value="orbs">Orbs</option><option value="grid">Grid</option><option value="stars">Stars</option><option value="topo">Contours</option><option value="ribbons">Ribbons</option>' +
+        '</select></label>' +
+        '<label class="ed-section-bar__style"><span>Motion</span><select data-section-motion="true" aria-label="Motion"><option value="normal" selected>Moving</option><option value="slow">Slow</option><option value="still">Still</option></select></label>' +
+        '<label class="ed-section-bar__style"><span>Strength</span><select data-section-intensity="true" aria-label="Strength"><option value="subtle">Subtle</option><option value="normal" selected>Normal</option><option value="bold">Bold</option></select></label>' +
+        '<label class="ed-section-bar__style"><span>Depth</span><select data-section-depth="true" aria-label="Depth"><option value="flat" selected>Flat</option><option value="tilt">Cards tilt toward the pointer</option></select></label>' +
+        '<input type="hidden" data-section-seed="true" value="">' +
+        '<button type="button" class="ed-library-btn" data-section-shuffle="true" title="Another variation of the same backdrop">Shuffle</button>' +
+        '<div class="ed-fx-preview" data-fx-preview="true"><span class="ed-fx-preview__note">Backdrop preview: the band behind everything up to the next section</span></div>' +
+        '</div>';
       return bar;
     }
     if (kind === "product") {
@@ -937,6 +959,7 @@
     }
     var empty = root.querySelector("[data-empty]");
     if (empty) empty.hidden = nodes.length > 0;
+    if (window.gosxFX) window.gosxFX.rescan(article);
   }
 
   function focusText(blockEl) {
@@ -1415,6 +1438,67 @@
     openPalette: openPalette,
   };
 
+  /* ---------- backdrops: live in the editor, exactly as on the page ---------- */
+
+  function newSeed() { return Math.random().toString(36).slice(2, 8); }
+
+  function setFxAttrs(host, fx, motion, intensity, seed) {
+    if (!host) return;
+    if (!fx || fx === "none") {
+      host.removeAttribute("data-fx"); host.removeAttribute("data-fx-motion"); host.removeAttribute("data-fx-intensity"); host.removeAttribute("data-fx-seed");
+    } else {
+      host.setAttribute("data-fx", fx); host.setAttribute("data-fx-motion", motion || "normal"); host.setAttribute("data-fx-intensity", intensity || "normal"); host.setAttribute("data-fx-seed", seed || "");
+    }
+    if (window.gosxFX) window.gosxFX.refresh(host);
+  }
+
+  function applySectionFx(bar) {
+    if (!bar) return;
+    var fx = bar.querySelector("[data-section-fx]"), motion = bar.querySelector("[data-section-motion]"), intensity = bar.querySelector("[data-section-intensity]"), seed = bar.querySelector("[data-section-seed]");
+    var preview = bar.querySelector("[data-fx-preview]");
+    if (fx && fx.value !== "none" && seed && !seed.value) seed.value = newSeed();
+    setFxAttrs(preview, fx ? fx.value : "none", motion && motion.value, intensity && intensity.value, seed && seed.value);
+  }
+
+  function applyHeroFx(composite) {
+    if (!composite) return;
+    var pick = function (key) { var n = composite.querySelector('[data-fx-field="' + key + '"]'); return n ? n.value : ""; };
+    var seedInput = composite.querySelector("[data-fx-seed]");
+    var fx = pick("effect");
+    if (fx && fx !== "none" && seedInput && !seedInput.value) seedInput.value = newSeed();
+    composite.classList.toggle("site-hero--fx", !!fx && fx !== "none");
+    composite.classList.toggle("site-fx-host", !!fx && fx !== "none");
+    setFxAttrs(composite, fx, pick("motion"), pick("intensity"), seedInput ? seedInput.value : "");
+  }
+
+  root.addEventListener("click", function (event) {
+    var sectionShuffle = event.target.closest("[data-section-shuffle]");
+    if (sectionShuffle) {
+      event.preventDefault();
+      var bar = sectionShuffle.closest(".ed-section-bar");
+      var seed = bar && bar.querySelector("[data-section-seed]");
+      var fx = bar && bar.querySelector("[data-section-fx]");
+      if (fx && fx.value === "none") { status("error", "Pick a backdrop first, then shuffle it."); return; }
+      snapshot();
+      if (seed) seed.value = newSeed();
+      applySectionFx(bar);
+      queueSave();
+      return;
+    }
+    var heroShuffle = event.target.closest("[data-shuffle]");
+    if (heroShuffle) {
+      event.preventDefault();
+      var composite = heroShuffle.closest("[data-composite]");
+      var effect = composite && composite.querySelector('[data-fx-field="effect"]');
+      if (effect && effect.value === "none") { status("error", "Pick a backdrop first, then shuffle it."); return; }
+      snapshot();
+      var seedInput = composite && composite.querySelector("[data-fx-seed]");
+      if (seedInput) seedInput.value = newSeed();
+      applyHeroFx(composite);
+      queueSave();
+    }
+  });
+
   /* ---------- interactions ---------- */
 
   root.addEventListener("click", function (event) {
@@ -1634,6 +1718,18 @@
       return;
     }
     if (event.target.matches("[data-section-align],[data-section-width],[data-section-space]")) { snapshot(); queueSave(); return; }
+    if (event.target.matches("[data-section-fx],[data-section-motion],[data-section-intensity],[data-section-depth]")) {
+      snapshot();
+      applySectionFx(event.target.closest(".ed-section-bar"));
+      queueSave();
+      return;
+    }
+    if (event.target.matches("select[data-fx-field]")) {
+      snapshot();
+      applyHeroFx(event.target.closest("[data-composite]"));
+      queueSave();
+      return;
+    }
     var variant = event.target.closest("[data-variant]");
     if (variant) {
       snapshot();
@@ -2340,7 +2436,14 @@
     var spacing = look.querySelector("[data-look-spacing]:checked");
     var headings = look.querySelector("[data-look-headings]:checked");
     var width = look.querySelector("[data-look-width]:checked");
+    var motion = look.querySelector("[data-look-motion]:checked");
+    var motionValue = motion ? motion.value : "full";
+    if (canvas && canvas.getAttribute("data-site-motion") !== motionValue) {
+      canvas.setAttribute("data-site-motion", motionValue);
+      if (window.gosxFX) window.gosxFX.rescan(canvas);
+    }
     return {
+      motion: motionValue,
       palette: palette ? palette.value : (presets.palettes[0] || {}).key,
       fonts: fonts ? fonts.value : (presets.fonts[0] || {}).key,
       accent: accentInput ? accentInput.value : "",

@@ -219,7 +219,8 @@ func RenderDocument(meta PageMeta, body gosx.Node) string {
 	lang := "en"
 	html := gosx.El("html", gosx.Attrs(gosx.Attr("lang", lang)),
 		RenderHead(meta),
-		gosx.El("body", gosx.Attrs(gosx.Attr("class", bodyClass(meta))), body),
+		gosx.El("body", gosx.Attrs(gosx.Attr("class", bodyClass(meta)), gosx.Attr("data-site-motion", firstNonEmpty(meta.Theme.Motion, "full"))), body,
+			gosx.El("script", gosx.Attrs(gosx.Attr("src", effectsScriptPath), gosx.Attr("defer", "defer")))),
 	)
 	return "<!doctype html>" + gosx.RenderHTML(html)
 }

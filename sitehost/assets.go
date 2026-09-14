@@ -13,6 +13,19 @@ var editorScript []byte
 //go:embed assets/consent.js
 var consentScript []byte
 
+//go:embed assets/effects.js
+var effectsScript []byte
+
+const effectsScriptPath = "/_gosx/site/effects.js"
+
+func effectsScriptHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=300")
+		http.ServeContent(w, r, "effects.js", editorScriptModTime, bytes.NewReader(effectsScript))
+	})
+}
+
 //go:embed assets/stats.js
 var statsScript []byte
 

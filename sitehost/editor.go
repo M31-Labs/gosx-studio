@@ -32,6 +32,7 @@ func (h *Host) mountEditor(mux *http.ServeMux) {
 	h.mountBlocks(mux)
 	mux.Handle("GET "+editorScriptPath, editorScriptHandler())
 	mux.Handle("GET "+webMCPScriptPath, webMCPScriptHandler())
+	mux.Handle("GET "+effectsScriptPath, effectsScriptHandler())
 	mux.HandleFunc("GET /admin/preview/{id}", h.handleDraftPreview)
 	mux.HandleFunc("GET /admin/preview/post/{id}", h.handleDraftPostPreview)
 }
@@ -704,7 +705,7 @@ func (h *Host) renderEditableCanvas(settings cmsstore.SiteSettings, subject edit
 		), renderPostMeta(*subject.Post))
 	}
 
-	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "gosx-site gosx-site--public ed-canvas")),
+	return gosx.El("div", gosx.Attrs(gosx.Attr("class", "gosx-site gosx-site--public ed-canvas"), gosx.Attr("data-site-motion", firstNonEmpty(h.theme().Motion, "full"))),
 		h.renderSiteHeader(settings, brandFromSettings(settings), activeSlug, true),
 		gosx.El("main", gosx.Attrs(gosx.Attr("class", "site-main")),
 			gosx.El("article", gosx.Attrs(gosx.Attr("class", "site-article"), gosx.Attr("data-blocks", "true")),
@@ -1097,6 +1098,12 @@ type editorBlockPayload struct {
 	Locked  string               `json:"locked,omitempty"`
 	Spacing string               `json:"spacing,omitempty"`
 	Images  []editorImagePayload `json:"images,omitempty"`
+	// Section breaks: the backdrop behind the band and how it moves.
+	Fx        string `json:"fx,omitempty"`
+	Motion    string `json:"motion,omitempty"`
+	Intensity string `json:"intensity,omitempty"`
+	Seed      string `json:"seed,omitempty"`
+	Depth     string `json:"depth,omitempty"`
 	// Ready-made sections: their named fields, repeated items, and layout.
 	Fields  map[string]string   `json:"fields,omitempty"`
 	Items   []map[string]string `json:"items,omitempty"`
@@ -1277,7 +1284,8 @@ func (h *Host) payloadDocument(blocks []editorBlockPayload) blockstudio.Document
 		case "divider":
 			instances = append(instances, block(order, blockDivider, values()))
 		case "section":
-			options := sectionOptions{Style: normalizeSectionStyle(incoming.Style), Align: normalizeChoice(incoming.Align, "left", sectionAligns), Width: normalizeChoice(incoming.Width, "normal", sectionWidths), Space: normalizeChoice(incoming.Space, "normal", sectionSpaces), Image: strings.TrimSpace(incoming.URL), Anchor: normalizeSlug(incoming.Anchor)}
+			options := sectionOptions{Style: normalizeSectionStyle(incoming.Style), Align: normalizeChoice(incoming.Align, "left", sectionAligns), Width: normalizeChoice(incoming.Width, "normal", sectionWidths), Space: normalizeChoice(incoming.Space, "normal", sectionSpaces), Image: strings.TrimSpace(incoming.URL), Anchor: normalizeSlug(incoming.Anchor),
+				Effect: normalizeChoice(incoming.Fx, "none", fxEffects), Motion: normalizeChoice(incoming.Motion, "normal", fxMotions), Intensity: normalizeChoice(incoming.Intensity, "normal", fxIntensitySet), Seed: normalizeSeed(incoming.Seed), Depth: normalizeChoice(incoming.Depth, "flat", fxDepthSet)}
 			instances = append(instances, block(order, blockSection, options.values()))
 		case "video":
 			url := strings.TrimSpace(incoming.URL)
@@ -1539,6 +1547,12 @@ func (h *Host) renderLookSection() gosx.Node {
 			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-shapes"), gosx.Attr("role", "radiogroup"), gosx.Attr("aria-label", "Text width")),
 				radios("lookWidth", "data-look-width", view.WidthKey, widthItems)),
 		),
+		gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-look-group")),
+			gosx.El("span", nil, gosx.Text("Motion")),
+			gosx.El("div", gosx.Attrs(gosx.Attr("class", "ed-shapes"), gosx.Attr("role", "radiogroup"), gosx.Attr("aria-label", "Motion")),
+				radios("lookMotion", "data-look-motion", view.Motion, [][2]string{{"full", "Full"}, {"calm", "Calm"}, {"off", "Off"}})),
+			gosx.El("p", gosx.Attrs(gosx.Attr("class", "ed-hint")), gosx.Text("How much the backdrops move. Visitors who ask their device for less motion always get a still picture.")),
+		),
 		gosx.El("link", gosx.Attrs(gosx.Attr("rel", "stylesheet"), gosx.Attr("href", fontsPreviewURL()))),
 		gosx.El("script", gosx.Attrs(gosx.Attr("type", "application/json"), gosx.Attr("data-look-presets", "true")),
 			gosx.RawHTML(presets)),
@@ -1615,6 +1629,7 @@ type themeSavePayload struct {
 	Ink      string `json:"ink"`
 	FontHead string `json:"fontHead"`
 	FontBody string `json:"fontBody"`
+	Motion   string `json:"motion"`
 }
 
 type themeSaveResult struct {
@@ -1630,7 +1645,7 @@ func (h *Host) handleThemeSave(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, themeSaveResult{Message: "We couldn't read that change. Try again."})
 		return
 	}
-	theme, err := h.SaveTheme(ThemeChoice{Palette: payload.Palette, Fonts: payload.Fonts, Accent: payload.Accent, Buttons: payload.Buttons, Spacing: payload.Spacing, Headings: payload.Headings, Width: payload.Width, Ground: payload.Ground, Ink: payload.Ink, FontHead: payload.FontHead, FontBody: payload.FontBody})
+	theme, err := h.SaveTheme(ThemeChoice{Palette: payload.Palette, Fonts: payload.Fonts, Accent: payload.Accent, Buttons: payload.Buttons, Spacing: payload.Spacing, Headings: payload.Headings, Width: payload.Width, Ground: payload.Ground, Ink: payload.Ink, FontHead: payload.FontHead, FontBody: payload.FontBody, Motion: payload.Motion})
 	if err != nil {
 		writeJSON(w, http.StatusOK, themeSaveResult{Message: "We couldn't save the look. Try again."})
 		return

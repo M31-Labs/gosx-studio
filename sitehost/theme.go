@@ -58,7 +58,11 @@ type Theme struct {
 	FontHead, FontBody string
 	// CustomCSS is the owner's own stylesheet, already sanitised.
 	CustomCSS string
+	// Motion is how much the site's backdrops move: full, calm, or off.
+	Motion string
 }
+
+var siteMotions = map[string]bool{"full": true, "calm": true, "off": true}
 
 const (
 	themePaletteKey  = "themePalette"
@@ -67,6 +71,7 @@ const (
 	themeButtonsKey  = "themeButtons"
 	themeSpacingKey  = "themeSpacing"
 	themeHeadingsKey = "themeHeadings"
+	themeMotionKey   = "themeMotion"
 	themeWidthKey    = "themeWidth"
 	themeGroundKey   = "themeGround"
 	themeInkKey      = "themeInk"
@@ -389,6 +394,7 @@ func ThemeFromSettings(settings cmsstore.SiteSettings) Theme {
 		FontHead:  fontName(m[themeFontHeadKey]),
 		FontBody:  fontName(m[themeFontBodyKey]),
 		CustomCSS: sanitizeCustomCSS(m[customCSSKey]),
+		Motion:    normalizeChoice(m[themeMotionKey], "full", siteMotions),
 	}
 	if strings.EqualFold(strings.TrimSpace(m[themePaletteKey]), customPaletteKey) && theme.Ground != "" && theme.Ink != "" {
 		theme.Palette = customPalette(theme.Ground, theme.Ink, theme.Accent)
@@ -476,6 +482,7 @@ type themeView struct {
 	SpacingKey         string
 	HeadingsKey        string
 	WidthKey           string
+	Motion             string
 	Ground, Ink        string
 	FontHead, FontBody string
 }
@@ -484,7 +491,7 @@ func (t Theme) view() themeView {
 	return themeView{
 		PaletteKey: t.Palette.Key, FontsKey: t.Fonts.Key, Accent: t.EffectiveAccent(),
 		ButtonsKey: ButtonShapeByKey(t.Buttons).Key, SpacingKey: SpacingScaleByKey(t.Spacing).Key,
-		HeadingsKey: HeadingScaleByKey(t.Headings).Key, WidthKey: PageWidthByKey(t.Width).Key,
+		HeadingsKey: HeadingScaleByKey(t.Headings).Key, WidthKey: PageWidthByKey(t.Width).Key, Motion: firstNonEmpty(t.Motion, "full"),
 		Ground: firstNonEmpty(t.Ground, "#ffffff"), Ink: firstNonEmpty(t.Ink, "#1a1a1a"),
 		FontHead: t.FontHead, FontBody: t.FontBody,
 	}
@@ -494,6 +501,7 @@ func (t Theme) view() themeView {
 type ThemeChoice struct {
 	Palette, Fonts, Accent, Buttons, Spacing, Headings, Width, Ground, Ink string
 	FontHead, FontBody                                                     string
+	Motion                                                                 string
 }
 
 // SaveTheme writes the Look to the site's settings, preserving every other
@@ -531,6 +539,7 @@ func (h *Host) SaveTheme(choice ThemeChoice) (Theme, error) {
 	metadata[themeSpacingKey] = SpacingScaleByKey(choice.Spacing).Key
 	metadata[themeHeadingsKey] = HeadingScaleByKey(choice.Headings).Key
 	metadata[themeWidthKey] = PageWidthByKey(choice.Width).Key
+	metadata[themeMotionKey] = normalizeChoice(choice.Motion, "full", siteMotions)
 	if normalized := NormalizeAccent(choice.Accent); normalized != "" && (normalized != palette.Accent || palette.Key == customPaletteKey) {
 		metadata[themeAccentKey] = normalized
 	} else {

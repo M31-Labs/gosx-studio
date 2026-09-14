@@ -205,6 +205,18 @@ A new site's first visit to `/admin` is a six-step wizard, and the answers becom
 
 On a hosted site the wizard is followed by the one-time password from the welcome mail, which creates the owner's account. Then the dashboard opens on **Your site is ready**: every page with its state and an Edit link, the live address, and the next few things to do.
 
+## Backdrops: generative, yours, and easy to calm
+
+Any section band and any hero can carry a **backdrop**: a generative picture drawn live on a canvas behind the words. Eight kinds: Aurora (soft drifting colour), Particles (drifting points that link up), Waves, Orbs (lit spheres in depth), Grid (a floor to the horizon), Stars (a parallax field), Contours (a slowly breathing map), and Ribbons (twisting bands in depth). There is nothing to download: they draw from your own palette, so changing the Look changes every backdrop.
+
+Every backdrop has a **variation**. New sites get one seeded from their name, so no two sites look alike and yours always looks like itself. **Shuffle** gives you another. Each has **Motion** (moving, slow, still), **Strength** (subtle, normal, bold), and a band can add **Depth**, which makes its cards lean toward the pointer.
+
+Two hero layouts are built for them: **Poster** (big type over a full backdrop) and **Stage** (centred on a floor).
+
+In the Look, **Motion** sets the whole site to full, calm, or off. Visitors who ask their device for less motion always get a still picture, tabs in the background stop drawing, and a big screen never costs more than it should.
+
+Agents see the same choices in the schema (`fx`, `motion`, `intensity`, `seed`, `depth` on a section; `effect`, `motion`, `intensity`, `seed` on a hero).
+
 ## Getting around the editor
 
 **Do anything.** Press **Ctrl+K** (or click the box at the top) and type what you want: "pricing" adds a pricing section, "publish" publishes, "visit" opens the Visit page, "look" jumps to colours and fonts. Arrow keys choose, Enter does it.

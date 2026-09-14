@@ -1737,6 +1737,7 @@ type agentLook struct {
 	Ink      string `json:"ink,omitempty"`
 	FontHead string `json:"fontHead,omitempty"`
 	FontBody string `json:"fontBody,omitempty"`
+	Motion   string `json:"motion"`
 }
 
 func (h *Host) agentLookView() agentLook {
@@ -1745,7 +1746,7 @@ func (h *Host) agentLookView() agentLook {
 	return agentLook{
 		Palette: firstNonEmpty(m[themePaletteKey], theme.Palette.Key), Fonts: firstNonEmpty(m[themeFontsKey], theme.Fonts.Key), Accent: theme.Accent,
 		Buttons: firstNonEmpty(theme.Buttons, "soft"), Spacing: firstNonEmpty(theme.Spacing, "normal"), Headings: firstNonEmpty(theme.Headings, "normal"), Width: firstNonEmpty(theme.Width, "normal"),
-		Ground: theme.Ground, Ink: theme.Ink, FontHead: theme.FontHead, FontBody: theme.FontBody,
+		Ground: theme.Ground, Ink: theme.Ink, FontHead: theme.FontHead, FontBody: theme.FontBody, Motion: firstNonEmpty(theme.Motion, "full"),
 	}
 }
 
@@ -1774,7 +1775,7 @@ func (h *Host) handleAgentLookPut(w http.ResponseWriter, r *http.Request) {
 	choice := ThemeChoice{
 		Palette: pick("palette", current.Palette), Fonts: pick("fonts", current.Fonts), Accent: pick("accent", current.Accent), Buttons: pick("buttons", current.Buttons),
 		Spacing: pick("spacing", current.Spacing), Headings: pick("headings", current.Headings), Width: pick("width", current.Width), Ground: pick("ground", current.Ground), Ink: pick("ink", current.Ink),
-		FontHead: pick("fontHead", current.FontHead), FontBody: pick("fontBody", current.FontBody),
+		FontHead: pick("fontHead", current.FontHead), FontBody: pick("fontBody", current.FontBody), Motion: pick("motion", current.Motion),
 	}
 	if _, err := h.SaveTheme(choice); err != nil {
 		agentError(w, http.StatusInternalServerError, "failed", "The Look could not be saved.")

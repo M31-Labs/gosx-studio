@@ -43,7 +43,7 @@ func TestStartersAreBuiltFromSections(t *testing.T) {
 	}
 	_, handler := newTestHost(t)
 	home := get(t, handler, "/").Body.String()
-	mustContain(t, home, `class="site-hero site-hero--center"`, "a fresh food site opens with a hero")
+	mustContain(t, home, `class="site-hero site-hero--center site-hero--fx site-fx-host"`, "a fresh food site opens with a hero")
 	mustContain(t, home, `class="site-hours site-hours--inline"`, "then its hours")
 	mustContain(t, home, `class="site-cta site-cta--band"`, "then a call to action")
 	mustContain(t, get(t, handler, "/visit").Body.String(), "maps.google.com/maps?q=", "and its visit page has a map")
