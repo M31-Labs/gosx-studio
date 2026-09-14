@@ -481,6 +481,8 @@ func TestWizardWalksSixStepsAndBuildsTheSite(t *testing.T) {
 	step4 := post(t, handler, "/setup", with("4", url.Values{"kind": {"food"}, "offer1Name": {"Sourdough loaf"}, "offer1Price": {"$8"}, "email": {"hello@wildflower.example"}, "location": {"42 Mill Lane"}, "hoursSet": {"1"}, "hoursmonOpen": {"7:00"}, "hoursmonClose": {"15:00"}, "hourssunClosed": {"1"}}))
 	mustContain(t, step4.Body.String(), "Pick a look", "where and when advances to the look")
 	mustContain(t, step4.Body.String(), `id="template-bakery"`, "with looks that suit a food business")
+	mustContain(t, step4.Body.String(), `data-fx="aurora" data-fx-motion="slow" data-fx-intensity="subtle" data-fx-seed="`+fxSeedFor("Wildflower Bakery")+`"`, "each look card previews the backdrop a food site starts with, seeded by the name")
+	mustContain(t, step4.Body.String(), `src="`+effectsScriptPath+`"`, "and the wizard loads the engine")
 	mustContain(t, step4.Body.String(), `name="hoursmonOpen" value="7:00"`, "and carries the hours forward")
 
 	step5 := post(t, handler, "/setup", with("5", url.Values{"kind": {"food"}, "template": {"bistro"}, "email": {"hello@wildflower.example"}, "location": {"42 Mill Lane"}, "hoursSet": {"1"}, "hoursmonOpen": {"7:00"}, "hoursmonClose": {"15:00"}}))

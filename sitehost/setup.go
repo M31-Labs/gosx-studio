@@ -414,8 +414,12 @@ func setupStepLook(answers SetupAnswers) gosx.Node {
 			gosx.El("input", gosx.Attrs(inputAttrs...)),
 			// A miniature of the look: its ground, a heading in its display
 			// face, a line of body text, and a button in its accent and shape.
-			gosx.El("span", gosx.Attrs(gosx.Attr("class", "wz-look"), gosx.Attr("aria-hidden", "true"),
-				gosx.Attr("style", "display:block;padding:14px;border-radius:3px;background:"+palette.Ground+";color:"+palette.Ink+";border:1px solid "+palette.Rule)),
+			// The card also carries the backdrop a site of this kind starts
+			// with, drawn in this palette and seeded by the site's name, so the
+			// owner sees the real thing before choosing.
+			gosx.El("span", gosx.Attrs(append([]any{gosx.Attr("class", "wz-look"), gosx.Attr("aria-hidden", "true"),
+				gosx.Attr("style", "display:block;padding:14px;border-radius:3px;background:"+palette.Ground+";color:"+palette.Ink+";border:1px solid "+palette.Rule+";--site-accent:"+palette.Accent+";--site-ground:"+palette.Ground+";--site-ink:"+palette.Ink)},
+				fxAttrs(fxDefaultFor(answers.Kind), "slow", "subtle", fxSeedFor(firstNonEmpty(answers.SiteTitle, template.Key)))...)...),
 				gosx.El("span", gosx.Attrs(gosx.Attr("style", "display:block;font-family:"+fonts.Display+";font-weight:700;font-size:18px;line-height:1.1;margin-bottom:6px")), gosx.Text(firstNonEmpty(answers.SiteTitle, "Your name here"))),
 				gosx.El("span", gosx.Attrs(gosx.Attr("style", "display:block;font-family:"+fonts.Body+";font-size:11.5px;color:"+palette.Muted+";margin-bottom:10px")), gosx.Text("A short line about what you do.")),
 				gosx.El("span", gosx.Attrs(gosx.Attr("style", "display:inline-block;padding:5px 11px;font-size:11px;font-family:"+fonts.Body+";background:"+palette.Accent+";color:"+palette.Ground+";border-radius:"+radius)), gosx.Text("Get in touch")),

@@ -611,6 +611,8 @@ details[open] > .site-faq__question::after { content: "–"; }
 .wz-choice input { position: absolute; opacity: 0; pointer-events: none; }
 .wz-choice:has(input:checked) { border-color: var(--site-accent); box-shadow: inset 0 0 0 1px var(--site-accent); }
 .wz-choice:has(input:focus-visible) { outline: 2px solid var(--site-accent); outline-offset: 2px; }
+.wz-look { position: relative; isolation: isolate; overflow: hidden; }
+.wz-look > span { position: relative; z-index: 1; }
 .wz-choice__label { font-weight: 600; font-size: 15.5px; }
 .wz-choice__blurb { font-size: 14px; color: var(--site-muted); line-height: 1.45; }
 .wz-choice__eg { font-size: 12.5px; color: var(--site-muted); opacity: .8; margin-top: 3px; }
