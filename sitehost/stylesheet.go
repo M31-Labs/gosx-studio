@@ -162,8 +162,12 @@ html { scroll-behavior: smooth; }
 /* Backdrops: a canvas behind a band or a hero, painted by effects.js. */
 .site-fx-host { position: relative; isolation: isolate; }
 .site-fx { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; display: block; pointer-events: none; }
-.site-section.site-fx-host { margin: calc(28px * var(--site-space, 1)) calc(-1 * max(16px, 5vw)); padding: calc(36px * var(--site-space, 1)) max(16px, 5vw); overflow: hidden; }
-.site-section--plain.site-fx-host { background: var(--site-ground); }
+.site-section.site-fx-host { overflow: hidden; }
+.site-section--plain.site-fx-host { width: 100cqw; margin: calc(28px * var(--site-space, 1)) calc(-1 * max(16px, 5vw)); max-width: none; box-sizing: border-box; padding: calc(36px * var(--site-space, 1)) max(16px, 5vw); background: var(--site-ground); }
+.site-section--plain.site-fx-host .site-section__inner { margin-left: 0; }
+/* A centred band centres its wide sections too, instead of starting them at the text column's edge. */
+.site-section--align-center .site-section__inner > * { margin-inline: auto; }
+.site-hero--poster .button--ghost { color: #fff !important; border-color: rgba(255,255,255,.75); }
 .site-hero--fx { padding: clamp(36px, 7vw, 88px) clamp(20px, 5vw, 56px); border-radius: calc(var(--site-radius, 2px) * 3); overflow: hidden; }
 .site-hero--poster { position: relative; isolation: isolate; min-height: min(78vh, 720px); padding: clamp(28px, 6vw, 64px); border-radius: calc(var(--site-radius, 2px) * 3); overflow: hidden; align-content: end; --site-ground: #12161a; --site-surface: rgba(255,255,255,.08); --site-ink: #f6f3ee; --site-muted: rgba(246,243,238,.75); --site-rule: rgba(255,255,255,.2); background: #12161a; color: #f6f3ee; grid-template-columns: 1fr; }
 .site-hero--poster .site-hero__headline { font-size: clamp(40px, 8vw, 96px); line-height: .98; letter-spacing: -.02em; max-width: 14ch; }
