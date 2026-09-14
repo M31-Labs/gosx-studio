@@ -165,8 +165,9 @@ html { scroll-behavior: smooth; }
 .site-section.site-fx-host { overflow: hidden; }
 .site-section--plain.site-fx-host { width: 100cqw; margin: calc(28px * var(--site-space, 1)) calc(-1 * max(16px, 5vw)); max-width: none; box-sizing: border-box; padding: calc(36px * var(--site-space, 1)) max(16px, 5vw); background: var(--site-ground); }
 .site-section--plain.site-fx-host .site-section__inner { margin-left: 0; }
-/* A centred band centres its wide sections too, instead of starting them at the text column's edge. */
-.site-section--align-center .site-section__inner > * { margin-inline: auto; }
+/* A centred band centres its wide sections too: auto margins cannot centre a
+   child wider than its column, so the offset is half the difference. */
+.site-section--align-center .site-section__inner > .site-hero, .site-section--align-center .site-section__inner > .site-features, .site-section--align-center .site-section__inner > .site-testimonials, .site-section--align-center .site-section__inner > .site-pricing, .site-section--align-center .site-section__inner > .site-cta, .site-section--align-center .site-section__inner > .site-stats, .site-section--align-center .site-section__inner > .site-team, .site-section--align-center .site-section__inner > .site-imagetext, .site-section--align-center .site-section__inner > .site-map, .site-section--align-center .site-section__inner > .site-faq { margin-left: calc((100% - min(calc(100cqw - 2 * max(16px, 5vw)), 1120px)) / 2); }
 .site-hero--poster .button--ghost { color: #fff !important; border-color: rgba(255,255,255,.75); }
 .site-hero--fx { padding: clamp(36px, 7vw, 88px) clamp(20px, 5vw, 56px); border-radius: calc(var(--site-radius, 2px) * 3); overflow: hidden; }
 .site-hero--poster { position: relative; isolation: isolate; min-height: min(78vh, 720px); padding: clamp(28px, 6vw, 64px); border-radius: calc(var(--site-radius, 2px) * 3); overflow: hidden; align-content: end; --site-ground: #12161a; --site-surface: rgba(255,255,255,.08); --site-ink: #f6f3ee; --site-muted: rgba(246,243,238,.75); --site-rule: rgba(255,255,255,.2); background: #12161a; color: #f6f3ee; grid-template-columns: 1fr; }
