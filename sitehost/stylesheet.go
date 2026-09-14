@@ -1,9 +1,7 @@
 package sitehost
 
 import (
-	"bytes"
 	"net/http"
-	"time"
 )
 
 // siteCSS styles the public site and the back-office chrome the default host
@@ -1058,13 +1056,6 @@ p.ed-palette__hint { margin: 0; padding: 8px 18px 12px; font-size: 12px; color: 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 `
 
-var siteCSSModTime = time.Now()
-
 func publicStylesheetHandler() http.Handler {
-	body := []byte(siteCSS)
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/css; charset=utf-8")
-		w.Header().Set("Cache-Control", "public, max-age=300")
-		http.ServeContent(w, r, "site.css", siteCSSModTime, bytes.NewReader(body))
-	})
+	return assetHandler("site.css", []byte(siteCSS), "text/css; charset=utf-8")
 }

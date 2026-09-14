@@ -126,7 +126,7 @@ func TestThirdPartyCodeIsGatedByConsentAndRelaxesOnlyThePublicPolicy(t *testing.
 	body := home.Body.String()
 	mustContain(t, body, `<template id="site-head-code">`, "with consent required the code waits in a template")
 	mustContain(t, body, `googletagmanager.com`, "the pasted code is present")
-	mustContain(t, body, `src="/_gosx/site/consent.js"`, "the consent script is loaded")
+	mustContain(t, body, `src="`+consentScriptURL+`"`, "the consent script is loaded")
 	mustContain(t, body, `data-consent="true"`, "the banner is rendered")
 	if !strings.Contains(get(t, handler, "/admin").Header().Get("Content-Security-Policy"), "script-src 'self';") {
 		t.Fatal("the admin area must keep the strict script policy")

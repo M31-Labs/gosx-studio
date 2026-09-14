@@ -1,10 +1,8 @@
 package sitehost
 
 import (
-	"bytes"
 	_ "embed"
 	"net/http"
-	"time"
 
 	"m31labs.dev/gosx"
 )
@@ -18,17 +16,11 @@ const webMCPScriptPath = "/_gosx/site/webmcp.js"
 //go:embed assets/webmcp.js
 var webMCPScriptBody []byte
 
-var webMCPScriptModTime = time.Now()
-
 func webMCPScriptHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
-		w.Header().Set("Cache-Control", "public, max-age=300")
-		http.ServeContent(w, r, "webmcp.js", webMCPScriptModTime, bytes.NewReader(webMCPScriptBody))
-	})
+	return assetHandler("webmcp.js", webMCPScriptBody, scriptContentType)
 }
 
 // webMCPScript is the tag every admin page and the editor carry.
 func webMCPScript() gosx.Node {
-	return gosx.El("script", gosx.Attrs(gosx.Attr("src", webMCPScriptPath), gosx.Attr("defer", "defer")))
+	return gosx.El("script", gosx.Attrs(gosx.Attr("src", webMCPScriptURL), gosx.Attr("defer", "defer")))
 }

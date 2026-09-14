@@ -32,7 +32,7 @@ func hitFrom(t *testing.T, handler http.Handler, ip, userAgent, payload string) 
 
 func TestBeaconGoesOnServedPublicPagesOnly(t *testing.T) {
 	host, handler := newTestHost(t)
-	beacon := `<script src="` + statsScriptPath + `" defer="defer">`
+	beacon := `<script src="` + statsScriptURL + `" defer="defer">`
 	mustContain(t, get(t, handler, "/").Body.String(), beacon, "the home page carries the beacon")
 	mustContain(t, get(t, handler, "/menu").Body.String(), beacon, "so does a live page")
 	if strings.Contains(get(t, handler, "/admin").Body.String(), beacon) {

@@ -22,7 +22,7 @@ func TestTheEditorHasThePaletteShortcutsCoachAndFinder(t *testing.T) {
 		`<datalist id="site-links">`, `<option value="/menu" label="Menu">`, `list="site-links"`,
 		`data-pages="true"`, `"href":"/admin/edit/` + id + `"`,
 		`data-label="Hero"`, `class="ed-fab"`, `data-side-toggle="true"`, `id="ed-side"`, `data-side-close="true"`,
-		`src="` + webMCPScriptPath + `"`, `data-kind="page"`,
+		`src="` + webMCPScriptURL + `"`, `data-kind="page"`,
 	} {
 		mustContain(t, editor, want, "the editor carries the UX pass")
 	}
@@ -154,7 +154,7 @@ func TestASignedInEditorGetsTheirOwnScopesThroughTheBrowser(t *testing.T) {
 func TestAdminPagesAnnounceWebMCPTools(t *testing.T) {
 	_, handler := newTestHost(t)
 	dashboard := get(t, handler, "/admin").Body.String()
-	mustContain(t, dashboard, `src="`+webMCPScriptPath+`"`, "every admin page loads the WebMCP script")
+	mustContain(t, dashboard, `src="`+webMCPScriptURL+`"`, "every admin page loads the WebMCP script")
 	pages := get(t, handler, "/admin/pages").Body.String()
 	mustContain(t, pages, `toolname="create_page_form" tooldescription="Add a new page`, "forms carry declarative tool names")
 	mustContain(t, get(t, handler, "/admin/settings").Body.String(), `toolname="site_settings_form"`, "settings too")

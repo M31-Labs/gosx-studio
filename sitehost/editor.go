@@ -165,7 +165,7 @@ func (h *Host) renderEditor(w http.ResponseWriter, subject editorSubject) {
 		gosx.El("script", gosx.Attrs(gosx.Attr("type", "application/json"), gosx.Attr("data-pages", "true")), gosx.RawHTML(h.pagesJSON())),
 		gosx.El("script", gosx.Attrs(gosx.Attr("type", "application/json"), gosx.Attr("data-forms-presets", "true")), gosx.RawHTML(h.formPresetsJSON())),
 		gosx.El("script", gosx.Attrs(gosx.Attr("type", "application/json"), gosx.Attr("data-products-presets", "true")), gosx.RawHTML(h.productPresetsJSON())),
-		gosx.El("script", gosx.Attrs(gosx.Attr("src", editorScriptPath), gosx.Attr("defer", "defer"))),
+		gosx.El("script", gosx.Attrs(gosx.Attr("src", editorScriptURL), gosx.Attr("defer", "defer"))),
 		webMCPScript(),
 	)
 

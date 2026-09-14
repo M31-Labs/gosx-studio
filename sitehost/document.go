@@ -147,7 +147,7 @@ func RenderHead(meta PageMeta) gosx.Node {
 		nodes = append(nodes, metaTag("theme-color", meta.Theme.Palette.Ground))
 	}
 	if meta.Stats {
-		nodes = append(nodes, gosx.El("script", gosx.Attrs(gosx.Attr("src", statsScriptPath), gosx.Attr("defer", "defer"))))
+		nodes = append(nodes, gosx.El("script", gosx.Attrs(gosx.Attr("src", statsScriptURL), gosx.Attr("defer", "defer"))))
 	}
 	if meta.Feed && !meta.AdminChrome {
 		nodes = append(nodes, gosx.El("link", gosx.Attrs(
@@ -182,7 +182,7 @@ func RenderHead(meta PageMeta) gosx.Node {
 
 	nodes = append(nodes, gosx.El("link", gosx.Attrs(
 		gosx.Attr("rel", "stylesheet"),
-		gosx.Attr("href", publicStylesheetPath),
+		gosx.Attr("href", publicStylesheetURL),
 	)))
 	// The theme comes after the base stylesheet so its values win.
 	theme := meta.Theme
@@ -220,7 +220,7 @@ func RenderDocument(meta PageMeta, body gosx.Node) string {
 	html := gosx.El("html", gosx.Attrs(gosx.Attr("lang", lang)),
 		RenderHead(meta),
 		gosx.El("body", gosx.Attrs(gosx.Attr("class", bodyClass(meta)), gosx.Attr("data-site-motion", firstNonEmpty(meta.Theme.Motion, "full"))), body,
-			gosx.El("script", gosx.Attrs(gosx.Attr("src", effectsScriptPath), gosx.Attr("defer", "defer")))),
+			gosx.El("script", gosx.Attrs(gosx.Attr("src", effectsScriptURL), gosx.Attr("defer", "defer")))),
 	)
 	return "<!doctype html>" + gosx.RenderHTML(html)
 }

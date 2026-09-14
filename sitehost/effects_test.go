@@ -30,7 +30,7 @@ func TestBandsCarryABackdropAndDepthToThePage(t *testing.T) {
 	mustContain(t, public, `<section class="site-section site-section--dark site-fx-host site-tilt" data-fx="orbs" data-fx-motion="slow" data-fx-intensity="bold" data-fx-seed="Loaf-42" data-tilt="true"><canvas class="site-fx" aria-hidden="true"></canvas>`, "the band is a host with its canvas first")
 	mustContain(t, public, `<section class="site-section site-section--plain"><div class="site-section__inner">`, "a band without a backdrop is unchanged")
 	mustContain(t, public, `data-site-motion="full"`, "the body carries the site's motion setting")
-	mustContain(t, public, `src="`+effectsScriptPath+`"`, "and loads the engine")
+	mustContain(t, public, `src="`+effectsScriptURL+`"`, "and loads the engine")
 	agent := agentCall(t, handler, http.MethodGet, "/agent/v1/pages/menu", agentKeyFor(t, host, "read"), "").Body.String()
 	mustContain(t, agent, `"fx":"orbs","motion":"slow","intensity":"bold","seed":"Loaf-42","depth":"tilt"`, "the agent API reads the backdrop back")
 }

@@ -368,7 +368,7 @@ func renderHeadCode(code string, consent bool) gosx.Node {
 	}
 	return gosx.Fragment(
 		gosx.El("template", gosx.Attrs(gosx.Attr("id", "site-head-code")), gosx.RawHTML(code)),
-		gosx.El("script", gosx.Attrs(gosx.Attr("src", consentScriptPath), gosx.Attr("defer", "defer"))),
+		gosx.El("script", gosx.Attrs(gosx.Attr("src", consentScriptURL), gosx.Attr("defer", "defer"))),
 	)
 }
 
