@@ -1,10 +1,8 @@
 # Host integration guide
 
 How a new host (a third GoSX site, beyond the Noni/Pajaritos reference pair)
-integrates GoSX Studio's editor. Terse and factual — see
-[`CROSS_HOST_OWNERSHIP_AUDIT.md`](CROSS_HOST_OWNERSHIP_AUDIT.md) for what
-Studio owns vs. what a host implements, and
-[`ARCHITECTURE.md`](ARCHITECTURE.md) for the in-module package DAG.
+integrates GoSX Studio's editor. The in-module package DAG is in
+[`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Contents
 
@@ -120,9 +118,7 @@ type DraftProjector interface {
 ```
 
 Contract your implementation must satisfy (see `conformance/draftprojector.go`
-doc comments for the exact scenarios, and
-[§B in the ownership audit](CROSS_HOST_OWNERSHIP_AUDIT.md) for why this
-matters — it is the "P1" outbox-wedge fix both hosts already carry):
+doc comments for the exact scenarios):
 
 - `ProjectStudioOperation` is idempotent by `record.ID` (exact replay is a
   no-op); the same id with different content is rejected, not re-applied.
