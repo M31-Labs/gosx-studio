@@ -412,6 +412,3 @@ packages now live under `cms/` in this module, and `gosx-studio`'s own
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §"Release model" for the folded
 DAG shape and [cms/PROVENANCE.md](cms/PROVENANCE.md) for the path mapping and
 source commit.
-
-See `docs/WEBFLOW_CLASS_EDITOR_GAP_INVENTORY.md` for the detailed gap
-inventory and work plan toward a Webflow-class no-code editor.
