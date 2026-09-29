@@ -33,7 +33,7 @@ import {
 const workRoot = path.resolve(__dirname, "../..");
 const muddyRepo = process.env.GOSX_STUDIO_MUDDY_REPO ?? path.join(workRoot, "muddy-noni-commerce");
 const pajaritosRepo = process.env.GOSX_STUDIO_PAJARITOS_REPO ?? path.join(workRoot, "pajaritos-forest-school");
-const defaultGoBin = process.env.GOBIN || path.join(process.env.GOPATH || path.join(homedir(), "go"), "bin");
+const defaultGoBin = process.env.GOBIN || path.join((process.env.GOPATH || path.join(homedir(), "go")).split(path.delimiter)[0], "bin");
 
 let muddyDistBuildPromise: Promise<void> | null = null;
 
