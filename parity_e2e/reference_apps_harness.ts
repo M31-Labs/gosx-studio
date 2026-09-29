@@ -1,7 +1,7 @@
 import { expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { createServer } from "node:net";
 import {
@@ -33,7 +33,7 @@ import {
 const workRoot = path.resolve(__dirname, "../..");
 const muddyRepo = process.env.GOSX_STUDIO_MUDDY_REPO ?? path.join(workRoot, "muddy-noni-commerce");
 const pajaritosRepo = process.env.GOSX_STUDIO_PAJARITOS_REPO ?? path.join(workRoot, "pajaritos-forest-school");
-const defaultGoBin = "/home/draco/go/bin";
+const defaultGoBin = process.env.GOBIN || path.join((process.env.GOPATH || path.join(homedir(), "go")).split(path.delimiter)[0], "bin");
 
 let muddyDistBuildPromise: Promise<void> | null = null;
 
