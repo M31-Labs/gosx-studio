@@ -13,7 +13,7 @@ func TestPreviewLinkSignVerifyRoundTrip(t *testing.T) {
 		ResourceID:   " home ",
 		Route:        "/pages/home",
 		Audience:     "client",
-		Issuer:       "draco",
+		Issuer:       "issuer",
 		Nonce:        "nonce-1",
 	}, now)
 	if err != nil {
