@@ -1004,6 +1004,8 @@
       return;
     }
     var formData = serializeForm(form, submitter);
+    // Preview GET overrides must not expose POST credentials in their URL.
+    if (method === "GET") formData.delete("csrf_token");
     var previous = submitBaselineState(form);
     var submittedControls = captureMutableControls(form);
     var csrfToken = method === "POST" ? formCSRFToken(formData) : "";

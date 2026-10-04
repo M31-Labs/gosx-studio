@@ -403,6 +403,7 @@ test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
               data-gosx-form-state="idle"
             >
               <input name="section" value="gallery" />
+              <input type="hidden" name="csrf_token" value="live-session-token" />
               <button type="submit" formmethod="get" formtarget="_blank">Preview filter</button>
             </form>
           </main>

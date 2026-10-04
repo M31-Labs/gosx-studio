@@ -557,6 +557,10 @@ button.button {
   padding: var(--space-xs);
 }
 
+.editor-panel[hidden] {
+  display: none !important;
+}
+
 .studio-panel-heading h2,
 .studio-panel-heading p,
 .editor-panel h2,
