@@ -247,6 +247,10 @@
 
   function setState(form, state, reason, options) {
     options = options || {};
+    if (state === "saved" && !options.message && !options.actionLabel &&
+        form.getAttribute("data-gosx-studio-authoring-state") === "saved") {
+      options.message = form.getAttribute("data-gosx-studio-authoring-message") || "";
+    }
     var dirty = state === "dirty" || state === "autosaving" || state === "error";
     var count = options.dirtyCount || 0;
     form.setAttribute("data-gosx-studio-save-state", state);

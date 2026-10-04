@@ -788,8 +788,10 @@
     if (token == null || String(token) === "") {
       // A host can create its session after constructing an embedded panel.
       // Use the current document's server-issued token for that first submit.
-      var meta = document.querySelector('meta[name="csrf-token"]');
-      var field = document.querySelector('input[type="hidden"][name="csrf_token"]:not(:disabled)');
+      var meta = doc.querySelector('meta[name="csrf-token"]');
+      var field = queryAll('input[type="hidden"][name="csrf_token"]:not(:disabled)').filter(function (input) {
+        return !!input.value;
+      })[0];
       token = meta && meta.content || field && field.value || "";
       if (token && typeof formData.set === "function") formData.set("csrf_token", token);
     }

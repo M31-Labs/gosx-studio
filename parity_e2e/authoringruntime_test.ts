@@ -31,13 +31,13 @@ test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
     let expectedToken = "live-session-token";
     await page.route("http://127.0.0.1:4173/editor", (route) => route.fulfill({
       contentType: "text/html",
-      body: `<form action="/signout"><input type="hidden" name="csrf_token" value="live-session-token"></form>
-        <main data-gosx-studio-workbench="true">
+      body: `<main data-gosx-studio-workbench="true">
           <span data-gosx-studio-save-detail="true">Unsaved</span>
           <form action="/authoring" method="post" data-gosx-studio-authoring-managed="true">
             <input name="value" value="draft"><button>Save</button>
           </form>
-        </main>`,
+        </main>
+        <form action="/signout"><input type="hidden" name="csrf_token" value="live-session-token"></form>`,
     }));
     await page.route("http://127.0.0.1:4173/authoring", async (route) => {
       expect(route.request().headers()["x-csrf-token"]).toBe(expectedToken);
@@ -54,13 +54,17 @@ test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
       await expect(page.locator("[data-gosx-studio-authoring-managed]")).toHaveAttribute("data-gosx-form-state", "idle");
     };
     await submit();
-    expectedToken = "explicit-form-token";
     await page.locator("[data-gosx-studio-authoring-managed]").evaluate((form) => {
       const field = document.createElement("input");
       field.type = "hidden";
       field.name = "csrf_token";
-      field.value = "explicit-form-token";
       form.appendChild(field);
+    });
+    await submit();
+    expectedToken = "explicit-form-token";
+    await page.locator("[data-gosx-studio-authoring-managed]").evaluate((form) => {
+      const field = form.querySelector<HTMLInputElement>('input[name="csrf_token"]')!;
+      field.value = "explicit-form-token";
     });
     await submit();
   });
