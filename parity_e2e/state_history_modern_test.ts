@@ -54,6 +54,83 @@ function nextActionResult(page: Page) {
 }
 
 test.describe("@smoke modern state runtime history shortcuts and save feedback", () => {
+  test("manual Save stays available after autosave confirms the form is clean", async ({ page }) => {
+    let saves = 0;
+    await page.route("http://127.0.0.1:4173/save-a", (route) => {
+      saves += 1;
+      return route.fulfill({ contentType: "application/json", body: '{"ok":true}' });
+    });
+    await mount(page);
+    await page.addStyleTag({ content: readFileSync(path.resolve(__dirname, "../hostruntime/assets/studio.css"), "utf8") });
+    const form = page.locator("#editor-a");
+    const save = form.locator("[data-gosx-studio-save-button]");
+    await expect(save).toBeVisible();
+    await form.evaluate((form) => {
+      form.setAttribute("data-gosx-studio-autosave", "true");
+      form.setAttribute("data-gosx-studio-autosave-delay", "250");
+    });
+    await form.locator('[name="title"]').fill("Autosaved title");
+    await expect.poll(() => saves).toBe(1);
+    await expect(form).toHaveAttribute("data-gosx-studio-save-state", "saved");
+    await expect(save).toBeVisible();
+    await save.click();
+    await expect.poll(() => saves).toBe(2);
+    await expect(form).toHaveAttribute("data-gosx-studio-save-state", "saved");
+  });
+
+  for (const mode of ["replace", "inner"]) {
+    for (const edit of ["removal", "reorder"]) {
+      test(`empty fragment refresh retains saved order during unrelated ${edit} (${mode})`, async ({ page }) => {
+        await page.route("http://127.0.0.1:4173/leave", (route) => route.fulfill({
+          contentType: "text/html", body: "<p>Left editor</p>",
+        }));
+        await page.route("http://127.0.0.1:4173/editor", (route) => route.fulfill({
+          contentType: "text/html",
+          body: `<form data-gosx-studio-state="true" data-gosx-studio-workbench="true">
+            <input name="before" value="A"><section id="contact"></section><input name="after" value="B">
+            <output data-gosx-studio-save-state="true">Saved</output>
+          </form><a href="/leave">Leave editor</a>`,
+        }));
+        await page.route("http://127.0.0.1:4173/fragment", (route) => route.fulfill({
+          contentType: "text/html", body: '<section id="contact"><input name="contact" value="C"></section>',
+        }));
+        await page.goto("http://127.0.0.1:4173/editor");
+        await page.addScriptTag({ content: runtimeJS });
+        await page.addScriptTag({ content: authoringRuntimeJS });
+        await page.evaluate((edit) => {
+          const field = document.querySelector('[name="after"]')!;
+          (window as any).__afterField = field;
+          if (edit === "removal") field.remove();
+          else field.parentElement!.prepend(field);
+          document.querySelector("form")!.dispatchEvent(new Event("change", { bubbles: true }));
+        }, edit);
+        await expect(page.locator("form")).toHaveAttribute("data-gosx-studio-save-state", "dirty");
+        await page.evaluate(async (mode) => {
+          await (window as any).GoSXStudioAuthoringRuntime.handleResult({ ok: true, data: {
+            fragmentURL: "/fragment", fragments: [{ selector: "#contact", mode }], changes: [],
+          } });
+        }, mode);
+        await expect(page.locator('[name="contact"]')).toHaveValue("C");
+        await expect(page.locator("form")).toHaveAttribute("data-gosx-studio-save-state", "dirty");
+        await page.evaluate(() => {
+          document.querySelector("#contact")!.after((window as any).__afterField);
+          document.querySelector("form")!.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+        await expect(page.locator("form")).toHaveAttribute("data-gosx-studio-save-state", "saved");
+        expect(await page.evaluate(() => {
+          const event = new Event("beforeunload", { cancelable: true });
+          window.dispatchEvent(event);
+          return event.defaultPrevented;
+        })).toBe(false);
+        await page.evaluate(() => {
+          window.confirm = () => { throw new Error("Unexpected discard warning after restoring saved order"); };
+        });
+        await page.getByRole("link", { name: "Leave editor" }).click();
+        await expect(page).toHaveURL("http://127.0.0.1:4173/leave");
+      });
+    }
+  }
+
   for (const mode of ["replace", "inner"]) {
     for (const edit of ["addition", "removal", "multi-select", "empty multi-select", "reorder"]) {
       test(`fragment refresh preserves unrelated ${edit} (${mode})`, async ({ page }) => {
