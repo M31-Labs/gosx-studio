@@ -337,13 +337,13 @@
     return frames.length;
   }
 
-  function writeSaveFeedback(message) {
+  function writeSaveFeedback(message, guardSaveState) {
     message = String(message || "").trim();
     var blocked = roots().some(function (root) {
       var state = root.getAttribute && root.getAttribute(STATE_ATTR);
       var saveState = root.getAttribute && root.getAttribute("data-gosx-studio-save-state");
       return state === "dirty" || state === "pending" || state === "error" ||
-        saveState === "dirty" || saveState === "saving" || saveState === "autosaving" || saveState === "error";
+        guardSaveState && (saveState === "dirty" || saveState === "saving" || saveState === "autosaving" || saveState === "error");
     });
     if (blocked) return;
     if (message) {
@@ -603,8 +603,8 @@
     });
     writeSaveFeedback(message);
     if (typeof window.setTimeout === "function") {
-      window.setTimeout(function () { writeSaveFeedback(message); }, 0);
-      window.setTimeout(function () { writeSaveFeedback(message); }, 100);
+      window.setTimeout(function () { writeSaveFeedback(message, true); }, 0);
+      window.setTimeout(function () { writeSaveFeedback(message, true); }, 100);
     }
   }
 
