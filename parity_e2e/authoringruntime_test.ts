@@ -8,6 +8,63 @@ const runtimeJS = readFileSync(
 );
 
 test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
+  test("keeps the authoring result through a clean state refresh and still reports new edits", async ({ page }) => {
+    await page.setContent(`<form class="editor-workbench" data-gosx-studio-workbench="true" data-gosx-studio-state="true">
+      <input name="title" value="Home" />
+      <span data-gosx-studio-save-detail="true">Ready</span>
+    </form>`);
+    await page.addScriptTag({ content: readFileSync(path.join(__dirname, "../hostruntime/assets/state_runtime.js"), "utf8") });
+    await page.addScriptTag({ content: runtimeJS });
+    await page.evaluate(() => {
+      (window as any).GoSXStudioAuthoringRuntime.handleResult({ ok: true, data: { message: "Landing page created.", changes: [] } });
+      document.querySelector("input")!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await expect(page.locator("form")).toHaveAttribute("data-gosx-studio-save-state", "saved");
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await expect(page.locator("[data-gosx-studio-save-detail]")).toHaveText("Landing page created.");
+    await page.locator("input").fill("Changed title");
+    await expect(page.locator("form")).toHaveAttribute("data-gosx-studio-save-state", "dirty");
+    await expect(page.locator("[data-gosx-studio-save-detail]")).toHaveText("1 change waiting");
+  });
+
+  test("uses the live session token for an embedded form and preserves an explicit form token", async ({ page }) => {
+    let expectedToken = "live-session-token";
+    await page.route("http://127.0.0.1:4173/editor", (route) => route.fulfill({
+      contentType: "text/html",
+      body: `<form action="/signout"><input type="hidden" name="csrf_token" value="live-session-token"></form>
+        <main data-gosx-studio-workbench="true">
+          <span data-gosx-studio-save-detail="true">Unsaved</span>
+          <form action="/authoring" method="post" data-gosx-studio-authoring-managed="true">
+            <input name="value" value="draft"><button>Save</button>
+          </form>
+        </main>`,
+    }));
+    await page.route("http://127.0.0.1:4173/authoring", async (route) => {
+      expect(route.request().headers()["x-csrf-token"]).toBe(expectedToken);
+      expect(route.request().postData()).toContain(expectedToken);
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, message: "Saved draft.", data: { message: "Saved draft." } }) });
+    });
+    await page.goto("http://127.0.0.1:4173/editor");
+    await page.addScriptTag({ content: runtimeJS });
+    const submit = async () => {
+      const response = page.waitForResponse("http://127.0.0.1:4173/authoring");
+      await page.getByRole("button", { name: "Save", exact: true }).click();
+      expect((await response).status()).toBe(200);
+      await expect(page.locator("[data-gosx-studio-save-detail]")).toHaveText("Saved draft.");
+      await expect(page.locator("[data-gosx-studio-authoring-managed]")).toHaveAttribute("data-gosx-form-state", "idle");
+    };
+    await submit();
+    expectedToken = "explicit-form-token";
+    await page.locator("[data-gosx-studio-authoring-managed]").evaluate((form) => {
+      const field = document.createElement("input");
+      field.type = "hidden";
+      field.name = "csrf_token";
+      field.value = "explicit-form-token";
+      form.appendChild(field);
+    });
+    await submit();
+  });
+
   test("selects changed component, refreshes preview, and emits result detail", async ({ page }) => {
     await page.setContent(`
       <main class="editor-workbench" data-gosx-studio-workbench="true">

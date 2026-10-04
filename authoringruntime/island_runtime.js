@@ -785,6 +785,14 @@
   function formCSRFToken(formData) {
     if (!formData || typeof formData.get !== "function") return "";
     var token = formData.get("csrf_token");
+    if (token == null || String(token) === "") {
+      // A host can create its session after constructing an embedded panel.
+      // Use the current document's server-issued token for that first submit.
+      var meta = document.querySelector('meta[name="csrf-token"]');
+      var field = document.querySelector('input[type="hidden"][name="csrf_token"]:not(:disabled)');
+      token = meta && meta.content || field && field.value || "";
+      if (token && typeof formData.set === "function") formData.set("csrf_token", token);
+    }
     return token == null ? "" : String(token);
   }
 

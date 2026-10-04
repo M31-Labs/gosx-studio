@@ -116,6 +116,10 @@ jobs:
         working-directory: gosx-studio/parity_e2e
         run: npm run test:reference-browser-contract
 
+      - name: Test embedded authoring session and save feedback
+        working-directory: gosx-studio/parity_e2e
+        run: npm test -- authoringruntime_test.ts
+
       - name: Run shared-runtime browser matrix
         working-directory: gosx-studio/parity_e2e
         env:

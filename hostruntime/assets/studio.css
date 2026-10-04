@@ -1160,6 +1160,11 @@ button.button {
     box-shadow var(--duration-fast) var(--ease-out);
 }
 
+/* Native radios own focus; their labels keep the same outline on hover. */
+.studio-advanced-panel__group {
+  outline: 0;
+}
+
 .studio-home-inspector__group:hover,
 .studio-home-inspector__group:focus-visible,
 .studio-look-panel__group:hover,

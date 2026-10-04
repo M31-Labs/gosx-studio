@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { createServer } from "node:net";
+import { startLoopbackTLSProxy } from "./reference_apps_tls";
 import {
   CandidateSourceCopyLeaseBook,
   assertResolvedCandidateModule,
@@ -14,6 +15,7 @@ import {
   CANDIDATE_SHA_ENV,
   createCandidateSourceCopy,
   loadCandidateIdentity,
+  prepareCandidateModuleDependencies,
   resolveCandidateModuleGraph,
   withCandidateModuleEnvironment,
   type CandidateIdentity,
@@ -966,6 +968,7 @@ function candidateSourceRepo(
     try {
       const graph = resolveCandidateModuleGraph(sourceCopy.sourceRepo, baseEnv, allowModuleUpdates);
       assertResolvedCandidateModule(graph, identity);
+      prepareCandidateModuleDependencies(sourceCopy, baseEnv);
       candidateModuleGraphHosts.add(hostKey);
       console.log(
         `[gosx-studio candidate] verified module=${graph.Path} Module.Replace.Dir=${identity.candidateRepo} candidateSHA=${identity.candidateSHA} sourceCopy=${sourceCopy.sourceRepo} host=${hostKey}`,
@@ -1179,6 +1182,15 @@ async function startGoServer(request: APIRequestContext, options: ServerOptions)
   if (candidateCopyHostKey && candidateCopyActive) {
     candidateSourceLease = retainCandidateSourceCopy(candidateCopyHostKey);
   }
+  let tlsProxy: Awaited<ReturnType<typeof startLoopbackTLSProxy>>;
+  try {
+    tlsProxy = await startLoopbackTLSProxy(options.baseURL, options.tempDir);
+    serverEnv.PUBLIC_SITE_URL = tlsProxy.baseURL;
+  } catch (error) {
+    if (candidateSourceLease) releaseCandidateSourceCopyLease(candidateSourceLease);
+    cleanupTempDir(options.tempDir);
+    throw error;
+  }
   let proc: ChildProcess;
   try {
     proc = spawn("go", goRunArgs, {
@@ -1188,6 +1200,7 @@ async function startGoServer(request: APIRequestContext, options: ServerOptions)
       detached: true,
     });
   } catch (error) {
+    await tlsProxy.stop();
     if (candidateSourceLease) releaseCandidateSourceCopyLease(candidateSourceLease);
     cleanupTempDir(options.tempDir);
     throw error;
@@ -1207,7 +1220,7 @@ async function startGoServer(request: APIRequestContext, options: ServerOptions)
   proc.stderr?.on("data", (chunk: Buffer) => logs.push(chunk.toString()));
 
   try {
-    await waitForServer(request, options.baseURL);
+    await waitForServer(request, tlsProxy.baseURL);
     if (publishedIdentity) {
       assertReleasedHostModuleGraph(options.cwd, publishedIdentity, serverEnv, "after reference-app go run");
       assertReleasedHostModuleSnapshot(options.cwd, moduleSnapshot!, "after reference-app go run");
@@ -1218,7 +1231,7 @@ async function startGoServer(request: APIRequestContext, options: ServerOptions)
         candidateIdentityForServer,
       );
     }
-    await warmEditor(request, options.baseURL);
+    await warmEditor(request, tlsProxy.baseURL);
   } catch (error) {
     let failure = String(error);
     if (publishedIdentity) {
@@ -1228,6 +1241,7 @@ async function startGoServer(request: APIRequestContext, options: ServerOptions)
         failure += `\n\n${String(snapshotError)}`;
       }
     }
+    await tlsProxy.stop();
     await stopProcess(proc);
     if (candidateSourceLease) releaseCandidateSourceCopyLease(candidateSourceLease);
     cleanupTempDir(options.tempDir);
@@ -1235,10 +1249,11 @@ async function startGoServer(request: APIRequestContext, options: ServerOptions)
   }
 
   return {
-    baseURL: options.baseURL,
+    baseURL: tlsProxy.baseURL,
     dataDir: options.tempDir,
     stop: async () => {
       try {
+        await tlsProxy.stop();
         await stopProcess(proc);
       } finally {
         try {

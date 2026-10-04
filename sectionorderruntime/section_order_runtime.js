@@ -909,6 +909,16 @@
         listen(root, "click", clickMove);
         listen(root, "click", clickHistory);
         listen(root, "keydown", keydown);
+        listen(root, "focusin", function (event) {
+          var control = event.target;
+          if (!control || !control.getBoundingClientRect || !root.contains(control)) return;
+          var lane = root.getBoundingClientRect();
+          var rect = control.getBoundingClientRect();
+          var top = lane.top + root.clientTop;
+          var bottom = top + root.clientHeight;
+          if (rect.top < top) root.scrollTop -= top - rect.top;
+          else if (rect.bottom > bottom) root.scrollTop += rect.bottom - bottom;
+        });
         listen(doc, "keydown", historyShortcut, true);
         listen(doc, "pointermove", handlePointerMove);
         listen(doc, "pointerup", finishPointer);

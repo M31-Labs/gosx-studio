@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { createServer } from "node:http";
+import { request as httpsRequest } from "node:https";
+import { tmpdir } from "node:os";
 import path from "node:path";
+import { startLoopbackTLSProxy } from "./reference_apps_tls";
 import referenceAppsConfig from "./playwright.reference-apps.config";
 import {
   REFERENCE_APP_FIXTURES,
@@ -44,6 +48,58 @@ function listedCases(output: string): ListedCase[] {
 }
 
 test.describe("reference-app browser matrix contract", () => {
+  test("loopback TLS preserves Secure cookies, origin rejection, and upgraded connections", async () => {
+    const tempDir = mkdtempSync(path.join(tmpdir(), "studio-tls-contract-"));
+    let directOrigin = "";
+    const backend = createServer((req, res) => {
+      if (req.method === "POST" && req.headers.origin !== directOrigin) {
+        res.writeHead(403).end();
+        return;
+      }
+      res.setHeader("Set-Cookie", "fixture=session; Secure; HttpOnly; SameSite=Lax; Path=/");
+      req.pipe(res);
+    });
+    backend.on("upgrade", (_req, socket, head) => {
+      socket.write("HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: fixture\r\n\r\n");
+      if (head.length) socket.write(head);
+      socket.pipe(socket);
+    });
+    await new Promise<void>((resolve) => backend.listen(0, "127.0.0.1", resolve));
+    let proxy: Awaited<ReturnType<typeof startLoopbackTLSProxy>> | undefined;
+    try {
+      const address = backend.address();
+      if (!address || typeof address === "string") throw new Error("fixture did not bind");
+      proxy = await startLoopbackTLSProxy(`http://127.0.0.1:${address.port}`, tempDir);
+      directOrigin = proxy.baseURL;
+      const post = (origin: string) => new Promise<{ status: number; cookies: string[]; body: string }>((resolve, reject) => {
+        const req = httpsRequest(proxy!.baseURL, { method: "POST", rejectUnauthorized: false, headers: { origin } }, (res) => {
+          let body = "";
+          res.on("data", (chunk) => body += chunk);
+          res.on("end", () => resolve({ status: res.statusCode!, cookies: res.headers["set-cookie"] ?? [], body }));
+        });
+        req.on("error", reject);
+        req.end("fixture body");
+      });
+      const sameOrigin = await post(proxy.baseURL);
+      expect(sameOrigin).toEqual({ status: 200, cookies: ["fixture=session; Secure; HttpOnly; SameSite=Lax; Path=/"], body: "fixture body" });
+      expect((await post("https://foreign.example")).status).toBe(403);
+      const echoed = await new Promise<string>((resolve, reject) => {
+        const req = httpsRequest(proxy!.baseURL, { rejectUnauthorized: false, headers: { connection: "Upgrade", upgrade: "fixture" } });
+        req.on("upgrade", (_res, socket) => {
+          socket.once("data", (chunk) => { resolve(chunk.toString()); socket.destroy(); });
+          socket.write("upgraded payload");
+        });
+        req.on("error", reject);
+        req.end();
+      });
+      expect(echoed).toBe("upgraded payload");
+    } finally {
+      await proxy?.stop();
+      await new Promise<void>((resolve) => backend.close(() => resolve()));
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test("keeps package selection and the canonical three-engine config aligned", () => {
     const packageJSON = JSON.parse(readFileSync(path.join(__dirname, "package.json"), "utf8")) as {
       scripts?: Record<string, string>;

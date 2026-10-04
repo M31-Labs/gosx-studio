@@ -12,6 +12,7 @@ import {
   CANDIDATE_SHA_ENV,
   createCandidateSourceCopy,
   loadCandidateIdentity,
+  prepareCandidateModuleDependencies,
   resolveCandidateModuleGraph,
   STUDIO_MODULE_PATH,
   type CandidateIdentity,
@@ -264,6 +265,39 @@ replace example.com/shared => ../shared-module
       firstCopy?.dispose();
       secondCopy?.dispose();
       rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test("prepares newer candidate dependencies for read-only builds without changing the host", () => {
+    const root = temporaryDirectory("dependency-upgrade");
+    const hostRepo = path.join(root, "host");
+    const candidateRepo = path.join(root, "candidate");
+    const sharedRepo = path.join(root, "shared");
+    for (const repo of [hostRepo, candidateRepo, sharedRepo]) mkdirSync(repo);
+    let copy: ReturnType<typeof createCandidateSourceCopy> | undefined;
+    try {
+      const hostGoMod = `module example.com/host\n\ngo 1.26\n\nrequire ${STUDIO_MODULE_PATH} v0.0.0\n\nreplace example.com/shared => ../shared\n`;
+      writeFileSync(path.join(hostRepo, "go.mod"), hostGoMod);
+      writeFileSync(path.join(hostRepo, "go.sum"), "");
+      writeFileSync(path.join(hostRepo, "main.go"), `package main\nimport studio "${STUDIO_MODULE_PATH}"\nfunc main() { studio.Use() }\n`);
+      writeFileSync(path.join(candidateRepo, "go.mod"), `module ${STUDIO_MODULE_PATH}\n\ngo 1.26\n\nrequire example.com/shared v0.1.0\n`);
+      writeFileSync(path.join(candidateRepo, "studio.go"), 'package studio\nimport "example.com/shared"\nfunc Use() { shared.Use() }\n');
+      writeFileSync(path.join(sharedRepo, "go.mod"), "module example.com/shared\n\ngo 1.26\n");
+      writeFileSync(path.join(sharedRepo, "shared.go"), "package shared\nfunc Use() {}\n");
+      copy = createCandidateSourceCopy(hostRepo, candidateIdentity(candidateRepo), { allowNonGitFixture: true });
+      const env = { ...withCandidateModuleEnvironment(process.env), GOPROXY: "off", GOSUMDB: "off" };
+      const scan = () => spawnSync("go", ["list", "-mod=readonly", "-deps", "./..."], { cwd: copy!.sourceRepo, env, encoding: "utf8" });
+      expect(scan().status).not.toBe(0);
+      prepareCandidateModuleDependencies(copy, env);
+      const prepared = scan();
+      expect(prepared.status, prepared.stderr).toBe(0);
+      expect(readFileSync(path.join(copy.sourceRepo, "go.mod"), "utf8")).toContain("example.com/shared v0.1.0");
+      expect(readFileSync(path.join(hostRepo, "go.mod"), "utf8")).toBe(hostGoMod);
+      expect(readFileSync(path.join(hostRepo, "go.sum"), "utf8")).toBe("");
+      expect(() => prepareCandidateModuleDependencies({ ...copy!, sourceRepo: hostRepo }, env)).toThrow(/helper-owned source copy/);
+    } finally {
+      copy?.dispose();
+      rmSync(root, { recursive: true, force: true });
     }
   });
 

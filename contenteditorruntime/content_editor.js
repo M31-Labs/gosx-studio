@@ -537,7 +537,7 @@
         event.dataTransfer.setData("text/plain", id);
       }
     });
-    state.list.addEventListener("dragover", function (event) {
+    function acceptNativeDrop(event) {
       if (String(state.searchQuery || "").trim()) {
         clearDropIndicators(state);
         return;
@@ -547,8 +547,11 @@
       var target = dropTarget(state, event);
       if (!target.valid) return;
       event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = state.dragging.type === "move" ? "move" : "copy";
       applyDropIndicator(state, target);
-    });
+    }
+    state.list.addEventListener("dragenter", acceptNativeDrop);
+    state.list.addEventListener("dragover", acceptNativeDrop);
     state.list.addEventListener("dragleave", function (event) {
       if (!state.list.contains(event.relatedTarget)) clearDropIndicators(state);
       if (state.dragging && state.dragging.type === "media" && !state.list.contains(event.relatedTarget)) state.dragging = null;
