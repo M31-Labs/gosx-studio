@@ -24,6 +24,7 @@ test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
     await expect(page.locator("[data-gosx-studio-save-detail]")).toHaveText("Landing page created.");
     await page.locator("input").fill("Changed title");
     await expect(page.locator("form")).toHaveAttribute("data-gosx-studio-save-state", "dirty");
+    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 150)));
     await expect(page.locator("[data-gosx-studio-save-detail]")).toHaveText("1 change waiting");
   });
 

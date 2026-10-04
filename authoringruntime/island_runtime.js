@@ -341,7 +341,9 @@
     message = String(message || "").trim();
     var blocked = roots().some(function (root) {
       var state = root.getAttribute && root.getAttribute(STATE_ATTR);
-      return state === "dirty" || state === "pending" || state === "error";
+      var saveState = root.getAttribute && root.getAttribute("data-gosx-studio-save-state");
+      return state === "dirty" || state === "pending" || state === "error" ||
+        saveState === "dirty" || saveState === "saving" || saveState === "autosaving" || saveState === "error";
     });
     if (blocked) return;
     if (message) {
