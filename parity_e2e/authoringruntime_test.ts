@@ -8,6 +8,33 @@ const runtimeJS = readFileSync(
 );
 
 test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
+  for (const hasLocalEdit of [false, true]) {
+    test(`acknowledges server fragment values while preserving local edits (${hasLocalEdit})`, async ({ page }) => {
+      await page.route("http://127.0.0.1:4173/editor", (route) => route.fulfill({
+        contentType: "text/html",
+        body: `<section id="contact"><input type="checkbox" name="contact" checked></section>`,
+      }));
+      await page.setContent(`<form data-gosx-studio-state="true" data-gosx-studio-workbench="true">
+        <input name="title" value="Home">
+        <section id="contact"><input type="checkbox" name="contact"></section>
+        <span data-gosx-studio-save-detail="true">Ready</span>
+      </form>`);
+      await page.addScriptTag({ content: readFileSync(path.join(__dirname, "../hostruntime/assets/state_runtime.js"), "utf8") });
+      await page.addScriptTag({ content: runtimeJS });
+      if (hasLocalEdit) await page.locator('[name="title"]').fill("Local draft");
+      await page.evaluate(async () => {
+        await (window as any).GoSXStudioAuthoringRuntime.handleResult({ ok: true, data: {
+          message: "Contact enabled.", fragmentURL: "http://127.0.0.1:4173/editor",
+          fragments: [{ selector: "#contact" }], changes: [],
+        } });
+      });
+      await expect(page.locator('[name="contact"]')).toBeChecked();
+      await expect(page.locator("form")).toHaveAttribute("data-gosx-studio-save-state", hasLocalEdit ? "dirty" : "saved");
+      await expect(page.locator('[name="title"]')).toHaveValue(hasLocalEdit ? "Local draft" : "Home");
+      await expect(page.locator("[data-gosx-studio-save-detail]")).toHaveText(hasLocalEdit ? "1 change waiting" : "Contact enabled.");
+    });
+  }
+
   test("keeps the authoring result through a clean state refresh and still reports new edits", async ({ page }) => {
     await page.setContent(`<form class="editor-workbench" data-gosx-studio-workbench="true" data-gosx-studio-state="true">
       <input name="title" value="Home" />
@@ -272,6 +299,8 @@ test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
 
   test("keeps targeted managed submits in-page and applies only the newest response", async ({ page }) => {
     let requestCount = 0;
+    let releaseFirstResponse!: () => void;
+    const firstResponseHeld = new Promise<void>((resolve) => { releaseFirstResponse = resolve; });
     const requests: { csrf?: string; postData: string }[] = [];
     await page.route("http://127.0.0.1:4173/editor-targeted-submit", async (route) => {
       await route.fulfill({
@@ -320,7 +349,9 @@ test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
         },
       });
       if (index === 1) {
-        await new Promise((resolve) => setTimeout(resolve, 150));
+        await firstResponseHeld;
+      } else {
+        releaseFirstResponse();
       }
       await route.fulfill({ contentType: "application/json", body });
     });
@@ -338,6 +369,7 @@ test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
     const popupPromise = page.waitForEvent("popup", { timeout: 600 }).then(() => "popup", () => "none");
 
     await page.getByRole("button", { name: "Save draft" }).click();
+    await expect.poll(() => requestCount).toBe(1);
     await page.getByRole("button", { name: "Save draft" }).click();
 
     const [details, popup] = await Promise.all([detailsPromise, popupPromise]);

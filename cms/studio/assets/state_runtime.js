@@ -560,6 +560,33 @@
       update("field");
     });
 
+    document.addEventListener("gosxstudio:fragments-applied", function (event) {
+      if (!formActive()) return;
+      var fragments = event.detail && event.detail.fragments || [];
+      if (!fragments.some(function (fragment) { return form.contains(fragment) || fragment.contains(form); })) return;
+      var values = Object.create(null);
+      saved.split("&").forEach(function (part) {
+        var name = part.split("=")[0];
+        if (!values[name]) values[name] = [];
+        values[name].push(part);
+      });
+      var positions = Object.create(null);
+      var parts = [];
+      Array.prototype.forEach.call(form.elements, function (field) {
+        if (skipField(field)) return;
+        var name = encodeURIComponent(field.name);
+        var refreshed = fragments.some(function (fragment) { return fragment.contains(field); });
+        fieldValues(field).forEach(function (value) {
+          var index = positions[name] || 0;
+          var previous = values[name] && values[name][index];
+          parts.push(refreshed || previous === undefined ? name + "=" + encodeURIComponent(value) : previous);
+          positions[name] = index + 1;
+        });
+      });
+      saved = parts.join("&");
+      updateFrame();
+    });
+
     function canUndo() {
       return historyIndex > 0;
     }

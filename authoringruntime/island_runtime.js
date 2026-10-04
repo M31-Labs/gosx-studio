@@ -528,15 +528,22 @@
     var focus = captureFocus();
     var changedControls = changedMutableControls(doc, meta.submittedControls);
     var count = 0;
+    var replaced = [];
     specs.forEach(function (spec) {
       var current = queryAll(spec.selector, doc);
       var fresh = queryAll(spec.selector, sourceDoc);
       var limit = Math.min(current.length, fresh.length);
       for (var index = 0; index < limit; index += 1) {
-        if (replaceFragment(current[index], fresh[index], spec.mode)) count += 1;
+        if (replaceFragment(current[index], fresh[index], spec.mode)) {
+          count += 1;
+          var applied = queryAll(spec.selector, doc)[index];
+          if (applied) replaced.push(applied);
+        }
       }
     });
     if (count > 0) {
+      // Acknowledge server values before restoring edits made during the request.
+      doc.dispatchEvent(new CustomEvent("gosxstudio:fragments-applied", { detail: { fragments: replaced } }));
       remountEditorRuntimes(doc);
       meta.preservedEditCount = restoreMutableControls(changedControls);
       restoreFocus(focus);
