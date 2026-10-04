@@ -15,8 +15,8 @@ import {
 } from "./reference_apps_released_identity";
 import { STUDIO_MODULE_PATH } from "./reference_apps_candidate_identity";
 
-const releasedVersion = "v0.6.2-0.20261004231402-c4a35a572594";
-const releasedOrigin = "c4a35a572594eee1c164f000df56702077507c86";
+const releasedVersion = "v0.6.2-0.20261004234110-0d730e75fc1a";
+const releasedOrigin = "0d730e75fc1af0d06299cd0f39419853cf154ede";
 
 function identity(): ReleasedIdentity {
   return { version: releasedVersion, origin: releasedOrigin };

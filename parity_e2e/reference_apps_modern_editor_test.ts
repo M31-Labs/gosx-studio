@@ -1011,10 +1011,9 @@ async function waitForPreviewRoute(page: Page, expectedPath: string) {
 }
 
 async function submitOrdinaryEditorSave(page: Page, _baseURL?: string) {
-  // The primary Save button is intentionally hidden while the whole editor
-  // form is clean. Make one real, disposable Advanced-mode edit first so the
-  // save below exercises the ordinary form POST rather than a hidden command
-  // palette option. The server is a fresh fixture for this test, so the probe
+  // Make a real, disposable Advanced-mode edit so Save exercises the
+  // ordinary form POST with dirty data. Scope the submit control below to
+  // avoid the hidden command palette option. The server is a fresh fixture, so the probe
   // value cannot touch customer or staging data.
   await revealModeIfPresent(page, "advanced");
   const probeField = page.locator("[data-studio-checkout-panel='true'] input[type='text']").first();
