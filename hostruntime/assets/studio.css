@@ -5289,16 +5289,6 @@ html[data-gosx-studio-preview-selectable] [data-gosx-studio-preview-tab-stop]:fo
   gap: 0.55rem;
 }
 
-/* #5/#12/#13 — one save indicator: the primary Save button is a real <form>
-   submit control (works with no JS), but once gosxstudio:state_runtime.js
-   binds it flips data-gosx-studio-save-button-state on every state change
-   (see hostruntime/assets/state_runtime.js setState()). Hide it once that
-   runtime confirms nothing is dirty so the top bar never shows a static
-   "Saved" indicator sitting next to an always-on "Save changes" button. */
-[data-gosx-studio-save-button][data-gosx-studio-save-button-state="saved"] {
-  display: none;
-}
-
 /* #15 — LOOK scope-card values ("SYSTEM muddy-no…", "DEFAU…") clipped with no
    min-width/overflow handling. Give each cell room to breathe and truncate
    politely instead of hard-wrapping/clipping mid-word; the title attribute
