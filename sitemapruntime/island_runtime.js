@@ -850,6 +850,12 @@
   }
 
   function setState(root, patch) {
+    // Selection metadata can trigger host mutation bindings. Keep the editor's
+    // viewport in place so the next canvas gesture uses the same coordinates.
+    var preserveViewport = patch && (Object.prototype.hasOwnProperty.call(patch, "selectedNode") || Object.prototype.hasOwnProperty.call(patch, "selectedNodes"));
+    var scrollX = window.scrollX;
+    var scrollY = window.scrollY;
+    var pageURL = window.location.href;
     var next = state(root);
     Object.keys(patch || {}).forEach(function (key) {
       next[key] = patch[key];
@@ -857,6 +863,17 @@
     writeState(root, next);
     next = sync(root);
     root.dispatchEvent(new CustomEvent("gosxstudio:site-map-change", { bubbles: true, detail: next }));
+    if (preserveViewport) {
+      // Register after mutation delivery, behind any host frame work it queues.
+      queueMicrotask(function () {
+        window.requestAnimationFrame(function () {
+          if (!document.contains(root) || window.location.href !== pageURL) return;
+          if (window.scrollX !== scrollX || window.scrollY !== scrollY) {
+            window.scrollTo({ left: scrollX, top: scrollY, behavior: "instant" });
+          }
+        });
+      });
+    }
     return next;
   }
 
