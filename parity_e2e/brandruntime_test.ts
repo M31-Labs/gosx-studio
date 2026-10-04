@@ -424,7 +424,7 @@ test.describe("GoSXStudioBrandRuntime parity", () => {
 // identically in baseline and candidate modes and doesn't affect what this
 // test is actually asserting (brandruntime.bindLogo parity).
 async function activateBrandInspectorPanel(page: Page): Promise<void> {
-  const brandTab = page.locator('[data-studio-mode-control="brand"]').first();
+  const brandTab = page.locator('[data-studio-mode-control="look"], [data-studio-mode-control="brand"]').first();
   if ((await brandTab.count()) === 0) return;
   await brandTab.click();
   // Wait for the panel to actually become visible before returning; the

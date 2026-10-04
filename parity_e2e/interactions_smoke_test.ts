@@ -113,6 +113,7 @@ test.describe("@smoke GoSXStudio no-code interactions", () => {
     const baseline = await hoverTarget.evaluate((el) => getComputedStyle(el).transform);
 
     await hoverTarget.hover();
+    await hoverTarget.evaluate(async (el) => { await Promise.all(el.getAnimations().map((animation) => animation.finished)); });
     const hoveredTransform = await hoverTarget.evaluate((el) => getComputedStyle(el).transform);
     expect(hoveredTransform).not.toBe(baseline);
     await page.mouse.move(0, 0);
@@ -126,6 +127,7 @@ test.describe("@smoke GoSXStudio no-code interactions", () => {
     await page.keyboard.press("Tab");
     const focusedTag = await page.evaluate(() => document.activeElement?.id ?? "");
     expect(focusedTag).toBe("hover-target");
+    await hoverTarget.evaluate(async (el) => { await Promise.all(el.getAnimations().map((animation) => animation.finished)); });
     const focusedTransform = await hoverTarget.evaluate((el) => getComputedStyle(el).transform);
     expect(focusedTransform).toBe(hoveredTransform);
   });
@@ -138,6 +140,7 @@ test.describe("@smoke GoSXStudio no-code interactions", () => {
     const hoverTarget = page.locator("#hover-target");
     const baseline = await hoverTarget.evaluate((el) => getComputedStyle(el).transform);
     await hoverTarget.hover();
+    await hoverTarget.evaluate(async (el) => { await Promise.all(el.getAnimations().map((animation) => animation.finished)); });
     const hoveredTransform = await hoverTarget.evaluate((el) => getComputedStyle(el).transform);
     expect(hoveredTransform).toBe(baseline);
   });
