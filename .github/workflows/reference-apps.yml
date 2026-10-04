@@ -82,9 +82,10 @@ jobs:
             pajaritos-forest-school/go.sum
 
       - name: Install gosx CLI
-        working-directory: gosx
+        working-directory: gosx-studio
         run: |
-          go install ./cmd/gosx
+          gosx_cli_version="$(go list -m -f '{{.Version}}' m31labs.dev/gosx)"
+          go install "m31labs.dev/gosx/cmd/gosx@${gosx_cli_version}"
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Setup Node
@@ -239,9 +240,10 @@ jobs:
             pajaritos-forest-school/go.sum
 
       - name: Install gosx CLI
-        working-directory: gosx
+        working-directory: gosx-studio
         run: |
-          go install ./cmd/gosx
+          gosx_cli_version="$(go list -m -f '{{.Version}}' m31labs.dev/gosx)"
+          go install "m31labs.dev/gosx/cmd/gosx@${gosx_cli_version}"
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Setup Node
