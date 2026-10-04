@@ -1104,7 +1104,33 @@
     update("init");
   }
 
+  function populateEditorSessionForms(root) {
+    var scope = root && root.querySelectorAll ? root : document;
+    var pages = Array.prototype.slice.call(scope.querySelectorAll("[data-gosx-studio-backend-editor-renderer][data-gosx-studio-csrf-token]"));
+    if (scope.matches && scope.matches("[data-gosx-studio-backend-editor-renderer][data-gosx-studio-csrf-token]")) pages.unshift(scope);
+    pages.forEach(function (page) {
+      var token = String(page.getAttribute("data-gosx-studio-csrf-token") || "").trim();
+      if (!token) return;
+      Array.prototype.forEach.call(page.querySelectorAll("form"), function (form) {
+        if (String(form.getAttribute("method") || "get").toUpperCase() === "GET") return;
+        if (!sameOriginURL(form.getAttribute("action") || window.location.href)) return;
+        var field = Array.prototype.find.call(form.elements, function (element) {
+          return element.name === "csrf_token" && !element.disabled;
+        });
+        if (field && String(field.value || "").trim()) return;
+        if (!field) {
+          field = document.createElement("input");
+          field.type = "hidden";
+          field.name = "csrf_token";
+          form.appendChild(field);
+        }
+        field.value = token;
+      });
+    });
+  }
+
   function initAll(root) {
+    populateEditorSessionForms(root);
     var scope = root && root.querySelectorAll ? root : document;
     Array.prototype.forEach.call(scope.querySelectorAll("[data-gosx-studio-state]"), initForm);
   }

@@ -1,11 +1,54 @@
 package shell
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
 	"m31labs.dev/gosx"
+	"m31labs.dev/gosx/route"
+	"m31labs.dev/gosx/session"
 )
+
+func TestBackendEditorEstablishesSessionForProtectedMutations(t *testing.T) {
+	manager := session.MustNew("editor-session-test-secret", session.Options{})
+	handler := manager.Middleware(manager.Protect(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		_, _ = w.Write([]byte(gosx.RenderHTML(RenderBackendEditorPage(BackendEditorPageProps{
+			EngineRuntime: &route.RouteContext{Request: r},
+		}))))
+	})))
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "http://example.test/admin/editor", nil))
+	match := regexp.MustCompile(`data-gosx-studio-csrf-token="([^"]+)"`).FindStringSubmatch(response.Body.String())
+	if len(match) != 2 || len(response.Result().Cookies()) != 1 {
+		t.Fatalf("editor must issue its session and CSRF token: %s", response.Body.String())
+	}
+	if got := response.Header().Get("Cache-Control"); got != "private, no-store" {
+		t.Fatalf("editor session response cache policy = %q", got)
+	}
+	for _, token := range []string{match[1], "wrong-token"} {
+		request := httptest.NewRequest(http.MethodPost, "http://example.test/admin/editor", strings.NewReader(url.Values{"csrf_token": {token}}.Encode()))
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		request.Header.Set("Origin", "http://example.test")
+		request.AddCookie(response.Result().Cookies()[0])
+		result := httptest.NewRecorder()
+		handler.ServeHTTP(result, request)
+		want := http.StatusNoContent
+		if token != match[1] {
+			want = http.StatusForbidden
+		}
+		if result.Code != want {
+			t.Fatalf("protected editor mutation status = %d, want %d", result.Code, want)
+		}
+	}
+}
 
 func TestRenderBackendEditorPagePreservesEditorShellContract(t *testing.T) {
 	html := gosx.RenderHTML(RenderBackendEditorPage(BackendEditorPageProps{

@@ -1,10 +1,14 @@
 package shell
 
 import (
+	"net/http"
+
 	"m31labs.dev/gosx"
 	"m31labs.dev/gosx-studio/canvas"
 	"m31labs.dev/gosx-studio/panels"
 	"m31labs.dev/gosx-studio/sitemap"
+	"m31labs.dev/gosx/route"
+	"m31labs.dev/gosx/session"
 )
 
 type BackendEditorPageProps struct {
@@ -30,6 +34,10 @@ type BackendEditorPageProps struct {
 	EngineRuntime                canvas.StudioEngineRuntime
 	EngineHostsNode              gosx.Node
 	Scripts                      BackendEditorScripts
+
+	// Request enables a session for the editor's protected forms. File routes
+	// may omit it when EngineRuntime is their RouteContext.
+	Request *http.Request
 }
 
 type BackendEditorMediaAsset struct {
@@ -64,10 +72,33 @@ func RenderBackendEditorPage(props BackendEditorPageProps) gosx.Node {
 		gosx.Fragment(backendEditorSupportNodes(props)...),
 		RenderBackendEditorRuntimeScripts(props.Scripts),
 	}
-	return gosx.El("div", gosx.Attrs(
+	attrs := gosx.Attrs(
 		gosx.Attr("class", className),
 		gosx.Attr("data-gosx-studio-backend-editor-renderer", "gosx-studio"),
-	), gosx.Fragment(children...))
+	)
+	if token := backendEditorSessionToken(props); token != "" {
+		attrs = append(attrs, gosx.Attr("data-gosx-studio-csrf-token", token))
+	}
+	return gosx.El("div", attrs, gosx.Fragment(children...))
+}
+
+func backendEditorSessionToken(props BackendEditorPageProps) string {
+	request := props.Request
+	if request == nil {
+		if ctx, ok := props.EngineRuntime.(*route.RouteContext); ok && ctx != nil {
+			request = ctx.Request
+		}
+	}
+	if request == nil || session.Current(request) == nil {
+		return ""
+	}
+	// GoSX leaves anonymous reads stateless. Opening an editor that owns
+	// protected mutations explicitly starts its session before emitting forms.
+	if token := session.Token(request); token != "" {
+		return token
+	}
+	session.Current(request).Set("gosx_studio_editor", true)
+	return session.Token(request)
 }
 
 func backendEditorSupportNodes(props BackendEditorPageProps) []gosx.Node {

@@ -51,6 +51,44 @@ function nextActionResult(page: Page) {
 }
 
 test.describe("@smoke modern state runtime history shortcuts and save feedback", () => {
+  test("server editor session populates only its same-origin mutation forms", async ({ page }) => {
+    const markup = editorHTML().replace('<input type="hidden" name="csrf_token" value="state-csrf-a" />', "");
+    await page.route("http://127.0.0.1:4173/editor**", (route) => route.fulfill({
+      contentType: "text/html",
+      body: `<div data-gosx-studio-backend-editor-renderer="gosx-studio" data-gosx-studio-csrf-token="server-editor-token">
+        ${markup}
+        <form id="preview-get" method="get" action="/preview"></form>
+        <form id="foreign-post" method="post" action="https://foreign.example/save"></form>
+      </div><form id="outside-post" method="post" action="/outside"></form>`,
+    }));
+    await page.goto("http://127.0.0.1:4173/editor");
+    await page.addScriptTag({ content: runtimeJS });
+    await expect(page.locator("#editor-a input[name='csrf_token']")).toHaveValue("server-editor-token");
+    await expect(page.locator("#editor-b input[name='csrf_token']")).toHaveValue("state-csrf-b");
+    for (const id of ["preview-get", "foreign-post", "outside-post"]) {
+      await expect(page.locator(`#${id} input[name='csrf_token']`)).toHaveCount(0);
+    }
+    await page.evaluate(() => {
+      window.fetch = async (_url: RequestInfo | URL, init?: RequestInit) => {
+        const body = init?.body as FormData;
+        (window as unknown as { __editorSessionRequest: unknown }).__editorSessionRequest = {
+          token: body.get("csrf_token"),
+          header: new Headers(init?.headers).get("X-CSRF-Token"),
+        };
+        return new Response(JSON.stringify({ ok: true, message: "Saved." }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      };
+    });
+    await page.getByLabel("Title A").fill("First editor save");
+    const result = nextActionResult(page);
+    await page.locator("#editor-a [data-gosx-studio-save-button]").click();
+    await expect(result).resolves.toMatchObject({ ok: true });
+    expect(await page.evaluate(() => (window as unknown as { __editorSessionRequest: unknown }).__editorSessionRequest)).toEqual({
+      token: "server-editor-token", header: "server-editor-token",
+    });
+  });
+
   test("native input undo is not canceled by editor history shortcuts", async ({ page }) => {
     await mount(page);
     await page.evaluate(() => {
