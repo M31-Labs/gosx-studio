@@ -153,7 +153,7 @@ async function snapshotSelected(page: Page): Promise<string[]> {
     return Array.prototype.slice.call(document.querySelectorAll(sel))
       .filter((r) => r.classList.contains("is-selected"))
       .map((r) => r.getAttribute("data-block-studio-block") || "");
-  }, BLOCK_ROW_SELECTOR);
+  }, "[data-block-studio-block]");
 }
 
 async function callRuntime(page: Page, method: string, args: unknown[]): Promise<unknown> {
