@@ -124,23 +124,43 @@
 
   function savedFields(form) {
     var fields = [];
-    Array.prototype.forEach.call(form.elements, function (field) {
-      if (skipField(field)) return;
+    // Keep structural anchors as well as values. An empty fragment must retain
+    // its saved position even if unrelated fields are moved or detached later.
+    var controls = Array.prototype.slice.call(form.elements);
+    var controlSet = new Set(controls);
+    var nodes = Array.prototype.slice.call(form.querySelectorAll("*"));
+    var hasExternal = false;
+    controls.forEach(function (field) {
+      if (!form.contains(field)) {
+        nodes.push(field);
+        hasExternal = true;
+      }
+    });
+    if (hasExternal) {
+      nodes.sort(function (left, right) {
+        return left.compareDocumentPosition(right) & 4 ? -1 : 1;
+      });
+    }
+    nodes.forEach(function (field) {
       var ancestors = [];
       for (var node = field; node; node = node.parentElement) ancestors.push(node);
       fields.push({
         field: field,
         ancestors: ancestors,
-        parts: fieldValues(field).map(function (value) {
+        parts: controlSet.has(field) && !skipField(field) ? fieldValues(field).map(function (value) {
           return encodeURIComponent(field.name) + "=" + encodeURIComponent(value);
-        })
+        }) : []
       });
     });
     return fields;
   }
 
   function savedFieldsSignature(fields) {
-    return fields.reduce(function (parts, entry) { return parts.concat(entry.parts); }, []).join("&");
+    var parts = [];
+    fields.forEach(function (entry) {
+      Array.prototype.push.apply(parts, entry.parts);
+    });
+    return parts.join("&");
   }
 
   function refreshSavedFields(fields, form, fragments, previousFragments) {
@@ -158,7 +178,7 @@
       });
       var fresh = savedFields(form).filter(function (entry) { return fragment.contains(entry.field); });
       if (insertion < 0) {
-        // A previously empty fragment has no saved field to anchor its position.
+        // A newly introduced fragment has no anchor in the saved structure.
         insertion = kept.findIndex(function (entry) {
           var position = fragment.compareDocumentPosition(entry.field);
           return !(position & 1) && !!(position & 4);
