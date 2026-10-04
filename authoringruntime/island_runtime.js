@@ -529,6 +529,7 @@
     var changedControls = changedMutableControls(doc, meta.submittedControls);
     var count = 0;
     var replaced = [];
+    var previous = [];
     specs.forEach(function (spec) {
       var current = queryAll(spec.selector, doc);
       var fresh = queryAll(spec.selector, sourceDoc);
@@ -537,13 +538,16 @@
         if (replaceFragment(current[index], fresh[index], spec.mode)) {
           count += 1;
           var applied = queryAll(spec.selector, doc)[index];
-          if (applied) replaced.push(applied);
+          if (applied) {
+            replaced.push(applied);
+            previous.push(current[index]);
+          }
         }
       }
     });
     if (count > 0) {
       // Acknowledge server values before restoring edits made during the request.
-      doc.dispatchEvent(new CustomEvent("gosxstudio:fragments-applied", { detail: { fragments: replaced } }));
+      doc.dispatchEvent(new CustomEvent("gosxstudio:fragments-applied", { detail: { fragments: replaced, previousFragments: previous } }));
       remountEditorRuntimes(doc);
       meta.preservedEditCount = restoreMutableControls(changedControls);
       restoreFocus(focus);

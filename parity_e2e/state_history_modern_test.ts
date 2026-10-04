@@ -6,6 +6,9 @@ const runtimeJS = readFileSync(
   path.resolve(__dirname, "../hostruntime/assets/state_runtime.js"),
   "utf8",
 );
+const authoringRuntimeJS = readFileSync(
+  path.resolve(__dirname, "../authoringruntime/island_runtime.js"), "utf8",
+);
 
 function editorHTML(): string {
   return `
@@ -51,6 +54,179 @@ function nextActionResult(page: Page) {
 }
 
 test.describe("@smoke modern state runtime history shortcuts and save feedback", () => {
+  for (const mode of ["replace", "inner"]) {
+    for (const edit of ["addition", "removal", "multi-select", "empty multi-select", "reorder"]) {
+      test(`fragment refresh preserves unrelated ${edit} (${mode})`, async ({ page }) => {
+        await page.route("http://127.0.0.1:4173/editor", (route) => route.fulfill({
+          contentType: "text/html",
+          body: `<form data-gosx-studio-state="true" data-gosx-studio-workbench="true">
+            <section id="unrelated"><input name="shared" value="Local baseline">
+              <input name="removed" value="Keep me">
+              <select name="tags" multiple><option value="a" selected>A</option><option value="b">B</option></select>
+              <select name="empty" multiple><option value="b">B</option></select>
+            </section>
+            <section id="contact"><input name="shared" value="Old contact"><input name="server-removed" value="Old field"><input type="checkbox" name="contact"></section>
+            <span data-gosx-studio-save-detail="true">Ready</span>
+          </form><a href="/leave">Leave editor</a>`,
+        }));
+        await page.route("http://127.0.0.1:4173/fragment", (route) => route.fulfill({
+          contentType: "text/html",
+          body: `<section id="contact"><input name="shared" value="Server contact"><input type="checkbox" name="contact" checked><input name="server-added" value="Saved addition"></section>`,
+        }));
+        await page.goto("http://127.0.0.1:4173/editor");
+        await page.addScriptTag({ content: runtimeJS });
+        await page.addScriptTag({ content: authoringRuntimeJS });
+        await page.evaluate((edit) => {
+          const section = document.querySelector("#unrelated")!;
+          (window as any).__originalFields = [...section.children];
+          if (edit === "addition") section.insertAdjacentHTML("afterbegin", '<input name="new-field" value="Unsaved addition">');
+          if (edit === "removal") section.querySelector('[name="removed"]')!.remove();
+          if (edit === "multi-select") (section.querySelector('[name="tags"]') as HTMLSelectElement).options[1].selected = true;
+          if (edit === "empty multi-select") (section.querySelector('[name="empty"]') as HTMLSelectElement).options[0].selected = true;
+          if (edit === "reorder") section.appendChild(section.firstElementChild!);
+          section.dispatchEvent(new Event("change", { bubbles: true }));
+        }, edit);
+        await expect(page.locator("form")).toHaveAttribute("data-gosx-studio-save-state", "dirty");
+        await page.evaluate(async (mode) => {
+          await (window as any).GoSXStudioAuthoringRuntime.handleResult({ ok: true, data: {
+            message: "Contact saved.", fragmentURL: "/fragment",
+            fragments: [{ selector: "#contact", mode }], changes: [],
+          } });
+        }, mode);
+        await expect(page.locator('#contact [name="contact"]')).toBeChecked();
+        await expect(page.locator('#contact [name="shared"]')).toHaveValue("Server contact");
+        await expect(page.locator('[name="server-removed"]')).toHaveCount(0);
+        await expect(page.locator("form")).toHaveAttribute("data-gosx-studio-save-state", "dirty");
+        expect(await page.evaluate(() => {
+          const event = new Event("beforeunload", { cancelable: true });
+          window.dispatchEvent(event);
+          return event.defaultPrevented;
+        })).toBe(true);
+        await page.evaluate(() => {
+          (window as any).__discardPrompts = 0;
+          window.confirm = () => { (window as any).__discardPrompts++; return false; };
+        });
+        await page.getByRole("link", { name: "Leave editor" }).click();
+        expect(await page.evaluate(() => (window as any).__discardPrompts)).toBe(1);
+        await expect(page).toHaveURL("http://127.0.0.1:4173/editor");
+        await page.evaluate(() => {
+          const section = document.querySelector("#unrelated")!;
+          section.replaceChildren(...(window as any).__originalFields);
+          (section.querySelector('[name="tags"]') as HTMLSelectElement).options[1].selected = false;
+          (section.querySelector('[name="empty"]') as HTMLSelectElement).options[0].selected = false;
+          section.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+        await expect(page.locator("form")).toHaveAttribute("data-gosx-studio-save-state", "saved");
+      });
+    }
+  }
+
+  test("client save acknowledges refreshed fields while preserving edits made in flight", async ({ page }) => {
+    await page.route("http://127.0.0.1:4173/editor", (route) => route.fulfill({
+      contentType: "text/html",
+      body: `<form action="/save" method="post" data-gosx-studio-state="true" data-gosx-studio-client="true">
+        <input name="csrf_token" value="own-form-token" type="hidden">
+        <input name="title" value="Original">
+        <section id="contact"><input type="checkbox" name="contact"></section>
+        <button>Save</button>
+      </form>`,
+    }));
+    await page.route("http://127.0.0.1:4173/fragment", (route) => route.fulfill({
+      contentType: "text/html", body: '<section id="contact"><input type="checkbox" name="contact" checked></section>',
+    }));
+    await page.goto("http://127.0.0.1:4173/editor");
+    await page.addScriptTag({ content: runtimeJS });
+    await page.addScriptTag({ content: authoringRuntimeJS });
+    await page.evaluate(() => {
+      const originalFetch = window.fetch;
+      window.fetch = async (url, init) => {
+        if (init?.method !== "POST") return originalFetch(url, init);
+        await new Promise<void>((resolve) => { (window as any).__releaseSave = resolve; });
+        return new Response(JSON.stringify({ ok: true, data: {
+          fragmentURL: "/fragment", fragments: [{ selector: "#contact" }], changes: [],
+        } }), { headers: { "Content-Type": "application/json" } });
+      };
+    });
+    await page.locator('[name="title"]').fill("Submitted");
+    const result = nextActionResult(page);
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.locator("form")).toHaveAttribute("data-gosx-studio-save-state", "saving");
+    await page.locator('[name="title"]').fill("New local draft");
+    await page.evaluate(() => {
+      document.querySelector("form")!.insertAdjacentHTML("afterbegin", '<input name="new-field" value="New local field">');
+      (window as any).__releaseSave();
+    });
+    await expect(result).resolves.toMatchObject({ ok: true });
+    await expect(page.locator('[name="contact"]')).toBeChecked();
+    await expect(page.locator('[name="title"]')).toHaveValue("New local draft");
+    await expect(page.locator("form")).toHaveAttribute("data-gosx-studio-save-state", "dirty");
+    expect(await page.evaluate(() => {
+      const event = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    })).toBe(true);
+    await page.locator('[name="title"]').fill("Submitted");
+    await page.locator('[name="new-field"]').evaluate((field) => {
+      const form = field.closest("form")!;
+      field.remove();
+      form.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await expect(page.locator("form")).toHaveAttribute("data-gosx-studio-save-state", "saved");
+  });
+
+  for (const client of [false, true]) {
+    for (const override of ["local GET", "foreign GET", "foreign POST", ...(client ? [] : ["base-relative POST", "invalid GET"])]) {
+      test(`session token stays private for ${client ? "client" : "native"} ${override} submitter`, async ({ page }) => {
+        const target = override.startsWith("foreign") || override === "base-relative POST" ? "https://foreign.example/collect" : "http://127.0.0.1:4173/collect";
+        const method = override.endsWith("GET") ? "get" : "post";
+        await page.route("http://127.0.0.1:4173/editor", (route) => route.fulfill({
+          contentType: "text/html",
+          body: `${override === "base-relative POST" ? '<base href="https://foreign.example/">' : ""}
+          <main data-gosx-studio-backend-editor-renderer="gosx-studio" data-gosx-studio-csrf-token="private-session-token">
+            <form method="post" action="http://127.0.0.1:4173/save" target="result" data-gosx-studio-state="true" data-gosx-studio-client="${client}">
+              <input name="title" value="Draft">
+              <input name="action" value="edit" type="hidden">
+              <button id="override" formmethod="${override === "invalid GET" ? "put" : method}" formaction="${override === "base-relative POST" ? "/collect" : target}">Override</button>
+              <button id="save">Save</button>
+            </form><iframe name="result"></iframe></main>`,
+        }));
+        await page.goto("http://127.0.0.1:4173/editor");
+        await page.addScriptTag({ content: runtimeJS });
+        await expect(page.locator('[name="csrf_token"]')).toHaveValue("private-session-token");
+        if (client) {
+          await page.evaluate(() => {
+            (window as any).__requests = [];
+            window.fetch = async (url, init) => {
+              (window as any).__requests.push({ url: String(url), body: init?.body ? [...(init.body as FormData)] : [], headers: [...new Headers(init?.headers)] });
+              return new Response('{"ok":true}', { headers: { "Content-Type": "application/json" } });
+            };
+          });
+          const result = nextActionResult(page);
+          await page.locator("#override").click();
+          await expect(result).resolves.toMatchObject({ ok: method === "get" });
+          const requests = await page.evaluate(() => (window as any).__requests);
+          expect(requests).toHaveLength(method === "get" ? 1 : 0);
+          expect(JSON.stringify(requests)).not.toMatch(/csrf_token|private-session-token|x-csrf-token/i);
+          const saved = nextActionResult(page);
+          await page.locator("#save").click();
+          await expect(saved).resolves.toMatchObject({ ok: true });
+          expect(await page.evaluate(() => (window as any).__requests.at(-1).body)).toContainEqual(["csrf_token", "private-session-token"]);
+        } else {
+          await page.route(`${target}**`, (route) => route.fulfill({ contentType: "text/html", body: "Submitted" }));
+          const submitted = page.waitForRequest((request) => request.url().startsWith(target));
+          await page.locator("#override").click();
+          const request = await submitted;
+          expect(request.method()).toBe(method.toUpperCase());
+          expect(request.url() + (request.postData() || "")).not.toMatch(/csrf_token|private-session-token/);
+          await page.route("http://127.0.0.1:4173/save", (route) => route.fulfill({ contentType: "text/html", body: "Saved" }));
+          const saved = page.waitForRequest("http://127.0.0.1:4173/save");
+          await page.locator("#save").click();
+          expect((await saved).postData()).toContain("csrf_token=private-session-token");
+        }
+      });
+    }
+  }
+
   test("server editor session populates only its same-origin mutation forms", async ({ page }) => {
     const markup = editorHTML().replace('<input type="hidden" name="csrf_token" value="state-csrf-a" />', "");
     await page.route("http://127.0.0.1:4173/editor**", (route) => route.fulfill({
