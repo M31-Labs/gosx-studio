@@ -357,6 +357,7 @@ test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
       await route.fulfill({
         contentType: "text/html",
         body: `
+          <meta name="csrf-token" content="live-session-token" />
           <main class="editor-workbench" data-gosx-studio-workbench="true">
             <section data-gosx-studio-preview="true" data-gosx-studio-preview-url="http://127.0.0.1:4173/preview?gosx-preview=1">
               <iframe title="preview" src="http://127.0.0.1:4173/preview?gosx-preview=1"></iframe>
@@ -386,6 +387,7 @@ test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
     await expect(page.locator("#filter-preview")).toHaveAttribute("data-gosx-form-state", "idle");
     await expect(page.locator("iframe")).toHaveAttribute("src", /section=gallery/);
     await expect(page.locator("iframe")).toHaveAttribute("src", /gosx-studio-refresh=/);
+    await expect(page.locator("iframe")).not.toHaveAttribute("src", /csrf_token|live-session-token/);
     expect(await popupPromise).toBe("none");
   });
 

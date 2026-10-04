@@ -999,7 +999,7 @@
     var formData = serializeForm(form, submitter);
     var previous = submitBaselineState(form);
     var submittedControls = captureMutableControls(form);
-    var csrfToken = formCSRFToken(formData);
+    var csrfToken = method === "POST" ? formCSRFToken(formData) : "";
     var sourcePanel = sourcePanelForSubmitter(submitter);
     var sequence = nextSubmitSequence(form);
 
