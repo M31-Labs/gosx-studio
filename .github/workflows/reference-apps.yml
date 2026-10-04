@@ -364,8 +364,10 @@ jobs:
           cache-dependency-path: muddy-noni-commerce/go.sum
 
       - name: Install released GoSX CLI
+        working-directory: muddy-noni-commerce
         run: |
-          go install m31labs.dev/gosx/cmd/gosx@v0.53.8
+          gosx_cli_version="$(go list -m -f '{{.Version}}' m31labs.dev/gosx)"
+          go install "m31labs.dev/gosx/cmd/gosx@${gosx_cli_version}"
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Setup Node

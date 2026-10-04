@@ -1,5 +1,5 @@
 {
-  "_comment": "Host repo refs the reference-app editor e2e suite runs against. Branches under review pin their matching host branches; flip both back to main in the same PR that lands after the host PRs merge.",
-  "muddy": "codex/noni-pagecanvas-release",
-  "pajaritos": "codex/pajaritos-pagecanvas-release"
+  "_comment": "Immutable reference-app commit SHAs. Review branch heads are allowed; advance pins explicitly when fixes change.",
+  "muddy": "f8a28b9fac651dfdb4142b46febb24f6d03b7b0d",
+  "pajaritos": "d4ea22eaa07f1ebafa281561d43ad65a6da8415d"
 }
