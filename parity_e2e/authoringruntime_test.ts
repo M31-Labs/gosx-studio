@@ -8,6 +8,95 @@ const runtimeJS = readFileSync(
 );
 
 test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
+  for (const hasLocalEdit of [false, true]) {
+    test(`acknowledges server fragment values while preserving local edits (${hasLocalEdit})`, async ({ page }) => {
+      await page.route("http://127.0.0.1:4173/editor", (route) => route.fulfill({
+        contentType: "text/html",
+        body: `<section id="contact"><input type="checkbox" name="contact" checked></section>`,
+      }));
+      await page.setContent(`<form data-gosx-studio-state="true" data-gosx-studio-workbench="true">
+        <input name="title" value="Home">
+        <section id="contact"><input type="checkbox" name="contact"></section>
+        <span data-gosx-studio-save-detail="true">Ready</span>
+      </form>`);
+      await page.addScriptTag({ content: readFileSync(path.join(__dirname, "../hostruntime/assets/state_runtime.js"), "utf8") });
+      await page.addScriptTag({ content: runtimeJS });
+      if (hasLocalEdit) await page.locator('[name="title"]').fill("Local draft");
+      await page.evaluate(async () => {
+        await (window as any).GoSXStudioAuthoringRuntime.handleResult({ ok: true, data: {
+          message: "Contact enabled.", fragmentURL: "http://127.0.0.1:4173/editor",
+          fragments: [{ selector: "#contact" }], changes: [],
+        } });
+      });
+      await expect(page.locator('[name="contact"]')).toBeChecked();
+      await expect(page.locator("form")).toHaveAttribute("data-gosx-studio-save-state", hasLocalEdit ? "dirty" : "saved");
+      await expect(page.locator('[name="title"]')).toHaveValue(hasLocalEdit ? "Local draft" : "Home");
+      await expect(page.locator("[data-gosx-studio-save-detail]")).toHaveText(hasLocalEdit ? "1 change waiting" : "Contact enabled.");
+    });
+  }
+
+  test("keeps the authoring result through a clean state refresh and still reports new edits", async ({ page }) => {
+    await page.setContent(`<form class="editor-workbench" data-gosx-studio-workbench="true" data-gosx-studio-state="true">
+      <input name="title" value="Home" />
+      <span data-gosx-studio-save-detail="true">Ready</span>
+    </form>`);
+    await page.addScriptTag({ content: readFileSync(path.join(__dirname, "../hostruntime/assets/state_runtime.js"), "utf8") });
+    await page.addScriptTag({ content: runtimeJS });
+    await page.evaluate(() => {
+      (window as any).GoSXStudioAuthoringRuntime.handleResult({ ok: true, data: { message: "Landing page created.", changes: [] } });
+      document.querySelector("input")!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await expect(page.locator("form")).toHaveAttribute("data-gosx-studio-save-state", "saved");
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await expect(page.locator("[data-gosx-studio-save-detail]")).toHaveText("Landing page created.");
+    await page.locator("input").fill("Changed title");
+    await expect(page.locator("form")).toHaveAttribute("data-gosx-studio-save-state", "dirty");
+    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 150)));
+    await expect(page.locator("[data-gosx-studio-save-detail]")).toHaveText("1 change waiting");
+  });
+
+  test("uses the live session token for an embedded form and preserves an explicit form token", async ({ page }) => {
+    let expectedToken = "live-session-token";
+    await page.route("http://127.0.0.1:4173/editor", (route) => route.fulfill({
+      contentType: "text/html",
+      body: `<main data-gosx-studio-workbench="true">
+          <span data-gosx-studio-save-detail="true">Unsaved</span>
+          <form action="/authoring" method="post" data-gosx-studio-authoring-managed="true">
+            <input name="value" value="draft"><button>Save</button>
+          </form>
+        </main>
+        <form action="/signout"><input type="hidden" name="csrf_token" value="live-session-token"></form>`,
+    }));
+    await page.route("http://127.0.0.1:4173/authoring", async (route) => {
+      expect(route.request().headers()["x-csrf-token"]).toBe(expectedToken);
+      expect(route.request().postData()).toContain(expectedToken);
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, message: "Saved draft.", data: { message: "Saved draft." } }) });
+    });
+    await page.goto("http://127.0.0.1:4173/editor");
+    await page.addScriptTag({ content: runtimeJS });
+    const submit = async () => {
+      const response = page.waitForResponse("http://127.0.0.1:4173/authoring");
+      await page.getByRole("button", { name: "Save", exact: true }).click();
+      expect((await response).status()).toBe(200);
+      await expect(page.locator("[data-gosx-studio-save-detail]")).toHaveText("Saved draft.");
+      await expect(page.locator("[data-gosx-studio-authoring-managed]")).toHaveAttribute("data-gosx-form-state", "idle");
+    };
+    await submit();
+    await page.locator("[data-gosx-studio-authoring-managed]").evaluate((form) => {
+      const field = document.createElement("input");
+      field.type = "hidden";
+      field.name = "csrf_token";
+      form.appendChild(field);
+    });
+    await submit();
+    expectedToken = "explicit-form-token";
+    await page.locator("[data-gosx-studio-authoring-managed]").evaluate((form) => {
+      const field = form.querySelector<HTMLInputElement>('input[name="csrf_token"]')!;
+      field.value = "explicit-form-token";
+    });
+    await submit();
+  });
+
   test("selects changed component, refreshes preview, and emits result detail", async ({ page }) => {
     await page.setContent(`
       <main class="editor-workbench" data-gosx-studio-workbench="true">
@@ -210,6 +299,8 @@ test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
 
   test("keeps targeted managed submits in-page and applies only the newest response", async ({ page }) => {
     let requestCount = 0;
+    let releaseFirstResponse!: () => void;
+    const firstResponseHeld = new Promise<void>((resolve) => { releaseFirstResponse = resolve; });
     const requests: { csrf?: string; postData: string }[] = [];
     await page.route("http://127.0.0.1:4173/editor-targeted-submit", async (route) => {
       await route.fulfill({
@@ -258,7 +349,9 @@ test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
         },
       });
       if (index === 1) {
-        await new Promise((resolve) => setTimeout(resolve, 150));
+        await firstResponseHeld;
+      } else {
+        releaseFirstResponse();
       }
       await route.fulfill({ contentType: "application/json", body });
     });
@@ -276,6 +369,7 @@ test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
     const popupPromise = page.waitForEvent("popup", { timeout: 600 }).then(() => "popup", () => "none");
 
     await page.getByRole("button", { name: "Save draft" }).click();
+    await expect.poll(() => requestCount).toBe(1);
     await page.getByRole("button", { name: "Save draft" }).click();
 
     const [details, popup] = await Promise.all([detailsPromise, popupPromise]);
@@ -295,6 +389,7 @@ test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
       await route.fulfill({
         contentType: "text/html",
         body: `
+          <meta name="csrf-token" content="live-session-token" />
           <main class="editor-workbench" data-gosx-studio-workbench="true">
             <section data-gosx-studio-preview="true" data-gosx-studio-preview-url="http://127.0.0.1:4173/preview?gosx-preview=1">
               <iframe title="preview" src="http://127.0.0.1:4173/preview?gosx-preview=1"></iframe>
@@ -308,6 +403,7 @@ test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
               data-gosx-form-state="idle"
             >
               <input name="section" value="gallery" />
+              <input type="hidden" name="csrf_token" value="live-session-token" />
               <button type="submit" formmethod="get" formtarget="_blank">Preview filter</button>
             </form>
           </main>
@@ -324,6 +420,7 @@ test.describe("@smoke GoSXStudioAuthoringRuntime feedback", () => {
     await expect(page.locator("#filter-preview")).toHaveAttribute("data-gosx-form-state", "idle");
     await expect(page.locator("iframe")).toHaveAttribute("src", /section=gallery/);
     await expect(page.locator("iframe")).toHaveAttribute("src", /gosx-studio-refresh=/);
+    await expect(page.locator("iframe")).not.toHaveAttribute("src", /csrf_token|live-session-token/);
     expect(await popupPromise).toBe("none");
   });
 

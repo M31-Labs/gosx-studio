@@ -652,6 +652,7 @@ test.describe("@smoke shared content editor touch/pointer reorder", () => {
     await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
     await page.mouse.down();
     await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + 4, { steps: 12 });
+    await expect(targetRow).toHaveAttribute("data-content-editor-drop-before", "true");
     await page.mouse.up();
 
     expect(await sourceValue(page)).not.toBe(before);

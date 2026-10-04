@@ -797,7 +797,8 @@
     if (!form || (side !== "left" && side !== "right")) return;
     var bounds = railBounds(handle, side);
     var next = clampNumber(Math.round(width), bounds.min, bounds.max);
-    form.style.setProperty(railWidthProperty(side), next + "px");
+    var property = railWidthProperty(side);
+    form.style.setProperty(property, next + "px", form.style.getPropertyPriority(property));
     if (handle) handle.setAttribute("aria-valuenow", String(next));
     emitWorkbenchRailWidth(form, side, next, !!committed);
   }

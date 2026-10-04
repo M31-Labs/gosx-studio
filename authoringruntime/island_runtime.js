@@ -337,11 +337,13 @@
     return frames.length;
   }
 
-  function writeSaveFeedback(message) {
+  function writeSaveFeedback(message, guardSaveState) {
     message = String(message || "").trim();
     var blocked = roots().some(function (root) {
       var state = root.getAttribute && root.getAttribute(STATE_ATTR);
-      return state === "dirty" || state === "pending" || state === "error";
+      var saveState = root.getAttribute && root.getAttribute("data-gosx-studio-save-state");
+      return state === "dirty" || state === "pending" || state === "error" ||
+        guardSaveState && (saveState === "dirty" || saveState === "saving" || saveState === "autosaving" || saveState === "error");
     });
     if (blocked) return;
     if (message) {
@@ -526,15 +528,26 @@
     var focus = captureFocus();
     var changedControls = changedMutableControls(doc, meta.submittedControls);
     var count = 0;
+    var replaced = [];
+    var previous = [];
     specs.forEach(function (spec) {
       var current = queryAll(spec.selector, doc);
       var fresh = queryAll(spec.selector, sourceDoc);
       var limit = Math.min(current.length, fresh.length);
       for (var index = 0; index < limit; index += 1) {
-        if (replaceFragment(current[index], fresh[index], spec.mode)) count += 1;
+        if (replaceFragment(current[index], fresh[index], spec.mode)) {
+          count += 1;
+          var applied = queryAll(spec.selector, doc)[index];
+          if (applied) {
+            replaced.push(applied);
+            previous.push(current[index]);
+          }
+        }
       }
     });
     if (count > 0) {
+      // Acknowledge server values before restoring edits made during the request.
+      doc.dispatchEvent(new CustomEvent("gosxstudio:fragments-applied", { detail: { fragments: replaced, previousFragments: previous } }));
       remountEditorRuntimes(doc);
       meta.preservedEditCount = restoreMutableControls(changedControls);
       restoreFocus(focus);
@@ -601,8 +614,8 @@
     });
     writeSaveFeedback(message);
     if (typeof window.setTimeout === "function") {
-      window.setTimeout(function () { writeSaveFeedback(message); }, 0);
-      window.setTimeout(function () { writeSaveFeedback(message); }, 100);
+      window.setTimeout(function () { writeSaveFeedback(message, true); }, 0);
+      window.setTimeout(function () { writeSaveFeedback(message, true); }, 100);
     }
   }
 
@@ -785,6 +798,16 @@
   function formCSRFToken(formData) {
     if (!formData || typeof formData.get !== "function") return "";
     var token = formData.get("csrf_token");
+    if (token == null || String(token) === "") {
+      // A host can create its session after constructing an embedded panel.
+      // Use the current document's server-issued token for that first submit.
+      var meta = doc.querySelector('meta[name="csrf-token"]');
+      var field = queryAll('input[type="hidden"][name="csrf_token"]:not(:disabled)').filter(function (input) {
+        return !!input.value;
+      })[0];
+      token = meta && meta.content || field && field.value || "";
+      if (token && typeof formData.set === "function") formData.set("csrf_token", token);
+    }
     return token == null ? "" : String(token);
   }
 
@@ -985,9 +1008,11 @@
       return;
     }
     var formData = serializeForm(form, submitter);
+    // Preview GET overrides must not expose POST credentials in their URL.
+    if (method === "GET") formData.delete("csrf_token");
     var previous = submitBaselineState(form);
     var submittedControls = captureMutableControls(form);
-    var csrfToken = formCSRFToken(formData);
+    var csrfToken = method === "POST" ? formCSRFToken(formData) : "";
     var sourcePanel = sourcePanelForSubmitter(submitter);
     var sequence = nextSubmitSequence(form);
 

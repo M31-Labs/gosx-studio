@@ -343,6 +343,21 @@ export function withCandidateModuleEnvironment(baseEnv: NodeJS.ProcessEnv): Node
   };
 }
 
+/** Hydrate only the helper-owned copy before GoSX's read-only package scan. */
+export function prepareCandidateModuleDependencies(
+  sourceCopy: CandidateSourceCopy,
+  baseEnv: NodeJS.ProcessEnv = process.env,
+): void {
+  if (path.resolve(sourceCopy.sourceRepo) === path.resolve(sourceCopy.hostRepo)) {
+    throw new Error("candidate dependency preparation requires a helper-owned source copy");
+  }
+  execFileSync("go", ["list", "-mod=mod", "-deps", "./..."], {
+    cwd: sourceCopy.sourceRepo,
+    env: withCandidateModuleEnvironment(baseEnv),
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+}
+
 /** Resolve the module graph in the exact source directory passed to Go. */
 export function resolveCandidateModuleGraph(
   sourceRepo: string,

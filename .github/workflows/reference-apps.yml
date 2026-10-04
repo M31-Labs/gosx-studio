@@ -82,9 +82,10 @@ jobs:
             pajaritos-forest-school/go.sum
 
       - name: Install gosx CLI
-        working-directory: gosx
+        working-directory: gosx-studio
         run: |
-          go install ./cmd/gosx
+          gosx_cli_version="$(go list -m -f '{{.Version}}' m31labs.dev/gosx)"
+          go install "m31labs.dev/gosx/cmd/gosx@${gosx_cli_version}"
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Setup Node
@@ -115,6 +116,10 @@ jobs:
       - name: Test reference-app browser and published-case contracts
         working-directory: gosx-studio/parity_e2e
         run: npm run test:reference-browser-contract
+
+      - name: Test embedded authoring session and save feedback
+        working-directory: gosx-studio/parity_e2e
+        run: npm test -- authoringruntime_test.ts
 
       - name: Run shared-runtime browser matrix
         working-directory: gosx-studio/parity_e2e
@@ -235,9 +240,10 @@ jobs:
             pajaritos-forest-school/go.sum
 
       - name: Install gosx CLI
-        working-directory: gosx
+        working-directory: gosx-studio
         run: |
-          go install ./cmd/gosx
+          gosx_cli_version="$(go list -m -f '{{.Version}}' m31labs.dev/gosx)"
+          go install "m31labs.dev/gosx/cmd/gosx@${gosx_cli_version}"
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Setup Node

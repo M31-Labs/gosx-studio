@@ -8,6 +8,7 @@
     autosaving: "Autosaving",
     error: "Save failed"
   };
+  var formDataRequests = new WeakMap();
 
   function ready(fn) {
     if (document.readyState === "loading") {
@@ -119,6 +120,55 @@
       });
     });
     return parts.join("&");
+  }
+
+  function savedFields(form) {
+    var fields = [];
+    Array.prototype.forEach.call(form.elements, function (field) {
+      if (skipField(field)) return;
+      var ancestors = [];
+      for (var node = field; node; node = node.parentElement) ancestors.push(node);
+      fields.push({
+        field: field,
+        ancestors: ancestors,
+        parts: fieldValues(field).map(function (value) {
+          return encodeURIComponent(field.name) + "=" + encodeURIComponent(value);
+        })
+      });
+    });
+    return fields;
+  }
+
+  function savedFieldsSignature(fields) {
+    return fields.reduce(function (parts, entry) { return parts.concat(entry.parts); }, []).join("&");
+  }
+
+  function refreshSavedFields(fields, form, fragments, previousFragments) {
+    fragments.forEach(function (fragment, index) {
+      // An outer refresh already includes the final values of nested fragments.
+      if (fragments.some(function (other, otherIndex) {
+        return otherIndex !== index && (other === fragment ? otherIndex < index : other.contains(fragment));
+      })) return;
+      var previous = previousFragments[index] || fragment;
+      var insertion = -1;
+      var kept = fields.filter(function (entry, entryIndex) {
+        if (entry.ancestors.indexOf(previous) < 0) return true;
+        if (insertion < 0) insertion = entryIndex;
+        return false;
+      });
+      var fresh = savedFields(form).filter(function (entry) { return fragment.contains(entry.field); });
+      if (insertion < 0) {
+        // A previously empty fragment has no saved field to anchor its position.
+        insertion = kept.findIndex(function (entry) {
+          var position = fragment.compareDocumentPosition(entry.field);
+          return !(position & 1) && !!(position & 4);
+        });
+        if (insertion < 0) insertion = kept.length;
+      }
+      kept.splice.apply(kept, [insertion, 0].concat(fresh));
+      fields = kept;
+    });
+    return fields;
   }
 
   function dirtyCount(savedSignature, currentSignature) {
@@ -247,6 +297,10 @@
 
   function setState(form, state, reason, options) {
     options = options || {};
+    if (state === "saved" && !options.message && !options.actionLabel &&
+        form.getAttribute("data-gosx-studio-authoring-state") === "saved") {
+      options.message = form.getAttribute("data-gosx-studio-authoring-message") || "";
+    }
     var dirty = state === "dirty" || state === "autosaving" || state === "error";
     var count = options.dirtyCount || 0;
     form.setAttribute("data-gosx-studio-save-state", state);
@@ -316,16 +370,23 @@
     };
   }
 
-  function actionFormData(form, submitter) {
+  function actionFormData(form, submitter, method, action) {
+    var previous = formDataRequests.get(form);
+    formDataRequests.set(form, { method: method, action: action });
     try {
-      if (submitter) return new FormData(form, submitter);
-    } catch (error) {
-      // Older browsers ignore the submitter argument; append it below.
+      try {
+        if (submitter) return new FormData(form, submitter);
+      } catch (error) {
+        // Older browsers ignore the submitter argument; append it below.
+      }
+      var data = new FormData(form);
+      var field = submitterField(submitter);
+      if (field) data.append(field.name, field.value);
+      return data;
+    } finally {
+      if (previous) formDataRequests.set(form, previous);
+      else formDataRequests.delete(form);
     }
-    var data = new FormData(form);
-    var field = submitterField(submitter);
-    if (field) data.append(field.name, field.value);
-    return data;
   }
 
   function submitActionURL(form, submitter, pendingAction) {
@@ -353,6 +414,7 @@
 
   function actionURLWithData(action, data) {
     var url = new URL(action, window.location.href);
+    data.delete("csrf_token");
     data.forEach(function (value, key) {
       url.searchParams.append(key, value);
     });
@@ -490,7 +552,9 @@
   function initForm(form) {
     if (!form || !form.elements || form.dataset.gosxStudioStateBound === "true") return;
     form.dataset.gosxStudioStateBound = "true";
-    var saved = formSignature(form);
+    var baseline = savedFields(form);
+    var saved = savedFieldsSignature(baseline);
+    var pendingBaseline = null;
     var submitting = false;
     var nativeNavigationPending = false;
     var autosaving = false;
@@ -554,6 +618,17 @@
 
     var updateFrame = frameTask(function () {
       update("field");
+    });
+
+    document.addEventListener("gosxstudio:fragments-applied", function (event) {
+      if (!formActive()) return;
+      var fragments = event.detail && event.detail.fragments || [];
+      if (!fragments.some(function (fragment) { return form.contains(fragment) || fragment.contains(form); })) return;
+      var previous = event.detail && event.detail.previousFragments || [];
+      baseline = refreshSavedFields(baseline, form, fragments, previous);
+      saved = savedFieldsSignature(baseline);
+      if (pendingBaseline) pendingBaseline.fields = refreshSavedFields(pendingBaseline.fields, form, fragments, previous);
+      updateFrame();
     });
 
     function canUndo() {
@@ -668,12 +743,12 @@
 
     function runAutosave() {
       if (!formActive() || !autosaveEnabled(form) || submitting || autosaving || !isDirty()) return;
-      var signature = formSignature(form);
+      var submittedBaseline = { fields: savedFields(form) };
       var method = autosaveMethod(form);
       var target = autosaveURL(form);
       var data;
       try {
-        data = new FormData(form);
+        data = actionFormData(form, null, method, target);
       } catch (error) {
         autosaving = false;
         actionErrorSignature = formSignature(form);
@@ -711,6 +786,7 @@
         }
       }
       autosaving = true;
+      pendingBaseline = submittedBaseline;
       actionErrorSignature = "";
       setState(form, "autosaving", "autosave", stateOptions());
       var request = {
@@ -733,7 +809,9 @@
         if ((response && (response.status === 401 || response.status === 403)) || responseLooksUnauthenticated(response)) return Promise.reject(new Error("Autosave redirected to sign-in"));
         if (!structuredActionSuccess(response, result)) return Promise.reject(new Error(actionFailureMessage(result, "Autosave failed; no structured success response")));
         if (redirectLooksUnauthenticated(result && result.redirect)) return Promise.reject(new Error("Autosave redirected to sign-in"));
-        saved = signature;
+        baseline = submittedBaseline.fields;
+        saved = savedFieldsSignature(baseline);
+        if (pendingBaseline === submittedBaseline) pendingBaseline = null;
         actionErrorSignature = "";
         lastSavedAt = new Date().toISOString();
         form.setAttribute("data-gosx-studio-last-saved-at", lastSavedAt);
@@ -745,6 +823,7 @@
         }
         setState(form, "saved", "autosave", stateOptions({ dirtyCount: 0 }));
       }).catch(function () {
+        if (pendingBaseline === submittedBaseline) pendingBaseline = null;
         if (!formActive()) {
           autosaving = false;
           return;
@@ -816,7 +895,7 @@
       var action = submitActionURL(form, submitter, pendingAction);
       var method = submitMethod(form, submitter);
       var label = actionLabel(submitter, pendingLabel);
-      var data = actionFormData(form, submitter);
+      var data = actionFormData(form, submitter, method, action);
       var requestURL = action;
       var requestHeaders = {
         "Accept": "application/json",
@@ -886,7 +965,8 @@
         headers: requestHeaders
       };
       if (methodHasBody(method)) request.body = data;
-      var signature = formSignature(form);
+      var submittedBaseline = { fields: savedFields(form) };
+      pendingBaseline = submittedBaseline;
       submitting = true;
       actionErrorSignature = "";
       window.clearTimeout(autosaveTimer);
@@ -919,7 +999,9 @@
             submitting = false;
             return;
           }
-          saved = signature;
+          baseline = submittedBaseline.fields;
+          saved = savedFieldsSignature(baseline);
+          if (pendingBaseline === submittedBaseline) pendingBaseline = null;
           actionErrorSignature = "";
           lastSavedAt = new Date().toISOString();
           form.setAttribute("data-gosx-studio-last-saved-at", lastSavedAt);
@@ -944,6 +1026,7 @@
           });
         });
       }).catch(function (error) {
+        if (pendingBaseline === submittedBaseline) pendingBaseline = null;
         if (!formActive()) {
           submitting = false;
           return;
@@ -1073,7 +1156,71 @@
     update("init");
   }
 
+  function bindEditorSessionCSRF(form) {
+    if (form.dataset.gosxStudioCsrfBound === "true") return;
+    form.dataset.gosxStudioCsrfBound = "true";
+    var submission = null;
+    form.addEventListener("submit", function (event) {
+      var current = { submitter: event.submitter || null };
+      submission = current;
+      // Canceled submissions may never construct FormData. Do not carry their
+      // overrides into later autosaves or programmatic native submissions.
+      window.setTimeout(function () {
+        if (submission === current) submission = null;
+      }, 0);
+    }, true);
+    form.addEventListener("formdata", function (event) {
+      var submitter = submission && submission.submitter;
+      var request = formDataRequests.get(form);
+      var method = request ? request.method : submitter && submitter.hasAttribute("formmethod")
+        ? submitter.getAttribute("formmethod") : form.getAttribute("method");
+      // Native forms treat missing or invalid method values as GET. Client
+      // actions and autosaves supply the method used by their actual request.
+      method = String(method || "get").toUpperCase();
+      var action = request ? request.action : submitter && submitter.hasAttribute("formaction")
+        ? submitter.getAttribute("formaction") : form.getAttribute("action");
+      var target = "";
+      try {
+        // Native relative targets honor <base>; client requests resolve against
+        // the current URL, just as their fetch guards do.
+        target = request ? sameOriginURL(action) : sameOriginURL(action ? new URL(action, document.baseURI).href : window.location.href);
+      } catch (error) {
+        // Invalid native targets cannot receive a session credential.
+      }
+      if (!(request ? methodHasBody(method) : method === "POST") || !target) {
+        event.formData.delete("csrf_token");
+      }
+    });
+  }
+
+  function populateEditorSessionForms(root) {
+    var scope = root && root.querySelectorAll ? root : document;
+    var pages = Array.prototype.slice.call(scope.querySelectorAll("[data-gosx-studio-backend-editor-renderer][data-gosx-studio-csrf-token]"));
+    if (scope.matches && scope.matches("[data-gosx-studio-backend-editor-renderer][data-gosx-studio-csrf-token]")) pages.unshift(scope);
+    pages.forEach(function (page) {
+      var token = String(page.getAttribute("data-gosx-studio-csrf-token") || "").trim();
+      if (!token) return;
+      Array.prototype.forEach.call(page.querySelectorAll("form"), function (form) {
+        bindEditorSessionCSRF(form);
+        if (String(form.getAttribute("method") || "get").toUpperCase() === "GET") return;
+        if (!sameOriginURL(form.getAttribute("action") || window.location.href)) return;
+        var field = Array.prototype.find.call(form.elements, function (element) {
+          return element.name === "csrf_token" && !element.disabled;
+        });
+        if (field && String(field.value || "").trim()) return;
+        if (!field) {
+          field = document.createElement("input");
+          field.type = "hidden";
+          field.name = "csrf_token";
+          form.appendChild(field);
+        }
+        field.value = token;
+      });
+    });
+  }
+
   function initAll(root) {
+    populateEditorSessionForms(root);
     var scope = root && root.querySelectorAll ? root : document;
     Array.prototype.forEach.call(scope.querySelectorAll("[data-gosx-studio-state]"), initForm);
   }

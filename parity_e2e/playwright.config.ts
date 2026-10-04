@@ -35,6 +35,8 @@ export default defineConfig({
 
   use: {
     baseURL,
+    // Reference hosts use ephemeral, self-signed loopback TLS certificates.
+    ignoreHTTPSErrors: process.env.GOSX_STUDIO_REFERENCE_APP_E2E === "1",
     actionTimeout: 10_000,
     navigationTimeout: 30_000,
     trace: "retain-on-failure",

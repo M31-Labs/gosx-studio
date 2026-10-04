@@ -557,6 +557,10 @@ button.button {
   padding: var(--space-xs);
 }
 
+.editor-panel[hidden] {
+  display: none !important;
+}
+
 .studio-panel-heading h2,
 .studio-panel-heading p,
 .editor-panel h2,
@@ -1158,6 +1162,11 @@ button.button {
     color var(--duration-fast) var(--ease-out),
     opacity var(--duration-fast) var(--ease-out),
     box-shadow var(--duration-fast) var(--ease-out);
+}
+
+/* Native radios own focus; their labels keep the same outline on hover. */
+.studio-advanced-panel__group {
+  outline: 0;
 }
 
 .studio-home-inspector__group:hover,
@@ -2653,6 +2662,10 @@ button.button {
   .admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] .admin-form[data-content-editor-enhanced-submit],
   .admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] .content-editor,
   .admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] .content-editor,
+  .admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] .content-block,
+  .admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] .content-block,
+  .admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] .content-block__field,
+  .admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] .content-block__field,
   .admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] .content-block-list,
   .admin-page[data-gosx-studio-backend-blog-detail-renderer="gosx-studio"] .content-block-list,
   .admin-page[data-gosx-studio-backend-page-detail-renderer="gosx-studio"] [data-content-editor-list],
