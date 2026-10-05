@@ -3,12 +3,12 @@
   "mode": "published-no-overlay",
   "studio": {
     "module": "m31labs.dev/gosx-studio",
-    "version": "v0.6.2-0.20261004234110-0d730e75fc1a",
-    "origin": "0d730e75fc1af0d06299cd0f39419853cf154ede"
+    "version": "v0.6.2-0.20261005004735-6efd4fa36022",
+    "origin": "6efd4fa3602299e5336d1ea8e099e62328bc7a1b"
   },
   "host": {
     "repository": "odvcencio/muddy-noni-commerce",
-    "ref": "8a796283d2d6b58c7ab85bf7ff949d4d234fa253",
-    "sha": "8a796283d2d6b58c7ab85bf7ff949d4d234fa253"
+    "ref": "c64a5687ae70195b1c8b49828d97db6051b096a2",
+    "sha": "c64a5687ae70195b1c8b49828d97db6051b096a2"
   }
 }
