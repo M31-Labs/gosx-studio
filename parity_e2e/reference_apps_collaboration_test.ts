@@ -31,8 +31,12 @@ test.describe("Muddy Noni authenticated collaboration", () => {
       }))));
       expect(scopes).toEqual([{ route: "/", viewport: "desktop" }, { route: "/", viewport: "desktop" }]);
 
-      const remoteSelection = pageB.evaluate(() => new Promise<any>((resolve) => document.addEventListener("gosxstudio:remote-selection", (event) => resolve((event as CustomEvent).detail), { once: true })));
+      // Await listener registration before the other context can send.
+      await pageB.evaluate(() => {
+        (window as any).__studioRemoteSelection = new Promise<any>((resolve) => document.addEventListener("gosxstudio:remote-selection", (event) => resolve((event as CustomEvent).detail), { once: true }));
+      });
       await pageA.evaluate(() => document.dispatchEvent(new CustomEvent("gosxstudio:preview-select", { detail: { field: "hero.headline", componentKey: "home:hero" } })));
+      const remoteSelection = pageB.evaluate(() => (window as any).__studioRemoteSelection);
       await expect.poll(async () => (await remoteSelection).selection?.field).toBe("hero.headline");
       expect((await remoteSelection).selection).toMatchObject({ route: "/", pageId: "page:home", blockKey: "home:hero", viewport: "desktop" });
       await expect(panelB.locator("[data-studio-collab-live]")).toContainText("selected hero.headline");
@@ -44,7 +48,9 @@ test.describe("Muddy Noni authenticated collaboration", () => {
       await expect(pageB.locator("[data-studio-remote-cursor]")).toHaveCount(1);
 
       const before = JSON.parse(readFileSync(dataPath, "utf8"));
-      const acceptedOnB = pageB.evaluate(() => new Promise<any>((resolve) => document.addEventListener("gosxstudio:collaboration-operation-accepted", (event) => resolve((event as CustomEvent).detail), { once: true })));
+      await pageB.evaluate(() => {
+        (window as any).__studioAcceptedOperation = new Promise<any>((resolve) => document.addEventListener("gosxstudio:collaboration-operation-accepted", (event) => resolve((event as CustomEvent).detail), { once: true }));
+      });
       const ack = await pageA.evaluate(async () => {
         const runtime = (window as any).GoSXStudioCollaborationRuntime;
         const operation = { schemaVersion: 1, id: "browser-author-a", kind: "set-field", target: { route: "/", pageId: "home", field: "hero.headline", breakpoint: "base", state: "default" }, value: "Browser collaboration wins", expectedDocumentRevision: 0, expectedTargetHead: "" };
@@ -52,6 +58,7 @@ test.describe("Muddy Noni authenticated collaboration", () => {
         return runtime.submit(operation);
       });
       expect(ack.sequence).toBe(1);
+      const acceptedOnB = pageB.evaluate(() => (window as any).__studioAcceptedOperation);
       expect((await acceptedOnB).record.id).toBe("browser-author-a");
 
       const stale = await pageB.evaluate(async () => {

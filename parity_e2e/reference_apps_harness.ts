@@ -262,6 +262,9 @@ export async function revealModeIfPresent(page: Page, mode: string | undefined) 
     const runtime = (window as unknown as { GoSXStudioWorkbenchRuntime?: { setMode?: (form: Element | null, mode: string, scroll: boolean) => void } }).GoSXStudioWorkbenchRuntime;
     runtime?.setMode?.(form, mode, false);
   }, mode).catch(() => null);
+  // The runtime already activates this mode without scrolling. A second click
+  // starts smooth scrolling after callers have measured canvas coordinates.
+  if (await page.locator("[data-studio-workbench]").first().getAttribute("data-studio-mode") === mode) return;
   const button = page.locator(`[data-studio-mode-control="${mode}"]`).first();
   if (await button.count() === 0) return;
   if (!await button.isVisible()) return;
