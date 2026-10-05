@@ -55,7 +55,8 @@ import { bootBaseline, bootCandidate, disposeBoot } from "./harness";
 // route's stable structure — see muddy-noni-commerce/app/admin/editor/page.gsx
 // + app/admin/editor/page.server.go:1402 (editorHomeLayerRowAttrs) which
 // emits data-block-studio-block on every row.
-const BLOCK_ROW_SELECTOR = "[data-block-studio-block]";
+// Home layer controls share block metadata; renumbering targets list rows.
+const BLOCK_ROW_SELECTOR = "article[data-block-studio-block]";
 
 interface CandidateFlagSnapshot {
   flagAttrPresent: boolean;
@@ -152,7 +153,7 @@ async function snapshotSelected(page: Page): Promise<string[]> {
     return Array.prototype.slice.call(document.querySelectorAll(sel))
       .filter((r) => r.classList.contains("is-selected"))
       .map((r) => r.getAttribute("data-block-studio-block") || "");
-  }, BLOCK_ROW_SELECTOR);
+  }, "[data-block-studio-block]");
 }
 
 async function callRuntime(page: Page, method: string, args: unknown[]): Promise<unknown> {

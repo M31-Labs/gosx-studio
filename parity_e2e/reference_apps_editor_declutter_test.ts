@@ -108,13 +108,9 @@ test.describe("@reference-apps Muddy/Noni editor declutter", () => {
       // to prove the working-state PERSISTENCE contract this slice adds.
       await form.evaluate((node) => node.setAttribute("data-studio-selection", "home:hero"));
 
-      // Make a real edit so the shared form is genuinely dirty. #12/#13 (UX
-      // wave 2A) made the primary Save button visible only while dirty (see
-      // hostruntime/assets/studio.css [data-gosx-studio-save-button-state]
-      // and state_runtime.js setState()) instead of a static always-on
-      // button — a synthetic data-studio-selection attribute alone (above)
-      // does not dirty the form, so type into a real, visible Advanced-mode
-      // field first, exactly like an operator would before saving.
+      // Make a real edit so Save proves edited values persist. Setting the
+      // selection attribute alone does not dirty the form, so type into a
+      // visible Advanced-mode field before saving.
       const checkoutField = checkoutPanel.locator("input[type='text']").first();
       await expect(checkoutField).toBeVisible();
       await checkoutField.fill("Shop the collection");
