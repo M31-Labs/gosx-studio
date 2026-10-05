@@ -251,6 +251,8 @@ func renderAdvancedPanelGroupInput(group map[string]any) gosx.Node {
 		gosx.Attr("id", core.WorkbenchViewString(group, "inputID")),
 		gosx.Attr("type", "radio"),
 		gosx.Attr("name", "studioAdvancedGroup"),
+		// This radio changes the visible group, not saved editor content.
+		gosx.Attr("data-gosx-studio-state-ignore", "true"),
 		gosx.Attr("value", core.WorkbenchViewString(group, "key")),
 		gosx.Attr("checked", core.WorkbenchViewBool(group, "selected")),
 		gosx.Attr("aria-label", core.WorkbenchViewString(group, "label")),
