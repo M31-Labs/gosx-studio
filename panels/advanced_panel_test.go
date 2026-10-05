@@ -22,7 +22,7 @@ func TestRenderAdvancedPanelFull(t *testing.T) {
 	for _, fragment := range []string{
 		`<section class="editor-panel editor-panel--advanced-studio studio-advanced-panel" data-studio-advanced-panel="true" data-studio-mode-panel="advanced" data-studio-panel="advanced" data-studio-engine-source="gosx" data-studio-advanced-group-active="flows" data-gosx-studio-advanced-panel-renderer="gosx-studio">`,
 		`<header class="studio-advanced-panel__head"><div><p class="kicker">Advanced</p><h2>Tool drawer</h2><p>Keep tools grouped.</p></div></header>`,
-		`<input class="studio-advanced-panel__group-input" id="studioAdvancedGroupFlows" type="radio" name="studioAdvancedGroup" value="flows" checked aria-label="Flows" />`,
+		`<input class="studio-advanced-panel__group-input" id="studioAdvancedGroupFlows" type="radio" name="studioAdvancedGroup" data-gosx-studio-state-ignore="true" value="flows" checked aria-label="Flows" />`,
 		`<label class="studio-advanced-panel__group" for="studioAdvancedGroupTypography" data-studio-advanced-group-label="typography"><strong>Fonts</strong><small>Fonts and custom CSS.</small></label>`,
 		`<label class="studio-advanced-panel__group" for="studioAdvancedGroupSettings" data-studio-advanced-group-label="settings"><strong>SEO</strong><small>SEO, domains, and integrations.</small></label>`,
 		`<section class="studio-advanced-panel__group-slot" data-studio-advanced-group-slot="flows" data-studio-advanced-group-selected="true">`,
